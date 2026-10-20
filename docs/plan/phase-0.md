@@ -26,16 +26,16 @@ Versions are "current stable major" as of Oct 2026. Exact patch versions are pin
 
 | Area | Choice | Why |
 |---|---|---|
-| Runtime | Node 24 LTS in Docker/CI, `engines >= 22` locally | Active LTS. The dev machine has 22.23. |
+| Runtime | Node 24 LTS in CI and production, `engines >= 22` locally | Active LTS. The dev machine has 22.23. |
 | API | Express 5, TypeScript strict, ESM | Express 5 forwards async errors natively, so no wrapper is needed |
-| DB | MySQL 8.4 LTS, InnoDB, utf8mb4_0900_ai_ci | LTS line, JSON + functional/multi-valued indexes |
+| DB | MySQL 8.4 LTS minimum (dev machine runs 26.7 via Homebrew), InnoDB, utf8mb4_0900_ai_ci | LTS floor, JSON + functional/multi-valued indexes |
 | SQL | Knex + mysql2 | Migrations + query builder, no ORM fighting JSON columns |
 | Validation | Zod 4 | `z.toJSONSchema` for blueprint schema, OpenAPI via `@asteasolutions/zod-to-openapi` |
-| Auth | `@node-rs/argon2` (argon2id), `jose` (JWT), `otplib` (TOTP) | Prebuilt binaries, so no node-gyp in Alpine images |
+| Auth | `@node-rs/argon2` (argon2id), `jose` (JWT), `otplib` (TOTP) | Prebuilt binaries, so servers need no native compiler toolchain |
 | CSRF | Double-submit token (`csrf-csrf`) | `csurf` is deprecated |
-| Security | helmet, cors, express-rate-limit (+ Redis store in prod) | Standard |
+| Security | helmet, cors, express-rate-limit (in-memory store in Phase 1, Redis store once Redis arrives in Phase 2) | Standard. Brute-force lockout is DB-backed, so it doesn't depend on the store |
 | Logging | pino + pino-http, request id propagation | Fast, structured |
-| Mail | nodemailer, Mailpit in dev, Handlebars templates | Auto-escaping templates, reused by blueprints |
+| Mail | nodemailer, Mailpit (Homebrew) in dev, Handlebars templates | Auto-escaping templates, reused by blueprints |
 | Files | multer + `file-type` (magic bytes), `StorageDriver` interface (local now, S3 later) | Safe uploads |
 | CSV | `csv-parse` / `csv-stringify` (streaming) | Large imports/exports |
 | Jobs | `JobRunner` interface; in-process runner in Phase 1, BullMQ in Phase 2 | "Design for it now" without adding Redis jobs yet |
@@ -52,7 +52,7 @@ Versions are "current stable major" as of Oct 2026. Exact patch versions are pin
 | i18n | i18next + react-i18next | Vocabulary overrides via interpolation |
 | Tests | Vitest + Supertest (API, real MySQL), Vitest + RTL (web), Playwright (E2E) | Spec |
 | Lint | ESLint 9 flat config, typescript-eslint strict, Prettier 3, Husky + lint-staged, commitlint | Spec |
-| CI | GitHub Actions with MySQL 8.4 + Redis service containers | Assumed (D11) |
+| CI | GitHub Actions, MySQL 8.4 installed natively on the runner (`shogo82148/actions-setup-mysql`) | No containers (D14) |
 
 Deliberate non-choices: no ORM, no GraphQL, no Next.js. A Vite SPA plus Express matches the spec; see D1.
 
@@ -104,7 +104,7 @@ Workspace package names are neutral (`@app/api`, `@app/web`, `@app/shared`, `@ap
 /modules
   /notes-demo     reference module (api, migrations, web, manifest.json)
   /bookings /invoices /tickets /documents   manifest-only stubs (status: "stub")
-/docker           docker-compose.yml, docker-compose.test.yml, api.Dockerfile, web.Dockerfile, nginx.conf
+/deploy           nginx site config (SPA + /api proxy), systemd unit for the API, release script
 /scripts          check-brand-strings.mjs, check-routes.mjs
 /docs             architecture.md, blueprint-authoring.md, module-authoring.md, deployment.md,
                   env-reference.md, roadmap.md, plan/
@@ -484,7 +484,7 @@ Phase 1 has 16 items, which is too much for one review. I'll deliver it as four 
 
 | Milestone | Spec items | Demo at checkpoint |
 |---|---|---|
-| **1a Foundation** | 1–6 + install CLI skeleton | `docker compose up`, install, log in, change branding and vocabulary live, roles admin UI |
+| **1a Foundation** | 1–6 + install CLI skeleton | `npm run dev`, install, log in, change branding and vocabulary live, roles admin UI |
 | **1b Records** | 7–10 | Custom fields end to end, contacts/orgs with dedupe and merge, deals Kanban, activities calendar |
 | **1c Productivity** | 11–13 | Saved views, bulk actions, import/export, dashboard, audit, notifications |
 | **1d Platform** | 14–16 | Blueprints (generic, coworking) with idempotent re-apply, export, module loader + notes-demo, Playwright flows, docs |
@@ -506,7 +506,7 @@ Phase 1 has 16 items, which is too much for one review. I'll deliver it as four 
 | 9 | Module web code is compiled in, so new modules need a rebuild | Documented. Enable/disable is runtime-only |
 | 10 | CSV import without a queue in P1 | `jobs` table + in-process runner, 50k row cap, resumable status; swapped for BullMQ in P2 |
 | 11 | Phase 1 is large | Milestone branches with atomic commits (section 11, D4) |
-| 12 | **Docker is not installed on this machine** | Can't verify the `docker compose up` DoD locally. Herd's MySQL works for dev and tests meanwhile (D7) |
+| 12 | No containers, so environments can drift (MySQL version, privileges, SQL mode) | `npm run doctor` checks Node and MySQL versions, `sql_mode`, the TRIGGER privilege, binlog settings, and SMTP reachability before install. Minimum versions are in the deployment guide (D14) |
 
 ---
 
@@ -522,13 +522,14 @@ You asked me to make these calls myself, based on how bespoke multi-industry CRM
 | D4 | Checkpoints | Phase 1 runs milestones 1a→1d on one branch per milestone, with **atomic conventional commits**. A short status after each milestone, a full report at the end of Phase 1. I stop early only if blocked | Keeps momentum and keeps every change reviewable |
 | D5 | Currency fields | Fixed currency per field (`options.currency`, defaulting to the instance currency) | Single-org installs almost always bill in one currency. Deals keep their own `currency` column for exceptions |
 | D6 | Audit vs. erasure | Privacy anonymization **may redact PII inside audit diffs**. It runs through one privileged, itself-audited path, and everything else stays append-only | GDPR/DPDP erasure obligations outrank audit immutability. This is standard practice |
-| D7 | Local infra | Docker Compose remains the reference stack (CI and prod). On this machine, dev and tests use Herd's MySQL plus a Redis service, configured through `.env` | Docker isn't installed here. Install Docker or OrbStack to verify the `docker compose up` DoD |
+| D7 | Local infra | Dev and tests use the Homebrew MySQL and Mailpit already running on this machine, configured through `.env` (`crm_dev` and `crm_test` databases). Phase 1 needs no Redis. Phase 2 adds Redis via Homebrew for BullMQ | Both services are already installed and running here |
 | D8 | Coworking renewals | Add `end_date` (date, filterable) and `billing_cycle` (select: monthly, quarterly, annual) to coworking deal fields. The renewals widget counts deals whose `end_date` falls in the next 30 days | Memberships renew on a contract end date. Without it the widget has nothing to count |
 | D9 | Activity visibility | Users see activities and files on any record they can view. `own` scope limits only the "My activities" lists and editing | Matches how teams work: front desk sees the community manager's notes on a member |
 | D10 | Leads | Leads stay a core entity, toggled per instance by the `features.leads` setting. `generic` enables it. `coworking` disables it, because enquiries enter the Memberships pipeline at "Enquiry" | Many verticals (coworking, clinics, gyms) qualify inside the deal pipeline, while B2B sales wants separate leads |
-| D11 | CI | GitHub Actions. No remote exists yet, so nothing is pushed until you add one | Most common choice, and service containers cover MySQL and Redis |
+| D11 | CI | GitHub Actions. No remote exists yet, so nothing is pushed until you add one | Most common choice. MySQL is installed natively on the runner |
 | D12 | Locales | English at launch. i18n scaffolding from day one, and **RTL-ready** layout using CSS logical properties | Visa-consultancy and regional clients often need Arabic or Hebrew, and retrofitting RTL is expensive |
 | D13 | Blueprints per install | One primary blueprint per instance. It can be upgraded to newer versions but not swapped for another blueprint. Industry extras come as modules | Mixing two blueprints' vocabularies and roles creates unresolvable conflicts |
+| D14 | No Docker | No Dockerfiles or Compose anywhere. Dev runs natively (`npm run dev` starts API and web together). Production is the built API under **systemd** behind **nginx**, which serves the web build and proxies `/api` same-origin. Each client instance gets its own server or vhost, database, and `.env`. This **replaces** the brief's Docker items: the DoD's `docker compose up` becomes `npm run dev` + `npm run install:instance`, and "one Dockerfile per service" becomes `deploy/` configs + the deployment guide | Your instruction. systemd + nginx are the most boring, widely supported way to run one Node app per client |
 
 ### Industry-informed extras folded into the design (no scope added)
 - Every pipeline stage has `rotting_days`, so deals that sit too long are flagged. This is standard in sales, admissions, and memberships CRMs.
