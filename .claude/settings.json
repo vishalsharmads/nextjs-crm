@@ -19,8 +19,7 @@
       "Bash(git branch*)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git switch *)",
-      "Bash(docker compose *)"
+      "Bash(git switch *)"
     ],
     "ask": [
       "Bash(git push*)",

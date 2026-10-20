@@ -16,7 +16,7 @@ Then report, in this order and kept tight:
 Grouped by spec item number, one line each, with the key files linked.
 
 ## How to run it
-Exact commands from a clean checkout (install, env, migrate, install:instance, dev). Note any local-environment differences (e.g. Herd MySQL vs Docker).
+Exact commands from a clean checkout (install, env, migrate, install:instance, dev). Note any local-environment differences (e.g. MySQL version on dev vs the 8.4 floor), and include `npm run doctor` output.
 
 ## Verification
 The real results of lint, typecheck, tests (counts), build, brand check, and e2e. Paste the failing output for anything red.
