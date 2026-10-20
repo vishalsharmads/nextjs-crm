@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Env and secrets (only .env.example is committed)
+.env
+.env.*
+!.env.example
+
+# Local storage driver uploads
+storage/
+uploads/
+
+# Test artifacts
+playwright-report/
+test-results/
+blob-report/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Claude Code personal overrides (shared settings live in .claude/settings.json)
+.claude/settings.local.json
+CLAUDE.local.md
