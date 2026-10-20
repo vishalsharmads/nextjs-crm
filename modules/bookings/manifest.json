@@ -1,0 +1,33 @@
+{
+  "key": "bookings",
+  "name": "Bookings",
+  "version": "0.1.0",
+  "status": "stub",
+  "description": "Book desks, rooms and resources. Placeholder until Phase 4; declares permissions so blueprints can reference them.",
+  "depends_on": [],
+  "permissions": [
+    {
+      "key": "bookings.bookings.view",
+      "description": "View bookings"
+    },
+    {
+      "key": "bookings.bookings.create",
+      "description": "Create bookings"
+    },
+    {
+      "key": "bookings.bookings.update",
+      "description": "Update bookings"
+    },
+    {
+      "key": "bookings.bookings.delete",
+      "description": "Delete bookings"
+    }
+  ],
+  "menu_items": [],
+  "labels": {
+    "booking": {
+      "singular": "Booking",
+      "plural": "Bookings"
+    }
+  }
+}
