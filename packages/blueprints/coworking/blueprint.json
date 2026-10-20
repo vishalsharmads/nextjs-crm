@@ -1,0 +1,281 @@
+{
+  "$schema": "../schema.json",
+  "key": "coworking",
+  "name": "Coworking space",
+  "version": "1.0.0",
+  "description": "Members, companies and memberships for coworking and flexible-office operators, with front-desk roles.",
+  "settings": {
+    "features": { "leads": false },
+    "general": { "currency": "GBP" },
+    "contacts": {
+      "sources": ["Walk-in", "Website", "Referral", "Broker", "Event", "Social", "Other"],
+      "lifecycleStatuses": ["Enquirer", "Member", "Former member"]
+    },
+    "deals": {
+      "lostReasons": ["Price", "Location", "Space not available", "Chose another space", "No response"]
+    }
+  },
+  "vocabulary": {
+    "contact": { "singular": "Member", "plural": "Members" },
+    "organization": { "singular": "Company", "plural": "Companies" },
+    "deal": { "singular": "Membership", "plural": "Memberships" }
+  },
+  "modules": ["bookings", "invoices", "tickets", "documents"],
+  "custom_field_groups": {
+    "contact": [{ "key": "membership", "label": "Membership" }],
+    "deal": [{ "key": "terms", "label": "Terms" }]
+  },
+  "custom_fields": {
+    "contact": [
+      {
+        "key": "id_verified",
+        "label": "ID verified",
+        "type": "boolean",
+        "group": "membership",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "preferred_plan",
+        "label": "Preferred plan",
+        "type": "select",
+        "group": "membership",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          { "key": "hot_desk", "label": "Hot desk" },
+          { "key": "dedicated_desk", "label": "Dedicated desk" },
+          { "key": "private_office", "label": "Private office" },
+          { "key": "virtual_office", "label": "Virtual office" }
+        ]
+      },
+      {
+        "key": "access_card_no",
+        "label": "Access card no.",
+        "type": "text",
+        "group": "membership",
+        "filterable": true,
+        "visibility": { "default": "write", "roles": { "front_desk": "write" } }
+      }
+    ],
+    "deal": [
+      { "key": "desk_or_room", "label": "Desk or room", "type": "text", "group": "terms" },
+      {
+        "key": "start_date",
+        "label": "Start date",
+        "type": "date",
+        "group": "terms",
+        "required": true,
+        "filterable": true
+      },
+      {
+        "key": "end_date",
+        "label": "End date",
+        "type": "date",
+        "group": "terms",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "billing_cycle",
+        "label": "Billing cycle",
+        "type": "select",
+        "group": "terms",
+        "filterable": true,
+        "options": [
+          { "key": "monthly", "label": "Monthly" },
+          { "key": "quarterly", "label": "Quarterly" },
+          { "key": "annual", "label": "Annual" }
+        ]
+      },
+      {
+        "key": "monthly_fee",
+        "label": "Monthly fee",
+        "type": "currency",
+        "group": "terms",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "deposit_paid",
+        "label": "Deposit paid",
+        "type": "boolean",
+        "group": "terms",
+        "filterable": true
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "memberships",
+      "name": "Memberships",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        { "key": "enquiry", "name": "Enquiry", "probability": 10, "rotting_days": 3 },
+        { "key": "tour_booked", "name": "Tour booked", "probability": 30, "rotting_days": 7 },
+        { "key": "proposal_sent", "name": "Proposal sent", "probability": 60, "rotting_days": 7 },
+        { "key": "contract_signed", "name": "Contract signed", "probability": 90, "rotting_days": 14 },
+        { "key": "active", "name": "Active", "probability": 100, "is_won": true },
+        { "key": "lost", "name": "Lost", "probability": 0, "is_lost": true }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "community_manager",
+      "name": "Community manager",
+      "description": "Runs members, companies and memberships, and handles tickets",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.*",
+        "core.saved_views.share",
+        "tickets.tickets.*",
+        "bookings.bookings.view"
+      ],
+      "scopes": { "*": "all" }
+    },
+    {
+      "key": "front_desk",
+      "name": "Front desk",
+      "description": "Looks up members, manages bookings and logs tickets",
+      "permissions": [
+        "core.contacts.view",
+        "core.organizations.view",
+        "core.activities.view",
+        "core.activities.create",
+        "core.activities.update",
+        "core.tags.view",
+        "core.files.view",
+        "core.dashboard.view",
+        "bookings.bookings.*",
+        "tickets.tickets.create",
+        "tickets.tickets.view"
+      ],
+      "scopes": { "core.contacts": "all", "core.organizations": "all", "core.activities": "own" }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": [
+        "full_name",
+        "email",
+        "phone",
+        "organization",
+        "cf.preferred_plan",
+        "cf.id_verified",
+        "owner"
+      ]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": ["title", "contact", "stage", "cf.monthly_fee", "cf.start_date", "cf.end_date", "owner"]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      { "key": "occupancy", "type": "module:bookings.occupancy", "title": "Occupancy", "size": "sm" },
+      {
+        "key": "pipeline_value",
+        "type": "pipeline_value",
+        "title": "Membership pipeline",
+        "size": "lg",
+        "params": { "pipeline": "memberships" }
+      },
+      {
+        "key": "renewals",
+        "type": "date_window",
+        "title": "Renewals in the next 30 days",
+        "size": "md",
+        "params": { "entity": "deal", "field": "cf.end_date", "days": 30, "status": "won" }
+      },
+      { "key": "open_tickets", "type": "module:tickets.open_count", "title": "Open tickets", "size": "sm" },
+      { "key": "tasks_due", "type": "tasks_due", "title": "My tasks due", "size": "md" }
+    ]
+  },
+  "templates": [],
+  "sample_data": {
+    "organizations": [
+      {
+        "ref": "northwind",
+        "name": "Northwind Studio",
+        "website": "https://northwind.test",
+        "industry": "Design"
+      },
+      {
+        "ref": "fable",
+        "name": "Fable Analytics",
+        "website": "https://fable-analytics.test",
+        "industry": "Software"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "amara",
+        "first_name": "Amara",
+        "last_name": "Okafor",
+        "email": "amara@northwind.test",
+        "organization": "northwind",
+        "lifecycle_status": "Member",
+        "custom": { "preferred_plan": "dedicated_desk", "id_verified": true }
+      },
+      {
+        "ref": "lukas",
+        "first_name": "Lukas",
+        "last_name": "Brandt",
+        "email": "lukas@fable-analytics.test",
+        "organization": "fable",
+        "lifecycle_status": "Enquirer",
+        "custom": { "preferred_plan": "private_office", "id_verified": false }
+      },
+      {
+        "ref": "mei",
+        "first_name": "Mei",
+        "last_name": "Tanaka",
+        "email": "mei.tanaka@example.test",
+        "lifecycle_status": "Enquirer",
+        "custom": { "preferred_plan": "hot_desk" }
+      }
+    ],
+    "deals": [
+      {
+        "title": "Northwind – 4 dedicated desks",
+        "contact": "amara",
+        "organization": "northwind",
+        "stage": "active",
+        "value": 1600,
+        "custom": {
+          "start_date": "2026-01-01",
+          "end_date": "2026-11-10",
+          "monthly_fee": 1600,
+          "billing_cycle": "monthly",
+          "deposit_paid": true
+        }
+      },
+      {
+        "title": "Fable – private office",
+        "contact": "lukas",
+        "organization": "fable",
+        "stage": "proposal_sent",
+        "value": 2400,
+        "custom": { "start_date": "2026-12-01", "monthly_fee": 2400 }
+      },
+      {
+        "title": "Mei – hot desk",
+        "contact": "mei",
+        "stage": "tour_booked",
+        "value": 250,
+        "custom": { "start_date": "2026-11-15", "monthly_fee": 250 }
+      }
+    ]
+  }
+}
