@@ -13,7 +13,11 @@ export function createKnex(url = isTest ? env.DATABASE_URL_TEST : env.DATABASE_U
       database: u.pathname.slice(1),
       charset: 'utf8mb4',
       timezone: 'Z',
-      dateStrings: ['DATE'],
+      // DATE columns stay as 'YYYY-MM-DD' strings (no timezone shifting); DATETIME are UTC Dates.
+      typeCast(field: { type: string; string(): string | null }, next: () => unknown) {
+        if (field.type === 'DATE') return field.string();
+        return next();
+      },
       decimalNumbers: true,
       supportBigNumbers: true,
       multipleStatements: false,
