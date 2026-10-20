@@ -38,7 +38,8 @@ packages/shared   Zod schemas, DTO types, permission keys, error codes, filter A
 packages/blueprints  <key>/blueprint.json + schema + validator
 packages/module-sdk  manifest + ModuleContext types
 modules/<key>     manifest.json, api/, api/migrations/, web/
-docker/ scripts/ docs/
+deploy/           nginx site config, systemd unit, release script (no Docker)
+scripts/ docs/
 ```
 
 ## Commands
@@ -51,6 +52,7 @@ npm run db:migrate | db:rollback | db:seed
 npm run install:instance -- --blueprint=<key>
 npm run crm:export-blueprint -- --out=<file>
 npm run check:brand
+npm run doctor        # verifies Node/MySQL versions, sql_mode, TRIGGER privilege, binlog, SMTP
 ```
 
 ## Backend conventions
@@ -112,4 +114,8 @@ npm run check:brand
 
 ## Local environment notes
 
-- Docker is **not** installed on the primary dev machine. Laravel Herd provides MySQL locally, so point `.env` at it. Docker Compose remains the reference stack for CI and production.
+- **No Docker, anywhere.** No Dockerfiles, Compose files, or container-based tooling (including Testcontainers and CI service containers). Everything runs natively.
+- Dev machine: Homebrew MySQL (server 26.7, root without password, binlog on, `log_bin_trust_function_creators=0`) and Mailpit (SMTP `localhost:1025`, UI `http://localhost:8025`) are already running as brew services. Databases are `crm_dev` and `crm_test`. Redis is not installed; Phase 1 doesn't need it, and Phase 2 will add it via `brew install redis`.
+- CI: GitHub Actions installs MySQL 8.4 natively on the runner.
+- Production: the built API runs under systemd behind nginx, which serves `apps/web/dist` and proxies `/api` same-origin. One server or vhost, database, and `.env` per client instance.
+- The minimum supported MySQL is 8.4 LTS. Don't rely on features newer than 8.4 just because dev runs a newer server.
