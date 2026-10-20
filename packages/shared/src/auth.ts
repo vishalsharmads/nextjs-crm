@@ -1,0 +1,59 @@
+import { z } from 'zod';
+import type { Scope } from './permissions';
+import type { VisibilityLevel } from './custom-fields';
+
+export const loginSchema = z.object({
+  email: z
+    .email()
+    .max(255)
+    .transform((e) => e.toLowerCase()),
+  password: z.string().min(1).max(256),
+});
+
+export const totpCodeSchema = z.object({ code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code') });
+
+export const forgotPasswordSchema = z.object({
+  email: z
+    .email()
+    .max(255)
+    .transform((e) => e.toLowerCase()),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(20).max(200),
+  password: z.string().min(1).max(256),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(256),
+  newPassword: z.string().min(1).max(256),
+});
+
+export interface MeDto {
+  uuid: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  locale: string | null;
+  timezone: string | null;
+  totpEnabled: boolean;
+  roles: { key: string; name: string }[];
+}
+
+/** Effective access for the current user, used by the UI to show/hide affordances. */
+export interface AccessDto {
+  isAdmin: boolean;
+  permissions: string[];
+  scopes: Record<string, Scope>;
+  /** entity → field key → level */
+  fields: Record<string, Record<string, VisibilityLevel>>;
+}
+
+export interface SessionDto {
+  uuid: string;
+  userAgent: string | null;
+  ip: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  current: boolean;
+}
