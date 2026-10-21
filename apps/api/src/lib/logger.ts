@@ -2,7 +2,7 @@ import pino from 'pino';
 import { env, isProd, isTest } from '../config/env';
 
 export const logger = pino({
-  level: isTest ? 'silent' : env.LOG_LEVEL,
+  level: isTest ? (process.env.TEST_LOG_LEVEL ?? 'silent') : env.LOG_LEVEL,
   redact: {
     paths: [
       'req.headers.cookie',

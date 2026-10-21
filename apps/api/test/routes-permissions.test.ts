@@ -50,6 +50,19 @@ describe('route permissions', () => {
     expect(unexpected).toEqual([]);
   });
 
+  it('no route is shadowed by an earlier route with a path parameter', async () => {
+    await getApp();
+    const toRe = (path: string) => new RegExp(`^${path.replace(/:[A-Za-z]+/g, '[^/]+')}$`);
+    const shadowed: string[] = [];
+    routeRegistry.forEach((r, i) => {
+      const earlier = routeRegistry
+        .slice(0, i)
+        .find((e) => e.method === r.method && e.path !== r.path && toRe(e.path).test(r.path));
+      if (earlier) shadowed.push(`${r.method} ${r.path} (shadowed by ${earlier.path})`);
+    });
+    expect(shadowed).toEqual([]);
+  });
+
   it('every module manifest in /modules is compiled into the build', () => {
     const dir = path.resolve(__dirname, '../../../modules');
     const keys = readdirSync(dir).filter((k) => existsSync(path.join(dir, k, 'manifest.json')));
