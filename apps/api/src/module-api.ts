@@ -38,3 +38,7 @@ export { userRefs, iso } from './core/records/hydrate';
 export { escapeLike } from './core/records/filters';
 export { userIdFromRef } from './core/records/hydrate';
 export { isModuleEnabled } from './modules/registry';
+export { sendMail } from './lib/mailer';
+export { getBranding } from './core/settings/settings.service';
+export { randomToken, sha256 } from './lib/crypto';
+export { rateLimiter, appUrl, cookieOptions } from './modules/helpers';
