@@ -24,6 +24,7 @@ export const contactsDef: ResourceDef<Row, ContactDto> = {
   ownerColumns: ['contacts.owner_id'],
   fulltext: ['contacts.full_name', 'contacts.email'],
   likeColumns: ['contacts.full_name', 'contacts.email', 'contacts.phone_e164'],
+  notifyColumn: 'owner_id',
   defaultSort: '-created_at',
   createSchema: contactCreateSchema,
   patchSchema: contactPatchSchema,

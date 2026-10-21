@@ -9,6 +9,8 @@ import { applyScope, assertCan, scopeAllows } from '../rbac/access';
 import { fieldAccessMap, getDefinitions } from '../custom-fields/definitions';
 import { applySearch, applySort, compileFilter, type FilterContext } from './filters';
 import { prepareCustom, redactDiff } from './custom';
+import { notify } from '../notifications/notifications.service';
+import { ENTITY_ROUTE } from '@app/shared';
 import type { ResourceDef } from './types';
 
 export async function filterContext(def: ResourceDef, user: AuthUser): Promise<FilterContext> {
@@ -167,6 +169,7 @@ export async function createRecord<Dto>(
     return trx(def.table).where({ id }).first();
   };
   const created = conn ? await run(conn) : await db.transaction(run);
+  await notifyAssignment(def, user, created);
   const [dto] = await def.toDtos([created], { user, conn: db });
   return dto!;
 }
@@ -216,9 +219,10 @@ export async function updateRecord<Dto>(
         diff: redactDiff(diff, fc.fieldLevels),
       });
     }
-    return after;
+    return { after, existing };
   });
-  const [dto] = await def.toDtos([updated], { user, conn: db });
+  await notifyAssignment(def, user, updated.after, updated.existing);
+  const [dto] = await def.toDtos([updated.after], { user, conn: db });
   return dto!;
 }
 
@@ -257,4 +261,30 @@ export async function restoreRecord<Dto>(
   });
   const [dto] = await def.toDtos([row], { user, conn: db });
   return dto!;
+}
+
+/** Tell the new owner/assignee about a record handed to them. */
+export async function notifyAssignment(
+  def: ResourceDef,
+  user: AuthUser,
+  row: Record<string, unknown>,
+  before?: Record<string, unknown>,
+) {
+  const col = def.notifyColumn;
+  if (!col) return;
+  const to = row[col] as number | null | undefined;
+  if (!to || to === user.id || (before && before[col] === to)) return;
+  const title = (row.title ?? row.full_name ?? row.name ?? row.subject ?? '') as string;
+  const who = `${user.firstName} ${user.lastName}`.trim() || user.email;
+  await notify(
+    to,
+    {
+      type: `${def.entity}.assigned`,
+      title: `${who} assigned you ${title ? `“${title}”` : 'a record'}`,
+      link: def.entity === 'activity' ? '/tasks' : `/${ENTITY_ROUTE[def.entity]}/${row.uuid as string}`,
+      data: { entity: def.entity, uuid: row.uuid },
+      email: true,
+    },
+    { actorId: user.id },
+  );
 }

@@ -21,6 +21,7 @@ export const leadsDef: ResourceDef<Row, LeadDto> = {
   ownerColumns: ['leads.owner_id'],
   fulltext: ['leads.full_name', 'leads.email', 'leads.company_name'],
   likeColumns: ['leads.full_name', 'leads.email', 'leads.company_name'],
+  notifyColumn: 'owner_id',
   defaultSort: '-created_at',
   createSchema: leadCreateSchema,
   patchSchema: leadPatchSchema,

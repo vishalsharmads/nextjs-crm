@@ -30,6 +30,7 @@ export const organizationsDef: ResourceDef<Row, OrganizationDto> = {
   ownerColumns: ['organizations.owner_id'],
   fulltext: ['organizations.name', 'organizations.domain'],
   likeColumns: ['organizations.name', 'organizations.domain'],
+  notifyColumn: 'owner_id',
   defaultSort: 'name',
   createSchema: organizationInputSchema,
   patchSchema: organizationPatchSchema,
