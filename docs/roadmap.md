@@ -22,3 +22,6 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - Record-level sharing beyond owner and team (explicit share with user or team).
 - Deal velocity and forecast reports built on `deal_stage_history`.
 - Extract remaining literal English UI copy into `apps/web/src/i18n/en.json` (entity names already go through vocabulary).
+- Dashboard editing in the UI (add, remove, resize widgets). Phase 1 ships blueprint-defined dashboards and the API to save personal copies.
+- Mouse-friendly "Move to stage" menu on Kanban cards (keyboard drag works today).
+- Per-user notification preferences UI (the `preferences.emailNotifications` flag exists).
