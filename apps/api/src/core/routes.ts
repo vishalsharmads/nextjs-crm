@@ -15,6 +15,9 @@ import { notificationsRoutes } from './notifications/notifications.routes';
 import { savedViewsRoutes } from './saved-views/saved-views.routes';
 import { entityCollectionRoutes, importsRoutes } from './imports/imports.routes';
 import { auditRoutes, dashboardRoutes } from './dashboard/dashboard.routes';
+import { blueprintsRoutes, modulesRoutes } from './platform/platform.routes';
+import { privacyRoutes } from './privacy/privacy.routes';
+import { docsRoutes } from './platform/docs.routes';
 
 /** All core route groups. Specific paths (e.g. /deals/board) are registered before /:uuid. */
 export function coreRouteGroups(): RouteGroup[] {
@@ -41,6 +44,10 @@ export function coreRouteGroups(): RouteGroup[] {
     importsRoutes,
     dashboardRoutes,
     auditRoutes,
+    blueprintsRoutes,
+    modulesRoutes,
+    privacyRoutes,
+    docsRoutes,
     ...entityCollectionRoutes(),
     ...contactsRoutes,
     ...organizationsRoutes,
