@@ -88,7 +88,7 @@ describe('custom fields', () => {
         visibility: { default: 'write', roles: { [role]: 'hidden' } },
       })
       .expect(201);
-    await admin
+    const po = await admin
       .post('/custom-fields', {
         entity: 'deal',
         key: 'po_number',
@@ -125,6 +125,8 @@ describe('custom fields', () => {
     await admin.patch(`/deals/${deal.body.uuid}`, { custom: { margin: 0.5 } }).expect(200);
     const timeline = await client.get(`/deals/${deal.body.uuid}/timeline`).expect(200);
     expect(JSON.stringify(timeline.body)).not.toContain('custom.margin');
+    // Shared test database: don't leave a required deal field behind for other files.
+    await admin.post(`/custom-fields/${po.body.uuid}/archive`).expect(200);
   });
 
   it('archives a field without losing values and refuses to remove select options', async () => {

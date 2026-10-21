@@ -42,6 +42,8 @@ const schema = z.object({
   UPLOAD_MAX_MB: z.coerce.number().int().min(1).max(200).default(20),
 
   REDIS_URL: z.string().default(''),
+  /** Allow webhook URLs that resolve to private/loopback addresses (development only). */
+  WEBHOOKS_ALLOW_PRIVATE: bool.default(false),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

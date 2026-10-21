@@ -10,7 +10,8 @@ import type {
   GeneralSettings,
   SecuritySettings,
 } from '@app/shared';
-import { apiGet, apiPatch } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch } from '@/lib/api';
+import { useBranding } from '@/app/branding';
 import { bootstrapKey, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
@@ -248,6 +249,7 @@ export function SecuritySettingsPage() {
       description="Password rules, account lockout and two-factor authentication."
     >
       {q.data ? <SecurityForm initial={q.data.security} /> : <Skeleton className="h-80" />}
+      <DemoLoginPane />
     </SettingsPage>
   );
 }
@@ -315,5 +317,32 @@ function SecurityForm({ initial }: { initial: SecuritySettings }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+/** Lets an admin remove demo credentials from the sign-in screen (demo instances only). */
+function DemoLoginPane() {
+  const { branding } = useBranding();
+  const qc = useQueryClient();
+  const remove = useMutation({
+    mutationFn: () => apiDelete('/settings/demo-login'),
+    onSuccess: () => {
+      toast.success('Demo sign-in details removed');
+      void qc.invalidateQueries({ queryKey: ['public', 'branding'] });
+    },
+  });
+  if (!branding.demoLogin) return null;
+  return (
+    <Pane title="Demo sign-in">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted">
+          The sign-in screen shows the demo account ({branding.demoLogin.email}). Remove it before real people
+          use this workspace.
+        </p>
+        <Button variant="danger" onClick={() => remove.mutate()} loading={remove.isPending}>
+          Remove
+        </Button>
+      </div>
+    </Pane>
   );
 }

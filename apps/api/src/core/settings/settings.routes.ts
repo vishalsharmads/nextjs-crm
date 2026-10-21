@@ -16,7 +16,16 @@ import { storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
 import { storeFile } from '../files/files.service';
 import { getLabels, clearLabelCache } from '../labels/labels.service';
-import { getBranding, getBrandingAssets, getGroup, getRaw, isInstalled, setRaw } from './settings.service';
+import {
+  clearSettingsCache,
+  getBranding,
+  getBrandingAssets,
+  getDemoLogin,
+  getGroup,
+  getRaw,
+  isInstalled,
+  setRaw,
+} from './settings.service';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
 const assetUpload = multer({
@@ -39,6 +48,7 @@ async function publicBranding(): Promise<PublicBranding> {
     ...rest,
     locale: general.locale,
     installed: await isInstalled(),
+    demoLogin: await getDemoLogin(),
     assets: Object.fromEntries(
       Object.entries(assets).map(([slot, uuid]) => [
         slot,
@@ -99,6 +109,17 @@ export const publicRoutes = defineRoutes('/public', ['public'])
   });
 
 export const settingsRoutes = defineRoutes('/settings', ['settings'])
+  .add({
+    method: 'delete',
+    path: '/demo-login',
+    permission: 'core.settings.manage',
+    summary: 'Stop showing demo sign-in details on the sign-in screen',
+    handler: async ({ ctx }) => {
+      await db('settings').where({ key: 'demo_login' }).delete();
+      clearSettingsCache();
+      await audit(db, ctx, { action: 'settings.demo_login_removed', entity: 'settings' });
+    },
+  })
   .add({
     method: 'get',
     path: '/',

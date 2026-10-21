@@ -80,7 +80,9 @@
     "mfaHelp": "Enter the 6-digit code from your authenticator app.",
     "code": "Code",
     "verify": "Verify",
-    "notInstalled": "This workspace has not been set up yet. Ask your administrator to run the installer."
+    "notInstalled": "This workspace has not been set up yet. Ask your administrator to run the installer.",
+    "demoTitle": "Demo account",
+    "demoUse": "Sign in with the demo account"
   },
   "home": {
     "greeting": "Good to see you, {{name}}"
@@ -120,6 +122,7 @@
     "lifecycleHelp": "The stages each {{contactLower}} moves through.",
     "lostReasons": "Lost reasons",
     "lostReasonsHelp": "Asked whenever {{dealPluralLower}} are marked lost, so you can see why.",
-    "vocabularyHelp": "Use the words your team already uses. Names change everywhere: menus, titles, buttons, empty states and emails."
+    "vocabularyHelp": "Use the words your team already uses. Names change everywhere: menus, titles, buttons, empty states and emails.",
+    "layouts": "Layouts"
   }
 }

@@ -4,7 +4,7 @@ import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
 import { audit } from '../audit/audit.service';
 import { applyScope, assertCan } from '../rbac/access';
-import { getRow } from '../records/service';
+import { emitRecordEvent, getRow } from '../records/service';
 import { recordRoutes, uuidParam } from '../records/routes';
 import { recordDefs } from '../records/registry';
 import { activitiesDef } from './activities.def';
@@ -30,6 +30,8 @@ async function setCompleted(
     return trx('activities').where({ id: a.id }).first();
   });
   const [dto] = await activitiesDef.toDtos([row], { user, conn: db });
+  if (done)
+    await emitRecordEvent(activitiesDef, 'completed', dto as unknown as Record<string, unknown>, user);
   return dto!;
 }
 
