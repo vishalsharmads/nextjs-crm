@@ -11,12 +11,24 @@ const bump = (bp: Blueprint, version: string, patch: (b: Blueprint) => void = ()
   return parseBlueprint(copy);
 };
 
+/** Next minor version after whatever is applied now (other test files may have applied newer ones). */
+async function nextVersion() {
+  const last = await db('blueprint_applications')
+    .where({ blueprint_key: 'generic' })
+    .orderBy('id', 'desc')
+    .first();
+  const [major = 1, minor = 0] = (last.version as string).split('.').map(Number);
+  return `${major}.${minor + 1}.0`;
+}
+
 describe('blueprint engine', () => {
   const generic = loadBlueprint('generic');
 
   it('re-applying the same blueprint changes nothing', async () => {
+    const bp = bump(generic, await nextVersion());
+    await applyBlueprint(db, bp);
     const before = await db('blueprint_applications').count({ c: '*' }).first();
-    const report = await applyBlueprint(db, generic);
+    const report = await applyBlueprint(db, bp);
     expect(report.created).toEqual([]);
     expect(report.updated).toEqual([]);
     expect(report.conflicts).toEqual([]);
@@ -29,7 +41,7 @@ describe('blueprint engine', () => {
     await db('custom_field_definitions')
       .where({ entity: 'contact', key: 'linkedin' })
       .update({ label: 'LinkedIn profile', customized: true });
-    const next = bump(generic, '1.1.0', (b) => {
+    const next = bump(generic, await nextVersion(), (b) => {
       b.custom_fields.contact![0]!.label = 'LinkedIn URL';
       b.custom_fields.contact!.push({
         key: 'nickname',
@@ -62,7 +74,7 @@ describe('blueprint engine', () => {
   });
 
   it('updates untouched items and reports removed ones as orphaned', async () => {
-    const next = bump(generic, '1.2.0', (b) => {
+    const next = bump(generic, await nextVersion(), (b) => {
       b.custom_fields.contact = b.custom_fields.contact!.filter((f) => f.key !== 'birthday');
       b.roles.find((r) => r.key === 'read_only')!.name = 'Viewer';
     });
@@ -89,7 +101,7 @@ describe('blueprint engine', () => {
   });
 
   it('dry-run reports without writing', async () => {
-    const next = bump(generic, '1.3.0', (b) => {
+    const next = bump(generic, await nextVersion(), (b) => {
       b.vocabulary = { team: { singular: 'Squad', plural: 'Squads' } };
     });
     const report = await applyBlueprint(db, next, { dryRun: true });
