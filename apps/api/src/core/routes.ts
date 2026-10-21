@@ -3,8 +3,16 @@ import { authRoutes, meRoutes } from './auth/auth.routes';
 import { permissionsRoutes, rolesRoutes, teamsRoutes, usersRoutes } from './users/users.routes';
 import { labelsRoutes, publicRoutes, settingsRoutes } from './settings/settings.routes';
 import { metaRoutes } from './meta/meta.routes';
+import { contactsRoutes, organizationsRoutes } from './contacts/contacts.routes';
+import { dealsRoutes, leadsRoutes } from './deals/deals.routes';
+import { activitiesRoutes } from './activities/activities.routes';
+import { tagsRoutes } from './tags/tags.routes';
+import { filesRoutes } from './files/files.routes';
+import { searchRoutes } from './search/search.routes';
+import { customFieldsRoutes, fieldGroupsRoutes, layoutsRoutes } from './custom-fields/custom-fields.routes';
+import { pipelinesRoutes } from './pipelines/pipelines.routes';
 
-/** All core route groups. Order matters only for overlapping paths (specific before generic). */
+/** All core route groups. Specific paths (e.g. /deals/board) are registered before /:uuid. */
 export function coreRouteGroups(): RouteGroup[] {
   return [
     publicRoutes,
@@ -17,5 +25,17 @@ export function coreRouteGroups(): RouteGroup[] {
     settingsRoutes,
     labelsRoutes,
     metaRoutes,
+    customFieldsRoutes,
+    fieldGroupsRoutes,
+    layoutsRoutes,
+    pipelinesRoutes,
+    tagsRoutes,
+    filesRoutes,
+    searchRoutes,
+    ...contactsRoutes,
+    ...organizationsRoutes,
+    ...leadsRoutes,
+    ...dealsRoutes,
+    ...activitiesRoutes,
   ];
 }
