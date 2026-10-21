@@ -22,7 +22,17 @@ export function createKnex(url = isTest ? env.DATABASE_URL_TEST : env.DATABASE_U
       supportBigNumbers: true,
       multipleStatements: false,
     },
-    pool: { min: 0, max: 10 },
+    pool: {
+      min: 0,
+      max: 10,
+      // All DATETIME defaults (CURRENT_TIMESTAMP) must be UTC, matching what the app writes.
+      afterCreate(
+        conn: { query: (sql: string, cb: (err: Error | null) => void) => void },
+        done: (err: Error | null, conn: unknown) => void,
+      ) {
+        conn.query("SET time_zone = '+00:00'", (err) => done(err, conn));
+      },
+    },
   });
 }
 

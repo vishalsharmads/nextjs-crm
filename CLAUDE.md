@@ -111,6 +111,8 @@ API tests drop and recreate `crm_test` on every run (`apps/api/test/global-setup
 - Generated columns for custom fields are named `cf_<key>`. At most 40 indexed custom fields per entity.
 - Multi-select uses multi-valued indexes (`CAST(... AS CHAR(64) ARRAY)`) and is queried with `JSON_OVERLAPS` / `MEMBER OF`.
 - Audit triggers need the `TRIGGER` privilege, plus `log_bin_trust_function_creators=1` when binlog is on.
+- **Never use Knex `whereLike`/`orWhereLike`** on MySQL: it appends `COLLATE utf8_bin` (invalid for utf8mb4, and case-sensitive). Use `.where(col, 'like', value)` with `escapeLike()`.
+- Every pooled connection runs `SET time_zone = '+00:00'` (`db/knex.ts`) so `CURRENT_TIMESTAMP` defaults are UTC like app-written dates. Don't remove it.
 - MySQL identifiers max 64 chars: give long composite indexes an explicit `indexName`.
 - Indexing a VIRTUAL generated column needs `LOCK=SHARED` (blocks writes during the build), not `LOCK=NONE`.
 - **Never store JSON `null` in `custom`**: a null makes multi-valued index inserts fail. Clearing a value removes the key.

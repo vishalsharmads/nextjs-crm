@@ -108,7 +108,7 @@ export const usersRoutes = defineRoutes('/users', ['users'])
       if (query.q) {
         const like = `%${escapeLike(query.q)}%`;
         base.where((w) =>
-          w.whereLike('email', like).orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [like]),
+          w.where('email', 'like', like).orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [like]),
         );
       }
       const total = Number(((await base.clone().count({ c: '*' }).first()) as { c: number }).c);
