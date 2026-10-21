@@ -75,6 +75,7 @@ export const dealsDef: ResourceDef<Row, DealDto> = {
   ownerColumns: ['deals.owner_id'],
   fulltext: ['deals.title'],
   likeColumns: ['deals.title', 'deals.reference'],
+  notifyColumn: 'owner_id',
   defaultSort: '-created_at',
   createSchema: dealInputSchema,
   patchSchema: dealPatchSchema,

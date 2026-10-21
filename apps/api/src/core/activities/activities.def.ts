@@ -72,6 +72,7 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
   ownerColumns: ['activities.assignee_id', 'activities.owner_id'],
   fulltext: [],
   likeColumns: ['activities.subject'],
+  notifyColumn: 'assignee_id',
   defaultSort: 'due_at',
   createSchema: activityCreateSchema,
   patchSchema: activityPatchSchema,

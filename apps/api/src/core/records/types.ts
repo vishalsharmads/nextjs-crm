@@ -38,6 +38,8 @@ export interface ResourceDef<Row extends Record<string, unknown> = Record<string
   toRow(input: Record<string, unknown>, ctx: WriteContext): Promise<Record<string, unknown>>;
   /** Build DTOs for a page of rows (batch-load relations). */
   toDtos(rows: Row[], ctx: ReadContext): Promise<Dto[]>;
+  /** Column whose new holder is notified when it changes (owner, assignee). */
+  notifyColumn?: string;
   /** Optional hooks. */
   beforeCreate?(row: Record<string, unknown>, ctx: WriteContext): Promise<void>;
   afterWrite?(
