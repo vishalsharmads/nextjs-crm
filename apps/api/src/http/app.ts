@@ -42,6 +42,15 @@ export function createApp(opts: AppOptions = {}): Express {
         logger,
         genReqId: (req) => (req as express.Request).ctx?.requestId ?? 'unknown',
         autoLogging: { ignore: (req) => req.url === '/api/v1/health' },
+        // One compact line per request: no headers (cookies stay out of logs entirely).
+        serializers: {
+          req: (req: { id: string; method: string; url: string }) => ({
+            id: req.id,
+            method: req.method,
+            url: req.url,
+          }),
+          res: (res: { statusCode: number }) => ({ status: res.statusCode }),
+        },
       }),
     );
   }
