@@ -150,13 +150,12 @@ export function LoginPage() {
           {t('auth.forgot')}
         </Link>
       </form>
-      {branding.demoLogin ? (
-        <DemoLogin
-          email={branding.demoLogin.email}
-          password={branding.demoLogin.password}
-          onUse={() => {
-            form.setValue('email', branding.demoLogin!.email);
-            form.setValue('password', branding.demoLogin!.password);
+      {branding.demoAccounts.length ? (
+        <DemoAccounts
+          accounts={branding.demoAccounts}
+          onUse={(a) => {
+            form.setValue('email', a.email);
+            form.setValue('password', a.password);
             void onPassword();
           }}
         />
@@ -293,26 +292,50 @@ export function AcceptInvitePage() {
   );
 }
 
-/** Shown only on demo instances (enabled with `npm run cli -w @app/api -- demo:enable`). */
-function DemoLogin({ email, password, onUse }: { email: string; password: string; onUse: () => void }) {
+interface DemoAccount {
+  label: string;
+  email: string;
+  password: string;
+}
+
+/** Shown only when the server runs with DEMO_MODE=true and demo accounts were seeded (`demo:seed`). */
+function DemoAccounts({ accounts, onUse }: { accounts: DemoAccount[]; onUse: (a: DemoAccount) => void }) {
   const t = useT();
+  const shared = accounts.every((a) => a.password === accounts[0]!.password) ? accounts[0]!.password : null;
   return (
     <section
-      aria-labelledby="demo-login"
+      aria-labelledby="demo-accounts"
       className="mt-8 rounded-md border border-dashed border-line-strong bg-subtle p-4"
     >
-      <h2 id="demo-login" className="text-sm font-semibold">
-        {t('auth.demoTitle')}
+      <h2 id="demo-accounts" className="text-sm font-semibold">
+        {t(accounts.length === 1 ? 'auth.demoTitle' : 'auth.demoTitlePlural')}
       </h2>
-      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        <dt className="text-muted">{t('auth.email')}</dt>
-        <dd className="font-mono text-xs leading-5 break-all select-all">{email}</dd>
-        <dt className="text-muted">{t('auth.password')}</dt>
-        <dd className="font-mono text-xs leading-5 select-all">{password}</dd>
-      </dl>
-      <Button type="button" className="mt-3 w-full" onClick={onUse}>
-        {t('auth.demoUse')}
-      </Button>
+      <p className="mt-1 text-xs text-muted">{t('auth.demoHelp')}</p>
+      <ul className="mt-3 flex flex-col gap-2">
+        {accounts.map((a) => (
+          <li key={a.email}>
+            <button
+              type="button"
+              onClick={() => onUse(a)}
+              className="flex w-full items-center gap-3 rounded-md border border-line bg-surface px-3 py-2 text-start transition-colors duration-150 ease-out hover:border-primary hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{a.label}</span>
+                <span className="block truncate font-mono text-xs text-muted">{a.email}</span>
+                {shared ? null : (
+                  <span className="block truncate font-mono text-xs text-muted">{a.password}</span>
+                )}
+              </span>
+              <span className="shrink-0 text-xs font-medium text-primary">{t('auth.demoUse')}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {shared ? (
+        <p className="mt-3 text-xs text-muted">
+          {t('auth.password')}: <span className="font-mono select-all">{shared}</span>
+        </p>
+      ) : null}
     </section>
   );
 }

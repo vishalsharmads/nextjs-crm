@@ -45,8 +45,8 @@ export interface PublicBranding extends Omit<Branding, 'emailFromAddress' | 'ema
   assets: Partial<Record<BrandingAssetSlot, string>>;
   locale: string;
   installed: boolean;
-  /** Demo instances only: credentials shown on the sign-in screen. Null unless explicitly enabled. */
-  demoLogin: { email: string; password: string } | null;
+  /** Demo instances only (`DEMO_MODE=true` + `demo:seed`): accounts shown on the sign-in screen. Empty otherwise. */
+  demoAccounts: { label: string; email: string; password: string }[];
 }
 
 /** Neutral factory theme. Every instance overrides it from settings. */

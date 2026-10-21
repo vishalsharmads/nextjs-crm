@@ -1,3 +1,4 @@
+import { env } from '../../config/env';
 import type { z } from 'zod';
 import {
   brandingSchema,
@@ -70,9 +71,23 @@ export async function isInstalled(conn: Db = db): Promise<boolean> {
   }
 }
 
-/** Demo instances can show sign-in credentials publicly. Off unless enabled via `npm run cli -- demo:enable`. */
-export async function getDemoLogin(conn: Db = db): Promise<{ email: string; password: string } | null> {
+export interface DemoAccount {
+  label: string;
+  email: string;
+  password: string;
+}
+
+/**
+ * Demo accounts for the sign-in screen. Two switches must both be on:
+ * `DEMO_MODE=true` in the environment, and accounts stored by `npm run cli -- demo:seed` (or `demo:enable`).
+ * Flipping the env off hides them without touching the database.
+ */
+export async function getDemoAccounts(conn: Db = db): Promise<DemoAccount[]> {
+  if (!env.DEMO_MODE) return [];
   const v = (await getRaw('demo_login', conn)) as
-    { enabled?: boolean; email?: string; password?: string } | undefined;
-  return v?.enabled && v.email && v.password ? { email: v.email, password: v.password } : null;
+    { accounts?: DemoAccount[]; enabled?: boolean; email?: string; password?: string } | undefined;
+  if (!v) return [];
+  if (Array.isArray(v.accounts)) return v.accounts.filter((a) => a.email && a.password);
+  // Single-account shape written by earlier versions of demo:enable.
+  return v.enabled && v.email && v.password ? [{ label: 'Admin', email: v.email, password: v.password }] : [];
 }

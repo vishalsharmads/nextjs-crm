@@ -331,13 +331,14 @@ function DemoLoginPane() {
       void qc.invalidateQueries({ queryKey: ['public', 'branding'] });
     },
   });
-  if (!branding.demoLogin) return null;
+  if (!branding.demoAccounts.length) return null;
   return (
     <Pane title="Demo sign-in">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted">
-          The sign-in screen shows the demo account ({branding.demoLogin.email}). Remove it before real people
-          use this workspace.
+          The sign-in screen shows {branding.demoAccounts.length} demo{' '}
+          {branding.demoAccounts.length === 1 ? 'account' : 'accounts'}. Remove them before real people use
+          this workspace, or set DEMO_MODE=false on the server.
         </p>
         <Button variant="danger" onClick={() => remove.mutate()} loading={remove.isPending}>
           Remove

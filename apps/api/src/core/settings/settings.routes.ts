@@ -20,7 +20,7 @@ import {
   clearSettingsCache,
   getBranding,
   getBrandingAssets,
-  getDemoLogin,
+  getDemoAccounts,
   getGroup,
   getRaw,
   isInstalled,
@@ -48,7 +48,7 @@ async function publicBranding(): Promise<PublicBranding> {
     ...rest,
     locale: general.locale,
     installed: await isInstalled(),
-    demoLogin: await getDemoLogin(),
+    demoAccounts: await getDemoAccounts(),
     assets: Object.fromEntries(
       Object.entries(assets).map(([slot, uuid]) => [
         slot,
