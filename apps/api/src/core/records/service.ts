@@ -10,6 +10,7 @@ import { fieldAccessMap, getDefinitions } from '../custom-fields/definitions';
 import { applySearch, applySort, compileFilter, type FilterContext } from './filters';
 import { prepareCustom, redactDiff } from './custom';
 import { notify } from '../notifications/notifications.service';
+import { emit, type EventType } from '../events/events';
 import { ENTITY_ROUTE } from '@app/shared';
 import type { ResourceDef } from './types';
 
@@ -171,6 +172,7 @@ export async function createRecord<Dto>(
   const created = conn ? await run(conn) : await db.transaction(run);
   await notifyAssignment(def, user, created);
   const [dto] = await def.toDtos([created], { user, conn: db });
+  if (!conn) await emitRecordEvent(def, 'created', dto as Record<string, unknown>, user);
   return dto!;
 }
 
@@ -223,6 +225,15 @@ export async function updateRecord<Dto>(
   });
   await notifyAssignment(def, user, updated.after, updated.existing);
   const [dto] = await def.toDtos([updated.after], { user, conn: db });
+  const changes = diffRecords(updated.existing, updated.after);
+  if (Object.keys(changes).length) {
+    await emitRecordEvent(def, 'updated', dto as Record<string, unknown>, user, changes);
+    if (def.entity === 'deal' && changes.stage_id)
+      await emitDealStage(dto as Record<string, unknown>, user, changes);
+    if (def.entity === 'activity' && changes.completed_at && updated.after.completed_at) {
+      await emitRecordEvent(def, 'completed', dto as Record<string, unknown>, user, changes);
+    }
+  }
   return dto!;
 }
 
@@ -238,6 +249,7 @@ export async function deleteRecord(def: ResourceDef, ctx: RequestContext, user: 
       entityUuid: uuid,
     });
   });
+  await emitRecordEvent(def, 'deleted', { uuid }, user);
 }
 
 export async function restoreRecord<Dto>(
@@ -287,4 +299,47 @@ export async function notifyAssignment(
     },
     { actorId: user.id },
   );
+}
+
+export async function emitRecordEvent(
+  def: Pick<ResourceDef, 'entity'>,
+  action: 'created' | 'updated' | 'deleted' | 'completed' | 'converted',
+  record: Record<string, unknown>,
+  user: AuthUser,
+  changes?: Record<string, { from: unknown; to: unknown }>,
+) {
+  await emit({
+    type: `${def.entity}.${action}` as EventType,
+    entity: def.entity,
+    uuid: record.uuid as string,
+    record,
+    changes,
+    actorId: user.id,
+  });
+}
+
+/** Stage moves also emit won/lost so automations can react to outcomes. */
+export async function emitDealStage(
+  record: Record<string, unknown>,
+  user: AuthUser,
+  changes: Record<string, { from: unknown; to: unknown }>,
+) {
+  await emit({
+    type: 'deal.stage_changed',
+    entity: 'deal',
+    uuid: record.uuid as string,
+    record,
+    changes,
+    actorId: user.id,
+  });
+  const status = record.status as string;
+  if (status === 'won' || status === 'lost')
+    await emit({
+      type: `deal.${status}`,
+      entity: 'deal',
+      uuid: record.uuid as string,
+      record,
+      changes,
+      actorId: user.id,
+    });
 }

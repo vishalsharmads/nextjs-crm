@@ -5,7 +5,7 @@ import { db } from '../../db/knex';
 import { AppError, notFound } from '../../lib/errors';
 import { audit } from '../audit/audit.service';
 import { applyScope, assertCan } from '../rbac/access';
-import { applyListCriteria, createRecord, getRow } from '../records/service';
+import { applyListCriteria, createRecord, emitDealStage, emitRecordEvent, getRow } from '../records/service';
 import { recordRoutes } from '../records/routes';
 import { filterParamSchema } from '@app/shared';
 import { dealsDef, statusForStage } from './deals.def';
@@ -153,9 +153,16 @@ export const dealsRoutes = [
               },
             });
           }
-          return trx('deals').where({ id: deal.id }).first();
+          return {
+            row: await trx('deals').where({ id: deal.id }).first(),
+            stageChange: stageChanged ? { from: deal.stage_id, to: stage.id } : null,
+          };
         });
-        const [dto] = await dealsDef.toDtos([updated], { user, conn: db });
+        const [dto] = await dealsDef.toDtos([updated.row], { user, conn: db });
+        if (updated.stageChange)
+          await emitDealStage(dto as unknown as Record<string, unknown>, user, {
+            stage_id: updated.stageChange,
+          });
         return dto!;
       },
     }),
@@ -173,91 +180,96 @@ export const leadsRoutes = [
     handler: async ({ ctx, user, params, body }) => {
       assertCan(user, 'core.contacts.create');
       if (body.createDeal) assertCan(user, 'core.deals.create');
-      return db.transaction(async (trx) => {
-        const lead = await getRow(leadsDef, user, params.uuid, trx, { forUpdate: true });
-        if (lead.converted_at) throw new AppError('CONFLICT', 'This lead was already converted');
-        const leadCustom = (lead.custom as Record<string, unknown>) ?? {};
-        // Custom values carry over to fields with the same key on the new records.
-        const carry = async (entity: 'contact' | 'organization' | 'deal') => {
-          const keys = (await trx('custom_field_definitions')
-            .where({ entity, active: true })
-            .pluck('key')) as string[];
-          return Object.fromEntries(Object.entries(leadCustom).filter(([k]) => keys.includes(k)));
-        };
-        let organizationUuid = body.organizationUuid ?? null;
-        if (!organizationUuid && body.createOrganization && lead.company_name) {
-          assertCan(user, 'core.organizations.create');
-          const org = await createRecord(
-            organizationsDef,
-            ctx,
-            user,
-            { name: lead.company_name, custom: await carry('organization') },
-            trx,
-          );
-          organizationUuid = org.uuid;
-        }
-        const contact = await createRecord(
-          contactsDef,
-          ctx,
-          user,
-          {
-            firstName: lead.first_name,
-            lastName: lead.last_name,
-            email: lead.email,
-            phone: lead.phone,
-            jobTitle: lead.job_title,
-            source: lead.source,
-            organizationUuid,
-            custom: await carry('contact'),
-          },
-          trx,
-        );
-        let dealUuid: string | null = null;
-        if (body.createDeal) {
-          const deal = await createRecord(
-            dealsDef,
+      return db
+        .transaction(async (trx) => {
+          const lead = await getRow(leadsDef, user, params.uuid, trx, { forUpdate: true });
+          if (lead.converted_at) throw new AppError('CONFLICT', 'This lead was already converted');
+          const leadCustom = (lead.custom as Record<string, unknown>) ?? {};
+          // Custom values carry over to fields with the same key on the new records.
+          const carry = async (entity: 'contact' | 'organization' | 'deal') => {
+            const keys = (await trx('custom_field_definitions')
+              .where({ entity, active: true })
+              .pluck('key')) as string[];
+            return Object.fromEntries(Object.entries(leadCustom).filter(([k]) => keys.includes(k)));
+          };
+          let organizationUuid = body.organizationUuid ?? null;
+          if (!organizationUuid && body.createOrganization && lead.company_name) {
+            assertCan(user, 'core.organizations.create');
+            const org = await createRecord(
+              organizationsDef,
+              ctx,
+              user,
+              { name: lead.company_name, custom: await carry('organization') },
+              trx,
+            );
+            organizationUuid = org.uuid;
+          }
+          const contact = await createRecord(
+            contactsDef,
             ctx,
             user,
             {
-              title:
-                body.dealTitle ||
-                lead.company_name ||
-                `${lead.first_name} ${lead.last_name}`.trim() ||
-                'New deal',
-              value: body.dealValue ?? 0,
-              contactUuid: contact.uuid,
+              firstName: lead.first_name,
+              lastName: lead.last_name,
+              email: lead.email,
+              phone: lead.phone,
+              jobTitle: lead.job_title,
+              source: lead.source,
               organizationUuid,
-              pipelineUuid: body.pipelineUuid,
+              custom: await carry('contact'),
             },
             trx,
           );
-          dealUuid = deal.uuid;
-        }
-        const ids = async (table: string, uuid: string | null) =>
-          uuid ? ((await trx(table).where({ uuid }).first('id'))?.id as number) : null;
-        await trx('leads')
-          .where({ id: lead.id })
-          .update({
-            status: 'converted',
-            converted_at: new Date(),
-            converted_contact_id: await ids('contacts', contact.uuid),
-            converted_organization_id: await ids('organizations', organizationUuid),
-            converted_deal_id: await ids('deals', dealUuid),
-            updated_by: user.id,
+          let dealUuid: string | null = null;
+          if (body.createDeal) {
+            const deal = await createRecord(
+              dealsDef,
+              ctx,
+              user,
+              {
+                title:
+                  body.dealTitle ||
+                  lead.company_name ||
+                  `${lead.first_name} ${lead.last_name}`.trim() ||
+                  'New deal',
+                value: body.dealValue ?? 0,
+                contactUuid: contact.uuid,
+                organizationUuid,
+                pipelineUuid: body.pipelineUuid,
+              },
+              trx,
+            );
+            dealUuid = deal.uuid;
+          }
+          const ids = async (table: string, uuid: string | null) =>
+            uuid ? ((await trx(table).where({ uuid }).first('id'))?.id as number) : null;
+          await trx('leads')
+            .where({ id: lead.id })
+            .update({
+              status: 'converted',
+              converted_at: new Date(),
+              converted_contact_id: await ids('contacts', contact.uuid),
+              converted_organization_id: await ids('organizations', organizationUuid),
+              converted_deal_id: await ids('deals', dealUuid),
+              updated_by: user.id,
+            });
+          // Activities logged on the lead follow the new contact.
+          await trx('activities')
+            .where({ related_type: 'lead', related_id: lead.id })
+            .update({ related_type: 'contact', related_id: await ids('contacts', contact.uuid) });
+          await audit(trx, ctx, {
+            action: 'lead.converted',
+            entity: 'lead',
+            entityId: lead.id as number,
+            entityUuid: params.uuid,
+            diff: { contact: contact.uuid, organization: organizationUuid, deal: dealUuid },
           });
-        // Activities logged on the lead follow the new contact.
-        await trx('activities')
-          .where({ related_type: 'lead', related_id: lead.id })
-          .update({ related_type: 'contact', related_id: await ids('contacts', contact.uuid) });
-        await audit(trx, ctx, {
-          action: 'lead.converted',
-          entity: 'lead',
-          entityId: lead.id as number,
-          entityUuid: params.uuid,
-          diff: { contact: contact.uuid, organization: organizationUuid, deal: dealUuid },
+          return { contactUuid: contact.uuid, organizationUuid, dealUuid };
+        })
+        .then(async (r) => {
+          await emitRecordEvent(leadsDef, 'converted', { uuid: params.uuid, ...r }, user);
+          return r;
         });
-        return { contactUuid: contact.uuid, organizationUuid, dealUuid };
-      });
     },
   }),
   recordRoutes(leadsDef, 'leads'),
