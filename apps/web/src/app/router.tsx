@@ -6,6 +6,8 @@ import { AppShell } from '@/app/shell/app-shell';
 import { AcceptInvitePage, ForgotPasswordPage, LoginPage, ResetPasswordPage } from '@/features/auth/pages';
 import { HomePage } from '@/features/home/home-page';
 import { SettingsLayout } from '@/features/settings/layout';
+import { RecordListPage } from '@/features/records/list-page';
+import { RecordPage } from '@/features/records/record-page';
 
 const lazyPage = <T extends Record<string, unknown>>(loader: () => Promise<T>, name: keyof T) =>
   lazy(() => loader().then((m) => ({ default: m[name] as React.ComponentType })));
@@ -21,6 +23,11 @@ const VocabularyPage = lazyPage(() => import('@/features/settings/vocabulary-pag
 const UsersPage = lazyPage(() => import('@/features/settings/people-pages'), 'UsersPage');
 const TeamsPage = lazyPage(() => import('@/features/settings/people-pages'), 'TeamsPage');
 const RolesPage = lazyPage(() => import('@/features/settings/people-pages'), 'RolesPage');
+const FieldsPage = lazyPage(() => import('@/features/settings/fields-page'), 'FieldsPage');
+const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'), 'PipelinesPage');
+const DealsPage = lazyPage(() => import('@/features/deals/deals-page'), 'DealsPage');
+const TasksPage = lazyPage(() => import('@/features/activities/tasks-page'), 'TasksPage');
+const CalendarPage = lazyPage(() => import('@/features/activities/calendar-page'), 'CalendarPage');
 
 export function PageFallback() {
   return (
@@ -56,6 +63,8 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'users', element: <UsersPage /> },
   { path: 'teams', element: <TeamsPage /> },
   { path: 'roles', element: <RolesPage /> },
+  { path: 'fields', element: <FieldsPage /> },
+  { path: 'pipelines', element: <PipelinesPage /> },
 ];
 
 export const router = createBrowserRouter([
@@ -70,6 +79,16 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <HomePage /> },
+          { path: 'contacts', element: <RecordListPage entity="contact" /> },
+          { path: 'contacts/:uuid', element: <RecordPage entity="contact" /> },
+          { path: 'organizations', element: <RecordListPage entity="organization" /> },
+          { path: 'organizations/:uuid', element: <RecordPage entity="organization" /> },
+          { path: 'leads', element: <RecordListPage entity="lead" /> },
+          { path: 'leads/:uuid', element: <RecordPage entity="lead" /> },
+          { path: 'deals', element: page(<DealsPage />) },
+          { path: 'deals/:uuid', element: <RecordPage entity="deal" /> },
+          { path: 'tasks', element: page(<TasksPage />) },
+          { path: 'calendar', element: page(<CalendarPage />) },
           {
             path: 'settings',
             element: <SettingsLayout available={settingsPages.map((p) => p.path)} />,
