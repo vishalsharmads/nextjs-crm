@@ -1,0 +1,7 @@
+# One string per line (case-insensitive). The build fails if any appears in user-facing output.
+# Add vendor, agency or product names here so they can never leak into a client's instance.
+Acme
+Lorem ipsum
+Powered by
+Claude
+Anthropic
