@@ -18,11 +18,18 @@ import { auditRoutes, dashboardRoutes } from './dashboard/dashboard.routes';
 import { blueprintsRoutes, modulesRoutes } from './platform/platform.routes';
 import { privacyRoutes } from './privacy/privacy.routes';
 import { docsRoutes } from './platform/docs.routes';
+import { apiKeysRoutes } from './api-keys/api-keys';
+import { webhooksRoutes } from './webhooks/webhooks';
+import { automationsRoutes } from './automations/automations';
+import { formsRoutes, publicFormsRoutes } from './forms/forms';
+import { templatesRoutes } from './templates/templates';
+import { emailRoutes } from './email/email';
 
 /** All core route groups. Specific paths (e.g. /deals/board) are registered before /:uuid. */
 export function coreRouteGroups(): RouteGroup[] {
   return [
     publicRoutes,
+    publicFormsRoutes,
     authRoutes,
     meRoutes,
     usersRoutes,
@@ -48,6 +55,12 @@ export function coreRouteGroups(): RouteGroup[] {
     modulesRoutes,
     privacyRoutes,
     docsRoutes,
+    apiKeysRoutes,
+    webhooksRoutes,
+    automationsRoutes,
+    formsRoutes,
+    templatesRoutes,
+    emailRoutes,
     ...entityCollectionRoutes(),
     ...contactsRoutes,
     ...organizationsRoutes,
