@@ -47,6 +47,8 @@ export interface AccessDto {
   scopes: Record<string, Scope>;
   /** entity → field key → level */
   fields: Record<string, Record<string, VisibilityLevel>>;
+  /** Workspace requires this admin to turn on 2FA before doing anything else. */
+  mfaSetupRequired: boolean;
 }
 
 export interface SessionDto {

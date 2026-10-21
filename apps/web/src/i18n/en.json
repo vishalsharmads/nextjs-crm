@@ -117,8 +117,9 @@
     "sources": "Sources",
     "sourcesHelp": "Where {{contactPluralLower}} and {{leadPluralLower}} come from. Used for attribution reports.",
     "lifecycle": "Lifecycle statuses",
-    "lifecycleHelp": "The stages a relationship with a {{contactLower}} moves through.",
+    "lifecycleHelp": "The stages each {{contactLower}} moves through.",
     "lostReasons": "Lost reasons",
-    "lostReasonsHelp": "Asked when a {{dealLower}} is marked lost, so you can see why."
+    "lostReasonsHelp": "Asked whenever {{dealPluralLower}} are marked lost, so you can see why.",
+    "vocabularyHelp": "Use the words your team already uses. Names change everywhere: menus, titles, buttons, empty states and emails."
   }
 }

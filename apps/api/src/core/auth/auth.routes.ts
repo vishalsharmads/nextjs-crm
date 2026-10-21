@@ -121,20 +121,22 @@ export const meRoutes = defineRoutes('/me', ['me'])
     permission: 'authenticated',
     body: profileSchema,
     handler: async ({ ctx, user, body }) => {
-      await db('users')
-        .where({ id: user.id })
-        .update({
-          ...(body.firstName !== undefined ? { first_name: body.firstName } : {}),
-          ...(body.lastName !== undefined ? { last_name: body.lastName } : {}),
-          ...(body.locale !== undefined ? { locale: body.locale } : {}),
-          ...(body.timezone !== undefined ? { timezone: body.timezone } : {}),
+      await db.transaction(async (trx) => {
+        await trx('users')
+          .where({ id: user.id })
+          .update({
+            ...(body.firstName !== undefined ? { first_name: body.firstName } : {}),
+            ...(body.lastName !== undefined ? { last_name: body.lastName } : {}),
+            ...(body.locale !== undefined ? { locale: body.locale } : {}),
+            ...(body.timezone !== undefined ? { timezone: body.timezone } : {}),
+          });
+        await audit(trx, ctx, {
+          action: 'user.profile_updated',
+          entity: 'user',
+          entityId: user.id,
+          entityUuid: user.uuid,
+          diff: body,
         });
-      await audit(db, ctx, {
-        action: 'user.profile_updated',
-        entity: 'user',
-        entityId: user.id,
-        entityUuid: user.uuid,
-        diff: body,
       });
       return getMe(user.id);
     },
@@ -143,6 +145,7 @@ export const meRoutes = defineRoutes('/me', ['me'])
     method: 'post',
     path: '/password',
     permission: 'authenticated',
+    before: [authLimiter],
     body: changePasswordSchema,
     handler: ({ ctx, user, body }) =>
       auth.changePassword(ctx, user.id, body.currentPassword, body.newPassword),
@@ -151,12 +154,14 @@ export const meRoutes = defineRoutes('/me', ['me'])
     method: 'post',
     path: '/2fa/setup',
     permission: 'authenticated',
-    handler: ({ user }) => auth.setupTotp(user.id, user.email),
+    before: [authLimiter],
+    handler: ({ ctx, user }) => auth.setupTotp(ctx, user.id, user.email),
   })
   .add({
     method: 'post',
     path: '/2fa/enable',
     permission: 'authenticated',
+    before: [authLimiter],
     body: totpCodeSchema,
     handler: ({ ctx, user, body }) => auth.enableTotp(ctx, user.id, body.code),
   })
@@ -164,6 +169,7 @@ export const meRoutes = defineRoutes('/me', ['me'])
     method: 'post',
     path: '/2fa/disable',
     permission: 'authenticated',
+    before: [authLimiter],
     body: z.object({ password: z.string().min(1).max(256) }),
     handler: ({ ctx, user, body }) => auth.disableTotp(ctx, user.id, body.password),
   })
@@ -199,7 +205,9 @@ export const meRoutes = defineRoutes('/me', ['me'])
     handler: async ({ ctx, user, params }) => {
       const s = await db('sessions').where({ uuid: params.uuid, user_id: user.id }).first('family_id');
       if (!s) throw notFound('Session');
-      await revokeFamily(s.family_id);
-      await audit(db, ctx, { action: 'auth.session_revoked', entity: 'user', entityId: user.id });
+      await db.transaction(async (trx) => {
+        await revokeFamily(s.family_id, trx);
+        await audit(trx, ctx, { action: 'auth.session_revoked', entity: 'user', entityId: user.id });
+      });
     },
   });

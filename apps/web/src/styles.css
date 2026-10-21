@@ -7,15 +7,16 @@
  * These defaults only cover first paint before branding loads.
  */
 :root {
-  --canvas: #f3f5f4;
-  --surface: #ffffff;
-  --ink: #17201d;
-  --line: #dce3e0;
-  --primary: #1f6f5c;
-  --primary-fg: #ffffff;
-  --secondary: #3b4a63;
-  --accent: #c2410c;
-  --accent-fg: #ffffff;
+  /* No literals here: theme/defaults.ts is applied before first render (main.tsx). System colors cover the instant before. */
+  --canvas: Canvas;
+  --surface: Canvas;
+  --ink: CanvasText;
+  --line: GrayText;
+  --primary: LinkText;
+  --primary-fg: Canvas;
+  --secondary: GrayText;
+  --accent: Mark;
+  --accent-fg: MarkText;
   --radius: 8px;
   --font-family: 'IBM Plex Sans', system-ui, sans-serif;
 

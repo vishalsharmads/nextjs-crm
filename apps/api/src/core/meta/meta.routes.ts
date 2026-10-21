@@ -14,7 +14,13 @@ export async function accessFor(user: AuthUser): Promise<AccessDto> {
   const fields: AccessDto['fields'] = {};
   for (const entity of CUSTOMIZABLE_ENTITIES)
     fields[entity] = fieldAccessMap(await getDefinitions(entity), user);
-  return { isAdmin: user.isAdmin, permissions: user.permissions, scopes: user.scopes, fields };
+  return {
+    isAdmin: user.isAdmin,
+    permissions: user.permissions,
+    scopes: user.scopes,
+    fields,
+    mfaSetupRequired: !!user.mfaSetupRequired,
+  };
 }
 
 export async function getLayouts(): Promise<LayoutDto[]> {

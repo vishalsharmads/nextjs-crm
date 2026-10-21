@@ -122,17 +122,24 @@ export async function createOneTimeToken(
   return token;
 }
 
+/** Atomically consume a one-time token: exactly one concurrent caller can succeed. */
 export async function consumeOneTimeToken(
   conn: Db,
   token: string,
   purpose: 'reset' | 'invite' | 'mfa',
 ): Promise<number | null> {
-  const row = await conn('auth_tokens')
-    .where({ token_hash: sha256(token), purpose })
+  const hash = sha256(token);
+  const row = await conn('auth_tokens').where({ token_hash: hash, purpose }).first('user_id');
+  if (!row) return null;
+  const affected = await conn('auth_tokens')
+    .where({ token_hash: hash, purpose })
     .whereNull('used_at')
     .where('expires_at', '>', new Date())
-    .first();
-  if (!row) return null;
-  await conn('auth_tokens').where({ id: row.id }).update({ used_at: new Date() });
-  return row.user_id as number;
+    .update({ used_at: new Date() });
+  return affected === 1 ? (row.user_id as number) : null;
+}
+
+/** Invalidate every unused one-time token for a user (on disable, password change). */
+export async function burnUserTokens(conn: Db, userId: number) {
+  await conn('auth_tokens').where({ user_id: userId }).whereNull('used_at').update({ used_at: new Date() });
 }

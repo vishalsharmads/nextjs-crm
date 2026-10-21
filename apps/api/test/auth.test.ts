@@ -105,7 +105,11 @@ describe('auth', () => {
     expect(first.body.mfaRequired).toBe(true);
     expect((await fresh.get('/me')).status).toBe(401);
     await fresh.post('/auth/2fa/verify', { code: '123456' }).expect(401);
-    await fresh.post('/auth/2fa/verify', { code: totpAt(setup.body.secret, Date.now()) }).expect(200);
+    // The code used to enable 2FA cannot be replayed; the next time step's code works.
+    await fresh.post('/auth/2fa/verify', { code: totpAt(setup.body.secret, Date.now()) }).expect(401);
+    await fresh
+      .post('/auth/2fa/verify', { code: totpAt(setup.body.secret, Date.now() + 30_000) })
+      .expect(200);
     expect((await fresh.get('/me')).status).toBe(200);
   });
 

@@ -10,6 +10,11 @@ import { BrandingProvider } from '@/app/branding';
 import { SessionProvider } from '@/app/session';
 import { TooltipProvider } from '@/components/ui/menu';
 import { router } from '@/app/router';
+import { applyBranding } from '@/theme/apply';
+import { FACTORY_THEME } from '@/theme/defaults';
+
+// Factory theme until the instance's branding loads.
+applyBranding({ ...FACTORY_THEME, assets: {} }, 'system');
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

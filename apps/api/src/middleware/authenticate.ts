@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { ACCESS_COOKIE, verifyAccessToken } from '../core/auth/tokens';
 import { loadAccess } from '../core/rbac/access';
 import { db } from '../db/knex';
+import { getGroup } from '../core/settings/settings.service';
 
 /** Attach request context. Never rejects; route permission checks decide what is allowed. */
 export async function contextMiddleware(req: Request, _res: Response, next: NextFunction) {
@@ -31,7 +32,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       .whereNull('s.revoked_at')
       .whereNull('u.deleted_at')
       .where('u.status', 'active')
-      .first('u.id', 'u.uuid', 'u.email', 'u.first_name', 'u.last_name');
+      .first('u.id', 'u.uuid', 'u.email', 'u.first_name', 'u.last_name', 'u.totp_enabled');
     if (!row) return next();
     const access = await loadAccess(row.id as number);
     req.ctx.user = {
@@ -43,6 +44,10 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       sessionId: result.claims.sid,
       ...access,
     };
+    if (access.isAdmin && !row.totp_enabled) {
+      const security = await getGroup('security');
+      if (security.totpRequiredForAdmins && security.totpAllowed) req.ctx.user.mfaSetupRequired = true;
+    }
     next();
   } catch (err) {
     next(err);

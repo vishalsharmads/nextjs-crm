@@ -51,7 +51,16 @@ export function totpAt(secret: string, timeMs: number, step = 30, digits = 6): s
 
 /** Accepts the current code and one step either side for clock drift. */
 export function verifyTotp(secret: string, code: string, now = Date.now()): boolean {
-  return [-1, 0, 1].some((w) => totpAt(secret, now + w * 30_000) === code);
+  return matchTotpStep(secret, code, now) !== null;
+}
+
+/** The time step a code belongs to (for replay protection), or null if it does not match. */
+export function matchTotpStep(secret: string, code: string, now = Date.now()): number | null {
+  for (const w of [-1, 0, 1]) {
+    const t = now + w * 30_000;
+    if (totpAt(secret, t) === code) return Math.floor(t / 1000 / 30);
+  }
+  return null;
 }
 
 export function otpauthUrl(secret: string, account: string, issuer: string): string {

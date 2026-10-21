@@ -12,6 +12,7 @@ import {
 } from '@app/shared';
 import { ApiError, apiGet, onUnauthenticated } from '@/lib/api';
 import { labelVars } from '@/lib/labels';
+import { setFormatSettings } from '@/lib/format';
 
 export const bootstrapKey = ['meta', 'bootstrap'] as const;
 
@@ -42,6 +43,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       off();
     };
   }, [qc]);
+
+  useEffect(() => {
+    if (query.data) setFormatSettings(query.data.settings.general);
+  }, [query.data]);
 
   const status: SessionValue['status'] = query.isPending
     ? 'loading'

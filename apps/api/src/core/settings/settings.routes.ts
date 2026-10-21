@@ -167,6 +167,9 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
           { ...assets, [params.slot]: f.uuid },
           { isPublic: true, userId: user.id, conn: trx },
         );
+        const previous = assets[params.slot];
+        if (previous)
+          await trx('files').where({ uuid: previous }).update({ deleted_at: new Date(), is_public: false });
         await audit(trx, ctx, {
           action: 'settings.branding_asset_updated',
           entity: 'settings',
@@ -213,7 +216,7 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
         await audit(trx, ctx, {
           action: 'settings.updated',
           entity: 'settings',
-          diff: { group: params.group, changes: body },
+          diff: { group: params.group, before: current, after: next },
         });
       });
       return next;
