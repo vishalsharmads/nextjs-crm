@@ -83,7 +83,7 @@ export async function anonymousClient(): Promise<Client> {
   const agent = request.agent(app);
   const res = await agent.get('/api/v1/auth/csrf');
   const csrf = res.body.token as string;
-  const url = (p: string) => (p.startsWith('/api') ? p : `/api/v1${p}`);
+  const url = (p: string) => (p.startsWith('/api/') ? p : `/api/v1${p}`);
   return {
     agent,
     csrf,
