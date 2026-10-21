@@ -90,12 +90,12 @@ describe('blueprint engine', () => {
 
   it('dry-run reports without writing', async () => {
     const next = bump(generic, '1.3.0', (b) => {
-      b.vocabulary = { contact: { singular: 'Person', plural: 'People' } };
+      b.vocabulary = { team: { singular: 'Squad', plural: 'Squads' } };
     });
     const report = await applyBlueprint(db, next, { dryRun: true });
     expect(report.status).toBe('dry_run');
-    expect(report.created).toContain('label.contact');
-    expect(await db('labels').where({ entity_key: 'contact', singular: 'Person' }).first()).toBeUndefined();
+    expect(report.created).toContain('label.team');
+    expect(await db('labels').where({ entity_key: 'team', singular: 'Squad' }).first()).toBeUndefined();
   });
 
   it('exports the configuration as a valid, re-importable blueprint', async () => {
