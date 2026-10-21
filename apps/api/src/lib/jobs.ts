@@ -133,6 +133,10 @@ async function runJob(id: number, uuid: string, type: string, payload: Record<st
 
 // ---------- Recurring tasks ----------
 
+interface RedisLock {
+  set(key: string, value: string, px: 'PX', ttl: number, nx: 'NX'): Promise<'OK' | null>;
+}
+
 const timers: NodeJS.Timeout[] = [];
 
 /**
@@ -143,7 +147,8 @@ export function every(ms: number, name: string, fn: () => Promise<unknown>) {
   const tick = async () => {
     try {
       if (queue) {
-        const client = await queue.client;
+        // Narrow view of the Redis client: SET key value PX ttl NX (atomic lock).
+        const client = (await queue.client) as unknown as RedisLock;
         const ok = await client.set(
           `crm:schedule:${name}`,
           String(process.pid),
