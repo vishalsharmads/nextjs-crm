@@ -1,0 +1,26 @@
+{
+  "key": "notes-demo",
+  "name": "Pinned notes",
+  "version": "1.0.0",
+  "status": "available",
+  "description": "Reference module: workspace-wide pinned notes. Shows the full module contract (permissions, menu, migrations, API, web page, dashboard widget).",
+  "depends_on": [],
+  "permissions": [
+    { "key": "notes-demo.notes.view", "description": "View pinned notes" },
+    { "key": "notes-demo.notes.manage", "description": "Create and delete pinned notes" }
+  ],
+  "menu_items": [
+    {
+      "key": "notes",
+      "label": "Pinned notes",
+      "path": "/m/notes-demo",
+      "icon": "notebook",
+      "permission": "notes-demo.notes.view",
+      "order": 50
+    }
+  ],
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx",
+  "dashboard_widgets": [{ "type": "notes-demo.latest", "title": "Latest pinned notes" }]
+}
