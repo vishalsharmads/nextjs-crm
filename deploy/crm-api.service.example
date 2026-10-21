@@ -1,0 +1,24 @@
+# /etc/systemd/system/crm-<client>.service — one unit per client instance.
+[Unit]
+Description=CRM API (%i)
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=crm
+WorkingDirectory=/srv/crm/client/apps/api
+EnvironmentFile=/srv/crm/client/.env
+Environment=NODE_ENV=production
+Environment=BLUEPRINTS_DIR=/srv/crm/client/packages/blueprints
+ExecStart=/usr/bin/node dist/server.js
+Restart=on-failure
+RestartSec=3
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/srv/crm/client/storage
+
+[Install]
+WantedBy=multi-user.target
