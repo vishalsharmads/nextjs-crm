@@ -1,33 +1,33 @@
 {
   "key": "invoices",
   "name": "Invoices",
-  "version": "0.1.0",
-  "status": "stub",
-  "description": "Invoices and payments. Placeholder until Phase 4; declares permissions so blueprints can reference them.",
-  "depends_on": [],
+  "version": "1.0.0",
+  "status": "available",
+  "description": "Invoices with line items, payments and overdue tracking. Accepted quotes convert in one click.",
+  "depends_on": ["products"],
   "permissions": [
+    { "key": "invoices.invoices.view", "description": "View invoices" },
+    { "key": "invoices.invoices.create", "description": "Create invoices" },
+    { "key": "invoices.invoices.update", "description": "Edit, issue and void invoices" },
+    { "key": "invoices.invoices.delete", "description": "Delete draft invoices" },
+    { "key": "invoices.payments.manage", "description": "Record and remove payments" }
+  ],
+  "menu_items": [
     {
-      "key": "invoices.invoices.view",
-      "description": "View invoices"
-    },
-    {
-      "key": "invoices.invoices.create",
-      "description": "Create invoices"
-    },
-    {
-      "key": "invoices.invoices.update",
-      "description": "Update invoices"
-    },
-    {
-      "key": "invoices.invoices.delete",
-      "description": "Delete invoices"
+      "key": "invoices",
+      "label": "Invoices",
+      "path": "/m/invoices",
+      "icon": "receipt",
+      "permission": "invoices.invoices.view",
+      "order": 42
     }
   ],
-  "menu_items": [],
   "labels": {
-    "invoice": {
-      "singular": "Invoice",
-      "plural": "Invoices"
-    }
-  }
+    "invoice": { "singular": "Invoice", "plural": "Invoices" },
+    "payment": { "singular": "Payment", "plural": "Payments" }
+  },
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx",
+  "dashboard_widgets": [{ "type": "invoices.receivables", "title": "Outstanding invoices" }]
 }

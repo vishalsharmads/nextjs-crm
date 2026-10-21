@@ -1,3 +1,4 @@
+import { toPatch } from './patch';
 import { z } from 'zod';
 import {
   ACTIVITY_TYPES,
@@ -168,7 +169,7 @@ export const contactCreateSchema = contactInputSchema.refine(
     path: ['firstName'],
   },
 );
-export const contactPatchSchema = contactInputSchema.partial();
+export const contactPatchSchema = toPatch(contactInputSchema);
 
 export const organizationInputSchema = z.object({
   name: z.string().trim().min(1, 'Enter a name').max(200),
@@ -197,7 +198,7 @@ export const organizationInputSchema = z.object({
   tags: tagsInput,
   custom: customInput,
 });
-export const organizationPatchSchema = organizationInputSchema.partial();
+export const organizationPatchSchema = toPatch(organizationInputSchema);
 
 export const leadInputSchema = z.object({
   firstName: z.string().trim().max(100).default(''),
@@ -222,7 +223,7 @@ export const leadCreateSchema = leadInputSchema.refine(
     path: ['firstName'],
   },
 );
-export const leadPatchSchema = leadInputSchema.partial();
+export const leadPatchSchema = toPatch(leadInputSchema);
 
 export const leadConvertSchema = z.object({
   createOrganization: z.boolean().default(true),
@@ -251,7 +252,7 @@ export const dealInputSchema = z.object({
   tags: tagsInput,
   custom: customInput,
 });
-export const dealPatchSchema = dealInputSchema.partial();
+export const dealPatchSchema = toPatch(dealInputSchema);
 
 export const dealMoveSchema = z.object({
   stageUuid: z.uuid(),
@@ -285,7 +286,7 @@ export const activityCreateSchema = activityInputSchema.refine(
     path: ['subject'],
   },
 );
-export const activityPatchSchema = activityInputSchema.partial();
+export const activityPatchSchema = toPatch(activityInputSchema);
 
 export const BULK_ACTIONS = [
   'delete',

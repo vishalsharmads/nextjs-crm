@@ -1,6 +1,6 @@
 import Handlebars from 'handlebars';
 import { z } from 'zod';
-import { filterSchema, isGroup, type FilterCondition, type FilterNode } from '@app/shared';
+import { filterSchema, isGroup, type FilterCondition, type FilterNode, toPatch } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { db } from '../../db/knex';
@@ -358,7 +358,7 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
     path: '/:uuid',
     permission: 'core.automations.manage',
     params: z.object({ uuid: z.uuid() }),
-    body: automationBody.partial(),
+    body: toPatch(automationBody),
     handler: async ({ ctx, params, body }) => {
       const a = await db('automations').where({ uuid: params.uuid }).first();
       if (!a) throw notFound('Automation');

@@ -7,6 +7,7 @@ import {
   valueSchemaFor,
   visibilitySchema,
   fieldValidationSchema,
+  toPatch,
 } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
@@ -49,14 +50,11 @@ async function missingCount(entity: (typeof CUSTOMIZABLE_ENTITIES)[number], key:
   return Number((row as { c: number }).c);
 }
 
-const patchSchema = customFieldInputSchema
-  .omit({ entity: true, key: true, type: true })
-  .partial()
-  .extend({
-    options: z.array(fieldOptionSchema).optional(),
-    visibility: visibilitySchema.optional(),
-    validation: fieldValidationSchema.optional(),
-  });
+const patchSchema = toPatch(customFieldInputSchema.omit({ entity: true, key: true, type: true })).extend({
+  options: z.array(fieldOptionSchema).optional(),
+  visibility: visibilitySchema.optional(),
+  validation: fieldValidationSchema.optional(),
+});
 
 export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields'])
   .add({

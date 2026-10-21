@@ -7,6 +7,7 @@ import { installCore, markInstalled } from './install';
 import { runDoctor } from './doctor';
 import { hashPassword, validatePassword } from '../core/auth/auth.service';
 import { randomToken } from '../lib/crypto';
+import { newUuid } from '../lib/ids';
 import { clearSettingsCache } from '../core/settings/settings.service';
 
 type Command = (args: string[]) => Promise<void>;
@@ -114,34 +115,96 @@ const commands: Record<string, Command> = {
     }
   },
 
+  /**
+   * Create (or refresh) one demo user per role and store them for the sign-in screen.
+   * They only show while DEMO_MODE=true. Never run this on a client instance.
+   */
+  async 'demo:seed'(args) {
+    const { values } = parseArgs({
+      args,
+      options: { password: { type: 'string' }, domain: { type: 'string' }, roles: { type: 'string' } },
+    });
+    const password = values.password ?? 'DemoAccess2026!';
+    await validatePassword(password);
+    const domain = (values.domain ?? 'demo.test').toLowerCase();
+    const wanted = values.roles?.split(',').map((r) => r.trim());
+    const roles = await db('roles')
+      .modify((q) => (wanted ? q.whereIn('key', wanted) : q))
+      .orderBy('id')
+      .select('id', 'key', 'name');
+    if (!roles.length) throw new Error('No matching roles. Apply a blueprint first.');
+    const hash = await hashPassword(password);
+    const accounts: { label: string; email: string; password: string }[] = [];
+    for (const role of roles) {
+      const email = `demo.${String(role.key).replace(/_/g, '-')}@${domain}`;
+      const existing = await db('users').where({ email }).first('id');
+      let id = existing?.id as number | undefined;
+      if (id) {
+        await db('users')
+          .where({ id })
+          .update({
+            password_hash: hash,
+            status: 'active',
+            failed_login_count: 0,
+            locked_until: null,
+            deleted_at: null,
+          });
+      } else {
+        [id] = await db('users').insert({
+          uuid: newUuid(),
+          email,
+          first_name: 'Demo',
+          last_name: role.name,
+          status: 'active',
+          password_hash: hash,
+        });
+      }
+      await db('user_roles').where({ user_id: id }).delete();
+      await db('user_roles').insert({ user_id: id, role_id: role.id });
+      accounts.push({ label: role.name as string, email, password });
+    }
+    await db('settings')
+      .insert({ key: 'demo_login', group: 'system', value: JSON.stringify({ accounts }), is_public: false })
+      .onConflict('key')
+      .merge();
+    clearSettingsCache();
+    for (const a of accounts) out(`${a.label.padEnd(24)} ${a.email}`);
+    out(`Password for all: ${password}`);
+    out(
+      env.DEMO_MODE
+        ? 'Shown on the sign-in screen (DEMO_MODE=true).'
+        : 'Hidden until you set DEMO_MODE=true in .env and restart the API.',
+    );
+  },
+
+  /** Show one existing account on the sign-in screen (while DEMO_MODE=true). */
   async 'demo:enable'(args) {
     const { values } = parseArgs({
       args,
-      options: { email: { type: 'string' }, password: { type: 'string' } },
+      options: { email: { type: 'string' }, password: { type: 'string' }, label: { type: 'string' } },
     });
     if (!values.email || !values.password)
       throw new Error('Pass --email and --password of an existing account');
     const user = await db('users').where({ email: values.email.toLowerCase() }).first('id');
     if (!user) throw new Error('No user with that email');
+    const accounts = [
+      { label: values.label ?? 'Admin', email: values.email.toLowerCase(), password: values.password },
+    ];
     await db('settings')
-      .insert({
-        key: 'demo_login',
-        group: 'system',
-        value: JSON.stringify({
-          enabled: true,
-          email: values.email.toLowerCase(),
-          password: values.password,
-        }),
-        is_public: true,
-      })
+      .insert({ key: 'demo_login', group: 'system', value: JSON.stringify({ accounts }), is_public: false })
       .onConflict('key')
       .merge();
-    out('Demo sign-in details will show on the sign-in screen. Never enable this on a client instance.');
+    clearSettingsCache();
+    out(
+      env.DEMO_MODE
+        ? 'Demo sign-in details will show on the sign-in screen. Never enable this on a client instance.'
+        : 'Saved. Set DEMO_MODE=true in .env and restart the API to show it.',
+    );
   },
 
   async 'demo:disable'() {
     await db('settings').where({ key: 'demo_login' }).delete();
-    out('Demo sign-in details removed.');
+    out('Demo sign-in details removed. Demo users still exist; disable them in Settings → People if needed.');
   },
 
   async doctor() {

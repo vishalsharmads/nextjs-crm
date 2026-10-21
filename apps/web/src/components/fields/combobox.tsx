@@ -29,6 +29,7 @@ export function Combobox({
   renderValue,
   'aria-invalid': ariaInvalid,
   'aria-describedby': describedBy,
+  'aria-label': ariaLabel,
 }: {
   id?: string;
   value: string | string[] | null;
@@ -45,6 +46,7 @@ export function Combobox({
   renderValue?: (selected: ComboOption[]) => ReactNode;
   'aria-invalid'?: boolean;
   'aria-describedby'?: string;
+  'aria-label'?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -70,6 +72,7 @@ export function Combobox({
           type="button"
           aria-invalid={ariaInvalid}
           aria-describedby={describedBy}
+          aria-label={ariaLabel}
           aria-haspopup="listbox"
           className="flex min-h-8 w-full items-center gap-1.5 rounded-sm border border-line bg-surface px-2.5 py-1 text-start text-sm transition-colors hover:border-line-strong focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-soft disabled:opacity-60 aria-[invalid=true]:border-accent"
         >

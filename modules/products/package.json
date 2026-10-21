@@ -1,0 +1,12 @@
+{
+  "name": "@app/module-products",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@app/api": "*",
+    "@app/module-sdk": "*",
+    "@app/shared": "*",
+    "zod": "4.6.7"
+  }
+}

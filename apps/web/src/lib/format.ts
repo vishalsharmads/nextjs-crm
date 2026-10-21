@@ -14,13 +14,19 @@ export function setFormatSettings(s: typeof settings) {
 
 const locale = () => (typeof navigator !== 'undefined' ? navigator.language : settings.locale);
 
-export function formatMoney(value: number | null | undefined, currency = settings.currency): string {
+/** Money for summaries (whole amounts drop their decimals). Pass `exact` on documents, where cents always show. */
+export function formatMoney(
+  value: number | null | undefined,
+  currency = settings.currency,
+  exact = false,
+): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '';
   try {
     return new Intl.NumberFormat(locale(), {
       style: 'currency',
       currency,
-      maximumFractionDigits: value % 1 === 0 ? 0 : 2,
+      ...(exact ? { minimumFractionDigits: 2 } : {}),
+      maximumFractionDigits: !exact && value % 1 === 0 ? 0 : 2,
     }).format(value);
   } catch {
     return `${currency} ${value}`;

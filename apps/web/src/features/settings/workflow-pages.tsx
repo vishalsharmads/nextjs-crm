@@ -59,6 +59,19 @@ function useEventLabel() {
     completed: 'is completed',
     converted: 'is converted',
     submitted: 'is submitted',
+    sent: 'is sent',
+    accepted: 'is accepted',
+    declined: 'is declined',
+    issued: 'is issued',
+    paid: 'is paid in full',
+    overdue: 'becomes overdue',
+    voided: 'is voided',
+    recorded: 'is recorded',
+    activated: 'becomes active',
+    renewal_due: 'is due for renewal',
+    renewed: 'is renewed',
+    expired: 'expires',
+    cancelled: 'is cancelled',
   };
   return (event: string) => {
     const [entity, action] = event.split('.') as [string, string];

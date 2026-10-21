@@ -82,7 +82,9 @@
     "verify": "Verify",
     "notInstalled": "This workspace has not been set up yet. Ask your administrator to run the installer.",
     "demoTitle": "Demo account",
-    "demoUse": "Sign in with the demo account"
+    "demoUse": "Sign in",
+    "demoTitlePlural": "Demo accounts",
+    "demoHelp": "Pick a role to sign in and look around."
   },
   "home": {
     "greeting": "Good to see you, {{name}}"

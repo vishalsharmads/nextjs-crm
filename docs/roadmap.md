@@ -2,13 +2,13 @@
 
 Phases come from the product brief. Ideas that come up during a phase but sit outside its scope go under **Future** rather than into the code.
 
-| Phase | Scope                                                                                                                                                                                     | Status                                      |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| 0     | Planning: architecture, schema, API, blueprint and module contracts                                                                                                                       | Awaiting approval ([plan](plan/phase-0.md)) |
-| 1     | Foundation: auth, RBAC, branding, vocabulary, custom fields, contacts, organizations, deals, activities, views, import/export, dashboard, audit, notifications, blueprints, module loader | Not started                                 |
-| 2     | Configuration and communication: layout builder UI, workflow automation, templates manager, email integration, web forms, webhooks, API keys, BullMQ jobs                                 | Not started                                 |
-| 3     | Commercial: products, quotes, invoices, payments, contracts and renewals, client portal                                                                                                   | Not started                                 |
-| 4     | Operational and industry modules: bookings, tickets, documents, inventory/assets, vertical modules                                                                                        | Not started                                 |
+| Phase | Scope                                                                                                                                                                                     | Status                         |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| 0     | Planning: architecture, schema, API, blueprint and module contracts                                                                                                                       | Done ([plan](plan/phase-0.md)) |
+| 1     | Foundation: auth, RBAC, branding, vocabulary, custom fields, contacts, organizations, deals, activities, views, import/export, dashboard, audit, notifications, blueprints, module loader | Done                           |
+| 2     | Configuration and communication: layout builder UI, workflow automation, templates manager, email integration, web forms, webhooks, API keys, BullMQ jobs                                 | Done                           |
+| 3     | Commercial: products, quotes, invoices, payments, contracts and renewals, client portal                                                                                                   | Done                           |
+| 4     | Operational and industry modules: bookings, tickets, documents, inventory/assets, vertical modules                                                                                        | Not started                    |
 
 ## Future
 
@@ -27,3 +27,11 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - Per-user notification preferences UI (the `preferences.emailNotifications` flag exists).
 - OAuth mailbox connection (Google, Microsoft) instead of app passwords.
 - Threaded email view and reply-from-CRM using `In-Reply-To`.
+- Credit notes and refunds (Phase 3 voids unpaid invoices only).
+- Online card payments from the client portal (payment provider integration).
+- Recurring invoices generated from active contracts.
+- Server-side PDF rendering (Phase 3 prints from the browser, which is also "Save as PDF").
+- E-signature with document hashing for quote acceptance (Phase 3 records a typed name, time and IP in the audit log).
+- Quote and invoice panels on deal and organization record pages.
+- Scope-filter linked record names on commercial documents (a document's owner sees its linked contact or deal name even when that record is outside their scope), and re-check link scope when duplicating or converting.
+- Purge expired portal tokens and sessions on a schedule.

@@ -1,3 +1,4 @@
+import { toPatch } from '@app/shared';
 import { lookup } from 'node:dns/promises';
 import net from 'node:net';
 import { z } from 'zod';
@@ -104,16 +105,14 @@ async function deliver(deliveryId: number) {
     error = (err as Error).message.slice(0, 900);
   }
   if (!error) {
-    await db('webhook_deliveries')
-      .where({ id: d.id })
-      .update({
-        status: 'succeeded',
-        attempts,
-        response_status: status,
-        error: null,
-        delivered_at: new Date(),
-        next_attempt_at: null,
-      });
+    await db('webhook_deliveries').where({ id: d.id }).update({
+      status: 'succeeded',
+      attempts,
+      response_status: status,
+      error: null,
+      delivered_at: new Date(),
+      next_attempt_at: null,
+    });
     await db('webhooks').where({ id: d.wid }).update({ failure_count: 0 });
     return;
   }
@@ -239,7 +238,7 @@ export const webhooksRoutes = defineRoutes('/webhooks', ['webhooks'])
     path: '/:uuid',
     permission: 'core.webhooks.manage',
     params: z.object({ uuid: z.uuid() }),
-    body: body.partial(),
+    body: toPatch(body),
     handler: async ({ ctx, params, body: b }) => {
       const w = await db('webhooks').where({ uuid: params.uuid }).first();
       if (!w) throw notFound('Webhook');

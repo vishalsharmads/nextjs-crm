@@ -1,0 +1,29 @@
+{
+  "key": "contracts",
+  "name": "Contracts",
+  "version": "1.0.0",
+  "status": "available",
+  "description": "Agreements with start and end dates, renewal reminders and automatic renewal.",
+  "depends_on": [],
+  "permissions": [
+    { "key": "contracts.contracts.view", "description": "View contracts" },
+    { "key": "contracts.contracts.create", "description": "Create contracts" },
+    { "key": "contracts.contracts.update", "description": "Edit, activate, renew and cancel contracts" },
+    { "key": "contracts.contracts.delete", "description": "Delete draft contracts" }
+  ],
+  "menu_items": [
+    {
+      "key": "contracts",
+      "label": "Contracts",
+      "path": "/m/contracts",
+      "icon": "clipboard-list",
+      "permission": "contracts.contracts.view",
+      "order": 43
+    }
+  ],
+  "labels": { "contract": { "singular": "Contract", "plural": "Contracts" } },
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx",
+  "dashboard_widgets": [{ "type": "contracts.renewals", "title": "Upcoming renewals" }]
+}

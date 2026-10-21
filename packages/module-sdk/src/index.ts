@@ -93,4 +93,11 @@ export function sortByDependencies(manifests: ModuleManifest[]): ModuleManifest[
 export interface WebModule<Element = unknown> {
   key: string;
   routes: { path: string; element: Element }[];
+  /**
+   * Pages for people who are not users (customers), rendered without the app shell or a staff session
+   * under /p/<key>/. The module's API must authenticate these callers itself.
+   */
+  publicRoutes?: { path: string; element: Element }[];
+  /** Renderers for this module's dashboard widgets, keyed by widget type (`<key>.<name>`). */
+  widgets?: Record<string, (props: { data: unknown }) => Element>;
 }

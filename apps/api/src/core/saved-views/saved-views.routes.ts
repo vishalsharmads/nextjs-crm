@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CUSTOMIZABLE_ENTITIES, filterSchema } from '@app/shared';
+import { CUSTOMIZABLE_ENTITIES, filterSchema, toPatch } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
 import { AppError, notFound } from '../../lib/errors';
@@ -91,7 +91,7 @@ export const savedViewsRoutes = defineRoutes('/saved-views', ['saved-views'])
     path: '/:uuid',
     permission: 'authenticated',
     params: z.object({ uuid: z.uuid() }),
-    body: viewBody.omit({ entity: true }).partial(),
+    body: toPatch(viewBody.omit({ entity: true })),
     handler: async ({ ctx, user, params, body }) => {
       const v = await editable(params.uuid, user);
       if (

@@ -8,7 +8,7 @@ import { AcceptInvitePage, ForgotPasswordPage, LoginPage, ResetPasswordPage } fr
 import { SettingsLayout } from '@/features/settings/layout';
 import { RecordListPage } from '@/features/records/list-page';
 import { RecordPage } from '@/features/records/record-page';
-import { ModuleOutlet } from '@/modules/loader';
+import { ModuleOutlet, PublicModuleOutlet } from '@/modules/loader';
 
 const lazyPage = <T extends Record<string, unknown>>(loader: () => Promise<T>, name: keyof T) =>
   lazy(() => loader().then((m) => ({ default: m[name] as React.ComponentType })));
@@ -45,6 +45,10 @@ const AutomationsPage = lazyPage(() => import('@/features/settings/workflow-page
 const FormsPage = lazyPage(() => import('@/features/settings/workflow-pages'), 'FormsPage');
 const LayoutBuilderPage = lazyPage(() => import('@/features/settings/layout-builder'), 'LayoutBuilderPage');
 const PublicFormPage = lazyPage(() => import('@/features/forms/public-form-page'), 'PublicFormPage');
+const CommerceSettingsPage = lazyPage(
+  () => import('@/features/settings/commerce-page'),
+  'CommerceSettingsPage',
+);
 const CalendarPage = lazyPage(() => import('@/features/activities/calendar-page'), 'CalendarPage');
 
 export function PageFallback() {
@@ -94,6 +98,7 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'automations', element: <AutomationsPage /> },
   { path: 'forms', element: <FormsPage /> },
   { path: 'layouts', element: <LayoutBuilderPage /> },
+  { path: 'sales-documents', element: <CommerceSettingsPage /> },
 ];
 
 /** Shown instead of a blank screen when a page throws while rendering. */
@@ -115,6 +120,7 @@ export const router = createBrowserRouter([
   { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/accept-invite', element: <AcceptInvitePage /> },
   { path: '/f/:uuid', element: page(<PublicFormPage />) },
+  { path: '/p/:moduleKey/*', element: <PublicModuleOutlet />, errorElement: <RouteError /> },
   {
     element: <RequireAuth />,
     errorElement: <RouteError />,

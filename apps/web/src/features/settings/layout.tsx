@@ -1,5 +1,5 @@
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router';
-import { useCan, useT } from '@/app/session';
+import { useBoot, useCan, useT } from '@/app/session';
 import { cn } from '@/lib/cn';
 
 interface SettingsLink {
@@ -11,6 +11,8 @@ interface SettingsLink {
 export function useSettingsSections() {
   const t = useT();
   const can = useCan();
+  const { modules } = useBoot();
+  const commerceOn = ['quotes', 'invoices', 'contracts'].some((k) => modules.enabled.includes(k));
   const sections: { title: string; links: SettingsLink[] }[] = [
     { title: t('settings.account'), links: [{ to: 'profile', label: t('settings.profile') }] },
     {
@@ -20,6 +22,9 @@ export function useSettingsSections() {
         { to: 'branding', label: t('settings.branding'), permission: 'core.branding.manage' },
         { to: 'vocabulary', label: t('settings.vocabulary'), permission: 'core.labels.manage' },
         { to: 'security', label: t('settings.security'), permission: 'core.settings.manage' },
+        ...(commerceOn
+          ? [{ to: 'sales-documents', label: 'Sales documents', permission: 'core.settings.manage' }]
+          : []),
       ],
     },
     {
