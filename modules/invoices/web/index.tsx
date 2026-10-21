@@ -633,6 +633,7 @@ function InvoiceDetail() {
         <PaymentsPane invoice={inv} />
         <DocumentPaper
           kind={nouns.one}
+          business={boot.settings.commerce}
           partyLabel="Billed to"
           number={inv.number}
           title={inv.title}

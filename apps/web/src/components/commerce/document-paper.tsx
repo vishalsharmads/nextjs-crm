@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useBoot } from '@/app/session';
+import type { CommerceSettings } from '@app/shared';
 import { useBranding } from '@/app/branding';
 import { formatDate, formatMoney } from '@/lib/format';
 import { TotalsSummary, type LineDto } from './line-items';
@@ -15,6 +15,7 @@ export interface RecordRef {
  */
 export function DocumentPaper({
   kind,
+  business,
   partyLabel = 'Prepared for',
   number,
   title,
@@ -30,6 +31,8 @@ export function DocumentPaper({
   footer,
 }: {
   kind: string;
+  /** Business details printed in the header (settings → sales documents). */
+  business: CommerceSettings;
   partyLabel?: string;
   number: string;
   title?: string;
@@ -44,9 +47,8 @@ export function DocumentPaper({
   terms?: string | null;
   footer?: ReactNode;
 }) {
-  const { settings } = useBoot();
   const { branding } = useBranding();
-  const company = settings.commerce;
+  const company = business;
   const logo = branding.assets.logoLight;
   return (
     <article className="mx-auto w-full max-w-4xl rounded-md border border-line bg-surface p-6 text-sm shadow-sm md:p-10 print:max-w-none print:border-0 print:p-0 print:shadow-none">

@@ -89,3 +89,37 @@ export function ModuleWidget({ type, data }: { type: string; data: unknown }) {
   if (!Render) return <Spinner />;
   return Render({ data });
 }
+
+function PublicRoutes({ mod }: { mod: Mod }) {
+  return useRoutes(
+    (mod.publicRoutes ?? []).map((r) => ({ path: r.path ? `${r.path}/*` : '*', element: r.element })),
+  );
+}
+
+/** Customer-facing module pages (/p/<key>/...): no staff session, no app shell. */
+export function PublicModuleOutlet() {
+  const { moduleKey = '' } = useParams();
+  const known = loaders.has(moduleKey);
+  const [state, setState] = useState<{ key: string; mod?: Mod; error?: unknown } | null>(null);
+  useEffect(() => {
+    if (!known) return;
+    let live = true;
+    loadModule(moduleKey).then(
+      (mod) => live && setState({ key: moduleKey, mod }),
+      (error: unknown) => live && setState({ key: moduleKey, error }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [moduleKey, known]);
+  if (!known) return <Navigate to="/login" replace />;
+  if (state?.key === moduleKey && state.error) return <ErrorState error={state.error} />;
+  if (state?.key !== moduleKey || !state.mod)
+    return (
+      <div className="flex h-dvh items-center justify-center text-muted">
+        <Spinner />
+      </div>
+    );
+  if (!state.mod.publicRoutes?.length) return <Navigate to="/login" replace />;
+  return <PublicRoutes mod={state.mod} />;
+}

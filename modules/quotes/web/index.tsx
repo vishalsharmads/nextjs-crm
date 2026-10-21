@@ -498,6 +498,7 @@ function QuoteDetail() {
         ) : null}
         <DocumentPaper
           kind={nouns.one}
+          business={boot.settings.commerce}
           number={q.number}
           title={q.title}
           organization={q.organization}

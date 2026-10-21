@@ -8,7 +8,7 @@ import { AcceptInvitePage, ForgotPasswordPage, LoginPage, ResetPasswordPage } fr
 import { SettingsLayout } from '@/features/settings/layout';
 import { RecordListPage } from '@/features/records/list-page';
 import { RecordPage } from '@/features/records/record-page';
-import { ModuleOutlet } from '@/modules/loader';
+import { ModuleOutlet, PublicModuleOutlet } from '@/modules/loader';
 
 const lazyPage = <T extends Record<string, unknown>>(loader: () => Promise<T>, name: keyof T) =>
   lazy(() => loader().then((m) => ({ default: m[name] as React.ComponentType })));
@@ -120,6 +120,7 @@ export const router = createBrowserRouter([
   { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/accept-invite', element: <AcceptInvitePage /> },
   { path: '/f/:uuid', element: page(<PublicFormPage />) },
+  { path: '/p/:moduleKey/*', element: <PublicModuleOutlet />, errorElement: <RouteError /> },
   {
     element: <RequireAuth />,
     errorElement: <RouteError />,
