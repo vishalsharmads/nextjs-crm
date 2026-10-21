@@ -167,7 +167,7 @@ function AccountsPage() {
             <table className="w-full min-w-[720px] text-sm">
               <thead className="border-b border-line bg-subtle text-xs text-muted">
                 <tr>
-                  <th className="px-4 py-2 text-start font-medium">Customer</th>
+                  <th className="px-4 py-2 text-start font-medium">{L.contact}</th>
                   <th className="px-4 py-2 text-start font-medium">Sees</th>
                   <th className="px-4 py-2 text-start font-medium">Last sign-in</th>
                   <th className="w-56" aria-label="Actions" />
@@ -255,7 +255,7 @@ interface Me {
   name: string;
   firstName: string;
   email: string;
-  business: CommerceSettings & { name: string };
+  business: Pick<CommerceSettings, 'legalName' | 'address' | 'taxId' | 'email' | 'phone'> & { name: string };
   features: { quotes: boolean; invoices: boolean; contracts: boolean };
 }
 

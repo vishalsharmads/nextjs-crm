@@ -5,11 +5,21 @@ import { db } from '../src/db/knex';
 const P = '/public/portal';
 const tokenFrom = (text: string) => decodeURIComponent(/token=([^\s&"]+)/.exec(text)![1]!);
 
+/** Sign-in mail is sent in the background; wait briefly for it. */
+async function nextMail() {
+  for (let i = 0; i < 50; i++) {
+    const mails = takeMail();
+    if (mails.length) return mails;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  return [];
+}
+
 async function signIn(email: string): Promise<Client> {
   takeMail();
   const customer = await anonymousClient();
   await customer.post(`${P}/login`, { email }).expect(200);
-  const [mail] = takeMail();
+  const [mail] = await nextMail();
   if (!mail) throw new Error('no login mail');
   await customer.post(`${P}/session`, { token: tokenFrom(mail.text) }).expect(200);
   return customer;
@@ -46,10 +56,13 @@ describe('client portal', () => {
     // Unknown and known emails get the same answer; only the known one gets mail.
     const anon = await anonymousClient();
     const unknown = await anon.post(`${P}/login`, { email: 'nobody@example.test' }).expect(200);
-    expect(takeMail()).toHaveLength(0);
+    expect(await nextMail()).toHaveLength(0);
     const known = await anon.post(`${P}/login`, { email: 'PAULA.portal@example.test' }).expect(200);
     expect(known.body).toEqual(unknown.body);
-    expect(takeMail()).toHaveLength(1);
+    expect(await nextMail()).toHaveLength(1);
+    // A second request within a minute sends nothing (no inbox flooding).
+    await anon.post(`${P}/login`, { email: 'paula.portal@example.test' }).expect(200);
+    expect(await nextMail()).toHaveLength(0);
 
     // A portal session is not a staff session, and a staff session is not a portal session.
     expect((await customer.get('/contacts')).status).toBe(401);
@@ -94,6 +107,7 @@ describe('client portal', () => {
     expect(quoteIds).toEqual([mine.body.uuid]);
     expect(docs.body.invoices.map((i: { uuid: string }) => i.uuid)).toEqual([inv.body.uuid]);
     expect(docs.body.quotes[0].owner).toBeUndefined();
+    expect(docs.body.quotes[0].deal).toBeUndefined();
     expect((await customer.get(`${P}/quotes/${draft.body.uuid}`)).status).toBe(404);
     expect((await customer.get(`${P}/quotes/${someoneElse.body.uuid}`)).status).toBe(404);
     expect((await customer.get(`${P}/quotes/${orgQuote.body.uuid}`)).status).toBe(404);
@@ -125,14 +139,32 @@ describe('client portal', () => {
     expect((await customer.get(`${P}/documents`)).status).toBe(401);
   });
 
-  it('only lets staff invite contacts inside their own scope', async () => {
+  it('only lets staff manage portal access for contacts inside their own scope', async () => {
     const hidden = await staff
       .post('/contacts', { firstName: 'Hidden', email: 'hidden.portal@example.test' })
       .expect(201);
+    const acc = await staff.post('/m/portal/accounts', { contactUuid: hidden.body.uuid }).expect(201);
     const role = await createRole(['portal.accounts.manage', 'core.contacts.view'], { '*': 'own' });
     const { client } = await clientWithRoles([role]);
     expect((await client.post('/m/portal/accounts', { contactUuid: hidden.body.uuid })).status).toBe(422);
+    const list = await client.get('/m/portal/accounts').expect(200);
+    expect(list.body.data.some((a: { uuid: string }) => a.uuid === acc.body.uuid)).toBe(false);
+    expect(
+      (await client.patch(`/m/portal/accounts/${acc.body.uuid}`, { organizationAccess: true })).status,
+    ).toBe(404);
+    expect((await client.post(`/m/portal/accounts/${acc.body.uuid}/invite`)).status).toBe(404);
     const noEmail = await staff.post('/contacts', { firstName: 'NoMail' }).expect(201);
     expect((await staff.post('/m/portal/accounts', { contactUuid: noEmail.body.uuid })).status).toBe(422);
+  });
+
+  it('ends portal access when the contact is archived', async () => {
+    const c = await staff
+      .post('/contacts', { firstName: 'Gone', email: 'gone.portal@example.test' })
+      .expect(201);
+    await staff.post('/m/portal/accounts', { contactUuid: c.body.uuid }).expect(201);
+    const customer = await signIn('gone.portal@example.test');
+    await customer.get(`${P}/me`).expect(200);
+    await staff.delete(`/contacts/${c.body.uuid}`).expect(204);
+    expect((await customer.get(`${P}/me`)).status).toBe(401);
   });
 });

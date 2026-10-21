@@ -536,9 +536,27 @@ export async function customerQuotes(match: CustomerMatch, uuid?: string) {
   match(qb);
   if (uuid) qb.where({ uuid });
   const rows = await qb.orderBy('id', 'desc').limit(uuid ? 1 : 100);
-  return (await toDtos(rows, !!uuid)).map(
-    ({ owner: _o, declineReason: _d, convertedInvoiceUuid: _c, notes, ...rest }) => ({ ...rest, notes }),
-  );
+  // Allowlist: only what is printed on the document the customer received.
+  return (await toDtos(rows, !!uuid)).map((q) => ({
+    uuid: q.uuid,
+    number: q.number,
+    title: q.title,
+    status: q.status,
+    issueDate: q.issueDate,
+    validUntil: q.validUntil,
+    currency: q.currency,
+    contact: q.contact,
+    organization: q.organization,
+    subtotal: q.subtotal,
+    discountTotal: q.discountTotal,
+    taxTotal: q.taxTotal,
+    total: q.total,
+    notes: q.notes,
+    terms: q.terms,
+    respondedAt: q.respondedAt,
+    acceptedByName: q.acceptedByName,
+    ...(q.lines ? { lines: q.lines, taxes: q.taxes } : {}),
+  }));
 }
 
 /** The customer accepts or declines a sent quote from the portal. Expired quotes need a new one. */

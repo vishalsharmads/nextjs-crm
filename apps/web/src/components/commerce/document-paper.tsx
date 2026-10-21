@@ -32,7 +32,7 @@ export function DocumentPaper({
 }: {
   kind: string;
   /** Business details printed in the header (settings → sales documents). */
-  business: CommerceSettings;
+  business: Pick<CommerceSettings, 'legalName' | 'address' | 'taxId' | 'email' | 'phone'>;
   partyLabel?: string;
   number: string;
   title?: string;

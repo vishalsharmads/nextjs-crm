@@ -10,6 +10,9 @@ import {
   defineRoutes,
   getBranding,
   getSettingsGroup,
+  applyScope,
+  logger,
+  type AuthUser,
   isModuleEnabled,
   iso,
   newUuid,
@@ -55,6 +58,8 @@ async function currentAccount(req: Request): Promise<Account> {
     .join(`${ACCOUNTS} as a`, 'a.id', 's.account_id')
     .where('s.token_hash', sha256(token))
     .where('s.expires_at', '>', new Date())
+    .join('contacts as c', 'c.id', 'a.contact_id')
+    .whereNull('c.deleted_at') // Archiving the contact ends portal access.
     .where('a.status', 'active')
     .first('a.*', 's.id as session_id');
   if (!row) throw new AppError('UNAUTHENTICATED', 'Your session has ended. Sign in again.');
@@ -90,13 +95,41 @@ const portalCtx = (ctx: RequestContext, account: Account): RequestContext => ({
 
 // ---------- Login links ----------
 
-async function emailLink(account: Account, purpose: 'login' | 'invite') {
+/**
+ * Issue a one-time link and email it. A new invite cancels earlier unused links; login links are
+ * throttled to one a minute per account so nobody can flood a customer's inbox.
+ */
+async function emailLink(account: Account, purpose: 'login' | 'invite', ctx: RequestContext) {
   const token = randomToken(32);
-  await db(TOKENS).insert({
-    account_id: account.id,
-    token_hash: sha256(token),
-    expires_at: new Date(Date.now() + (purpose === 'invite' ? INVITE_LINK_MS : LOGIN_LINK_MS)),
+  const issued = await db.transaction(async (trx) => {
+    if (purpose === 'login') {
+      const recent = await trx(TOKENS)
+        .where({ account_id: account.id })
+        .where('created_at', '>', new Date(Date.now() - 60_000))
+        // Login links expire within LOGIN_LINK_MS; invitation links last longer and do not count.
+        .where('expires_at', '<=', new Date(Date.now() + LOGIN_LINK_MS))
+        .first('id');
+      if (recent) return false;
+    } else {
+      await trx(TOKENS)
+        .where({ account_id: account.id })
+        .whereNull('used_at')
+        .update({ used_at: new Date() });
+    }
+    await trx(TOKENS).insert({
+      account_id: account.id,
+      token_hash: sha256(token),
+      expires_at: new Date(Date.now() + (purpose === 'invite' ? INVITE_LINK_MS : LOGIN_LINK_MS)),
+    });
+    await audit(trx, ctx, {
+      action: `portal.${purpose}_link_issued`,
+      entity: 'portal.account',
+      entityId: account.id,
+      entityUuid: account.uuid,
+    });
+    return true;
   });
+  if (!issued) return;
   const [branding, commerce, contact] = await Promise.all([
     getBranding(),
     getSettingsGroup('commerce'),
@@ -135,9 +168,17 @@ const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
     before: [loginLimiter],
     body: z.object({ email: z.email().max(254) }),
     summary: 'Email a sign-in link. Always answers the same way, so it cannot reveal who has access.',
-    handler: async ({ body }) => {
-      const account = await db(ACCOUNTS).where({ email: body.email.toLowerCase(), status: 'active' }).first();
-      if (account) await emailLink(account as Account, 'login');
+    handler: async ({ ctx, body }) => {
+      const account = await db(`${ACCOUNTS} as a`)
+        .join('contacts as c', 'c.id', 'a.contact_id')
+        .whereNull('c.deleted_at')
+        .where({ 'a.email': body.email.toLowerCase(), 'a.status': 'active' })
+        .first('a.*');
+      // Sent in the background: response time and mail errors must not reveal who has access.
+      if (account)
+        void emailLink(account as Account, 'login', portalCtx(ctx, account as Account)).catch(
+          (err: unknown) => logger.error({ err }, 'Portal sign-in email failed'),
+        );
       return { ok: true };
     },
   })
@@ -160,7 +201,11 @@ const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
             'VALIDATION_FAILED',
             'This link has expired or was already used. Ask for a new one.',
           );
-        const acc = await trx(ACCOUNTS).where({ id: link.account_id, status: 'active' }).first();
+        const acc = await trx(`${ACCOUNTS} as a`)
+          .join('contacts as c', 'c.id', 'a.contact_id')
+          .whereNull('c.deleted_at')
+          .where({ 'a.id': link.account_id, 'a.status': 'active' })
+          .first('a.*');
         if (!acc)
           throw new AppError(
             'VALIDATION_FAILED',
@@ -215,7 +260,15 @@ const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
         name: contact?.full_name ?? '',
         firstName: contact?.first_name ?? '',
         email: account.email,
-        business: { ...commerce, name: commerce.legalName || branding.appName },
+        // Identity only: numbering, terms and other settings stay internal.
+        business: {
+          name: commerce.legalName || branding.appName,
+          legalName: commerce.legalName,
+          address: commerce.address,
+          taxId: commerce.taxId,
+          email: commerce.email,
+          phone: commerce.phone,
+        },
         features: {
           quotes: isModuleEnabled('quotes'),
           invoices: isModuleEnabled('invoices'),
@@ -311,19 +364,32 @@ const accountDto = (a: Record<string, unknown>) => ({
   lastLoginAt: iso(a.last_login_at),
 });
 
-const accountsQuery = () =>
-  db(`${ACCOUNTS} as a`)
+/** Portal accounts for contacts this staff member can see (contact record scope applies). */
+async function accountsQuery(user: AuthUser) {
+  const qb = db(`${ACCOUNTS} as a`)
     .join('contacts as c', 'c.id', 'a.contact_id')
+    .whereNull('c.deleted_at')
     .select('a.*', 'c.uuid as contact_uuid', 'c.full_name as contact_name');
+  await applyScope(qb, user, 'core.contacts', ['c.owner_id']);
+  return { qb };
+}
+
+async function scopedAccount(user: AuthUser, uuid: string) {
+  const { qb } = await accountsQuery(user);
+  const a = await qb.where('a.uuid', uuid).first();
+  if (!a) throw notFound('Portal account');
+  return a as Record<string, unknown> & Account;
+}
 
 const staffRoutes = defineRoutes('/m/portal/accounts', ['portal'], 'portal')
   .add({
     method: 'get',
     path: '/',
     permission: 'portal.accounts.manage',
-    handler: async () => ({
-      data: (await accountsQuery().orderBy('a.id', 'desc').limit(500)).map(accountDto),
-    }),
+    handler: async ({ user }) => {
+      const { qb } = await accountsQuery(user);
+      return { data: (await qb.orderBy('a.id', 'desc').limit(500)).map(accountDto) };
+    },
   })
   .add({
     method: 'post',
@@ -370,8 +436,8 @@ const staffRoutes = defineRoutes('/m/portal/accounts', ['portal'], 'portal')
         });
       });
       const account = (await db(ACCOUNTS).where({ uuid }).first()) as Account;
-      await emailLink(account, 'invite');
-      return accountDto(await accountsQuery().where('a.uuid', uuid).first());
+      await emailLink(account, 'invite', ctx);
+      return accountDto(await scopedAccount(user, uuid));
     },
   })
   .add({
@@ -384,7 +450,8 @@ const staffRoutes = defineRoutes('/m/portal/accounts', ['portal'], 'portal')
       organizationAccess: z.boolean().optional(),
     }),
     summary: 'Disabling access also signs the customer out everywhere.',
-    handler: async ({ ctx, params, body }) => {
+    handler: async ({ ctx, user, params, body }) => {
+      await scopedAccount(user, params.uuid);
       await db.transaction(async (trx) => {
         const a = await trx(ACCOUNTS).where({ uuid: params.uuid }).forUpdate().first();
         if (!a) throw notFound('Portal account');
@@ -404,7 +471,7 @@ const staffRoutes = defineRoutes('/m/portal/accounts', ['portal'], 'portal')
           diff: body,
         });
       });
-      return accountDto(await accountsQuery().where('a.uuid', params.uuid).first());
+      return accountDto(await scopedAccount(user, params.uuid));
     },
   })
   .add({
@@ -413,16 +480,21 @@ const staffRoutes = defineRoutes('/m/portal/accounts', ['portal'], 'portal')
     permission: 'portal.accounts.manage',
     params: z.object({ uuid: z.uuid() }),
     summary: 'Send a fresh invitation link.',
-    handler: async ({ ctx, params }) => {
-      const a = await db(ACCOUNTS).where({ uuid: params.uuid, status: 'active' }).first();
-      if (!a) throw notFound('Portal account');
-      await db(ACCOUNTS).where({ id: a.id }).update({ invited_at: new Date() });
-      await emailLink(a as Account, 'invite');
-      await audit(db, ctx, {
-        action: 'portal.account.reinvited',
-        entity: 'portal.account',
-        entityUuid: params.uuid,
+    handler: async ({ ctx, user, params }) => {
+      const a = await scopedAccount(user, params.uuid);
+      if (a.status !== 'active')
+        throw new AppError('CONFLICT', 'Restore access before sending an invitation');
+      await db.transaction(async (trx) => {
+        await trx(ACCOUNTS).where({ id: a.id }).update({ invited_at: new Date() });
+        await audit(trx, ctx, {
+          action: 'portal.account.reinvited',
+          entity: 'portal.account',
+          entityId: a.id,
+          entityUuid: params.uuid,
+        });
       });
+      // Issuing the link is audited on its own and cancels earlier unused invitations.
+      await emailLink(a, 'invite', ctx);
       return { ok: true };
     },
   });

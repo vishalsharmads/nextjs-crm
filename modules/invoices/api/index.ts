@@ -725,10 +725,33 @@ export async function customerInvoices(match: (qb: Knex.QueryBuilder) => void, u
   match(qb);
   if (uuid) qb.where({ uuid });
   const rows = await qb.orderBy('id', 'desc').limit(uuid ? 1 : 100);
-  return (await toDtos(rows, !!uuid, await today())).map(
-    ({ owner: _o, voidReason: _v, sourceQuoteUuid: _s, ...rest }) => ({
-      ...rest,
-      payments: rest.payments?.map(({ note: _n, ...p }) => p),
-    }),
-  );
+  // Allowlist: only what is printed on the invoice, plus payment amounts and dates.
+  return (await toDtos(rows, !!uuid, await today())).map((i) => ({
+    uuid: i.uuid,
+    number: i.number,
+    title: i.title,
+    status: i.status,
+    overdue: i.overdue,
+    issueDate: i.issueDate,
+    dueDate: i.dueDate,
+    currency: i.currency,
+    contact: i.contact,
+    organization: i.organization,
+    subtotal: i.subtotal,
+    discountTotal: i.discountTotal,
+    taxTotal: i.taxTotal,
+    total: i.total,
+    amountPaid: i.amountPaid,
+    balanceDue: i.balanceDue,
+    notes: i.notes,
+    terms: i.terms,
+    paymentInstructions: i.paymentInstructions,
+    ...(i.lines
+      ? {
+          lines: i.lines,
+          taxes: i.taxes,
+          payments: i.payments?.map((p) => ({ amount: p.amount, paidOn: p.paidOn, method: p.method })),
+        }
+      : {}),
+  }));
 }
