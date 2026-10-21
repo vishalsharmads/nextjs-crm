@@ -63,6 +63,11 @@ export async function runDoctor(out: Out): Promise<boolean> {
 
   if (env.NODE_ENV === 'production') {
     check(env.APP_URL.startsWith('https://'), 'APP_URL uses https', 'Serve the app over HTTPS in production');
+    check(
+      env.TRUST_PROXY > 0,
+      'TRUST_PROXY set for the reverse proxy',
+      'Set TRUST_PROXY=1 behind nginx, or rate limits and audit IPs see only the proxy',
+    );
   }
   return ok;
 }

@@ -18,12 +18,16 @@ import { bumpDefinitionsVersion } from '../core/custom-fields/definitions';
 import { ensureCustomFieldIndexes } from '../core/custom-fields/ddl.service';
 import { loadModules, enableModule, getModule } from '../modules/registry';
 import { seedSampleData } from './sample-data';
+import { audit } from '../core/audit/audit.service';
+import { systemContext, type RequestContext } from '../http/context';
 
 export interface ApplyOptions {
   dryRun?: boolean;
   force?: boolean;
   sampleData?: boolean;
   appliedBy?: number | null;
+  /** Who is applying (CLI by default); recorded in the audit log. */
+  ctx?: RequestContext;
 }
 
 export interface Conflict {
@@ -427,6 +431,20 @@ export async function applyBlueprint(
     report = await knex.transaction(async (trx) => {
       const applier = new Applier(trx, bp);
       await applier.run();
+      if (!opts.dryRun) {
+        const r = applier.report;
+        await audit(trx, opts.ctx ?? systemContext('cli'), {
+          action: 'blueprint.applied',
+          entity: 'blueprint',
+          diff: {
+            key: bp.key,
+            version: bp.version,
+            created: r.created,
+            updated: r.updated,
+            conflicts: r.conflicts.map((c) => c.item),
+          },
+        });
+      }
       if (opts.dryRun) {
         applier.report.status = 'dry_run';
         throw Object.assign(new Error('dry run'), { [DRY]: applier.report });

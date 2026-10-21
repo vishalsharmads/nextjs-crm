@@ -23,10 +23,10 @@ const SAFE = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 export function csrfProtection(req: Request, _res: Response, next: NextFunction) {
   if (SAFE.has(req.method)) return next();
-  // Bearer-token clients (API keys) are not cookie-authenticated, so CSRF does not apply.
-  if (req.headers.authorization?.startsWith('Bearer ')) return next();
-  // Public endpoints that are hit cross-site by design (web forms) opt out by path.
-  if (req.path.startsWith('/api/v1/public/forms/')) return next();
+  // Bearer-token clients (API keys) are not cookie-authenticated, so CSRF does not apply —
+  // but only when no session cookie is present, so a stray header cannot bypass CSRF.
+  const hasSessionCookie = !!(req.cookies?.access_token || req.cookies?.refresh_token);
+  if (req.headers.authorization?.startsWith('Bearer ') && !hasSessionCookie) return next();
   const cookie = req.cookies?.[CSRF_COOKIE] as string | undefined;
   const header = req.get(CSRF_HEADER);
   if (!cookie || !header || !safeEqual(cookie, header) || !validToken(header)) {
