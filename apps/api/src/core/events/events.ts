@@ -26,6 +26,23 @@ export const EVENT_TYPES = [
   'activity.updated',
   'activity.completed',
   'form.submitted',
+  // Commercial modules (emitted only while the module is enabled).
+  'quote.created',
+  'quote.sent',
+  'quote.accepted',
+  'quote.declined',
+  'invoice.created',
+  'invoice.issued',
+  'invoice.paid',
+  'invoice.overdue',
+  'invoice.voided',
+  'payment.recorded',
+  'contract.created',
+  'contract.activated',
+  'contract.renewal_due',
+  'contract.renewed',
+  'contract.expired',
+  'contract.cancelled',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

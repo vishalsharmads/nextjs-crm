@@ -46,6 +46,26 @@ export const contactSettingsSchema = z.object({
 });
 export type ContactSettings = z.infer<typeof contactSettingsSchema>;
 
+/** Business details and defaults printed on quotes, invoices and contracts. */
+export const commerceSettingsSchema = z.object({
+  legalName: z.string().max(200).default(''),
+  address: z.string().max(1000).default(''),
+  taxId: z.string().max(100).default(''),
+  email: z.union([z.email().max(254), z.literal('')]).default(''),
+  phone: z.string().max(50).default(''),
+  quotePrefix: z.string().max(10).default('Q-'),
+  invoicePrefix: z.string().max(10).default('INV-'),
+  contractPrefix: z.string().max(10).default('C-'),
+  quoteValidityDays: z.number().int().min(1).max(365).default(30),
+  invoiceDueDays: z.number().int().min(0).max(365).default(14),
+  defaultTaxRate: z.number().min(0).max(100).default(0),
+  quoteTerms: z.string().max(5000).default(''),
+  invoiceTerms: z.string().max(5000).default(''),
+  paymentInstructions: z.string().max(2000).default(''),
+  renewalNoticeDays: z.number().int().min(1).max(365).default(30),
+});
+export type CommerceSettings = z.infer<typeof commerceSettingsSchema>;
+
 /** Setting groups addressable via PATCH /settings/:group. Branding has its own endpoint. */
 export const SETTINGS_GROUPS = {
   general: generalSettingsSchema,
@@ -53,6 +73,7 @@ export const SETTINGS_GROUPS = {
   features: featureSettingsSchema,
   deals: dealSettingsSchema,
   contacts: contactSettingsSchema,
+  commerce: commerceSettingsSchema,
 } as const;
 export type SettingsGroup = keyof typeof SETTINGS_GROUPS;
 

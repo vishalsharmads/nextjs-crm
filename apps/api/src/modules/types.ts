@@ -5,6 +5,8 @@ import type { RouteGroup } from '../http/routes';
 export interface ApiModule {
   routes?: () => RouteGroup[];
   migrations?: Record<string, Migration>;
+  /** Start recurring work (called once at boot, outside tests). Tasks must no-op while the module is disabled. */
+  start?: () => void;
 }
 
 export interface InstalledModuleSource {

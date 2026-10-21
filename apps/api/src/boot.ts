@@ -27,6 +27,7 @@ export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promi
     every(60_000, 'activity-reminders', () => sendDueReminders());
     startWebhookRetries();
     startMailSync();
+    for (const m of loadModules()) m.api?.start?.();
   }
   return {
     app,

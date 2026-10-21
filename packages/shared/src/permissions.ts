@@ -74,6 +74,10 @@ export const SCOPED_RESOURCES = [
   'core.leads',
   'core.deals',
   'core.activities',
+  // Commercial modules: documents are owned like deals.
+  'quotes.quotes',
+  'invoices.invoices',
+  'contracts.contracts',
 ] as const;
 
 /** Does a granted pattern cover a required permission key? */
