@@ -45,6 +45,10 @@ const AutomationsPage = lazyPage(() => import('@/features/settings/workflow-page
 const FormsPage = lazyPage(() => import('@/features/settings/workflow-pages'), 'FormsPage');
 const LayoutBuilderPage = lazyPage(() => import('@/features/settings/layout-builder'), 'LayoutBuilderPage');
 const PublicFormPage = lazyPage(() => import('@/features/forms/public-form-page'), 'PublicFormPage');
+const CommerceSettingsPage = lazyPage(
+  () => import('@/features/settings/commerce-page'),
+  'CommerceSettingsPage',
+);
 const CalendarPage = lazyPage(() => import('@/features/activities/calendar-page'), 'CalendarPage');
 
 export function PageFallback() {
@@ -94,6 +98,7 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'automations', element: <AutomationsPage /> },
   { path: 'forms', element: <FormsPage /> },
   { path: 'layouts', element: <LayoutBuilderPage /> },
+  { path: 'sales-documents', element: <CommerceSettingsPage /> },
 ];
 
 /** Shown instead of a blank screen when a page throws while rendering. */
