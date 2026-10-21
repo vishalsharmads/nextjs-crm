@@ -69,3 +69,10 @@ export async function isInstalled(conn: Db = db): Promise<boolean> {
     return false;
   }
 }
+
+/** Demo instances can show sign-in credentials publicly. Off unless enabled via `npm run cli -- demo:enable`. */
+export async function getDemoLogin(conn: Db = db): Promise<{ email: string; password: string } | null> {
+  const v = (await getRaw('demo_login', conn)) as
+    { enabled?: boolean; email?: string; password?: string } | undefined;
+  return v?.enabled && v.email && v.password ? { email: v.email, password: v.password } : null;
+}

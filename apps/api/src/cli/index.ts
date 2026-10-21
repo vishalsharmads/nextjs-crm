@@ -114,6 +114,36 @@ const commands: Record<string, Command> = {
     }
   },
 
+  async 'demo:enable'(args) {
+    const { values } = parseArgs({
+      args,
+      options: { email: { type: 'string' }, password: { type: 'string' } },
+    });
+    if (!values.email || !values.password)
+      throw new Error('Pass --email and --password of an existing account');
+    const user = await db('users').where({ email: values.email.toLowerCase() }).first('id');
+    if (!user) throw new Error('No user with that email');
+    await db('settings')
+      .insert({
+        key: 'demo_login',
+        group: 'system',
+        value: JSON.stringify({
+          enabled: true,
+          email: values.email.toLowerCase(),
+          password: values.password,
+        }),
+        is_public: true,
+      })
+      .onConflict('key')
+      .merge();
+    out('Demo sign-in details will show on the sign-in screen. Never enable this on a client instance.');
+  },
+
+  async 'demo:disable'() {
+    await db('settings').where({ key: 'demo_login' }).delete();
+    out('Demo sign-in details removed.');
+  },
+
   async doctor() {
     const ok = await runDoctor(out);
     if (!ok) process.exitCode = 1;

@@ -150,6 +150,17 @@ export function LoginPage() {
           {t('auth.forgot')}
         </Link>
       </form>
+      {branding.demoLogin ? (
+        <DemoLogin
+          email={branding.demoLogin.email}
+          password={branding.demoLogin.password}
+          onUse={() => {
+            form.setValue('email', branding.demoLogin!.email);
+            form.setValue('password', branding.demoLogin!.password);
+            void onPassword();
+          }}
+        />
+      ) : null}
     </AuthLayout>
   );
 }
@@ -279,5 +290,29 @@ export function AcceptInvitePage() {
       title={t('auth.inviteTitle')}
       description={t('auth.inviteHelp')}
     />
+  );
+}
+
+/** Shown only on demo instances (enabled with `npm run cli -w @app/api -- demo:enable`). */
+function DemoLogin({ email, password, onUse }: { email: string; password: string; onUse: () => void }) {
+  const t = useT();
+  return (
+    <section
+      aria-labelledby="demo-login"
+      className="mt-8 rounded-md border border-dashed border-line-strong bg-subtle p-4"
+    >
+      <h2 id="demo-login" className="text-sm font-semibold">
+        {t('auth.demoTitle')}
+      </h2>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        <dt className="text-muted">{t('auth.email')}</dt>
+        <dd className="font-mono text-xs leading-5 break-all select-all">{email}</dd>
+        <dt className="text-muted">{t('auth.password')}</dt>
+        <dd className="font-mono text-xs leading-5 select-all">{password}</dd>
+      </dl>
+      <Button type="button" className="mt-3 w-full" onClick={onUse}>
+        {t('auth.demoUse')}
+      </Button>
+    </section>
   );
 }

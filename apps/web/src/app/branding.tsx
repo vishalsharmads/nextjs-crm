@@ -14,7 +14,13 @@ interface BrandingContextValue {
   preview: (b: PublicBranding | null) => void;
 }
 
-const FALLBACK: PublicBranding = { ...FACTORY_THEME, assets: {}, locale: 'en', installed: true };
+const FALLBACK: PublicBranding = {
+  ...FACTORY_THEME,
+  assets: {},
+  locale: 'en',
+  installed: true,
+  demoLogin: null,
+};
 const BrandingContext = createContext<BrandingContextValue | null>(null);
 const MODE_KEY = 'ui.colorMode';
 
