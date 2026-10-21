@@ -458,12 +458,16 @@ export async function applyBlueprint(
   }
 
   // Phase B (outside the transaction: DDL commits implicitly). Idempotent and safe to re-run.
-  for (const key of bp.modules) {
+  // Dependencies are enabled first (invoices needs products), even if the blueprint does not list them.
+  const enabling = new Set<string>();
+  const enableWithDeps = async (key: string) => {
     const mod = getModule(key);
-    if (mod && mod.manifest.status !== 'stub') {
-      await enableModule(key);
-    }
-  }
+    if (!mod || mod.manifest.status === 'stub' || enabling.has(key)) return;
+    enabling.add(key);
+    for (const dep of mod.manifest.depends_on) await enableWithDeps(dep);
+    await enableModule(key);
+  };
+  for (const key of bp.modules) await enableWithDeps(key);
   report.ddl = await ensureCustomFieldIndexes();
 
   if (opts.sampleData && bp.sample_data && !last) {
