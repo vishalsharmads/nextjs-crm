@@ -4,7 +4,6 @@ import { useSession } from '@/app/session';
 import { Spinner } from '@/components/ui/spinner';
 import { AppShell } from '@/app/shell/app-shell';
 import { AcceptInvitePage, ForgotPasswordPage, LoginPage, ResetPasswordPage } from '@/features/auth/pages';
-import { HomePage } from '@/features/home/home-page';
 import { SettingsLayout } from '@/features/settings/layout';
 import { RecordListPage } from '@/features/records/list-page';
 import { RecordPage } from '@/features/records/record-page';
@@ -27,6 +26,9 @@ const FieldsPage = lazyPage(() => import('@/features/settings/fields-page'), 'Fi
 const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'), 'PipelinesPage');
 const DealsPage = lazyPage(() => import('@/features/deals/deals-page'), 'DealsPage');
 const TasksPage = lazyPage(() => import('@/features/activities/tasks-page'), 'TasksPage');
+const ImportPage = lazyPage(() => import('@/features/imports/import-page'), 'ImportPage');
+const DashboardPage = lazyPage(() => import('@/features/dashboard/dashboard-page'), 'DashboardPage');
+const AuditPage = lazyPage(() => import('@/features/audit/audit-page'), 'AuditPage');
 const CalendarPage = lazyPage(() => import('@/features/activities/calendar-page'), 'CalendarPage');
 
 export function PageFallback() {
@@ -65,6 +67,7 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'roles', element: <RolesPage /> },
   { path: 'fields', element: <FieldsPage /> },
   { path: 'pipelines', element: <PipelinesPage /> },
+  { path: 'audit', element: <AuditPage /> },
 ];
 
 export const router = createBrowserRouter([
@@ -78,7 +81,8 @@ export const router = createBrowserRouter([
       {
         element: <AppShell />,
         children: [
-          { index: true, element: <HomePage /> },
+          { index: true, element: page(<DashboardPage />) },
+          { path: 'import/:route', element: page(<ImportPage />) },
           { path: 'contacts', element: <RecordListPage entity="contact" /> },
           { path: 'contacts/:uuid', element: <RecordPage entity="contact" /> },
           { path: 'organizations', element: <RecordListPage entity="organization" /> },
