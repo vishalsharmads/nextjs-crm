@@ -1,0 +1,24 @@
+{
+  "key": "portal",
+  "name": "Client portal",
+  "version": "1.0.0",
+  "status": "available",
+  "description": "A secure page where customers sign in with an email link to see their quotes, invoices and contracts, and accept quotes online.",
+  "depends_on": [],
+  "permissions": [
+    { "key": "portal.accounts.manage", "description": "Invite customers to the portal and revoke access" }
+  ],
+  "menu_items": [
+    {
+      "key": "portal",
+      "label": "Client portal",
+      "path": "/m/portal",
+      "icon": "key",
+      "permission": "portal.accounts.manage",
+      "order": 60
+    }
+  ],
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx"
+}
