@@ -241,3 +241,12 @@ export function addDays(date: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
+
+/** Add calendar months, clamping to the month's last day (Jan 31 + 1 month = Feb 28/29). */
+export function addMonths(date: string, months: number): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const target = new Date(Date.UTC(y, m - 1 + months, 1));
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(d, last));
+  return target.toISOString().slice(0, 10);
+}

@@ -28,6 +28,7 @@ export {
   totalsColumns,
   todayIn,
   addDays,
+  addMonths,
   type LineDto,
   type LineInput,
   type LinkInput,

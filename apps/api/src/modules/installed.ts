@@ -10,6 +10,8 @@ import { products as productsApi } from '../../../../modules/products/api';
 import quotes from '../../../../modules/quotes/manifest.json' with { type: 'json' };
 import { quotes as quotesApi } from '../../../../modules/quotes/api';
 import { invoices as invoicesApi } from '../../../../modules/invoices/api';
+import contracts from '../../../../modules/contracts/manifest.json' with { type: 'json' };
+import { contracts as contractsApi } from '../../../../modules/contracts/api';
 
 /**
  * Modules compiled into this build. Adding a module means adding it here (a test checks that
@@ -23,4 +25,5 @@ export const installedModuleSources: InstalledModuleSource[] = [
   { manifest: notesDemo, api: notesDemoApi },
   { manifest: products, api: productsApi },
   { manifest: quotes, api: quotesApi },
+  { manifest: contracts, api: contractsApi },
 ];
