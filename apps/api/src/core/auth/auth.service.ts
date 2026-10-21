@@ -4,9 +4,9 @@ import { passwordPolicySchema } from '@app/shared';
 import { env } from '../../config/env';
 import { db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
-import { sha256 } from '../../lib/crypto';
-import { decrypt, encrypt } from '../../lib/crypto';
-import { generateTotpSecret, otpauthUrl, verifyTotp } from '../../lib/totp';
+import { decrypt, encrypt, sha256 } from '../../lib/crypto';
+import { generateTotpSecret, matchTotpStep, otpauthUrl } from '../../lib/totp';
+import { loadAccess } from '../rbac/access';
 import type { RequestContext } from '../../http/context';
 import { audit } from '../audit/audit.service';
 import { getBranding, getGroup } from '../settings/settings.service';
@@ -17,6 +17,7 @@ import {
   clearAuthCookies,
   consumeOneTimeToken,
   createOneTimeToken,
+  burnUserTokens,
   revokeFamily,
   setMfaCookie,
   startSession,
@@ -102,18 +103,41 @@ async function completeLogin(req: Request, res: Response, user: { id: number; uu
 export async function verifyMfa(req: Request, res: Response, code: string) {
   const token = req.cookies?.[MFA_COOKIE] as string | undefined;
   if (!token) throw new AppError('UNAUTHENTICATED', 'Sign in again to continue');
+  const hash = sha256(token);
   const row = await db('auth_tokens')
-    .where({ token_hash: sha256(token), purpose: 'mfa' })
+    .where({ token_hash: hash, purpose: 'mfa' })
     .whereNull('used_at')
     .where('expires_at', '>', new Date())
     .first();
   if (!row) throw new AppError('UNAUTHENTICATED', 'Sign in again to continue');
-  const user = await db('users').where({ id: row.user_id }).first();
-  if (!user?.totp_secret_enc || !verifyTotp(decrypt(user.totp_secret_enc), code)) {
-    await audit(db, req.ctx, { action: 'auth.mfa_failed', entity: 'user', entityId: row.user_id });
+  const user = await db('users').where({ id: row.user_id, status: 'active' }).whereNull('deleted_at').first();
+  if (!user || (user.locked_until && new Date(user.locked_until) > new Date())) {
+    throw new AppError('UNAUTHENTICATED', 'Sign in again to continue');
+  }
+  const step = user.totp_secret_enc ? matchTotpStep(decrypt(user.totp_secret_enc), code) : null;
+  // A step that was already used cannot be replayed.
+  if (step === null || (user.totp_last_step !== null && step <= Number(user.totp_last_step))) {
+    const security = await getGroup('security');
+    await db.transaction(async (trx) => {
+      await trx('auth_tokens').where({ id: row.id }).increment('attempts', 1);
+      // Five wrong codes burn this sign-in attempt; failures also count toward account lockout.
+      if (row.attempts + 1 >= 5)
+        await trx('auth_tokens').where({ id: row.id }).update({ used_at: new Date() });
+      const failed = (user.failed_login_count as number) + 1;
+      const lock = failed >= security.lockoutMaxAttempts;
+      await trx('users')
+        .where({ id: user.id })
+        .update({
+          failed_login_count: lock ? 0 : failed,
+          locked_until: lock ? new Date(Date.now() + security.lockoutMinutes * 60_000) : user.locked_until,
+        });
+      await audit(trx, req.ctx, { action: 'auth.mfa_failed', entity: 'user', entityId: user.id });
+    });
     throw new AppError('MFA_INVALID', 'That code is not valid. Check your authenticator app and try again.');
   }
-  await consumeOneTimeToken(db, token, 'mfa');
+  const userId = await consumeOneTimeToken(db, token, 'mfa');
+  if (userId !== user.id) throw new AppError('UNAUTHENTICATED', 'Sign in again to continue');
+  await db('users').where({ id: user.id }).update({ totp_last_step: step, failed_login_count: 0 });
   await completeLogin(req, res, user);
 }
 
@@ -134,7 +158,11 @@ export async function refresh(req: Request, res: Response) {
     clearAuthCookies(res);
     throw new AppError('UNAUTHENTICATED', 'Sign in to continue');
   }
-  if (new Date(session.expires_at) < new Date()) {
+  const { sessionIdleDays } = await getGroup('security');
+  // Each refresh rotates the session row, so its creation time is the last activity.
+  const idle = Date.now() - new Date(session.created_at).getTime() > sessionIdleDays * 86_400_000;
+  if (new Date(session.expires_at) < new Date() || idle) {
+    await revokeFamily(session.family_id);
     clearAuthCookies(res);
     throw new AppError('UNAUTHENTICATED', 'Your session expired. Sign in again.');
   }
@@ -239,6 +267,7 @@ export async function changePassword(ctx: RequestContext, userId: number, curren
     await trx('users')
       .where({ id: userId })
       .update({ password_hash: await hashPassword(next), password_changed_at: new Date() });
+    await burnUserTokens(trx, userId);
     // Keep the current session, end all others.
     const currentFamily = ctx.user?.sessionId
       ? ((await trx('sessions').where({ id: ctx.user.sessionId }).first('family_id'))?.family_id as
@@ -251,14 +280,18 @@ export async function changePassword(ctx: RequestContext, userId: number, curren
   });
 }
 
-export async function setupTotp(userId: number, email: string) {
+export async function setupTotp(ctx: RequestContext, userId: number, email: string) {
   const security = await getGroup('security');
   if (!security.totpAllowed)
     throw new AppError('FORBIDDEN', 'Two-factor authentication is turned off for this workspace');
   const secret = generateTotpSecret();
-  await db('users')
-    .where({ id: userId, totp_enabled: false })
-    .update({ totp_secret_enc: encrypt(secret) });
+  await db.transaction(async (trx) => {
+    const n = await trx('users')
+      .where({ id: userId, totp_enabled: false })
+      .update({ totp_secret_enc: encrypt(secret), totp_last_step: null });
+    if (!n) throw new AppError('CONFLICT', 'Two-factor authentication is already on');
+    await audit(trx, ctx, { action: 'auth.mfa_setup_started', entity: 'user', entityId: userId });
+  });
   const branding = await getBranding();
   return { secret, otpauthUrl: otpauthUrl(secret, email, branding.appName) };
 }
@@ -266,10 +299,12 @@ export async function setupTotp(userId: number, email: string) {
 export async function enableTotp(ctx: RequestContext, userId: number, code: string) {
   const user = await db('users').where({ id: userId }).first();
   if (!user?.totp_secret_enc) throw new AppError('VALIDATION_FAILED', 'Start two-factor setup first');
-  if (!verifyTotp(decrypt(user.totp_secret_enc), code))
-    throw new AppError('MFA_INVALID', 'That code is not valid');
-  await db('users').where({ id: userId }).update({ totp_enabled: true });
-  await audit(db, ctx, { action: 'auth.mfa_enabled', entity: 'user', entityId: userId });
+  const step = matchTotpStep(decrypt(user.totp_secret_enc), code);
+  if (step === null) throw new AppError('MFA_INVALID', 'That code is not valid');
+  await db.transaction(async (trx) => {
+    await trx('users').where({ id: userId }).update({ totp_enabled: true, totp_last_step: step });
+    await audit(trx, ctx, { action: 'auth.mfa_enabled', entity: 'user', entityId: userId });
+  });
 }
 
 export async function disableTotp(ctx: RequestContext, userId: number, password: string) {
@@ -279,6 +314,15 @@ export async function disableTotp(ctx: RequestContext, userId: number, password:
       { path: 'password', message: 'Password is incorrect' },
     ]);
   }
-  await db('users').where({ id: userId }).update({ totp_enabled: false, totp_secret_enc: null });
-  await audit(db, ctx, { action: 'auth.mfa_disabled', entity: 'user', entityId: userId });
+  const security = await getGroup('security');
+  const access = await loadAccess(userId);
+  if (security.totpRequiredForAdmins && access.isAdmin) {
+    throw new AppError('FORBIDDEN', 'Two-factor authentication is required for admins in this workspace');
+  }
+  await db.transaction(async (trx) => {
+    await trx('users')
+      .where({ id: userId })
+      .update({ totp_enabled: false, totp_secret_enc: null, totp_last_step: null });
+    await audit(trx, ctx, { action: 'auth.mfa_disabled', entity: 'user', entityId: userId });
+  });
 }

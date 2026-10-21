@@ -14,6 +14,8 @@ export interface AuthUser {
   sessionId: number | null;
   /** Set when the request authenticated with an API key instead of a session. */
   apiKeyId?: number;
+  /** Admin who must enrol in 2FA (workspace policy) before using anything else. */
+  mfaSetupRequired?: boolean;
 }
 
 export interface RequestContext {

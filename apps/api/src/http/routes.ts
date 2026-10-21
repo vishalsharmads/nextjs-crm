@@ -112,13 +112,34 @@ export function defineRoutes(prefix: string, tags: string[] = [], moduleKey?: st
   return new RouteGroup(prefix, tags, moduleKey);
 }
 
-function toHandler(def: RouteDef): RequestHandler {
-  return async (req: Request, res: Response, next: NextFunction) => {
+/** Paths an admin who must enrol in 2FA can still reach. */
+const MFA_SETUP_ALLOWED = [/^\/auth\//, /^\/me(\/|$)/, /^\/meta\/bootstrap$/, /^\/public\//];
+
+/**
+ * Access gate: runs before any `before` middleware (so uploads are never parsed for callers
+ * who are not allowed), checks module state, permission, and enforced 2FA enrolment.
+ */
+function gate(def: RouteDef): RequestHandler {
+  return (req: Request, res: Response, next: NextFunction) => {
     try {
       if (def.moduleKey && !moduleGate(def.moduleKey)) {
         throw new AppError('MODULE_DISABLED', 'This feature is not enabled');
       }
       const user = checkPermission(req.ctx.user, def.permission, res.locals.tokenExpired === true);
+      if (user?.mfaSetupRequired && !MFA_SETUP_ALLOWED.some((re) => re.test(def.path))) {
+        throw new AppError('MFA_REQUIRED', 'Turn on two-factor authentication to continue');
+      }
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+function toHandler(def: RouteDef): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = req.ctx.user;
       const params = def.params ? def.params.parse(req.params) : req.params;
       const query = def.query ? def.query.parse(req.query) : req.query;
       const body = def.body ? def.body.parse(req.body ?? {}) : req.body;
@@ -146,7 +167,7 @@ function toHandler(def: RouteDef): RequestHandler {
 export function mountGroups(router: Router, groups: RouteGroup[]) {
   for (const group of groups) {
     for (const def of group.defs) {
-      router[def.method](def.path, ...(def.before ?? []), toHandler(def));
+      router[def.method](def.path, gate(def), ...(def.before ?? []), toHandler(def));
       routeRegistry.push({
         method: def.method,
         path: def.path,

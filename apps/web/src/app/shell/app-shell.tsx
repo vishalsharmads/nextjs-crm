@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Dialog as D } from 'radix-ui';
 import {
@@ -123,11 +123,25 @@ function ShellLayout({ nav }: { nav: NavItem[] }) {
       </D.Root>
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onMenu={() => setMobileOpen(true)} onHelp={() => setHelpOpen(true)} />
+        <MfaRequiredBanner />
         <main className="min-h-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>
       <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} nav={nav} />
+    </div>
+  );
+}
+
+/** When the workspace requires 2FA for admins, keep them on their profile until they enrol. */
+function MfaRequiredBanner() {
+  const { access } = useBoot();
+  const location = useLocation();
+  if (!access.mfaSetupRequired) return null;
+  if (!location.pathname.startsWith('/settings/profile')) return <Navigate to="/settings/profile" replace />;
+  return (
+    <div role="status" className="border-b border-accent bg-accent-soft px-4 py-2 text-sm">
+      This workspace requires two-factor authentication for admins. Turn it on below to continue.
     </div>
   );
 }
