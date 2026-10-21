@@ -86,6 +86,8 @@ API tests drop and recreate `crm_test` on every run (`apps/api/test/global-setup
 ## Backend conventions
 
 - **Layering:** `routes → controller → service → repository`. Controllers parse and respond only. Services hold business rules, permission/scope/field-visibility checks, and audit. Repositories hold SQL.
+- **Access gate** runs before a route's `before` middleware (uploads are never parsed for unauthorized callers) and enforces module state, permission and required 2FA enrolment.
+- **Grants:** non-admins can only grant permissions/scopes they hold (`core/rbac/grants.ts`); `*` belongs only to the system Admin role; only admins can change admin accounts.
 - **Routes** are registered only through `defineRoute({ method, path, permission, schema, handler })`. `permission` is a key, `'public'`, or `'authenticated'`. A test fails if any Express layer lacks a registry entry.
 - **Permission keys** follow `<module>.<resource>.<action>`. Wildcards: `*`, `core.contacts.*`.
 - **Record scope** (`own | team | all`) is applied in the repository from a service-supplied `ScopeContext`. An out-of-scope single-record read returns **404**.
@@ -101,6 +103,8 @@ API tests drop and recreate `crm_test` on every run (`apps/api/test/global-setup
 - **Copy:** anything that names an entity must go through `useT()` with vocabulary vars. Other literal English copy in components is tolerated for now (tracked in roadmap: extract to locale files).
 
 ## Database gotchas
+
+- **Knex builders are thenables.** Never `return qb` from an `async` function and never `await` a builder you still want to modify: the query runs. Mutate the builder in helpers (`applyScope` returns `void`) or wrap it (`return { qb }`).
 
 - **MySQL DDL implicitly commits.** Never put `ALTER TABLE` (generated columns, module migrations) inside a business transaction. DDL goes through idempotent reconcile passes (`CustomFieldDdlService.ensure()`).
 - **Migrations are immutable once committed.** Fix forward with a new migration. A hook blocks editing committed migration files.
