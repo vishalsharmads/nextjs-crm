@@ -1,3 +1,4 @@
+import { toPatch } from '@app/shared';
 import Handlebars from 'handlebars';
 import { z } from 'zod';
 import { defineRoutes } from '../../http/routes';
@@ -98,7 +99,7 @@ export const templatesRoutes = defineRoutes('/templates', ['templates'])
     path: '/:uuid',
     permission: 'core.templates.manage',
     params: z.object({ uuid: z.uuid() }),
-    body: body.pick({ name: true, subject: true, body: true }).partial(),
+    body: toPatch(body.pick({ name: true, subject: true, body: true })),
     handler: async ({ ctx, params, body: b }) => {
       const t = await db('templates').where({ uuid: params.uuid }).first();
       if (!t) throw notFound('Template');

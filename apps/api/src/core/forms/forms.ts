@@ -1,3 +1,4 @@
+import { toPatch } from '@app/shared';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { defineRoutes } from '../../http/routes';
@@ -259,7 +260,7 @@ export const formsRoutes = defineRoutes('/forms', ['forms'])
     path: '/:uuid',
     permission: 'core.forms.manage',
     params: z.object({ uuid: z.uuid() }),
-    body: formBody.partial(),
+    body: toPatch(formBody),
     handler: async ({ ctx, params, body }) => {
       const f = await db('web_forms').where({ uuid: params.uuid }).first();
       if (!f) throw notFound('Form');

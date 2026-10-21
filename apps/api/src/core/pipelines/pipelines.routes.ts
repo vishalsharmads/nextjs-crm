@@ -1,3 +1,4 @@
+import { toPatch } from '@app/shared';
 import { z } from 'zod';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
@@ -115,10 +116,9 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
     path: '/:uuid',
     permission: 'core.pipelines.manage',
     params: uuidParam,
-    body: pipelineBody
-      .omit({ stages: true, entity: true })
-      .partial()
-      .extend({ active: z.boolean().optional() }),
+    body: toPatch(pipelineBody.omit({ stages: true, entity: true })).extend({
+      active: z.boolean().optional(),
+    }),
     handler: async ({ ctx, params, body }) => {
       const p = await db('pipelines').where({ uuid: params.uuid }).first();
       if (!p) throw notFound('Pipeline');
@@ -202,7 +202,7 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
     path: '/:uuid/stages/:stageUuid',
     permission: 'core.pipelines.manage',
     params: z.object({ uuid: z.uuid(), stageUuid: z.uuid() }),
-    body: stageBody.omit({ key: true }).partial(),
+    body: toPatch(stageBody.omit({ key: true })),
     handler: async ({ ctx, params, body }) => {
       const p = await db('pipelines').where({ uuid: params.uuid }).first();
       const s = p

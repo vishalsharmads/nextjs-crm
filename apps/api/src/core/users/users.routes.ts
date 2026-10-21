@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PERMISSION_PATTERN_RE, SCOPES, listQuerySchema, type Scope } from '@app/shared';
+import { PERMISSION_PATTERN_RE, SCOPES, listQuerySchema, type Scope, toPatch } from '@app/shared';
 import type { AuthUser } from '../../http/context';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
@@ -30,7 +30,7 @@ const userInputSchema = z.object({
   sendInvite: z.boolean().default(true),
 });
 
-const userPatchSchema = userInputSchema.omit({ sendInvite: true, email: true }).partial();
+const userPatchSchema = toPatch(userInputSchema.omit({ sendInvite: true, email: true }));
 
 async function roleIds(keys: string[]) {
   const rows = await db('roles').whereIn('key', keys).select('id', 'key');
@@ -431,7 +431,7 @@ export const rolesRoutes = defineRoutes('/roles', ['roles'])
     path: '/:uuid',
     permission: 'core.roles.manage',
     params: uuidParam,
-    body: roleInputSchema.omit({ key: true }).partial(),
+    body: toPatch(roleInputSchema.omit({ key: true })),
     handler: async ({ ctx, user, params, body }) => {
       const r = await db('roles').where({ uuid: params.uuid }).first();
       if (!r) throw notFound('Role');
@@ -576,7 +576,7 @@ export const teamsRoutes = defineRoutes('/teams', ['users'])
     path: '/:uuid',
     permission: 'core.users.manage',
     params: uuidParam,
-    body: teamInputSchema.partial(),
+    body: toPatch(teamInputSchema),
     handler: async ({ ctx, params, body }) => {
       const t = await db('teams').where({ uuid: params.uuid }).first();
       if (!t) throw notFound('Team');

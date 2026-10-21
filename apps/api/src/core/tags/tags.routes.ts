@@ -1,3 +1,4 @@
+import { toPatch } from '@app/shared';
 import { z } from 'zod';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
@@ -53,7 +54,7 @@ export const tagsRoutes = defineRoutes('/tags', ['tags'])
     path: '/:uuid',
     permission: 'core.tags.manage',
     params: z.object({ uuid: z.uuid() }),
-    body: tagBody.partial(),
+    body: toPatch(tagBody),
     handler: async ({ ctx, params, body }) => {
       const tag = await db('tags').where({ uuid: params.uuid }).first();
       if (!tag) throw notFound('Tag');
