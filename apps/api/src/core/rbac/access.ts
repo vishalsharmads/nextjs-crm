@@ -76,6 +76,7 @@ export async function teamUserIds(userId: number, conn: Db = db): Promise<number
 /**
  * Restrict a query to records the user may see for a scoped resource.
  * `ownerColumns` are OR-ed (e.g. activities: assignee or owner).
+ * Mutates `qb` and returns nothing: returning a Knex builder from an async function would execute it.
  */
 export async function applyScope(
   qb: Knex.QueryBuilder,
@@ -83,11 +84,11 @@ export async function applyScope(
   resource: string,
   ownerColumns: string[],
   conn: Db = db,
-) {
+): Promise<void> {
   const scope = user.isAdmin ? 'all' : (user.scopes[resource] ?? 'own');
-  if (scope === 'all') return qb;
+  if (scope === 'all') return;
   const ids = scope === 'team' ? await teamUserIds(user.id, conn) : [user.id];
-  return qb.where((w) => {
+  qb.where((w) => {
     for (const col of ownerColumns) w.orWhereIn(col, ids);
   });
 }

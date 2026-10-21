@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { PERMISSION_PATTERN_RE, SCOPES, listQuerySchema } from '@app/shared';
+import { PERMISSION_PATTERN_RE, SCOPES, listQuerySchema, type Scope } from '@app/shared';
+import type { AuthUser } from '../../http/context';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
 import { AppError, conflict, notFound } from '../../lib/errors';
@@ -8,7 +9,9 @@ import { env } from '../../config/env';
 import { audit } from '../audit/audit.service';
 import { clearAccessCache } from '../rbac/access';
 import { isKnownPermissionPattern, permissionCatalog } from '../rbac/catalog';
-import { createOneTimeToken } from '../auth/tokens';
+import { burnUserTokens, createOneTimeToken } from '../auth/tokens';
+import { assertCanAssignRoles, assertCanGrant, assertCanManageUser } from '../rbac/grants';
+import { escapeLike } from '../records/filters';
 import { sendTemplatedEmail } from '../mail/templates';
 
 const uuidParam = z.object({ uuid: z.uuid() });
@@ -102,12 +105,12 @@ export const usersRoutes = defineRoutes('/users', ['users'])
     handler: async ({ query, user }) => {
       const base = db('users').whereNull('deleted_at');
       if (query.status) base.where({ status: query.status });
-      if (query.q)
+      if (query.q) {
+        const like = `%${escapeLike(query.q)}%`;
         base.where((w) =>
-          w
-            .whereILike('email', `%${query.q}%`)
-            .orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [`%${query.q}%`]),
+          w.whereLike('email', like).orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [like]),
         );
+      }
       const total = Number(((await base.clone().count({ c: '*' }).first()) as { c: number }).c);
       const rows = await base
         .clone()
@@ -148,6 +151,7 @@ export const usersRoutes = defineRoutes('/users', ['users'])
       if (await db('users').where({ email: body.email }).first('id'))
         throw conflict('A user with this email already exists');
       const rIds = await roleIds(body.roleKeys);
+      await assertCanAssignRoles(user, rIds);
       const tIds = await teamIds(body.teamUuids);
       const id = await db.transaction(async (trx) => {
         const [newId] = await trx('users').insert({
@@ -168,7 +172,7 @@ export const usersRoutes = defineRoutes('/users', ['users'])
         });
         return newId!;
       });
-      if (body.sendInvite) await sendInvite(id, `${user.firstName} ${user.lastName}`.trim() || user.email);
+      if (body.sendInvite) await sendInvite(id, displayName(user));
       return userDto(id);
     },
   })
@@ -178,17 +182,28 @@ export const usersRoutes = defineRoutes('/users', ['users'])
     permission: 'core.users.manage',
     params: uuidParam,
     body: userPatchSchema,
-    handler: async ({ ctx, params, body }) => {
+    handler: async ({ ctx, user, params, body }) => {
       const u = await db('users').where({ uuid: params.uuid }).whereNull('deleted_at').first();
       if (!u) throw notFound('User');
-      if (body.roleKeys && !body.roleKeys.includes('admin')) {
-        const isAdmin = await db('user_roles as ur')
-          .join('roles as r', 'r.id', 'ur.role_id')
-          .where({ 'ur.user_id': u.id, 'r.key': 'admin' })
-          .first();
-        if (isAdmin) await assertNotLastAdmin(u.id);
+      await assertCanManageUser(user, u.id);
+      let rIds: number[] | null = null;
+      if (body.roleKeys) {
+        rIds = await roleIds(body.roleKeys);
+        const current = (await db('user_roles').where({ user_id: u.id }).pluck('role_id')) as number[];
+        // Both added and removed roles must be within the caller's own access.
+        const changed = [
+          ...rIds.filter((r) => !current.includes(r)),
+          ...current.filter((r) => !rIds!.includes(r)),
+        ];
+        await assertCanAssignRoles(user, changed);
+        if (!body.roleKeys.includes('admin')) {
+          const isAdmin = await db('user_roles as ur')
+            .join('roles as r', 'r.id', 'ur.role_id')
+            .where({ 'ur.user_id': u.id, 'r.key': 'admin' })
+            .first();
+          if (isAdmin) await assertNotLastAdmin(u.id);
+        }
       }
-      const rIds = body.roleKeys ? await roleIds(body.roleKeys) : null;
       const tIds = body.teamUuids ? await teamIds(body.teamUuids) : null;
       await db.transaction(async (trx) => {
         const patch: Record<string, unknown> = {};
@@ -225,6 +240,7 @@ export const usersRoutes = defineRoutes('/users', ['users'])
       const u = await db('users').where({ uuid: params.uuid }).whereNull('deleted_at').first();
       if (!u) throw notFound('User');
       if (u.id === user.id) throw conflict('You cannot disable your own account');
+      await assertCanManageUser(user, u.id);
       await assertNotLastAdmin(u.id);
       await db.transaction(async (trx) => {
         await trx('users').where({ id: u.id }).update({ status: 'disabled' });
@@ -232,6 +248,8 @@ export const usersRoutes = defineRoutes('/users', ['users'])
           .where({ user_id: u.id })
           .whereNull('revoked_at')
           .update({ revoked_at: new Date() });
+        // Outstanding invite/reset links must not reactivate a disabled account.
+        await burnUserTokens(trx, u.id);
         await audit(trx, ctx, {
           action: 'user.disabled',
           entity: 'user',
@@ -247,13 +265,16 @@ export const usersRoutes = defineRoutes('/users', ['users'])
     path: '/:uuid/enable',
     permission: 'core.users.manage',
     params: uuidParam,
-    handler: async ({ ctx, params }) => {
+    handler: async ({ ctx, user, params }) => {
       const u = await db('users').where({ uuid: params.uuid }).whereNull('deleted_at').first();
       if (!u) throw notFound('User');
-      await db('users')
-        .where({ id: u.id })
-        .update({ status: u.password_hash ? 'active' : 'invited' });
-      await audit(db, ctx, { action: 'user.enabled', entity: 'user', entityId: u.id, entityUuid: u.uuid });
+      await assertCanManageUser(user, u.id);
+      await db.transaction(async (trx) => {
+        await trx('users')
+          .where({ id: u.id })
+          .update({ status: u.password_hash ? 'active' : 'invited' });
+        await audit(trx, ctx, { action: 'user.enabled', entity: 'user', entityId: u.id, entityUuid: u.uuid });
+      });
       return userDto(u.id);
     },
   })
@@ -268,7 +289,8 @@ export const usersRoutes = defineRoutes('/users', ['users'])
         .whereNull('deleted_at')
         .first();
       if (!u) throw notFound('Invited user');
-      await sendInvite(u.id, `${user.firstName} ${user.lastName}`.trim() || user.email);
+      await assertCanManageUser(user, u.id);
+      await sendInvite(u.id, displayName(user));
       await audit(db, ctx, { action: 'user.invite_resent', entity: 'user', entityId: u.id });
     },
   })
@@ -277,21 +299,35 @@ export const usersRoutes = defineRoutes('/users', ['users'])
     path: '/:uuid/reset-2fa',
     permission: 'core.users.manage',
     params: uuidParam,
-    handler: async ({ ctx, params }) => {
-      const u = await db('users').where({ uuid: params.uuid }).first();
+    handler: async ({ ctx, user, params }) => {
+      const u = await db('users').where({ uuid: params.uuid }).whereNull('deleted_at').first();
       if (!u) throw notFound('User');
-      await db('users').where({ id: u.id }).update({ totp_enabled: false, totp_secret_enc: null });
-      await audit(db, ctx, { action: 'user.mfa_reset', entity: 'user', entityId: u.id });
+      await assertCanManageUser(user, u.id);
+      await db.transaction(async (trx) => {
+        await trx('users')
+          .where({ id: u.id })
+          .update({ totp_enabled: false, totp_secret_enc: null, totp_last_step: null });
+        await audit(trx, ctx, { action: 'user.mfa_reset', entity: 'user', entityId: u.id });
+      });
     },
   });
 
+function displayName(u: AuthUser) {
+  return `${u.firstName} ${u.lastName}`.trim() || u.email;
+}
+
 // ---------- Roles ----------
+
+const permissionPattern = z
+  .string()
+  .regex(PERMISSION_PATTERN_RE)
+  .refine((p) => p !== '*', 'Full access (*) belongs only to the system Admin role');
 
 const roleInputSchema = z.object({
   key: z.string().regex(/^[a-z][a-z0-9_]{1,63}$/),
   name: z.string().trim().min(1).max(100),
   description: z.string().trim().max(500).default(''),
-  permissions: z.array(z.string().regex(PERMISSION_PATTERN_RE)).max(500),
+  permissions: z.array(permissionPattern).max(500),
   scopes: z.record(z.string().max(100), z.enum(SCOPES)).default({}),
 });
 
@@ -368,16 +404,19 @@ export const rolesRoutes = defineRoutes('/roles', ['roles'])
     permission: 'core.roles.manage',
     body: roleInputSchema,
     status: 201,
-    handler: async ({ ctx, body }) => {
+    handler: async ({ ctx, user, body }) => {
       validatePatterns(body.permissions);
+      assertCanGrant(user, body.permissions, body.scopes as Record<string, Scope>);
       if (await db('roles').where({ key: body.key }).first())
         throw conflict('A role with this key already exists');
       const id = await db.transaction(async (trx) => {
+        // customized = true: blueprints never adopt or overwrite roles created here.
         const [rid] = await trx('roles').insert({
           uuid: newUuid(),
           key: body.key,
           name: body.name,
           description: body.description,
+          customized: true,
         });
         await writeRolePermissions(trx, rid!, body.permissions, body.scopes);
         await audit(trx, ctx, { action: 'role.created', entity: 'role', entityId: rid, diff: body });
@@ -393,18 +432,24 @@ export const rolesRoutes = defineRoutes('/roles', ['roles'])
     permission: 'core.roles.manage',
     params: uuidParam,
     body: roleInputSchema.omit({ key: true }).partial(),
-    handler: async ({ ctx, params, body }) => {
+    handler: async ({ ctx, user, params, body }) => {
       const r = await db('roles').where({ uuid: params.uuid }).first();
       if (!r) throw notFound('Role');
-      if (r.is_system && body.permissions) throw conflict('The Admin role always has full access');
+      if (r.is_system && (body.permissions || body.scopes))
+        throw conflict('The Admin role always has full access');
       if (body.permissions) validatePatterns(body.permissions);
+      const current = await roleDto(r.id);
+      // Editing a role is granting: the caller must cover both what it has now and what it will have.
+      assertCanGrant(user, [...current.permissions, ...(body.permissions ?? [])], {
+        ...current.scopes,
+        ...(body.scopes ?? {}),
+      } as Record<string, Scope>);
       await db.transaction(async (trx) => {
-        const patch: Record<string, unknown> = { customized: r.source_blueprint ? true : r.customized };
+        const patch: Record<string, unknown> = { customized: true };
         if (body.name !== undefined) patch.name = body.name;
         if (body.description !== undefined) patch.description = body.description;
         await trx('roles').where({ id: r.id }).update(patch);
         if (body.permissions || body.scopes) {
-          const current = await roleDto(r.id);
           await writeRolePermissions(
             trx,
             r.id,
@@ -423,10 +468,12 @@ export const rolesRoutes = defineRoutes('/roles', ['roles'])
     path: '/:uuid',
     permission: 'core.roles.manage',
     params: uuidParam,
-    handler: async ({ ctx, params }) => {
+    handler: async ({ ctx, user, params }) => {
       const r = await db('roles').where({ uuid: params.uuid }).first();
       if (!r) throw notFound('Role');
       if (r.is_system) throw conflict('System roles cannot be deleted');
+      const current = await roleDto(r.id);
+      assertCanGrant(user, current.permissions, current.scopes as Record<string, Scope>);
       const inUse = await db('user_roles').where({ role_id: r.id }).first();
       if (inUse) throw conflict('Move users to another role before deleting this one');
       await db.transaction(async (trx) => {
@@ -454,7 +501,7 @@ export const permissionsRoutes = defineRoutes('/permissions', ['roles']).add({
 const teamInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   memberUuids: z.array(z.uuid()).max(500).default([]),
-  leadUuids: z.array(z.uuid()).max(50).default([]),
+  leadUuids: z.array(z.uuid()).max(50).optional(),
 });
 
 async function teamDto(id: number) {
@@ -485,6 +532,8 @@ async function writeMembers(
 ) {
   const users = members.length ? await trx('users').whereIn('uuid', members).select('id', 'uuid') : [];
   if (users.length !== new Set(members).size) throw new AppError('VALIDATION_FAILED', 'Unknown team member');
+  if (leads.some((l) => !members.includes(l)))
+    throw new AppError('VALIDATION_FAILED', 'Team leads must be members of the team');
   await trx('team_members').where({ team_id: teamId }).delete();
   if (users.length) {
     await trx('team_members').insert(
@@ -514,7 +563,7 @@ export const teamsRoutes = defineRoutes('/teams', ['users'])
         throw conflict('A team with this name already exists');
       const id = await db.transaction(async (trx) => {
         const [tid] = await trx('teams').insert({ uuid: newUuid(), name: body.name });
-        await writeMembers(trx, tid!, body.memberUuids, body.leadUuids);
+        await writeMembers(trx, tid!, body.memberUuids, body.leadUuids ?? []);
         await audit(trx, ctx, { action: 'team.created', entity: 'team', entityId: tid, diff: body });
         return tid!;
       });
@@ -531,9 +580,17 @@ export const teamsRoutes = defineRoutes('/teams', ['users'])
     handler: async ({ ctx, params, body }) => {
       const t = await db('teams').where({ uuid: params.uuid }).first();
       if (!t) throw notFound('Team');
+      const current = await teamDto(t.id);
       await db.transaction(async (trx) => {
         if (body.name) await trx('teams').where({ id: t.id }).update({ name: body.name });
-        if (body.memberUuids) await writeMembers(trx, t.id, body.memberUuids, body.leadUuids ?? []);
+        if (body.memberUuids || body.leadUuids) {
+          const members = body.memberUuids ?? current.members.map((m) => m.uuid);
+          // Omitted leads keep the existing leads (that are still members).
+          const leads =
+            body.leadUuids ??
+            current.members.filter((m) => m.isLead && members.includes(m.uuid)).map((m) => m.uuid);
+          await writeMembers(trx, t.id, members, leads);
+        }
         await audit(trx, ctx, { action: 'team.updated', entity: 'team', entityId: t.id, diff: body });
       });
       clearAccessCache();
