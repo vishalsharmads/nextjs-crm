@@ -6,3 +6,4 @@ export * from './filters';
 export * from './branding';
 export * from './settings';
 export * from './auth';
+export * from './meta';
