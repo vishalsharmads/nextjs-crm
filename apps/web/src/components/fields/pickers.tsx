@@ -5,7 +5,7 @@ import { useBoot } from '@/app/session';
 import { useTags, useUsersPicker } from '@/features/records/api';
 import { Combobox, type ComboOption } from './combobox';
 
-type A11y = { id?: string; 'aria-invalid'?: boolean; 'aria-describedby'?: string };
+type A11y = { id?: string; 'aria-invalid'?: boolean; 'aria-describedby'?: string; 'aria-label'?: string };
 
 export function UserPicker({
   value,

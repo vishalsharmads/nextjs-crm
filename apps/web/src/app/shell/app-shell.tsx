@@ -99,10 +99,10 @@ function ShellLayout({ nav }: { nav: NavItem[] }) {
   useHotkeys(hotkeys);
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="flex h-dvh overflow-hidden print:block print:h-auto print:overflow-visible">
       <aside
         className={cn(
-          'hidden shrink-0 flex-col border-e border-line bg-surface transition-[width] duration-150 md:flex',
+          'hidden shrink-0 flex-col border-e border-line bg-surface transition-[width] duration-150 md:flex print:hidden',
           collapsed ? 'w-14' : 'w-60',
         )}
       >
@@ -124,7 +124,7 @@ function ShellLayout({ nav }: { nav: NavItem[] }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onMenu={() => setMobileOpen(true)} onHelp={() => setHelpOpen(true)} />
         <MfaRequiredBanner />
-        <main className="min-h-0 flex-1 overflow-y-auto">
+        <main className="min-h-0 flex-1 overflow-y-auto print:overflow-visible">
           <Outlet />
         </main>
       </div>
@@ -276,7 +276,7 @@ function TopBar({ onMenu, onHelp }: { onMenu: () => void; onHelp: () => void }) 
   };
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 md:px-4">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 md:px-4 print:hidden">
       <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenu} aria-label="Open navigation">
         <MenuIcon />
       </Button>

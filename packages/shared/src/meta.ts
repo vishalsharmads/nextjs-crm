@@ -1,6 +1,12 @@
 import type { AccessDto, MeDto } from './auth';
 import type { CustomFieldDef, VisibilityLevel } from './custom-fields';
-import type { ContactSettings, DealSettings, FeatureSettings, GeneralSettings } from './settings';
+import type {
+  CommerceSettings,
+  ContactSettings,
+  DealSettings,
+  FeatureSettings,
+  GeneralSettings,
+} from './settings';
 
 export interface StageDto {
   uuid: string;
@@ -64,6 +70,7 @@ export interface BootstrapDto {
     features: FeatureSettings;
     deals: DealSettings;
     contacts: ContactSettings;
+    commerce: CommerceSettings;
   };
   customFields: (CustomFieldDef & { level: VisibilityLevel })[];
   fieldGroups: FieldGroupDto[];

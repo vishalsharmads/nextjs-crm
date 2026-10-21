@@ -51,6 +51,7 @@ export const metaRoutes = defineRoutes('/meta', ['meta']).add({
         features: await getGroup('features'),
         deals: await getGroup('deals'),
         contacts: await getGroup('contacts'),
+        commerce: await getGroup('commerce'),
       },
       customFields,
       fieldGroups: groups.map((g) => ({
