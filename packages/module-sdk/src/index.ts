@@ -93,4 +93,6 @@ export function sortByDependencies(manifests: ModuleManifest[]): ModuleManifest[
 export interface WebModule<Element = unknown> {
   key: string;
   routes: { path: string; element: Element }[];
+  /** Renderers for this module's dashboard widgets, keyed by widget type (`<key>.<name>`). */
+  widgets?: Record<string, (props: { data: unknown }) => Element>;
 }

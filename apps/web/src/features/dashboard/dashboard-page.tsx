@@ -11,6 +11,7 @@ import { useBoot, useT } from '@/app/session';
 import { setDocumentTitle } from '@/theme/apply';
 import { PageHeader, Skeleton } from '@/components/ui/misc';
 import { labelVars } from '@/lib/labels';
+import { ModuleWidget } from '@/modules/loader';
 
 interface Widget {
   key: string;
@@ -108,6 +109,8 @@ function WidgetBody({ widget }: { widget: Widget }) {
     case 'date_window':
       return <DateWindow data={q.data as never} />;
     default:
+      if (widget.type.startsWith('module:'))
+        return <ModuleWidget type={widget.type.slice(7)} data={q.data} />;
       return <Muted>Unknown widget</Muted>;
   }
 }

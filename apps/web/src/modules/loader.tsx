@@ -16,7 +16,9 @@ const loaders = new Map(
   Object.entries(entries).map(([path, load]) => [path.split('/modules/')[1]!.split('/')[0]!, load]),
 );
 const cache = new Map<string, Promise<Mod>>();
-const loadModule = (key: string) => {
+/** Load a module's web entry (cached). Rejects for modules not in this build. */
+export const loadModule = (key: string) => {
+  if (!loaders.has(key)) return Promise.reject(new Error(`Module "${key}" is not in this build`));
   if (!cache.has(key))
     cache.set(
       key,
@@ -65,4 +67,25 @@ export function ModuleOutlet() {
     );
   }
   return <ModuleRoutes mod={state.mod} />;
+}
+
+/** Renders a module's dashboard widget once its web entry has loaded. */
+export function ModuleWidget({ type, data }: { type: string; data: unknown }) {
+  const moduleKey = type.split('.')[0]!;
+  const [mod, setMod] = useState<Mod | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    loadModule(moduleKey).then(
+      (m) => live && setMod(m),
+      () => live && setFailed(true),
+    );
+    return () => {
+      live = false;
+    };
+  }, [moduleKey]);
+  const Render = mod?.widgets?.[type];
+  if (failed || (mod && !Render)) return <p className="text-sm text-muted">This widget is not available.</p>;
+  if (!Render) return <Spinner />;
+  return Render({ data });
 }
