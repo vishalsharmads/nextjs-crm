@@ -15,6 +15,7 @@ export interface RecordRef {
  */
 export function DocumentPaper({
   kind,
+  partyLabel = 'Prepared for',
   number,
   title,
   badge,
@@ -29,6 +30,7 @@ export function DocumentPaper({
   footer,
 }: {
   kind: string;
+  partyLabel?: string;
   number: string;
   title?: string;
   badge?: ReactNode;
@@ -69,7 +71,7 @@ export function DocumentPaper({
 
       <section className="grid gap-6 py-6 sm:grid-cols-2">
         <div>
-          <p className="text-xs font-medium tracking-wide text-muted uppercase">Prepared for</p>
+          <p className="text-xs font-medium tracking-wide text-muted uppercase">{partyLabel}</p>
           {organization ? <p className="mt-1 font-medium">{organization.name}</p> : null}
           {contact ? (
             <p className={organization ? 'text-muted' : 'mt-1 font-medium'}>{contact.name}</p>
