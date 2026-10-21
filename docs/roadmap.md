@@ -33,3 +33,5 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - Server-side PDF rendering (Phase 3 prints from the browser, which is also "Save as PDF").
 - E-signature with document hashing for quote acceptance (Phase 3 records a typed name, time and IP in the audit log).
 - Quote and invoice panels on deal and organization record pages.
+- Scope-filter linked record names on commercial documents (a document's owner sees its linked contact or deal name even when that record is outside their scope), and re-check link scope when duplicating or converting.
+- Purge expired portal tokens and sessions on a schedule.
