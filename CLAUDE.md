@@ -7,7 +7,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 ## Current status
 
 - Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
-- **Phases 1 and 2 complete.** Next: Phase 3 (commercial: products, quotes, invoices, payments, contracts, client portal), then Phase 4.
+- **Phases 1–3 complete.** Next: Phase 4 (bookings, tickets, documents, inventory/assets modules, then vertical modules).
 
 ## Non-negotiables
 
@@ -79,6 +79,7 @@ npm run crm:export-blueprint -- --out=<file>
 npm run check:brand              # white-label grep over build output, templates, blueprints, locales
 npm run doctor                   # Node/MySQL versions, sql_mode, TRIGGER privilege, binlog, SMTP
 npm run cli -w @app/api -- user:reset-password --email=<email>
+npm run cli -w @app/api -- demo:seed [--password=..]   # one demo user per role; shown on sign-in only with DEMO_MODE=true
 ```
 
 API tests drop and recreate `crm_test` on every run (`apps/api/test/global-setup.ts`). E2E (`npm run test:e2e`) drops and reinstalls `crm_e2e` and starts its own API (:4300) and web (:5300).
@@ -99,6 +100,8 @@ Run test suites one workspace at a time on this machine; running all three in pa
 - **Permission keys** follow `<module>.<resource>.<action>`. Wildcards: `*`, `core.contacts.*`.
 - **Record scope** (`own | team | all`) is applied in the repository from a service-supplied `ScopeContext`. An out-of-scope single-record read returns **404**.
 - **Field visibility** (custom fields): strip `hidden` from every response, export, search result, and timeline diff. Writing to `read`/`hidden` → `403 FIELD_FORBIDDEN`.
+- **PATCH schemas** always use `toPatch(createSchema)` from `@app/shared`, never `.partial()`: Zod 4's `.partial()` keeps `.default()`, so a one-field PATCH would reset every defaulted field.
+- **Commercial documents** (quotes, invoices, contracts) are modules that share `core/commerce/documents.ts`: gap-free numbering (`nextDocNumber`), scope-checked links (`resolveLinks`), and server-computed line totals (`saveLines`). Money math lives in `packages/shared/src/commerce.ts` (integer cents) so web previews match the API.
 - **Validation:** Zod on every body, query, and param. Custom fields use the runtime schema from `SchemaBuilder`.
 - **SQL:** parameterized only. Identifiers from user input (custom field keys) must match `^[a-z][a-z0-9_]{0,48}$` **and** be resolved through `custom_field_definitions`. Never interpolate request values into `knex.raw`.
 - **Audit:** every mutation writes an `audit_logs` row in the same transaction. Audit is append-only (DB triggers). The only exception is the privileged privacy anonymize path.
@@ -138,6 +141,7 @@ Run test suites one workspace at a time on this machine; running all three in pa
 - **RTL-ready:** use logical properties (`ms-`, `pe-`, `start-`, `end-`), never `ml-`/`pr-`/`left-`/`right-`.
 - **Motion:** 120–200 ms ease-out, only in response to user actions.
 - **Auth tokens** live in httpOnly cookies only. Never use localStorage or sessionStorage for tokens. The API client sends `X-CSRF-Token` and does a single-flight refresh on 401.
+- **Module pages** link with absolute paths, and buttons inside forms that are not submits need `type="button"`. Restart `npm run dev` after adding a module folder (Vite globs module entries at startup).
 - **Copy:** sentence case, active verbs. A button and its resulting toast use the same verb ("Archive" → "Archived").
 
 ## Testing

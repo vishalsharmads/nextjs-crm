@@ -62,7 +62,10 @@ export const notesDemo: ApiModule = { routes: () => [routes], migrations: { '000
 - Routes live under `/api/v1/m/<key>/…`. The third `defineRoutes` argument (the module key) makes the access gate return `MODULE_DISABLED` while the module is off.
 - Every route declares a permission, and mutations write an audit entry in the same transaction, exactly as in core.
 - Tables are prefixed `m_<key_with_underscores>_`. Migrations run when the module is first enabled and are tracked in their own table. Like core migrations, they are never edited once committed.
-- Dashboard widgets: `registerModuleWidget('<key>.<name>', async (params, user) => data)`.
+- Dashboard widgets: `registerModuleWidget('<key>.<name>', async (params, user) => data)`. Apply record scope inside the provider; it runs as the viewing user.
+- Recurring work: return `start: () => every(ms, '<key>.<task>', fn)` from the module. `fn` must return early while `isModuleEnabled('<key>')` is false.
+- Module-to-module calls: import the other module's exported functions directly (for example invoices imports `quoteForConversion` from quotes). Check `isModuleEnabled()` before calling into a module you do not declare in `depends_on`.
+- Public endpoints (for customers, not users) go under `/public/...` with `permission: 'public'` and must authenticate callers themselves. Use `rateLimiter()` and `cookieOptions()` from `module-api`.
 
 ## Web
 
@@ -72,6 +75,11 @@ export default notesModule;
 ```
 
 The page renders at `/m/<key>/…`, inside the app shell, as its own lazy-loaded chunk. Use the shared UI components and theme tokens; the same white-label and RTL lint rules apply.
+
+- Link with absolute paths (`/m/<key>/<uuid>`). Module routes are mounted under a wildcard, so relative links resolve unpredictably.
+- `widgets: { '<key>.<name>': ({ data }) => <Widget data={data} /> }` renders the module's dashboard widgets.
+- `publicRoutes` render at `/p/<key>/…` with no app shell and no staff session, for customer-facing pages such as the client portal. Call your API with `noRetry: true`, so a 401 never triggers a staff session refresh.
+- After adding a new module folder, restart `npm run dev`: Vite only picks up new `modules/*/web` entries at startup.
 
 ## Registering
 
