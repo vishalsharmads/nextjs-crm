@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Columns3, Plus, Rows3, Rows4, Search, Inbox } from 'lucide-react';
+import { Columns3, Download, Plus, Rows3, Rows4, Search, Inbox, Upload } from 'lucide-react';
+import { buildUrl } from '@/lib/api';
 import type { CoreEntity, FilterCondition } from '@app/shared';
 import { useBranding } from '@/app/branding';
 import { useBoot, useCan } from '@/app/session';
@@ -95,6 +96,7 @@ export function RecordListPage({
   const state = useListState();
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [allMatching, setAllMatching] = useState(false);
   const [density, setDensity] = useState<'comfortable' | 'compact'>(() =>
     readJson('ui.density', 'comfortable'),
   );
@@ -107,7 +109,10 @@ export function RecordListPage({
     }, 300);
     return () => clearTimeout(t);
   }, [search, state]);
-  useEffect(() => setSelected(new Set()), [state.q, state.view, state.conditions]);
+  useEffect(() => {
+    setSelected(new Set());
+    setAllMatching(false);
+  }, [state.q, state.view, state.conditions]);
 
   const layoutColumns = boot.layouts.find((l) => l.entity === entity && l.context === 'list')?.columns;
   const [columnIds, setColumnIds] = useState<string[]>(() =>
@@ -210,6 +215,26 @@ export function RecordListPage({
         <FilterBar fields={config.fields} conditions={state.conditions} onChange={state.setConditions} />
         <div className="ms-auto flex items-center gap-1">
           {toolbarExtra}
+          {entity !== 'activity' && can(`${config.resource}.import`) ? (
+            <Button size="sm" variant="ghost" onClick={() => navigate(`/import/${config.route}`)}>
+              <Upload /> Import
+            </Button>
+          ) : null}
+          {entity !== 'activity' && can(`${config.resource}.export`) ? (
+            <Button size="sm" variant="ghost" asChild>
+              <a
+                href={buildUrl(`/${config.route}/export`, {
+                  filter: state.conditions.length ? JSON.stringify({ and: state.conditions }) : undefined,
+                  q: state.q || undefined,
+                  view: state.view ?? undefined,
+                  sort: state.sort,
+                })}
+                download
+              >
+                <Download /> Export
+              </a>
+            </Button>
+          ) : null}
           <ColumnPicker config={config} value={columnIds} onChange={saveColumns} />
           <Tooltip content={density === 'compact' ? 'Comfortable rows' : 'Compact rows'}>
             <Button
@@ -228,7 +253,18 @@ export function RecordListPage({
         </div>
       </div>
       {selected.size ? (
-        <BulkBar config={config} selected={selected} onClear={() => setSelected(new Set())} />
+        <BulkBar
+          config={config}
+          selected={selected}
+          total={list.data?.meta.total}
+          allMatching={allMatching}
+          onSelectAllMatching={() => setAllMatching(true)}
+          criteria={{ conditions: state.conditions, q: state.q, view: state.view }}
+          onClear={() => {
+            setSelected(new Set());
+            setAllMatching(false);
+          }}
+        />
       ) : null}
       {list.isError ? (
         <ErrorState error={list.error} onRetry={() => list.refetch()} />
