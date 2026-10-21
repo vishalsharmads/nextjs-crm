@@ -1,0 +1,26 @@
+{
+  "key": "products",
+  "name": "Products and services",
+  "version": "1.0.0",
+  "status": "available",
+  "description": "A catalog of what you sell, with prices and tax rates, used on quotes and invoices.",
+  "depends_on": [],
+  "permissions": [
+    { "key": "products.products.view", "description": "View the product catalog" },
+    { "key": "products.products.manage", "description": "Create, edit and archive products" }
+  ],
+  "menu_items": [
+    {
+      "key": "products",
+      "label": "Products",
+      "path": "/m/products",
+      "icon": "package",
+      "permission": "products.products.view",
+      "order": 40
+    }
+  ],
+  "labels": { "product": { "singular": "Product", "plural": "Products" } },
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx"
+}
