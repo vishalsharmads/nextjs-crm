@@ -11,6 +11,10 @@ import { filesRoutes } from './files/files.routes';
 import { searchRoutes } from './search/search.routes';
 import { customFieldsRoutes, fieldGroupsRoutes, layoutsRoutes } from './custom-fields/custom-fields.routes';
 import { pipelinesRoutes } from './pipelines/pipelines.routes';
+import { notificationsRoutes } from './notifications/notifications.routes';
+import { savedViewsRoutes } from './saved-views/saved-views.routes';
+import { entityCollectionRoutes, importsRoutes } from './imports/imports.routes';
+import { auditRoutes, dashboardRoutes } from './dashboard/dashboard.routes';
 
 /** All core route groups. Specific paths (e.g. /deals/board) are registered before /:uuid. */
 export function coreRouteGroups(): RouteGroup[] {
@@ -32,6 +36,12 @@ export function coreRouteGroups(): RouteGroup[] {
     tagsRoutes,
     filesRoutes,
     searchRoutes,
+    notificationsRoutes,
+    savedViewsRoutes,
+    importsRoutes,
+    dashboardRoutes,
+    auditRoutes,
+    ...entityCollectionRoutes(),
     ...contactsRoutes,
     ...organizationsRoutes,
     ...leadsRoutes,
