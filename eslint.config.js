@@ -62,10 +62,13 @@ export default tseslint.config(
         },
         { selector: `TemplateElement[value.raw=${paletteClass}]`, message: 'Use theme token classes.' },
         {
-          selector: `Literal[value=${physicalDirection}]`,
+          selector: `:matches(JSXAttribute[name.name='className'], CallExpression[callee.name=/^(cn|cva)$/]) Literal[value=${physicalDirection}]`,
           message: 'Use logical utilities (ms-, me-, ps-, pe-, start-, end-, text-start).',
         },
-        { selector: `TemplateElement[value.raw=${physicalDirection}]`, message: 'Use logical utilities.' },
+        {
+          selector: `:matches(JSXAttribute[name.name='className'], CallExpression[callee.name=/^(cn|cva)$/]) TemplateElement[value.raw=${physicalDirection}]`,
+          message: 'Use logical utilities.',
+        },
       ],
     },
   },

@@ -37,3 +37,4 @@ Thumbs.db
 # Claude Code personal overrides (shared settings live in .claude/settings.json)
 .claude/settings.local.json
 CLAUDE.local.md
+.playwright-mcp/
