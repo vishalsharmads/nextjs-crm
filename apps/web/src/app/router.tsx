@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router';
+import { createBrowserRouter, Navigate, Outlet, useLocation, useRouteError } from 'react-router';
+import { ErrorState } from '@/components/ui/misc';
 import { useSession } from '@/app/session';
 import { Spinner } from '@/components/ui/spinner';
 import { AppShell } from '@/app/shell/app-shell';
@@ -30,6 +31,9 @@ const TasksPage = lazyPage(() => import('@/features/activities/tasks-page'), 'Ta
 const ImportPage = lazyPage(() => import('@/features/imports/import-page'), 'ImportPage');
 const DashboardPage = lazyPage(() => import('@/features/dashboard/dashboard-page'), 'DashboardPage');
 const AuditPage = lazyPage(() => import('@/features/audit/audit-page'), 'AuditPage');
+const ModulesPage = lazyPage(() => import('@/features/settings/platform-pages'), 'ModulesPage');
+const BlueprintPage = lazyPage(() => import('@/features/settings/platform-pages'), 'BlueprintPage');
+const PrivacyPage = lazyPage(() => import('@/features/settings/platform-pages'), 'PrivacyPage');
 const CalendarPage = lazyPage(() => import('@/features/activities/calendar-page'), 'CalendarPage');
 
 export function PageFallback() {
@@ -69,7 +73,23 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'fields', element: <FieldsPage /> },
   { path: 'pipelines', element: <PipelinesPage /> },
   { path: 'audit', element: <AuditPage /> },
+  { path: 'modules', element: <ModulesPage /> },
+  { path: 'blueprint', element: <BlueprintPage /> },
+  { path: 'privacy', element: <PrivacyPage /> },
 ];
+
+/** Shown instead of a blank screen when a page throws while rendering. */
+function RouteError() {
+  const error = useRouteError();
+  return (
+    <div className="flex min-h-dvh items-center justify-center p-6">
+      <ErrorState
+        error={error instanceof Error ? error : new Error('This page could not be shown.')}
+        onRetry={() => window.location.reload()}
+      />
+    </div>
+  );
+}
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -78,6 +98,7 @@ export const router = createBrowserRouter([
   { path: '/accept-invite', element: <AcceptInvitePage /> },
   {
     element: <RequireAuth />,
+    errorElement: <RouteError />,
     children: [
       {
         element: <AppShell />,

@@ -45,8 +45,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading || undefined}
         {...props}
       >
-        {loading ? <Spinner /> : null}
-        {children}
+        {/* Slot needs exactly one child, so asChild renders the child alone. */}
+        {asChild ? (
+          children
+        ) : (
+          <>
+            {loading ? <Spinner /> : null}
+            {children}
+          </>
+        )}
       </Comp>
     );
   },
