@@ -30,7 +30,7 @@ export function VocabularyPage() {
   return (
     <SettingsPage
       title={t('settings.vocabulary')}
-      description="Use the words your team uses. A coworking space might say Members and Memberships; a clinic might say Patients and Treatments."
+      description={t('settings.vocabularyHelp')}
       actions={
         <Button variant="primary" onClick={() => save.mutate()} loading={save.isPending}>
           Save vocabulary
