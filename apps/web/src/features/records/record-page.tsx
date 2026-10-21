@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, GitMerge, MoreHorizontal, Pencil, Trash2, UserCheck } from 'lucide-react';
+import { ArrowLeft, GitMerge, Mail, MoreHorizontal, Pencil, Trash2, UserCheck } from 'lucide-react';
+import { ComposeEmail } from '@/features/email/compose-email';
 import type { ContactDto, CoreEntity, DealDto, DuplicateCandidate, LeadDto, RelatedType } from '@app/shared';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
@@ -50,6 +51,7 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
   const [editing, setEditing] = useState(false);
   const [merging, setMerging] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [emailing, setEmailing] = useState(false);
   const title = q.data ? config.title(q.data as never) : '';
   useEffect(
     () => setDocumentTitle(title || config.singular, branding.appName),
@@ -97,6 +99,11 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
             {entity === 'lead' && !(rec as unknown as LeadDto).convertedAt && can('core.leads.update') ? (
               <Button variant="primary" onClick={() => setConverting(true)}>
                 <UserCheck /> Convert
+              </Button>
+            ) : null}
+            {typeof rec.email === 'string' && rec.email && can('core.email.use') ? (
+              <Button onClick={() => setEmailing(true)}>
+                <Mail /> Email
               </Button>
             ) : null}
             {can(`${config.resource}.update`) ? (
@@ -165,6 +172,13 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
       </div>
       <RecordFormSheet config={config} record={rec} open={editing} onOpenChange={setEditing} />
       {merging ? <MergeDialog config={config} rec={rec} onClose={() => setMerging(false)} /> : null}
+      {emailing ? (
+        <ComposeEmail
+          to={rec.email as string}
+          related={{ type: entity as RelatedType, uuid: rec.uuid }}
+          onClose={() => setEmailing(false)}
+        />
+      ) : null}
       {converting ? (
         <ConvertLeadDialog lead={rec as unknown as LeadDto} onClose={() => setConverting(false)} />
       ) : null}

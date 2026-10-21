@@ -34,6 +34,17 @@ const AuditPage = lazyPage(() => import('@/features/audit/audit-page'), 'AuditPa
 const ModulesPage = lazyPage(() => import('@/features/settings/platform-pages'), 'ModulesPage');
 const BlueprintPage = lazyPage(() => import('@/features/settings/platform-pages'), 'BlueprintPage');
 const PrivacyPage = lazyPage(() => import('@/features/settings/platform-pages'), 'PrivacyPage');
+const ApiKeysPage = lazyPage(() => import('@/features/settings/integration-pages'), 'ApiKeysPage');
+const WebhooksPage = lazyPage(() => import('@/features/settings/integration-pages'), 'WebhooksPage');
+const TemplatesPage = lazyPage(() => import('@/features/settings/integration-pages'), 'TemplatesPage');
+const EmailSettingsPage = lazyPage(
+  () => import('@/features/settings/integration-pages'),
+  'EmailSettingsPage',
+);
+const AutomationsPage = lazyPage(() => import('@/features/settings/workflow-pages'), 'AutomationsPage');
+const FormsPage = lazyPage(() => import('@/features/settings/workflow-pages'), 'FormsPage');
+const LayoutBuilderPage = lazyPage(() => import('@/features/settings/layout-builder'), 'LayoutBuilderPage');
+const PublicFormPage = lazyPage(() => import('@/features/forms/public-form-page'), 'PublicFormPage');
 const CalendarPage = lazyPage(() => import('@/features/activities/calendar-page'), 'CalendarPage');
 
 export function PageFallback() {
@@ -76,6 +87,13 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'modules', element: <ModulesPage /> },
   { path: 'blueprint', element: <BlueprintPage /> },
   { path: 'privacy', element: <PrivacyPage /> },
+  { path: 'api-keys', element: <ApiKeysPage /> },
+  { path: 'webhooks', element: <WebhooksPage /> },
+  { path: 'templates', element: <TemplatesPage /> },
+  { path: 'email', element: <EmailSettingsPage /> },
+  { path: 'automations', element: <AutomationsPage /> },
+  { path: 'forms', element: <FormsPage /> },
+  { path: 'layouts', element: <LayoutBuilderPage /> },
 ];
 
 /** Shown instead of a blank screen when a page throws while rendering. */
@@ -96,6 +114,7 @@ export const router = createBrowserRouter([
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/accept-invite', element: <AcceptInvitePage /> },
+  { path: '/f/:uuid', element: page(<PublicFormPage />) },
   {
     element: <RequireAuth />,
     errorElement: <RouteError />,
