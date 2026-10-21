@@ -122,6 +122,7 @@
     "lifecycleHelp": "The stages each {{contactLower}} moves through.",
     "lostReasons": "Lost reasons",
     "lostReasonsHelp": "Asked whenever {{dealPluralLower}} are marked lost, so you can see why.",
-    "vocabularyHelp": "Use the words your team already uses. Names change everywhere: menus, titles, buttons, empty states and emails."
+    "vocabularyHelp": "Use the words your team already uses. Names change everywhere: menus, titles, buttons, empty states and emails.",
+    "layouts": "Layouts"
   }
 }
