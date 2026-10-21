@@ -7,7 +7,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 ## Current status
 
 - Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
-- **Phase 1 complete** (milestones 1a–1d merged). Next: Phase 2 (configuration and communication), then 3 and 4.
+- **Phases 1 and 2 complete.** Next: Phase 3 (commercial: products, quotes, invoices, payments, contracts, client portal), then Phase 4.
 
 ## Non-negotiables
 
@@ -91,6 +91,9 @@ Run test suites one workspace at a time on this machine; running all three in pa
 - **Access gate** runs before a route's `before` middleware (uploads are never parsed for unauthorized callers) and enforces module state, permission and required 2FA enrolment.
 - **Grants:** non-admins can only grant permissions/scopes they hold (`core/rbac/grants.ts`); `*` belongs only to the system Admin role; only admins can change admin accounts.
 - **Route order:** static paths (`/deals/board`, `/contacts/export`) must be registered before `/:uuid` routes. A test fails on shadowed routes.
+- **Domain events** (`core/events/events.ts`) are emitted by services after commit; webhooks and automations subscribe and enqueue jobs. New record types must emit created/updated/deleted.
+- **Jobs:** `enqueue`/`registerJob` in `lib/jobs.ts` (in-process, or BullMQ with `REDIS_URL`); recurring work uses `every()`, which takes a Redis lock per tick.
+- **Tests share one database:** a test that creates a _required_ custom field must archive it before it ends, or other files' creates fail.
 - **Modules** import only from `@app/api/module-api`; tables are `m_<key>_*`; list new modules in `apps/api/src/modules/installed.ts`.
 - **Routes** are registered only through `defineRoute({ method, path, permission, schema, handler })`. `permission` is a key, `'public'`, or `'authenticated'`. A test fails if any Express layer lacks a registry entry.
 - **Permission keys** follow `<module>.<resource>.<action>`. Wildcards: `*`, `core.contacts.*`.

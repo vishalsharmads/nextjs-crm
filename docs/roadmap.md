@@ -25,3 +25,5 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - Dashboard editing in the UI (add, remove, resize widgets). Phase 1 ships blueprint-defined dashboards and the API to save personal copies.
 - Mouse-friendly "Move to stage" menu on Kanban cards (keyboard drag works today).
 - Per-user notification preferences UI (the `preferences.emailNotifications` flag exists).
+- OAuth mailbox connection (Google, Microsoft) instead of app passwords.
+- Threaded email view and reply-from-CRM using `In-Reply-To`.
