@@ -1,0 +1,28 @@
+{
+  "key": "quotes",
+  "name": "Quotes",
+  "version": "1.0.0",
+  "status": "available",
+  "description": "Priced proposals with line items, linked to deals, that customers can accept.",
+  "depends_on": ["products"],
+  "permissions": [
+    { "key": "quotes.quotes.view", "description": "View quotes" },
+    { "key": "quotes.quotes.create", "description": "Create quotes" },
+    { "key": "quotes.quotes.update", "description": "Edit, send and record responses to quotes" },
+    { "key": "quotes.quotes.delete", "description": "Delete quotes" }
+  ],
+  "menu_items": [
+    {
+      "key": "quotes",
+      "label": "Quotes",
+      "path": "/m/quotes",
+      "icon": "file-text",
+      "permission": "quotes.quotes.view",
+      "order": 41
+    }
+  ],
+  "labels": { "quote": { "singular": "Quote", "plural": "Quotes" } },
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx"
+}
