@@ -51,7 +51,8 @@ export async function resolveLinks(user: AuthUser, input: LinkInput, conn: Db = 
     }
     try {
       out[column] = (await getRow(recordDefs[entity], user, uuid, conn)).id;
-    } catch {
+    } catch (err) {
+      if (!(err instanceof AppError && err.code === 'NOT_FOUND')) throw err;
       throw new AppError('VALIDATION_FAILED', 'Linked record not found', [
         { path: key, message: 'Not found' },
       ]);
