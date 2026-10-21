@@ -40,6 +40,7 @@ import {
   type ApiModule,
   type AuthUser,
   type Db,
+  type Knex,
   type LineInput,
   type RequestContext,
 } from '@app/api/module-api';
@@ -717,3 +718,17 @@ export const invoices: ApiModule = {
   migrations: { '0001_invoices': m0001 },
   start: () => every(60 * 60_000, 'invoices.overdue', flagOverdueInvoices),
 };
+
+/** Invoices a customer may see: issued, paid or void, never drafts. */
+export async function customerInvoices(match: (qb: Knex.QueryBuilder) => void, uuid?: string) {
+  const qb = db(INVOICES).whereNull('deleted_at').whereNot({ status: 'draft' });
+  match(qb);
+  if (uuid) qb.where({ uuid });
+  const rows = await qb.orderBy('id', 'desc').limit(uuid ? 1 : 100);
+  return (await toDtos(rows, !!uuid, await today())).map(
+    ({ owner: _o, voidReason: _v, sourceQuoteUuid: _s, ...rest }) => ({
+      ...rest,
+      payments: rest.payments?.map(({ note: _n, ...p }) => p),
+    }),
+  );
+}

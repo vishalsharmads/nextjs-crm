@@ -18,6 +18,7 @@ import {
   newUuid,
   nextDocNumber,
   notFound,
+  notify,
   resolveLinks,
   saveLines,
   scopeAllows,
@@ -30,6 +31,7 @@ import {
   type ApiModule,
   type AuthUser,
   type Db,
+  type Knex,
   type LineInput,
   type RequestContext,
 } from '@app/api/module-api';
@@ -524,3 +526,61 @@ export const quotes: ApiModule = {
   start: () => every(60 * 60_000, 'quotes.expire', expireQuotes),
 };
 export { expireQuotes };
+
+/** Restricts a query to the documents one customer may see (built by the portal). */
+export type CustomerMatch = (qb: Knex.QueryBuilder) => void;
+
+/** Quotes a customer may see: never drafts. Detail (lines) only when one uuid is asked for. */
+export async function customerQuotes(match: CustomerMatch, uuid?: string) {
+  const qb = db(QUOTES).whereNull('deleted_at').whereNot({ status: 'draft' });
+  match(qb);
+  if (uuid) qb.where({ uuid });
+  const rows = await qb.orderBy('id', 'desc').limit(uuid ? 1 : 100);
+  return (await toDtos(rows, !!uuid)).map(
+    ({ owner: _o, declineReason: _d, convertedInvoiceUuid: _c, notes, ...rest }) => ({ ...rest, notes }),
+  );
+}
+
+/** The customer accepts or declines a sent quote from the portal. Expired quotes need a new one. */
+export async function respondAsCustomer(
+  ctx: RequestContext,
+  match: CustomerMatch,
+  uuid: string,
+  response: { accept: true; name: string } | { accept: false; reason: string | null },
+) {
+  const { timezone } = await getSettingsGroup('general');
+  const today = todayIn(timezone);
+  await db.transaction(async (trx) => {
+    const qb = trx(QUOTES).where({ uuid }).whereNull('deleted_at').forUpdate();
+    match(qb);
+    const row = await qb.first();
+    if (!row) throw notFound('Quote');
+    if (row.status !== 'sent' || (row.valid_until && row.valid_until < today))
+      throw new AppError(
+        'CONFLICT',
+        'This quote can no longer be answered online. Contact us for a new one.',
+      );
+    const patch = response.accept
+      ? { status: 'accepted', accepted_by_name: response.name }
+      : { status: 'declined', decline_reason: response.reason };
+    await trx(QUOTES)
+      .where({ id: row.id })
+      .update({ ...patch, responded_at: new Date(), updated_at: new Date() });
+    await audit(trx, ctx, {
+      action: `quotes.quote.${response.accept ? 'accepted' : 'declined'}`,
+      entity: 'quotes.quote',
+      entityId: row.id,
+      entityUuid: uuid,
+      diff: { via: 'portal', ...(response.accept ? { name: response.name } : { reason: response.reason }) },
+    });
+    if (row.owner_id)
+      await notify(row.owner_id as number, {
+        type: response.accept ? 'quote.accepted' : 'quote.declined',
+        title: `${row.number} was ${response.accept ? 'accepted' : 'declined'} online`,
+        body: response.accept ? `By ${response.name}` : (response.reason ?? null),
+        link: `/m/quotes/${uuid}`,
+        email: true,
+      });
+  });
+  await emitQuote(response.accept ? 'quote.accepted' : 'quote.declined', uuid, null);
+}

@@ -42,3 +42,4 @@ export { sendMail } from './lib/mailer';
 export { getBranding } from './core/settings/settings.service';
 export { randomToken, sha256 } from './lib/crypto';
 export { rateLimiter, appUrl, cookieOptions } from './modules/helpers';
+export type { Knex } from 'knex';

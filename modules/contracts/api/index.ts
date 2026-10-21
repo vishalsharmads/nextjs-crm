@@ -30,6 +30,7 @@ import {
   type ApiModule,
   type AuthUser,
   type Db,
+  type Knex,
   type RequestContext,
 } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_contracts';
@@ -586,3 +587,22 @@ export const contracts: ApiModule = {
   migrations: { '0001_contracts': m0001 },
   start: () => every(60 * 60_000, 'contracts.renewals', runRenewals),
 };
+
+/** Contracts a customer may see: active or past, never drafts. */
+export async function customerContracts(match: (qb: Knex.QueryBuilder) => void) {
+  const qb = db(CONTRACTS).whereNull('deleted_at').whereNot({ status: 'draft' });
+  match(qb);
+  const rows = await qb.orderBy('id', 'desc').limit(100);
+  return (await toDtos(rows)).map((c) => ({
+    uuid: c.uuid,
+    number: c.number,
+    title: c.title,
+    status: c.status,
+    startDate: c.startDate,
+    endDate: c.endDate,
+    value: c.value,
+    currency: c.currency,
+    billingCycle: c.billingCycle,
+    autoRenew: c.autoRenew,
+  }));
+}
