@@ -1,16 +1,27 @@
 import {
+  Box,
   Building2,
   Calendar,
+  CalendarDays,
   CheckSquare,
+  ClipboardList,
+  CreditCard,
+  FileText,
   Handshake,
   Home,
+  KeyRound,
+  LifeBuoy,
+  Mail,
+  MapPin,
+  Notebook,
+  Package,
+  Receipt,
   Settings,
   Target,
+  Ticket,
   Users,
-  Box,
   type LucideIcon,
 } from 'lucide-react';
-import * as Icons from 'lucide-react';
 import type { BootstrapDto } from '@app/shared';
 import { hasPermission } from '@app/shared';
 import { labelVars } from '@/lib/labels';
@@ -37,10 +48,25 @@ const ADMIN_PERMISSIONS = [
   'core.modules.manage',
 ];
 
+/** Icons modules may name in their manifest menu items (kept small so the bundle stays small). */
+const MODULE_ICONS: Record<string, LucideIcon> = {
+  box: Box,
+  calendar: CalendarDays,
+  'clipboard-list': ClipboardList,
+  'credit-card': CreditCard,
+  'file-text': FileText,
+  key: KeyRound,
+  'life-buoy': LifeBuoy,
+  mail: Mail,
+  'map-pin': MapPin,
+  notebook: Notebook,
+  package: Package,
+  receipt: Receipt,
+  ticket: Ticket,
+};
+
 export function moduleIcon(name: string): LucideIcon {
-  const pascal = name.replace(/(^|-)(\w)/g, (_, __, c: string) => c.toUpperCase());
-  const icon = (Icons as unknown as Record<string, LucideIcon>)[pascal];
-  return icon ?? Box;
+  return MODULE_ICONS[name] ?? Box;
 }
 
 /** Navigation is derived from vocabulary, feature toggles, enabled modules and permissions. */

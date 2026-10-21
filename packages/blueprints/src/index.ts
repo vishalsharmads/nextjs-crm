@@ -9,7 +9,14 @@ export * from './schema';
 /** Directory holding `<key>/blueprint.json`. Overridable for packaged deployments. */
 export function blueprintsDir(): string {
   if (process.env.BLUEPRINTS_DIR) return path.resolve(process.env.BLUEPRINTS_DIR);
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  // Source layout (packages/blueprints/src) or a bundled build run from the repo / app folder.
+  const candidates = [
+    path.resolve(here, '..'),
+    path.resolve(process.cwd(), 'packages/blueprints'),
+    path.resolve(process.cwd(), '../../packages/blueprints'),
+  ];
+  return candidates.find((c) => existsSync(path.join(c, 'generic', 'blueprint.json'))) ?? candidates[0]!;
 }
 
 export function listBlueprintKeys(dir = blueprintsDir()): string[] {
