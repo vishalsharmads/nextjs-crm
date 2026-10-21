@@ -1,0 +1,181 @@
+{
+  "$schema": "../schema.json",
+  "key": "generic",
+  "name": "General CRM",
+  "version": "1.0.0",
+  "description": "Industry-neutral sales CRM: leads, contacts, organizations, a sales pipeline and four roles.",
+  "settings": {
+    "features": { "leads": true }
+  },
+  "vocabulary": {},
+  "modules": [],
+  "custom_field_groups": {
+    "contact": [{ "key": "profile", "label": "Profile" }],
+    "deal": [{ "key": "details", "label": "Details" }]
+  },
+  "custom_fields": {
+    "contact": [
+      { "key": "linkedin", "label": "LinkedIn", "type": "url", "group": "profile" },
+      { "key": "birthday", "label": "Birthday", "type": "date", "group": "profile" }
+    ],
+    "organization": [
+      {
+        "key": "size",
+        "label": "Company size",
+        "type": "select",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          { "key": "1_10", "label": "1–10" },
+          { "key": "11_50", "label": "11–50" },
+          { "key": "51_200", "label": "51–200" },
+          { "key": "201_1000", "label": "201–1000" },
+          { "key": "1000_plus", "label": "1000+" }
+        ]
+      }
+    ],
+    "deal": [
+      {
+        "key": "deal_type",
+        "label": "Deal type",
+        "type": "select",
+        "group": "details",
+        "filterable": true,
+        "options": [
+          { "key": "new_business", "label": "New business" },
+          { "key": "upsell", "label": "Upsell" },
+          { "key": "renewal", "label": "Renewal" }
+        ]
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "sales",
+      "name": "Sales",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        { "key": "qualified", "name": "Qualified", "probability": 10, "rotting_days": 14 },
+        { "key": "meeting", "name": "Meeting scheduled", "probability": 30, "rotting_days": 14 },
+        { "key": "proposal", "name": "Proposal sent", "probability": 60, "rotting_days": 21 },
+        { "key": "negotiation", "name": "Negotiation", "probability": 80, "rotting_days": 21 },
+        { "key": "won", "name": "Won", "probability": 100, "is_won": true },
+        { "key": "lost", "name": "Lost", "probability": 0, "is_lost": true }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "manager",
+      "name": "Manager",
+      "description": "Manages the team's records, imports and exports, and views the audit log",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.*",
+        "core.saved_views.share",
+        "core.audit.view"
+      ],
+      "scopes": { "*": "all" }
+    },
+    {
+      "key": "sales_rep",
+      "name": "Sales rep",
+      "description": "Works their own leads, contacts and deals",
+      "permissions": [
+        "core.contacts.view",
+        "core.contacts.create",
+        "core.contacts.update",
+        "core.contacts.export",
+        "core.organizations.view",
+        "core.organizations.create",
+        "core.organizations.update",
+        "core.leads.view",
+        "core.leads.create",
+        "core.leads.update",
+        "core.deals.view",
+        "core.deals.create",
+        "core.deals.update",
+        "core.activities.*",
+        "core.tags.view",
+        "core.files.view",
+        "core.files.create",
+        "core.dashboard.view"
+      ],
+      "scopes": {
+        "core.contacts": "own",
+        "core.organizations": "all",
+        "core.leads": "own",
+        "core.deals": "own",
+        "core.activities": "own"
+      }
+    },
+    {
+      "key": "read_only",
+      "name": "Read-only",
+      "description": "Can view everything but change nothing",
+      "permissions": [
+        "core.contacts.view",
+        "core.organizations.view",
+        "core.leads.view",
+        "core.deals.view",
+        "core.activities.view",
+        "core.tags.view",
+        "core.files.view",
+        "core.dashboard.view"
+      ],
+      "scopes": { "*": "all" }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": ["full_name", "email", "phone", "organization", "owner", "lifecycle_status", "created_at"]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": ["title", "organization", "stage", "value", "expected_close", "owner", "cf.deal_type"]
+    },
+    {
+      "entity": "organization",
+      "context": "list",
+      "columns": ["name", "domain", "industry", "cf.size", "owner", "created_at"]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "pipeline_value",
+        "type": "pipeline_value",
+        "title": "Pipeline value",
+        "size": "lg",
+        "params": { "pipeline": "sales" }
+      },
+      { "key": "tasks_due", "type": "tasks_due", "title": "My tasks due", "size": "md" },
+      {
+        "key": "conversion",
+        "type": "conversion",
+        "title": "Win rate (90 days)",
+        "size": "sm",
+        "params": { "days": 90 }
+      },
+      {
+        "key": "activity_by_user",
+        "type": "activity_by_user",
+        "title": "Activity by user (30 days)",
+        "size": "md",
+        "params": { "days": 30 }
+      }
+    ]
+  },
+  "templates": []
+}

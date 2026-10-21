@@ -1,0 +1,22 @@
+{
+  "name": "@app/blueprints",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "schema": "tsx src/write-json-schema.ts"
+  },
+  "dependencies": {
+    "@app/shared": "*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15",
+    "vitest": "3.2.7"
+  }
+}

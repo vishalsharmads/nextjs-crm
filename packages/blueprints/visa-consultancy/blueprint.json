@@ -1,0 +1,27 @@
+{
+  "$schema": "../schema.json",
+  "key": "visa-consultancy",
+  "name": "Visa consultancy",
+  "version": "0.1.0",
+  "status": "stub",
+  "description": "Stub for Phase 2+: applicants, cases and an application pipeline for visa and immigration consultancies.",
+  "vocabulary": {
+    "contact": { "singular": "Applicant", "plural": "Applicants" },
+    "deal": { "singular": "Case", "plural": "Cases" }
+  },
+  "pipelines": [
+    {
+      "key": "applications",
+      "name": "Applications",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        { "key": "consultation", "name": "Consultation", "probability": 10 },
+        { "key": "documents", "name": "Collecting documents", "probability": 40 },
+        { "key": "submitted", "name": "Submitted", "probability": 70 },
+        { "key": "approved", "name": "Approved", "probability": 100, "is_won": true },
+        { "key": "refused", "name": "Refused", "probability": 0, "is_lost": true }
+      ]
+    }
+  ]
+}

@@ -6,12 +6,12 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 
 ## Current status
 
-- Phase 0 (plan) is written and **awaiting approval**. Do not write application code until the user approves.
-- After approval, implement **Phase 1 only**, in milestones 1a → 1d (plan §11). Do not start Phase 2 until the user says so.
+- Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
+- Milestone 1a (foundation) done. Next: 1b records, 1c productivity, 1d platform, then Phases 2–4.
 
 ## Non-negotiables
 
-1. **Not SaaS, not multi-tenant.** No `tenant_id`/`org_id`, no tenant scoping, no subdomain routing, billing, or super-admin. The top role is the org's Admin. The `organizations` table holds the client's *customers*, not tenants.
+1. **Not SaaS, not multi-tenant.** No `tenant_id`/`org_id`, no tenant scoping, no subdomain routing, billing, or super-admin. The top role is the org's Admin. The `organizations` table holds the client's _customers_, not tenants.
 2. **White-label.** No vendor, product, or company names anywhere user-visible (UI, titles, emails, PDFs, errors, API responses, docs). Everything comes from `settings`. Workspace packages are named `@app/*`. The fallback app name is "CRM".
 3. **No hardcoded colors** in `apps/web/src`: no hex/rgb literals and no Tailwind palette classes (`bg-blue-500`). Use theme tokens (`bg-primary`, `text-ink`, `border-line`). The only exception is `theme/defaults.ts`.
 4. **Vocabulary everywhere.** All user-facing copy goes through i18n keys that interpolate entity labels (`"New {{entity.deal.singular}}"`). Never put an article before an entity name ("a/an Member").
@@ -25,9 +25,34 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 
 **Every new dependency** needs a one-line reason in the table below, and boring, well-known libraries are preferred.
 
-| Dependency | Reason |
-|---|---|
-| _(filled as dependencies are added)_ | |
+| Dependency                                                                                      | Reason                                                                          |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| express 5, helmet, cors, cookie-parser, express-rate-limit                                      | HTTP server, secure headers, cookie auth, auth rate limits                      |
+| knex, mysql2                                                                                    | Migrations + query builder without an ORM fighting JSON columns                 |
+| zod                                                                                             | Validation everywhere; runtime custom-field schemas; blueprint/manifest schemas |
+| @node-rs/argon2                                                                                 | argon2id with prebuilt binaries (no native toolchain on servers)                |
+| jose                                                                                            | JWT access tokens                                                               |
+| pino, pino-http (pino-pretty dev)                                                               | Structured logging                                                              |
+| nodemailer, handlebars                                                                          | SMTP mail; auto-escaping templates shared with blueprints                       |
+| multer, file-type                                                                               | Multipart uploads; content sniffing instead of trusting client MIME             |
+| csv-parse, csv-stringify                                                                        | Streaming import/export                                                         |
+| sanitize-html                                                                                   | Safe rich text in activity bodies                                               |
+| uuid                                                                                            | UUIDv7 public ids (time-ordered)                                                |
+| dotenv                                                                                          | Load `.env`                                                                     |
+| tsx, tsup                                                                                       | Dev runner; production bundle including workspace packages                      |
+| @asteasolutions/zod-to-openapi                                                                  | OpenAPI from route Zod schemas                                                  |
+| react 19, react-router 7, @tanstack/react-query, @tanstack/react-table, @tanstack/react-virtual | SPA, routing, server state, headless tables, virtualized rows                   |
+| react-hook-form, @hookform/resolvers                                                            | Forms with Zod validation                                                       |
+| tailwindcss 4, clsx, tailwind-merge                                                             | Token-driven styling                                                            |
+| radix-ui, cmdk, sonner, vaul, lucide-react                                                      | Accessible primitives, command palette, toasts, mobile sheets, icons            |
+| @dnd-kit/*                                                                                      | Accessible drag and drop (Kanban, column order)                                 |
+| @fullcalendar/*                                                                                 | Calendar view (MIT standard views)                                              |
+| recharts                                                                                        | Dashboard charts                                                                |
+| i18next, react-i18next                                                                          | Locale files + vocabulary interpolation                                         |
+| qrcode                                                                                          | 2FA setup QR code                                                               |
+| @fontsource/*                                                                                   | Self-hosted fonts selectable from branding (no external font CDN)               |
+| vitest, supertest, @testing-library/*, jsdom, @playwright/test                                  | Tests                                                                           |
+| eslint, typescript-eslint, prettier, husky, lint-staged, commitlint, concurrently               | Tooling                                                                         |
 
 ## Repo layout
 
@@ -44,16 +69,19 @@ scripts/ docs/
 
 ## Commands
 
-_(Added in milestone 1a. Keep this section accurate.)_
-
 ```
-npm run dev | build | lint | typecheck | test | test:e2e
-npm run db:migrate | db:rollback | db:seed
-npm run install:instance -- --blueprint=<key>
+npm run dev                      # API :4000 + web :5173 (web proxies /api)
+npm run build | lint | typecheck | test | test:e2e
+npm run db:migrate | db:rollback
+npm run install:instance -- --blueprint=coworking --admin-email=a@b.c --admin-password='...' [--app-name=..] [--sample-data]
+npm run blueprint:apply -- --blueprint=<key> [--dry-run]
 npm run crm:export-blueprint -- --out=<file>
-npm run check:brand
-npm run doctor        # verifies Node/MySQL versions, sql_mode, TRIGGER privilege, binlog, SMTP
+npm run check:brand              # white-label grep over build output, templates, blueprints, locales
+npm run doctor                   # Node/MySQL versions, sql_mode, TRIGGER privilege, binlog, SMTP
+npm run cli -w @app/api -- user:reset-password --email=<email>
 ```
+
+API tests drop and recreate `crm_test` on every run (`apps/api/test/global-setup.ts`).
 
 ## Backend conventions
 
@@ -68,7 +96,9 @@ npm run doctor        # verifies Node/MySQL versions, sql_mode, TRIGGER privileg
 - **Errors:** throw `AppError(code, message, details?)`. Response shape is `{ error: { code, message, details? } }`. Codes are in `packages/shared/src/errors.ts` and are stable once released.
 - **Lists:** `{ data, meta: { page, pageSize, total } }`. `pageSize` max is 100. Filters use the shared filter AST with a per-resource field whitelist.
 - **IDs:** internal `BIGINT` ids never leave the API. URLs and DTOs use `uuid` (UUIDv7).
-- **Blueprint-seedable config rows** carry `source_blueprint`, `source_key`, `source_version`, `source_hash`, `customized`. Any admin edit sets `customized = 1`.
+- **Blueprint-seedable config rows** carry `source_blueprint`, `source_key`, `source_version`, `source_hash`, `customized`. Any admin edit **and any admin create** sets `customized = 1`, so blueprint upgrades never adopt or overwrite client work.
+- **Layering:** record entities (contacts, organizations, leads, deals, activities) use full `routes → service → repository`. Small admin resources (roles, teams, settings) may keep handler + data access in the routes file.
+- **Copy:** anything that names an entity must go through `useT()` with vocabulary vars. Other literal English copy in components is tolerated for now (tracked in roadmap: extract to locale files).
 
 ## Database gotchas
 
@@ -77,6 +107,11 @@ npm run doctor        # verifies Node/MySQL versions, sql_mode, TRIGGER privileg
 - Generated columns for custom fields are named `cf_<key>`. At most 40 indexed custom fields per entity.
 - Multi-select uses multi-valued indexes (`CAST(... AS CHAR(64) ARRAY)`) and is queried with `JSON_OVERLAPS` / `MEMBER OF`.
 - Audit triggers need the `TRIGGER` privilege, plus `log_bin_trust_function_creators=1` when binlog is on.
+- MySQL identifiers max 64 chars: give long composite indexes an explicit `indexName`.
+- Indexing a VIRTUAL generated column needs `LOCK=SHARED` (blocks writes during the build), not `LOCK=NONE`.
+- **Never store JSON `null` in `custom`**: a null makes multi-valued index inserts fail. Clearing a value removes the key.
+- Inserts into tables with generated columns must name their columns (always true with Knex objects).
+- DATE columns come back as `'YYYY-MM-DD'` strings (typeCast in `db/knex.ts`); DATETIME as UTC `Date`.
 
 ## Frontend conventions
 
@@ -84,6 +119,7 @@ npm run doctor        # verifies Node/MySQL versions, sql_mode, TRIGGER privileg
 - **Forms, detail pages, and list columns render from layouts + field definitions.** Never hardcode a custom field.
 - **Every data view** has loading (skeleton matching the layout), empty (next action + one primary button), and error (what failed + how to fix) states.
 - **Product patterns** (plan §9): `⌘K` command palette, keyboard shortcuts, record peek sheet, inline edit with undo toast, saved views as tabs, virtualized tables with bulk bar, Kanban with dnd-kit.
+- **Never `import * as Icons from 'lucide-react'`** (pulls every icon into the bundle). Module menu icons come from the curated map in `app/shell/nav.ts`.
 - **Accessibility:** labelled inputs, visible focus, focus trap in dialogs and sheets, AA contrast, full keyboard reach, `prefers-reduced-motion`.
 - **RTL-ready:** use logical properties (`ms-`, `pe-`, `start-`, `end-`), never `ml-`/`pr-`/`left-`/`right-`.
 - **Motion:** 120–200 ms ease-out, only in response to user actions.

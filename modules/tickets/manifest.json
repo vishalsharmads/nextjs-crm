@@ -1,0 +1,33 @@
+{
+  "key": "tickets",
+  "name": "Tickets",
+  "version": "0.1.0",
+  "status": "stub",
+  "description": "Support tickets for members and customers. Placeholder until Phase 4; declares permissions so blueprints can reference them.",
+  "depends_on": [],
+  "permissions": [
+    {
+      "key": "tickets.tickets.view",
+      "description": "View tickets"
+    },
+    {
+      "key": "tickets.tickets.create",
+      "description": "Create tickets"
+    },
+    {
+      "key": "tickets.tickets.update",
+      "description": "Update tickets"
+    },
+    {
+      "key": "tickets.tickets.delete",
+      "description": "Delete tickets"
+    }
+  ],
+  "menu_items": [],
+  "labels": {
+    "ticket": {
+      "singular": "Ticket",
+      "plural": "Tickets"
+    }
+  }
+}
