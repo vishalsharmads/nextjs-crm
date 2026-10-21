@@ -14,8 +14,10 @@ async function enable(keys: string[]) {
 describe('products and quotes', () => {
   beforeAll(async () => {
     const { client } = await clientWithRoles(['admin']);
-    // Quotes depend on products.
-    expect((await client.post('/modules/quotes/enable')).body.error.code).toBe('MODULE_DEPENDENCY');
+    // Quotes depend on products (other files share the database and may have enabled it already).
+    const products = await db('module_states').where({ module_key: 'products', enabled: true }).first();
+    if (!products)
+      expect((await client.post('/modules/quotes/enable')).body.error.code).toBe('MODULE_DEPENDENCY');
     await enable(['products', 'quotes']);
   });
 

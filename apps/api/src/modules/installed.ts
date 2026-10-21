@@ -9,6 +9,7 @@ import products from '../../../../modules/products/manifest.json' with { type: '
 import { products as productsApi } from '../../../../modules/products/api';
 import quotes from '../../../../modules/quotes/manifest.json' with { type: 'json' };
 import { quotes as quotesApi } from '../../../../modules/quotes/api';
+import { invoices as invoicesApi } from '../../../../modules/invoices/api';
 
 /**
  * Modules compiled into this build. Adding a module means adding it here (a test checks that
@@ -16,7 +17,7 @@ import { quotes as quotesApi } from '../../../../modules/quotes/api';
  */
 export const installedModuleSources: InstalledModuleSource[] = [
   { manifest: bookings },
-  { manifest: invoices },
+  { manifest: invoices, api: invoicesApi },
   { manifest: tickets },
   { manifest: documents },
   { manifest: notesDemo, api: notesDemoApi },
