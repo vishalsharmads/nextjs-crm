@@ -53,5 +53,8 @@
     "tsup": "8.5.1",
     "tsx": "4.23.15",
     "vitest": "3.2.7"
+  },
+  "exports": {
+    "./module-api": "./src/module-api.ts"
   }
 }

@@ -1,0 +1,42 @@
+# One server block per client instance. Web and API share an origin, so auth cookies stay first-party.
+server {
+    listen 443 ssl http2;
+    server_name crm.client.example;
+
+    ssl_certificate     /etc/letsencrypt/live/crm.client.example/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/crm.client.example/privkey.pem;
+
+    root /srv/crm/client/apps/web/dist;
+    index index.html;
+    client_max_body_size 25m;
+
+    # Security headers for the SPA (the API sets its own).
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy no-referrer always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'" always;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    # Hashed assets are immutable; index.html must always revalidate (branding is runtime anyway).
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    location / {
+        try_files $uri /index.html;
+        add_header Cache-Control "no-cache";
+    }
+}
+
+server {
+    listen 80;
+    server_name crm.client.example;
+    return 301 https://$host$request_uri;
+}

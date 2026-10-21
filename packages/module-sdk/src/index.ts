@@ -88,3 +88,9 @@ export function sortByDependencies(manifests: ModuleManifest[]): ModuleManifest[
   for (const m of manifests) visit(m, []);
   return out;
 }
+
+/** What a module's `web_entry` default-exports. Routes render under /m/<key>/. */
+export interface WebModule<Element = unknown> {
+  key: string;
+  routes: { path: string; element: Element }[];
+}

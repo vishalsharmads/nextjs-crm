@@ -1,0 +1,30 @@
+# Environment reference
+
+Variables are read from `.env` in `apps/api` or the repo root. Production refuses to start when a secret is missing, short, or still a development default.
+
+| Variable                                                              | Default                                | Purpose                                                                                        |
+| --------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                                            | `development`                          | `production` enables secure cookies and secret checks                                          |
+| `PORT`                                                                | `4000`                                 | API port (nginx proxies to it)                                                                 |
+| `APP_URL`                                                             | `http://localhost:5173`                | Public URL, used in email links                                                                |
+| `CORS_ORIGINS`                                                        | empty                                  | Comma-separated origins. Leave empty for same-origin deployments                               |
+| `TRUST_PROXY`                                                         | `0`                                    | Reverse-proxy hops. Use `1` behind nginx so rate limits and audit IPs see real clients         |
+| `DATABASE_URL`                                                        | `mysql://root@127.0.0.1:3306/crm_dev`  | Instance database                                                                              |
+| `DATABASE_URL_TEST`                                                   | `mysql://root@127.0.0.1:3306/crm_test` | Test database. **Dropped and recreated on every test run**                                     |
+| `JWT_SECRET`                                                          | dev value                              | Signs access tokens. 32+ chars in production                                                   |
+| `CSRF_SECRET`                                                         | dev value                              | Signs CSRF tokens and hard-delete confirmation codes                                           |
+| `FILE_URL_SECRET`                                                     | dev value                              | Signs short-lived download links                                                               |
+| `ENCRYPTION_KEY`                                                      | zeros                                  | 64 hex chars (32 bytes), AES-256-GCM key for 2FA secrets. Changing it invalidates enrolled 2FA |
+| `COOKIE_SECURE`                                                       | `true` in production                   | Override only for local HTTPS testing                                                          |
+| `ACCESS_TOKEN_TTL_MIN`                                                | `15`                                   | Access-token lifetime                                                                          |
+| `REFRESH_TOKEN_TTL_DAYS`                                              | `14`                                   | Maximum session length (idle expiry is a workspace setting)                                    |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | `127.0.0.1` / `1025` / `false` / — / — | Outgoing mail (Mailpit in development)                                                         |
+| `MAIL_FROM`                                                           | `no-reply@localhost`                   | Fallback sender address when branding has none                                                 |
+| `STORAGE_DIR`                                                         | `./storage`                            | Uploaded files. Back it up                                                                     |
+| `UPLOAD_MAX_MB`                                                       | `20`                                   | Upload limit (keep nginx `client_max_body_size` above it)                                      |
+| `REDIS_URL`                                                           | empty                                  | Reserved for Phase 2 job queues                                                                |
+| `LOG_LEVEL`                                                           | `info`                                 | `fatal` … `trace`, or `silent`                                                                 |
+| `BLUEPRINTS_DIR`                                                      | auto                                   | Folder with `<key>/blueprint.json` for bundled deployments                                     |
+| `TEST_LOG_LEVEL`                                                      | `silent`                               | Show API logs while running tests                                                              |
+
+Generate secrets with `openssl rand -hex 32`.

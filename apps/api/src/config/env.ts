@@ -1,4 +1,11 @@
-import 'dotenv/config';
+import { config as loadDotenv } from 'dotenv';
+import path from 'node:path';
+
+// `.env` may live in the API folder or the repo root (npm workspace scripts run from apps/api).
+loadDotenv({
+  path: [path.resolve(process.cwd(), '.env'), path.resolve(process.cwd(), '../../.env')],
+  quiet: true,
+});
 import { z } from 'zod';
 
 const bool = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');

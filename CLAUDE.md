@@ -7,7 +7,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 ## Current status
 
 - Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
-- Milestone 1a (foundation) done. Next: 1b records, 1c productivity, 1d platform, then Phases 2–4.
+- **Phase 1 complete** (milestones 1a–1d merged). Next: Phase 2 (configuration and communication), then 3 and 4.
 
 ## Non-negotiables
 
@@ -81,13 +81,17 @@ npm run doctor                   # Node/MySQL versions, sql_mode, TRIGGER privil
 npm run cli -w @app/api -- user:reset-password --email=<email>
 ```
 
-API tests drop and recreate `crm_test` on every run (`apps/api/test/global-setup.ts`).
+API tests drop and recreate `crm_test` on every run (`apps/api/test/global-setup.ts`). E2E (`npm run test:e2e`) drops and reinstalls `crm_e2e` and starts its own API (:4300) and web (:5300).
+Run test suites one workspace at a time on this machine; running all three in parallel can be killed for memory.
+`TEST_LOG_LEVEL=error npx vitest run` shows API errors that tests otherwise swallow as 500s.
 
 ## Backend conventions
 
 - **Layering:** `routes → controller → service → repository`. Controllers parse and respond only. Services hold business rules, permission/scope/field-visibility checks, and audit. Repositories hold SQL.
 - **Access gate** runs before a route's `before` middleware (uploads are never parsed for unauthorized callers) and enforces module state, permission and required 2FA enrolment.
 - **Grants:** non-admins can only grant permissions/scopes they hold (`core/rbac/grants.ts`); `*` belongs only to the system Admin role; only admins can change admin accounts.
+- **Route order:** static paths (`/deals/board`, `/contacts/export`) must be registered before `/:uuid` routes. A test fails on shadowed routes.
+- **Modules** import only from `@app/api/module-api`; tables are `m_<key>_*`; list new modules in `apps/api/src/modules/installed.ts`.
 - **Routes** are registered only through `defineRoute({ method, path, permission, schema, handler })`. `permission` is a key, `'public'`, or `'authenticated'`. A test fails if any Express layer lacks a registry entry.
 - **Permission keys** follow `<module>.<resource>.<action>`. Wildcards: `*`, `core.contacts.*`.
 - **Record scope** (`own | team | all`) is applied in the repository from a service-supplied `ScopeContext`. An out-of-scope single-record read returns **404**.
@@ -125,6 +129,7 @@ API tests drop and recreate `crm_test` on every run (`apps/api/test/global-setup
 - **Forms, detail pages, and list columns render from layouts + field definitions.** Never hardcode a custom field.
 - **Every data view** has loading (skeleton matching the layout), empty (next action + one primary button), and error (what failed + how to fix) states.
 - **Product patterns** (plan §9): `⌘K` command palette, keyboard shortcuts, record peek sheet, inline edit with undo toast, saved views as tabs, virtualized tables with bulk bar, Kanban with dnd-kit.
+- **`Button asChild`** renders its single child only (Radix Slot needs exactly one child).
 - **Never `import * as Icons from 'lucide-react'`** (pulls every icon into the bundle). Module menu icons come from the curated map in `app/shell/nav.ts`.
 - **Accessibility:** labelled inputs, visible focus, focus trap in dialogs and sheets, AA contrast, full keyboard reach, `prefers-reduced-motion`.
 - **RTL-ready:** use logical properties (`ms-`, `pe-`, `start-`, `end-`), never `ml-`/`pr-`/`left-`/`right-`.
