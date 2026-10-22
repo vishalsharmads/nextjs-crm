@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Module web entries live outside this app's root; scan them for classes too. */
+@source '../../../modules';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
