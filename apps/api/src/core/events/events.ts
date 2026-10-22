@@ -54,6 +54,9 @@ export const EVENT_TYPES = [
   'document.signed',
   'document_request.submitted',
   'document_request.reviewed',
+  'asset.assigned',
+  'asset.returned',
+  'stock.low',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

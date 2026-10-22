@@ -17,6 +17,8 @@ import contracts from '../../../../modules/contracts/manifest.json' with { type:
 import { contracts as contractsApi } from '../../../../modules/contracts/api';
 import portal from '../../../../modules/portal/manifest.json' with { type: 'json' };
 import { portal as portalApi } from '../../../../modules/portal/api';
+import assets from '../../../../modules/assets/manifest.json' with { type: 'json' };
+import { assets as assetsApi } from '../../../../modules/assets/api';
 
 /**
  * Modules compiled into this build. Adding a module means adding it here (a test checks that
@@ -32,4 +34,5 @@ export const installedModuleSources: InstalledModuleSource[] = [
   { manifest: quotes, api: quotesApi },
   { manifest: contracts, api: contractsApi },
   { manifest: portal, api: portalApi },
+  { manifest: assets, api: assetsApi },
 ];
