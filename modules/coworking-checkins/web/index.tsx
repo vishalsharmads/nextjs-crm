@@ -200,6 +200,7 @@ function VisitorDialog({ onDone }: { onDone: () => void }) {
 }
 
 function VisitRow({ v, onCheckOut }: { v: Visit; onCheckOut?: () => void }) {
+  const L = labelVars(useBoot().labels);
   const name = v.kind === 'member' ? (v.member?.name ?? 'Unknown') : (v.visitorName ?? 'Visitor');
   return (
     <li className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
@@ -214,7 +215,7 @@ function VisitRow({ v, onCheckOut }: { v: Visit; onCheckOut?: () => void }) {
             <span className="font-medium">{name}</span>
           )}
           <Badge tone={v.kind === 'visitor' ? 'accent' : 'neutral'}>
-            {v.kind === 'visitor' ? 'Visitor' : 'Member'}
+            {v.kind === 'visitor' ? 'Visitor' : L.contact}
           </Badge>
           {v.badge ? <span className="font-mono text-xs text-muted">{v.badge}</span> : null}
         </span>
@@ -235,6 +236,7 @@ function VisitRow({ v, onCheckOut }: { v: Visit; onCheckOut?: () => void }) {
 }
 
 function FrontDesk() {
+  const L = labelVars(useBoot().labels);
   const can = useCan();
   const qc = useQueryClient();
   const [tab, setTab] = useState<'in' | 'today'>('in');
@@ -260,7 +262,7 @@ function FrontDesk() {
         title="Front desk"
         description={
           tab === 'in' && visits.data
-            ? `${members} members and ${visitors} visitors in the building`
+            ? `${members} ${L.contactPluralLower} and ${visitors} visitors in the building`
             : undefined
         }
         actions={
@@ -324,13 +326,14 @@ function FrontDesk() {
 }
 
 function TodayWidget({ data }: { data: unknown }) {
+  const L = labelVars(useBoot().labels);
   const d = data as { members: number; visitors: number; today: number };
   return (
     <div className="flex flex-1 flex-col gap-3">
       <dl className="grid grid-cols-3 gap-2">
         {(
           [
-            ['Members in', d.members],
+            [`${L.contactPlural} in`, d.members],
             ['Visitors in', d.visitors],
             ['Visits today', d.today],
           ] as const

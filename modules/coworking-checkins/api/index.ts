@@ -87,7 +87,7 @@ async function tellHost(hostContactId: number, visitorName: string, company: str
   try {
     await sendMail({
       to: host.email as string,
-      subject: `${visitorName} has arrived`,
+      subject: `${visitorName.replace(/[\r\n]+/g, ' ')} has arrived`,
       html: `<p>Hi ${String(host.first_name ?? '').replace(/[<>&"]/g, '')},</p><p>Your guest ${who.replace(/[<>&"]/g, '')} is waiting at reception.</p>`,
       text: `Hi ${host.first_name ?? ''},\n\nYour guest ${who} is waiting at reception.`,
       fromName: branding.emailFromName || branding.appName,

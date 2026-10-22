@@ -88,7 +88,7 @@ function useNouns() {
     assets: L.assetPlural ?? 'Assets',
     stock: L.stockItem ?? 'Stock item',
     stocks: L.stockItemPlural ?? 'Stock items',
-    contact: L.contact ?? 'Contact',
+    contact: L.contact!,
   };
 }
 

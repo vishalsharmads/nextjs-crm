@@ -89,7 +89,7 @@ function useNouns() {
     docs: L.documentPlural ?? 'Documents',
     req: L.documentRequest ?? 'File request',
     reqs: L.documentRequestPlural ?? 'File requests',
-    contact: L.contact ?? 'Contact',
+    contact: L.contact!,
   };
 }
 
