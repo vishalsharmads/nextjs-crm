@@ -20,6 +20,7 @@ import {
   notFound,
   notify,
   resolveLinks,
+  visibleLinkIds,
   saveLines,
   scopeAllows,
   systemContext,
@@ -81,9 +82,9 @@ async function ownerFor(user: AuthUser, ref: string | null | undefined, conn: Db
   return id;
 }
 
-async function toDtos(rows: Record<string, unknown>[], withLines: boolean) {
+async function toDtos(rows: Record<string, unknown>[], withLines: boolean, viewer?: AuthUser) {
   const [refs, owners, lines] = await Promise.all([
-    linkRefs(rows),
+    linkRefs(rows, db, viewer),
     userRefs(rows.map((r) => r.owner_id as number | null)),
     withLines
       ? loadLines(
@@ -135,9 +136,9 @@ async function getScoped(user: AuthUser, uuid: string, conn: Db = db, forUpdate 
   return row as Record<string, unknown> & { id: number; uuid: string; status: string };
 }
 
-async function getDto(uuid: string) {
+async function getDto(uuid: string, viewer?: AuthUser) {
   const row = await db(QUOTES).where({ uuid }).first();
-  return (await toDtos([row], true))[0]!;
+  return (await toDtos([row], true, viewer))[0]!;
 }
 
 async function emitQuote(
@@ -214,7 +215,7 @@ const routes = defineRoutes('/m/quotes/quotes', ['quotes'], 'quotes')
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize);
       return {
-        data: await toDtos(rows, false),
+        data: await toDtos(rows, false, user),
         meta: { page: query.page, pageSize: query.pageSize, total },
       };
     },
@@ -224,7 +225,7 @@ const routes = defineRoutes('/m/quotes/quotes', ['quotes'], 'quotes')
     path: '/:uuid',
     permission: 'quotes.quotes.view',
     params: uuidParam,
-    handler: async ({ user, params }) => (await toDtos([await getScoped(user, params.uuid)], true))[0],
+    handler: async ({ user, params }) => (await toDtos([await getScoped(user, params.uuid)], true, user))[0],
   })
   .add({
     method: 'post',
@@ -270,7 +271,7 @@ const routes = defineRoutes('/m/quotes/quotes', ['quotes'], 'quotes')
         });
       });
       await emitQuote('quote.created', uuid, user.id);
-      return getDto(uuid);
+      return getDto(uuid, user);
     },
   })
   .add({
@@ -315,7 +316,7 @@ const routes = defineRoutes('/m/quotes/quotes', ['quotes'], 'quotes')
           diff: { ...body, lines: body.lines ? body.lines.length : undefined },
         });
       });
-      return getDto(params.uuid);
+      return getDto(params.uuid, user);
     },
   })
   .add({
@@ -339,7 +340,7 @@ const routes = defineRoutes('/m/quotes/quotes', ['quotes'], 'quotes')
         'sent',
       );
       await emitQuote('quote.sent', params.uuid, user.id);
-      return getDto(params.uuid);
+      return getDto(params.uuid, user);
     },
   })
   .add({
@@ -363,7 +364,7 @@ const routes = defineRoutes('/m/quotes/quotes', ['quotes'], 'quotes')
         'accepted',
       );
       await emitQuote('quote.accepted', params.uuid, user.id);
-      return getDto(params.uuid);
+      return getDto(params.uuid, user);
     },
   })
   .add({
@@ -382,7 +383,7 @@ const routes = defineRoutes('/m/quotes/quotes', ['quotes'], 'quotes')
         'declined',
       );
       await emitQuote('quote.declined', params.uuid, user.id);
-      return getDto(params.uuid);
+      return getDto(params.uuid, user);
     },
   })
   .add({
@@ -406,7 +407,7 @@ const routes = defineRoutes('/m/quotes/quotes', ['quotes'], 'quotes')
         }),
         'revised',
       );
-      return getDto(params.uuid);
+      return getDto(params.uuid, user);
     },
   })
   .add({
@@ -430,9 +431,7 @@ const routes = defineRoutes('/m/quotes/quotes', ['quotes'], 'quotes')
           uuid,
           number: formatDocNumber(commerce.quotePrefix, n),
           title: src.title,
-          contact_id: src.contact_id,
-          organization_id: src.organization_id,
-          deal_id: src.deal_id,
+          ...(await visibleLinkIds(user, src, trx)),
           owner_id: user.id,
           currency: src.currency,
           status: 'draft',
@@ -453,7 +452,7 @@ const routes = defineRoutes('/m/quotes/quotes', ['quotes'], 'quotes')
         });
       });
       await emitQuote('quote.created', uuid, user.id);
-      return getDto(uuid);
+      return getDto(uuid, user);
     },
   })
   .add({

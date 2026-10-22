@@ -92,9 +92,9 @@ async function today() {
   return todayIn((await getSettingsGroup('general')).timezone);
 }
 
-async function toDtos(rows: Record<string, unknown>[]) {
+async function toDtos(rows: Record<string, unknown>[], viewer?: AuthUser) {
   const [refs, owners, commerce, now] = await Promise.all([
-    linkRefs(rows),
+    linkRefs(rows, db, viewer),
     userRefs(rows.map((r) => r.owner_id as number | null)),
     getSettingsGroup('commerce'),
     today(),
@@ -152,8 +152,8 @@ async function getScoped(user: AuthUser, uuid: string, conn: Db = db, forUpdate 
   return row as Record<string, unknown> & { id: number; uuid: string; status: string };
 }
 
-async function getDto(uuid: string) {
-  return (await toDtos([await db(CONTRACTS).where({ uuid }).first()]))[0]!;
+async function getDto(uuid: string, viewer?: AuthUser) {
+  return (await toDtos([await db(CONTRACTS).where({ uuid }).first()], viewer))[0]!;
 }
 
 type ContractEvent =
@@ -296,7 +296,7 @@ const routes = defineRoutes('/m/contracts/contracts', ['contracts'], 'contracts'
         .orderByRaw(query.status === 'renewing' ? 'end_date ASC' : 'id DESC')
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize);
-      return { data: await toDtos(rows), meta: { page: query.page, pageSize: query.pageSize, total } };
+      return { data: await toDtos(rows, user), meta: { page: query.page, pageSize: query.pageSize, total } };
     },
   })
   .add({
@@ -304,7 +304,7 @@ const routes = defineRoutes('/m/contracts/contracts', ['contracts'], 'contracts'
     path: '/:uuid',
     permission: 'contracts.contracts.view',
     params: uuidParam,
-    handler: async ({ user, params }) => (await toDtos([await getScoped(user, params.uuid)]))[0],
+    handler: async ({ user, params }) => (await toDtos([await getScoped(user, params.uuid)], user))[0],
   })
   .add({
     method: 'post',
@@ -342,7 +342,7 @@ const routes = defineRoutes('/m/contracts/contracts', ['contracts'], 'contracts'
         });
       });
       await emitContract('contract.created', uuid, user.id);
-      return getDto(uuid);
+      return getDto(uuid, user);
     },
   })
   .add({
@@ -385,7 +385,7 @@ const routes = defineRoutes('/m/contracts/contracts', ['contracts'], 'contracts'
           diff: body,
         });
       });
-      return getDto(params.uuid);
+      return getDto(params.uuid, user);
     },
   })
   .add({
@@ -410,7 +410,7 @@ const routes = defineRoutes('/m/contracts/contracts', ['contracts'], 'contracts'
         });
       });
       await emitContract('contract.activated', params.uuid, user.id);
-      return getDto(params.uuid);
+      return getDto(params.uuid, user);
     },
   })
   .add({
@@ -429,7 +429,7 @@ const routes = defineRoutes('/m/contracts/contracts', ['contracts'], 'contracts'
         return renewContract(trx, ctx, row, user.id);
       });
       await emitContract('contract.renewed', params.uuid, user.id);
-      return getDto(uuid);
+      return getDto(uuid, user);
     },
   })
   .add({
@@ -458,7 +458,7 @@ const routes = defineRoutes('/m/contracts/contracts', ['contracts'], 'contracts'
         });
       });
       await emitContract('contract.cancelled', params.uuid, user.id);
-      return getDto(params.uuid);
+      return getDto(params.uuid, user);
     },
   })
   .add({
@@ -570,7 +570,7 @@ registerModuleWidget('contracts.renewals', async (_params, user) => {
   await applyScope(qb, user, RESOURCE, ['owner_id']);
   const rows = await qb.orderBy('end_date').limit(8);
   return {
-    contracts: (await toDtos(rows)).map((c) => ({
+    contracts: (await toDtos(rows, user)).map((c) => ({
       uuid: c.uuid,
       number: c.number,
       title: c.title,

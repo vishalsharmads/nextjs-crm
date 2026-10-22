@@ -6,6 +6,7 @@ import { db, type Db } from '../../db/knex';
 import type { AuthUser } from '../../http/context';
 import { AppError } from '../../lib/errors';
 import { getRow } from '../records/service';
+import { applyScope, can } from '../rbac/access';
 import { recordDefs } from '../records/registry';
 
 /**
@@ -66,18 +67,28 @@ export interface RecordRef {
   name: string;
 }
 
-/** Names for linked records, batch-loaded per table. */
-export async function linkRefs(rows: Record<string, unknown>[], conn: Db = db) {
-  const load = async (table: string, column: string, nameCol: string) => {
+/**
+ * Names for linked records, batch-loaded per table. With a `viewer`, only records that person may
+ * see (view permission and record scope) are returned; others come back as null. Without one
+ * (customer-facing reads), all links on documents the caller already owns are returned.
+ */
+export async function linkRefs(rows: Record<string, unknown>[], conn: Db = db, viewer?: AuthUser) {
+  const load = async (entity: 'contact' | 'organization' | 'deal', column: string, nameCol: string) => {
     const ids = [...new Set(rows.map((r) => r[column]).filter((v): v is number => typeof v === 'number'))];
     if (!ids.length) return new Map<number, RecordRef>();
-    const found = await conn(table).whereIn('id', ids).select('id', 'uuid', `${nameCol} as name`);
+    const def = recordDefs[entity];
+    if (viewer && !can(viewer, `${def.resource}.view`)) return new Map<number, RecordRef>();
+    const qb = conn(def.table)
+      .whereIn(`${def.table}.id`, ids)
+      .select(`${def.table}.id`, `${def.table}.uuid`, `${def.table}.${nameCol} as name`);
+    if (viewer) await applyScope(qb, viewer, def.resource, def.ownerColumns, conn);
+    const found = await qb;
     return new Map(found.map((f) => [f.id as number, { uuid: f.uuid as string, name: f.name as string }]));
   };
   const [contacts, organizations, deals] = await Promise.all([
-    load('contacts', 'contact_id', 'full_name'),
-    load('organizations', 'organization_id', 'name'),
-    load('deals', 'deal_id', 'title'),
+    load('contact', 'contact_id', 'full_name'),
+    load('organization', 'organization_id', 'name'),
+    load('deal', 'deal_id', 'title'),
   ]);
   return (r: Record<string, unknown>) => ({
     contact: contacts.get(r.contact_id as number) ?? null,
@@ -250,4 +261,24 @@ export function addMonths(date: string, months: number): string {
   const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
   target.setUTCDate(Math.min(d, last));
   return target.toISOString().slice(0, 10);
+}
+
+/**
+ * Links copied from another document (duplicate, convert) are re-checked for the acting user:
+ * any linked record they may not see is dropped rather than carried over.
+ */
+export async function visibleLinkIds(user: AuthUser, src: Record<string, unknown>, conn: Db = db) {
+  const check = async (entity: 'contact' | 'organization' | 'deal', id: unknown) => {
+    if (typeof id !== 'number') return null;
+    const def = recordDefs[entity];
+    if (!can(user, `${def.resource}.view`)) return null;
+    const qb = conn(def.table).where(`${def.table}.id`, id).whereNull(`${def.table}.deleted_at`);
+    await applyScope(qb, user, def.resource, def.ownerColumns, conn);
+    return (await qb.first(`${def.table}.id`)) ? id : null;
+  };
+  return {
+    contact_id: await check('contact', src.contact_id),
+    organization_id: await check('organization', src.organization_id),
+    deal_id: await check('deal', src.deal_id),
+  };
 }
