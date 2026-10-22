@@ -6,6 +6,7 @@ import {
   AppError,
   applyScope,
   assertCan,
+  can,
   audit,
   db,
   defineRoutes,
@@ -42,6 +43,7 @@ const REQUESTS = 'm_documents_requests';
 
 /** The contact (row) if the user may see it; otherwise 404, like any out-of-scope record. */
 async function visibleContact(user: AuthUser, uuid: string, conn: Db = db) {
+  assertCan(user, 'core.contacts.view');
   return getRow(recordDefs.contact, user, uuid, conn);
 }
 
@@ -86,11 +88,12 @@ async function mergeVars(
     .whereNull('ended_at')
     .first('organization_id');
   let organization: Record<string, unknown> | null = null;
-  if (orgLink) {
-    const orgRow = await db('organizations')
-      .where({ id: orgLink.organization_id })
-      .whereNull('deleted_at')
-      .first();
+  // Only organizations the user may see are merged in; otherwise placeholders stay empty.
+  if (orgLink && can(user, 'core.organizations.view')) {
+    const org = await db('organizations').where({ id: orgLink.organization_id }).first('uuid');
+    const orgRow = org
+      ? await getRow(recordDefs.organization, user, org.uuid as string).catch(() => null)
+      : null;
     if (orgRow)
       organization =
         (
@@ -99,8 +102,11 @@ async function mergeVars(
   }
   let deal: Record<string, unknown> | null = null;
   if (dealUuid) {
+    assertCan(user, 'core.deals.view');
     const dealRow = await getRow(recordDefs.deal, user, dealUuid).catch(() => {
-      throw new AppError('VALIDATION_FAILED', 'Deal not found', [{ path: 'dealUuid', message: 'Not found' }]);
+      throw new AppError('VALIDATION_FAILED', 'Linked record not found', [
+        { path: 'dealUuid', message: 'Not found' },
+      ]);
     });
     deal =
       ((await recordDefs.deal.toDtos([dealRow], { user, conn: db })) as Record<string, unknown>[])[0] ?? null;
