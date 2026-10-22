@@ -24,7 +24,7 @@
   ],
   "labels": {
     "document": { "singular": "Document", "plural": "Documents" },
-    "document_request": { "singular": "File request", "plural": "File requests" }
+    "document-request": { "singular": "File request", "plural": "File requests" }
   },
   "migrations_dir": "api/migrations",
   "api_entry": "api/index.ts",
