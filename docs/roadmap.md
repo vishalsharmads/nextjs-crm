@@ -40,3 +40,5 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - A rich-text template editor for documents, and drawn signatures.
 - Barcode scanning for asset tags and stock counts.
 - Visitor pre-registration and printed badges for the front desk.
+- Bookings and front desk show linked contact names to anyone with view access (shared calendar by design); add an option to hide names outside the viewer's contact scope.
+- Delete stored file data when an upload's database transaction fails (orphaned blobs).
