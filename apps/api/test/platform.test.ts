@@ -38,7 +38,7 @@ describe('blueprints over HTTP', () => {
     const list = await client.get('/blueprints').expect(200);
     expect(list.body.current.key).toBe('generic');
     expect(list.body.available.map((b: { key: string }) => b.key)).toEqual(
-      expect.arrayContaining(['generic', 'coworking']),
+      expect.arrayContaining(['generic', 'coworking', 'visa-consultancy']),
     );
     const exported = await client.get('/blueprints/export?key=client-preset&version=2.0.0').expect(200);
     expect(exported.body.key).toBe('client-preset');

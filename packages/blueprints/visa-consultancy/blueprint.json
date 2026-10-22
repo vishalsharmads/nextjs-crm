@@ -2,12 +2,130 @@
   "$schema": "../schema.json",
   "key": "visa-consultancy",
   "name": "Visa consultancy",
-  "version": "0.1.0",
-  "status": "stub",
-  "description": "Stub for Phase 2+: applicants, cases and an application pipeline for visa and immigration consultancies.",
+  "version": "1.0.0",
+  "description": "Applicants, cases through an application pipeline, document checklists collected in the client portal, quotes and invoices for fees.",
+  "settings": {
+    "features": { "leads": true },
+    "contacts": {
+      "sources": ["Website", "Referral", "Walk-in", "Agent", "Event", "Social", "Other"],
+      "lifecycleStatuses": ["Enquiry", "Applicant", "Visa granted", "Former applicant"]
+    },
+    "deals": {
+      "lostReasons": [
+        "Not eligible",
+        "Chose another adviser",
+        "Price",
+        "Withdrew",
+        "Refused by authority",
+        "No response"
+      ]
+    }
+  },
   "vocabulary": {
     "contact": { "singular": "Applicant", "plural": "Applicants" },
-    "deal": { "singular": "Case", "plural": "Cases" }
+    "deal": { "singular": "Case", "plural": "Cases" },
+    "lead": { "singular": "Enquiry", "plural": "Enquiries" }
+  },
+  "modules": ["documents", "portal", "quotes", "invoices", "tickets"],
+  "custom_field_groups": {
+    "contact": [
+      { "key": "passport", "label": "Passport" },
+      { "key": "background", "label": "Background" }
+    ],
+    "deal": [{ "key": "application", "label": "Application" }]
+  },
+  "custom_fields": {
+    "contact": [
+      {
+        "key": "nationality",
+        "label": "Nationality",
+        "type": "text",
+        "group": "passport",
+        "filterable": true,
+        "show_in_list": true
+      },
+      { "key": "passport_number", "label": "Passport number", "type": "text", "group": "passport" },
+      {
+        "key": "passport_expiry",
+        "label": "Passport expiry",
+        "type": "date",
+        "group": "passport",
+        "filterable": true
+      },
+      { "key": "date_of_birth", "label": "Date of birth", "type": "date", "group": "background" },
+      {
+        "key": "marital_status",
+        "label": "Marital status",
+        "type": "select",
+        "group": "background",
+        "options": [
+          { "key": "single", "label": "Single" },
+          { "key": "married", "label": "Married" },
+          { "key": "partner", "label": "Civil partner" },
+          { "key": "divorced", "label": "Divorced" },
+          { "key": "widowed", "label": "Widowed" }
+        ]
+      },
+      { "key": "dependants", "label": "Dependants", "type": "number", "group": "background" }
+    ],
+    "deal": [
+      {
+        "key": "visa_type",
+        "label": "Visa type",
+        "type": "select",
+        "group": "application",
+        "required": true,
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          { "key": "visitor", "label": "Visitor" },
+          { "key": "student", "label": "Student" },
+          { "key": "work", "label": "Work" },
+          { "key": "family", "label": "Family" },
+          { "key": "business", "label": "Business or investor" },
+          { "key": "settlement", "label": "Settlement" },
+          { "key": "citizenship", "label": "Citizenship" }
+        ]
+      },
+      {
+        "key": "destination",
+        "label": "Destination country",
+        "type": "text",
+        "group": "application",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "application_ref",
+        "label": "Authority reference",
+        "type": "text",
+        "group": "application",
+        "filterable": true
+      },
+      {
+        "key": "submitted_on",
+        "label": "Submitted on",
+        "type": "date",
+        "group": "application",
+        "filterable": true
+      },
+      {
+        "key": "decision_due",
+        "label": "Decision expected",
+        "type": "date",
+        "group": "application",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "biometrics_booked",
+        "label": "Biometrics booked",
+        "type": "boolean",
+        "group": "application",
+        "filterable": true
+      },
+      { "key": "government_fee", "label": "Government fee", "type": "currency", "group": "application" }
+    ]
   },
   "pipelines": [
     {
@@ -17,11 +135,138 @@
       "is_default": true,
       "stages": [
         { "key": "consultation", "name": "Consultation", "probability": 10 },
+        { "key": "engaged", "name": "Engaged", "probability": 25 },
         { "key": "documents", "name": "Collecting documents", "probability": 40 },
+        { "key": "review", "name": "Final review", "probability": 55 },
         { "key": "submitted", "name": "Submitted", "probability": 70 },
         { "key": "approved", "name": "Approved", "probability": 100, "is_won": true },
         { "key": "refused", "name": "Refused", "probability": 0, "is_lost": true }
       ]
     }
-  ]
+  ],
+  "roles": [
+    {
+      "key": "consultant",
+      "name": "Consultant",
+      "description": "Advises applicants and runs their own cases end to end",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.view",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.*",
+        "documents.documents.*",
+        "quotes.quotes.*",
+        "invoices.invoices.view",
+        "tickets.tickets.*"
+      ],
+      "scopes": { "*": "own" }
+    },
+    {
+      "key": "case_manager",
+      "name": "Case manager",
+      "description": "Oversees every case, reviews documents and manages billing",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.*",
+        "core.saved_views.share",
+        "documents.*",
+        "quotes.quotes.*",
+        "invoices.*",
+        "tickets.tickets.*",
+        "portal.accounts.manage"
+      ],
+      "scopes": { "*": "all" }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": ["full_name", "email", "phone", "cf.nationality", "lifecycle_status", "owner"]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": ["title", "contact", "stage", "cf.visa_type", "cf.destination", "cf.decision_due", "owner"]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "pipeline",
+        "type": "pipeline_value",
+        "title": "Cases by stage",
+        "size": "lg",
+        "params": { "pipeline": "applications" }
+      },
+      {
+        "key": "documents",
+        "type": "module:documents.awaiting",
+        "title": "Documents awaiting action",
+        "size": "md"
+      },
+      {
+        "key": "decisions",
+        "type": "date_window",
+        "title": "Decisions expected in the next 30 days",
+        "size": "md",
+        "params": { "entity": "deal", "field": "cf.decision_due", "days": 30, "status": "open" }
+      },
+      {
+        "key": "receivables",
+        "type": "module:invoices.receivables",
+        "title": "Outstanding fees",
+        "size": "sm"
+      },
+      { "key": "tasks_due", "type": "tasks_due", "title": "My tasks due", "size": "md" }
+    ]
+  },
+  "templates": [],
+  "sample_data": {
+    "contacts": [
+      {
+        "ref": "ana",
+        "first_name": "Ana",
+        "last_name": "Ribeiro",
+        "email": "ana.ribeiro@example.test",
+        "lifecycle_status": "Applicant",
+        "custom": { "nationality": "Brazilian", "passport_expiry": "2030-04-12", "dependants": 0 }
+      },
+      {
+        "ref": "omar",
+        "first_name": "Omar",
+        "last_name": "Haddad",
+        "email": "omar.haddad@example.test",
+        "lifecycle_status": "Enquiry",
+        "custom": { "nationality": "Jordanian", "dependants": 2 }
+      }
+    ],
+    "deals": [
+      {
+        "title": "Student visa: MSc 2027 intake",
+        "contact": "ana",
+        "stage": "documents",
+        "value": 1800,
+        "custom": { "visa_type": "student", "destination": "United Kingdom" }
+      },
+      {
+        "title": "Family visa consultation",
+        "contact": "omar",
+        "stage": "consultation",
+        "value": 2400,
+        "custom": { "visa_type": "family", "destination": "Canada" }
+      }
+    ]
+  }
 }
