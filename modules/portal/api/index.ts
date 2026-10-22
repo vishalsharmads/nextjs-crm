@@ -10,6 +10,7 @@ import {
   defineRoutes,
   getBranding,
   getSettingsGroup,
+  every,
   applyScope,
   logger,
   type AuthUser,
@@ -641,7 +642,19 @@ const staffRoutes = defineRoutes('/m/portal/accounts', ['portal'], 'portal')
     },
   });
 
+/** Remove sign-in links and sessions that can no longer be used (expired or spent over a day ago). */
+export async function purgePortalCredentials() {
+  if (!isModuleEnabled('portal')) return { tokens: 0, sessions: 0 };
+  const dayAgo = new Date(Date.now() - 86_400_000);
+  const tokens = await db(TOKENS)
+    .where((w) => w.where('expires_at', '<', new Date()).orWhere('used_at', '<', dayAgo))
+    .delete();
+  const sessions = await db(SESSIONS).where('expires_at', '<', new Date()).delete();
+  return { tokens, sessions };
+}
+
 export const portal: ApiModule = {
   routes: () => [publicRoutes, staffRoutes],
   migrations: { '0001_portal': m0001 },
+  start: () => every(6 * 60 * 60_000, 'portal.purge', purgePortalCredentials),
 };
