@@ -27,5 +27,6 @@ Variables are read from `.env` in `apps/api` or the repo root. Production refuse
 | `BLUEPRINTS_DIR`                                                      | auto                                   | Folder with `<key>/blueprint.json` for bundled deployments                                                                     |
 | `TEST_LOG_LEVEL`                                                      | `silent`                               | Show API logs while running tests                                                                                              |
 | `DEMO_MODE`                                                           | `false`                                | Show demo accounts (created with `npm run cli -w @app/api -- demo:seed`) on the sign-in screen. **Never on a client instance** |
+| `API_RATE_LIMIT_PER_MIN`                                              | `600`                                  | API requests per minute per IP. Raise behind a shared office IP or for load tests on staging                                   |
 
 Generate secrets with `openssl rand -hex 32`.
