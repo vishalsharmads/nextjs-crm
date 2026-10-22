@@ -74,6 +74,9 @@ function useEventLabel() {
     cancelled: 'is cancelled',
     replied: 'gets a reply',
     resolved: 'is resolved',
+    shared: 'is shared',
+    signed: 'is signed',
+    reviewed: 'is reviewed',
   };
   return (event: string) => {
     const [entity, action] = event.split('.') as [string, string];

@@ -50,6 +50,10 @@ export const EVENT_TYPES = [
   'ticket.updated',
   'ticket.replied',
   'ticket.resolved',
+  'document.shared',
+  'document.signed',
+  'document_request.submitted',
+  'document_request.reviewed',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
