@@ -52,3 +52,5 @@ This checks out the release, builds, runs `doctor` and migrations, re-applies th
 - Keep `CORS_ORIGINS` empty (same-origin deployment).
 - Admins can require two-factor authentication for all admins (Settings → Security).
 - Privacy requests: Settings → Privacy (anonymize, or permanently delete with a confirmation code).
+
+Before going live, work through the [production checklist](production-checklist.md).
