@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import type { Knex } from 'knex';
 import { z } from 'zod';
 import {
@@ -13,6 +13,7 @@ import {
   applyScope,
   logger,
   type AuthUser,
+  uploadSingle,
   isModuleEnabled,
   iso,
   newUuid,
@@ -30,6 +31,13 @@ import { customerQuotes, respondAsCustomer } from '../../quotes/api';
 import { customerInvoices } from '../../invoices/api';
 import { customerContracts } from '../../contracts/api';
 import { createTicketAsCustomer, customerTickets, replyAsCustomer } from '../../tickets/api';
+import {
+  customerDocument,
+  customerHasOpenRequest,
+  customerLibrary,
+  signAsCustomer,
+  submitFileAsCustomer,
+} from '../../documents/api';
 import * as m0001 from './migrations/0001_portal';
 
 const ACCOUNTS = 'm_portal_accounts';
@@ -162,6 +170,22 @@ const loginLimiter = rateLimiter(5);
 const sessionLimiter = rateLimiter(20);
 const ticketLimiter = rateLimiter(20);
 
+/** Before multipart parsing: the caller must hold a portal session and own an open file request. */
+async function uploadGate(req: Request, res: Response, next: NextFunction) {
+  try {
+    const account = await currentAccount(req);
+    if (
+      !isModuleEnabled('documents') ||
+      !(await customerHasOpenRequest(account.contact_id, String(req.params.uuid)))
+    )
+      throw notFound('File request');
+    res.locals.portalAccount = account;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
 const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
   .add({
     method: 'post',
@@ -276,6 +300,7 @@ const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
           invoices: isModuleEnabled('invoices'),
           contracts: isModuleEnabled('contracts'),
           tickets: isModuleEnabled('tickets'),
+          documents: isModuleEnabled('documents'),
         },
       };
     },
@@ -401,6 +426,57 @@ const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
         body.body,
       );
       return (await customerTickets(matcherFor(account), params.uuid))[0];
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/library',
+    permission: 'public',
+    summary: 'Documents shared with the customer and files they have been asked for.',
+    handler: async ({ req }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('documents')) return { documents: [], requests: [] };
+      return customerLibrary(account.contact_id);
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/docs/:uuid',
+    permission: 'public',
+    params: z.object({ uuid: z.uuid() }),
+    handler: async ({ req, params }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('documents')) throw notFound('Document');
+      return customerDocument(account.contact_id, params.uuid);
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/docs/:uuid/sign',
+    permission: 'public',
+    before: [ticketLimiter],
+    params: z.object({ uuid: z.uuid() }),
+    body: z.object({ name: z.string().trim().min(2).max(200), agree: z.literal(true) }),
+    summary: 'Sign by typing a full name and confirming agreement.',
+    handler: async ({ req, ctx, params, body }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('documents')) throw notFound('Document');
+      await signAsCustomer(portalCtx(ctx, account), account.contact_id, params.uuid, body.name);
+      return customerDocument(account.contact_id, params.uuid);
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/requests/:uuid/upload',
+    permission: 'public',
+    before: [ticketLimiter, uploadGate, uploadSingle()],
+    params: z.object({ uuid: z.uuid() }),
+    status: 201,
+    handler: async ({ req, res, ctx, params }) => {
+      const account = (res as Response).locals.portalAccount as Account;
+      if (!req.file) throw new AppError('VALIDATION_FAILED', 'Choose a file to upload');
+      await submitFileAsCustomer(portalCtx(ctx, account), account.contact_id, params.uuid, req.file);
+      return { ok: true };
     },
   })
   .add({
