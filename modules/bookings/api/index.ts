@@ -152,7 +152,14 @@ async function lockResource(trx: Db, uuid: string) {
 }
 
 /** Overlap: an existing confirmed booking starts before this one ends and ends after it starts. */
-async function assertFree(trx: Db, resourceId: number, start: Date, end: Date, ignoreId?: number) {
+async function assertFree(
+  trx: Db,
+  resourceId: number,
+  start: Date,
+  end: Date,
+  timeZone: string,
+  ignoreId?: number,
+) {
   const qb = trx(BOOKINGS)
     .where({ resource_id: resourceId, status: 'confirmed' })
     .where('starts_at', '<', end)
@@ -161,7 +168,10 @@ async function assertFree(trx: Db, resourceId: number, start: Date, end: Date, i
   const clash = await qb.first('uuid', 'starts_at', 'ends_at', 'title');
   if (clash)
     throw new AppError('CONFLICT', 'That time overlaps another booking', [
-      { path: 'startsAt', message: `Booked ${iso(clash.starts_at)} – ${iso(clash.ends_at)}` },
+      {
+        path: 'startsAt',
+        message: `Already booked ${localParts(new Date(clash.starts_at), timeZone).time}–${localParts(new Date(clash.ends_at), timeZone).time}`,
+      },
     ]);
 }
 
@@ -336,7 +346,7 @@ const bookingRoutes = defineRoutes('/m/bookings/bookings', ['bookings'], 'bookin
             { path: 'attendees', message: `At most ${resource.capacity}` },
           ]);
         checkOpeningHours(resource, start, end, timezone);
-        await assertFree(trx, resource.id, start, end);
+        await assertFree(trx, resource.id, start, end, timezone);
         const links = await resolveLinks(
           user,
           { contactUuid: body.contactUuid, organizationUuid: body.organizationUuid },
@@ -392,7 +402,7 @@ const bookingRoutes = defineRoutes('/m/bookings/bookings', ['bookings'], 'bookin
             { path: 'attendees', message: `At most ${resource.capacity}` },
           ]);
         checkOpeningHours(resource, start, end, timezone);
-        await assertFree(trx, resource.id, start, end, row.id);
+        await assertFree(trx, resource.id, start, end, timezone, row.id);
         const links = await resolveLinks(
           user,
           { contactUuid: body.contactUuid, organizationUuid: body.organizationUuid },
