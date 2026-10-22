@@ -80,6 +80,8 @@ The page renders at `/m/<key>/…`, inside the app shell, as its own lazy-loaded
 - `widgets: { '<key>.<name>': ({ data }) => <Widget data={data} /> }` renders the module's dashboard widgets.
 - `publicRoutes` render at `/p/<key>/…` with no app shell and no staff session, for customer-facing pages such as the client portal. Call your API with `noRetry: true`, so a 401 never triggers a staff session refresh.
 - After adding a new module folder, restart `npm run dev`: Vite only picks up new `modules/*/web` entries at startup.
+- Tailwind scans `modules/` through `@source` in `apps/web/src/styles.css`, so any utility class works in module code. Theme tokens only, as in core.
+- Uploads: put `uploadSingle()` in `before`, after a middleware that checks access, so files are never parsed for callers who may not upload. Store them with `storeFile()` against a core record.
 
 ## Registering
 
