@@ -44,6 +44,8 @@ const schema = z.object({
   REDIS_URL: z.string().default(''),
   /** Allow webhook URLs that resolve to private/loopback addresses (development only). */
   WEBHOOKS_ALLOW_PRIVATE: bool.default(false),
+  /** Requests per minute per IP for the API (sign-in has its own, stricter limit). */
+  API_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(60).max(1_000_000).default(600),
   /** Show demo accounts (seeded with `demo:seed`) on the sign-in screen. Never on a client instance. */
   DEMO_MODE: bool.default(false),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),

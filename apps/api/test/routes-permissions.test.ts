@@ -30,7 +30,10 @@ function collectRoutes(app: Express) {
 describe('route permissions', () => {
   it('every mounted route is registered with a declared permission', async () => {
     const app = await getApp();
-    const mounted = collectRoutes(app).filter((r) => r.path !== '/api/v1/health');
+    // Infrastructure probes live outside the API router and need no session.
+    const mounted = collectRoutes(app).filter(
+      (r) => !['/api/v1/health', '/api/v1/health/ready'].includes(r.path),
+    );
     expect(mounted.length).toBeGreaterThan(20);
     const missing = mounted.filter(
       (r) => !routeRegistry.some((reg) => reg.method === r.method && reg.path === r.path),

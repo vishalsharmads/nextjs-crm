@@ -140,15 +140,13 @@ const commands: Record<string, Command> = {
       const existing = await db('users').where({ email }).first('id');
       let id = existing?.id as number | undefined;
       if (id) {
-        await db('users')
-          .where({ id })
-          .update({
-            password_hash: hash,
-            status: 'active',
-            failed_login_count: 0,
-            locked_until: null,
-            deleted_at: null,
-          });
+        await db('users').where({ id }).update({
+          password_hash: hash,
+          status: 'active',
+          failed_login_count: 0,
+          locked_until: null,
+          deleted_at: null,
+        });
       } else {
         [id] = await db('users').insert({
           uuid: newUuid(),
@@ -210,6 +208,110 @@ const commands: Record<string, Command> = {
   async doctor() {
     const ok = await runDoctor(out);
     if (!ok) process.exitCode = 1;
+  },
+
+  /**
+   * Bulk-insert realistic volume for load testing (organizations, contacts, deals, tasks).
+   * Refuses to run in production. Usage: seed:volume --contacts=20000
+   */
+  async 'seed:volume'(args) {
+    if (env.NODE_ENV === 'production') throw new Error('seed:volume never runs in production');
+    const { values } = parseArgs({ args, options: { contacts: { type: 'string' } } });
+    const total = Math.min(Number(values.contacts ?? 10000), 500_000);
+    const owners = (await db('users')
+      .where({ status: 'active' })
+      .whereNull('deleted_at')
+      .pluck('id')) as number[];
+    const pipeline = await db('pipelines')
+      .where({ entity: 'deal' })
+      .orderBy('is_default', 'desc')
+      .first('id');
+    if (!owners.length || !pipeline)
+      throw new Error('Install the instance first (users and a deal pipeline are needed)');
+    const stages = (await db('pipeline_stages')
+      .where({ pipeline_id: pipeline.id })
+      .orderBy('sort_order')
+      .pluck('id')) as number[];
+    const general = (await db('settings').where({ key: 'general' }).first('value'))?.value as
+      { currency?: string } | undefined;
+    const currency = general?.currency ?? 'USD';
+    const first = [
+      'Ada',
+      'Ben',
+      'Chen',
+      'Dara',
+      'Eli',
+      'Fatima',
+      'Gus',
+      'Hana',
+      'Ivan',
+      'Jun',
+      'Kofi',
+      'Lena',
+      'Mo',
+      'Noor',
+      'Omar',
+      'Priya',
+    ];
+    const last = [
+      'Smith',
+      'Okafor',
+      'Tanaka',
+      'Garcia',
+      'Novak',
+      'Haddad',
+      'Silva',
+      'Kim',
+      'Brown',
+      'Rossi',
+      'Khan',
+      'Meyer',
+    ];
+    const pick = <T>(a: T[], i: number) => a[i % a.length]!;
+    const started = Date.now();
+    const batch = 1000;
+    const orgCount = Math.ceil(total / 5);
+    for (let i = 0; i < orgCount; i += batch) {
+      const rows = Array.from({ length: Math.min(batch, orgCount - i) }, (_, j) => ({
+        uuid: newUuid(),
+        name: `Load Org ${i + j + 1}`,
+        owner_id: pick(owners, i + j),
+      }));
+      await db('organizations').insert(rows);
+    }
+    for (let i = 0; i < total; i += batch) {
+      const rows = Array.from({ length: Math.min(batch, total - i) }, (_, j) => {
+        const n = i + j;
+        return {
+          uuid: newUuid(),
+          first_name: pick(first, n),
+          last_name: `${pick(last, n * 7)} ${n + 1}`,
+          email: `load.${n + 1}@load.test`,
+          owner_id: pick(owners, n),
+        };
+      });
+      await db('contacts').insert(rows);
+    }
+    const dealCount = Math.ceil(total / 2);
+    for (let i = 0; i < dealCount; i += batch) {
+      const rows = Array.from({ length: Math.min(batch, dealCount - i) }, (_, j) => {
+        const n = i + j;
+        return {
+          uuid: newUuid(),
+          title: `Load deal ${n + 1}`,
+          pipeline_id: pipeline.id,
+          stage_id: pick(stages, n),
+          currency,
+          value: (n % 50) * 100 + 500,
+          owner_id: pick(owners, n),
+          position: n,
+        };
+      });
+      await db('deals').insert(rows);
+    }
+    out(
+      `Inserted ${orgCount} organizations, ${total} contacts and ${dealCount} deals in ${((Date.now() - started) / 1000).toFixed(1)} s.`,
+    );
   },
 
   async 'user:reset-password'(args) {

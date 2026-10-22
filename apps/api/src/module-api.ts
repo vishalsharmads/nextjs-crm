@@ -24,6 +24,7 @@ export {
   loadLines,
   nextDocNumber,
   resolveLinks,
+  visibleLinkIds,
   saveLines,
   totalsColumns,
   todayIn,

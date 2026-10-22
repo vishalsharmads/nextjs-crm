@@ -65,10 +65,10 @@ const ticketPatch = toPatch(ticketBody.omit({ channel: true })).extend({
   status: z.enum(['open', 'pending', 'resolved', 'closed']).optional(),
 });
 
-async function toDtos(rows: Record<string, unknown>[]) {
+async function toDtos(rows: Record<string, unknown>[], viewer?: AuthUser) {
   const now = new Date();
   const [refs, users] = await Promise.all([
-    linkRefs(rows),
+    linkRefs(rows, db, viewer),
     userRefs(rows.flatMap((r) => [r.assignee_id as number | null, r.created_by as number | null])),
   ]);
   return rows.map((r) => {
@@ -235,7 +235,7 @@ const routes = defineRoutes('/m/tickets/tickets', ['tickets'], 'tickets')
         .orderBy('last_activity_at', 'desc')
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize);
-      return { data: await toDtos(rows), meta: { page: query.page, pageSize: query.pageSize, total } };
+      return { data: await toDtos(rows, user), meta: { page: query.page, pageSize: query.pageSize, total } };
     },
   })
   .add({
@@ -245,7 +245,7 @@ const routes = defineRoutes('/m/tickets/tickets', ['tickets'], 'tickets')
     params: uuidParam,
     handler: async ({ user, params }) => {
       const row = await getScoped(user, params.uuid);
-      const [dto] = await toDtos([row]);
+      const [dto] = await toDtos([row], user);
       return { ...dto, comments: await comments(row.id, true) };
     },
   })
@@ -272,7 +272,7 @@ const routes = defineRoutes('/m/tickets/tickets', ['tickets'], 'tickets')
         });
       });
       await emitTicket('ticket.created', uuid, user.id);
-      const [dto] = await toDtos([await db(TICKETS).where({ uuid }).first()]);
+      const [dto] = await toDtos([await db(TICKETS).where({ uuid }).first()], user);
       return dto;
     },
   })
@@ -330,7 +330,7 @@ const routes = defineRoutes('/m/tickets/tickets', ['tickets'], 'tickets')
         });
       }
       await emitTicket(resolved ? 'ticket.resolved' : 'ticket.updated', params.uuid, user.id);
-      const [dto] = await toDtos([await db(TICKETS).where({ uuid: params.uuid }).first()]);
+      const [dto] = await toDtos([await db(TICKETS).where({ uuid: params.uuid }).first()], user);
       return dto;
     },
   })
@@ -376,7 +376,7 @@ const routes = defineRoutes('/m/tickets/tickets', ['tickets'], 'tickets')
       if (!body.internal) await emitTicket('ticket.replied', params.uuid, user.id);
       if (body.status === 'resolved') await emitTicket('ticket.resolved', params.uuid, user.id);
       const row = await getScoped(user, params.uuid);
-      const [dto] = await toDtos([row]);
+      const [dto] = await toDtos([row], user);
       return { ...dto, comments: await comments(row.id, true) };
     },
   })

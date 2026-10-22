@@ -1,3 +1,4 @@
+import { db } from '../db/knex';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -41,7 +42,7 @@ export function createApp(opts: AppOptions = {}): Express {
       pinoHttp({
         logger,
         genReqId: (req) => (req as express.Request).ctx?.requestId ?? 'unknown',
-        autoLogging: { ignore: (req) => req.url === '/api/v1/health' },
+        autoLogging: { ignore: (req) => req.url?.startsWith('/api/v1/health') ?? false },
         // One compact line per request: no headers (cookies stay out of logs entirely).
         serializers: {
           req: (req: { id: string; method: string; url: string }) => ({
@@ -55,8 +56,18 @@ export function createApp(opts: AppOptions = {}): Express {
     );
   }
 
+  // Liveness: the process answers. Use for restarts (systemd, load balancer).
   app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok' });
+  });
+  // Readiness: the database answers too. Use for uptime monitoring and deploy checks.
+  app.get('/api/v1/health/ready', async (_req, res) => {
+    try {
+      await db.raw('SELECT 1');
+      res.json({ status: 'ok', database: 'ok' });
+    } catch {
+      res.status(503).json({ status: 'unavailable', database: 'unreachable' });
+    }
   });
 
   app.use('/api', authenticate, csrfProtection, apiLimiter);

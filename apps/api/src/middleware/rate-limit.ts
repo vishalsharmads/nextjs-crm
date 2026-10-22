@@ -1,5 +1,5 @@
 import rateLimit from 'express-rate-limit';
-import { isTest } from '../config/env';
+import { env, isTest } from '../config/env';
 import { AppError } from '../lib/errors';
 
 const handler = () => {
@@ -17,7 +17,7 @@ export const authLimiter = rateLimit({
 
 export const apiLimiter = rateLimit({
   windowMs: 60_000,
-  limit: isTest ? 100_000 : 600,
+  limit: isTest ? 100_000 : env.API_RATE_LIMIT_PER_MIN,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   handler,
