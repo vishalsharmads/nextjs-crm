@@ -25,7 +25,7 @@ describe('front desk check-ins', () => {
       .post(V, {
         kind: 'visitor',
         visitorName: 'Gus <b>Guest</b>',
-        visitorCompany: 'Acme',
+        visitorCompany: 'Northwind',
         hostUuid: member.body.uuid,
       })
       .expect(201);
