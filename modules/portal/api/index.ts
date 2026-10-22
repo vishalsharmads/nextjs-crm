@@ -116,7 +116,8 @@ async function emailLink(account: Account, purpose: 'login' | 'invite', ctx: Req
         .where({ account_id: account.id })
         .where('created_at', '>', new Date(Date.now() - 60_000))
         // Login links expire within LOGIN_LINK_MS; invitation links last longer and do not count.
-        .where('expires_at', '<=', new Date(Date.now() + LOGIN_LINK_MS))
+        // (+1 minute margin: DATETIME rounds to whole seconds.)
+        .where('expires_at', '<=', new Date(Date.now() + LOGIN_LINK_MS + 60_000))
         .first('id');
       if (recent) return false;
     } else {
