@@ -29,6 +29,7 @@ import {
 import { customerQuotes, respondAsCustomer } from '../../quotes/api';
 import { customerInvoices } from '../../invoices/api';
 import { customerContracts } from '../../contracts/api';
+import { createTicketAsCustomer, customerTickets, replyAsCustomer } from '../../tickets/api';
 import * as m0001 from './migrations/0001_portal';
 
 const ACCOUNTS = 'm_portal_accounts';
@@ -159,6 +160,7 @@ const escapeHtml = (s: string) =>
 
 const loginLimiter = rateLimiter(5);
 const sessionLimiter = rateLimiter(20);
+const ticketLimiter = rateLimiter(20);
 
 const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
   .add({
@@ -273,6 +275,7 @@ const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
           quotes: isModuleEnabled('quotes'),
           invoices: isModuleEnabled('invoices'),
           contracts: isModuleEnabled('contracts'),
+          tickets: isModuleEnabled('tickets'),
         },
       };
     },
@@ -336,6 +339,68 @@ const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
         reason: body.reason ?? null,
       });
       return (await customerQuotes(matcherFor(account), params.uuid))[0];
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/tickets',
+    permission: 'public',
+    handler: async ({ req }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('tickets')) return { data: [] };
+      return { data: await customerTickets(matcherFor(account)) };
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/tickets',
+    permission: 'public',
+    before: [ticketLimiter],
+    body: z.object({
+      subject: z.string().trim().min(3).max(250),
+      description: z.string().trim().min(1).max(10000),
+    }),
+    status: 201,
+    summary:
+      'The customer raises a support ticket. It is linked to their contact (and primary organization).',
+    handler: async ({ req, ctx, body }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('tickets')) throw notFound('Ticket');
+      const uuid = await createTicketAsCustomer(portalCtx(ctx, account), account.contact_id, body);
+      return (await customerTickets(matcherFor(account), uuid))[0];
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/tickets/:uuid',
+    permission: 'public',
+    params: z.object({ uuid: z.uuid() }),
+    handler: async ({ req, params }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('tickets')) throw notFound('Ticket');
+      const [t] = await customerTickets(matcherFor(account), params.uuid);
+      if (!t) throw notFound('Ticket');
+      return t;
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/tickets/:uuid/replies',
+    permission: 'public',
+    before: [ticketLimiter],
+    params: z.object({ uuid: z.uuid() }),
+    body: z.object({ body: z.string().trim().min(1).max(10000) }),
+    handler: async ({ req, ctx, params, body }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('tickets')) throw notFound('Ticket');
+      await replyAsCustomer(
+        portalCtx(ctx, account),
+        matcherFor(account),
+        account.contact_id,
+        params.uuid,
+        body.body,
+      );
+      return (await customerTickets(matcherFor(account), params.uuid))[0];
     },
   })
   .add({
