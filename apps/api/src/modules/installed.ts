@@ -1,5 +1,6 @@
 import type { InstalledModuleSource } from './types';
 import bookings from '../../../../modules/bookings/manifest.json' with { type: 'json' };
+import { bookings as bookingsApi } from '../../../../modules/bookings/api';
 import invoices from '../../../../modules/invoices/manifest.json' with { type: 'json' };
 import tickets from '../../../../modules/tickets/manifest.json' with { type: 'json' };
 import documents from '../../../../modules/documents/manifest.json' with { type: 'json' };
@@ -20,7 +21,7 @@ import { portal as portalApi } from '../../../../modules/portal/api';
  * every /modules/<key>/manifest.json is listed). Enabling or disabling is a runtime setting.
  */
 export const installedModuleSources: InstalledModuleSource[] = [
-  { manifest: bookings },
+  { manifest: bookings, api: bookingsApi },
   { manifest: invoices, api: invoicesApi },
   { manifest: tickets },
   { manifest: documents },
