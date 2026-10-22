@@ -50,6 +50,7 @@ export const EVENT_TYPES = [
   'ticket.updated',
   'ticket.replied',
   'ticket.resolved',
+  'ticket.deleted',
   'document.shared',
   'document.signed',
   'document_request.submitted',

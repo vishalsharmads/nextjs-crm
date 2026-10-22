@@ -139,7 +139,8 @@ async function assigneeFor(user: AuthUser, ref: string | null | undefined, conn:
   return id;
 }
 
-type TicketEvent = 'ticket.created' | 'ticket.updated' | 'ticket.replied' | 'ticket.resolved';
+type TicketEvent =
+  'ticket.created' | 'ticket.updated' | 'ticket.replied' | 'ticket.resolved' | 'ticket.deleted';
 async function emitTicket(type: TicketEvent, uuid: string, actorId: number | null) {
   const [record] = await toDtos([await db(TICKETS).where({ uuid }).first()]);
   await emit({ type, entity: 'ticket', uuid, record: record as unknown as Record<string, unknown>, actorId });
@@ -395,6 +396,7 @@ const routes = defineRoutes('/m/tickets/tickets', ['tickets'], 'tickets')
           entityUuid: params.uuid,
         });
       });
+      await emitTicket('ticket.deleted', params.uuid, user.id);
     },
   });
 
@@ -463,6 +465,8 @@ export async function createTicketAsCustomer(
       .where({ contact_id: contactId, is_primary: true })
       .whereNull('ended_at')
       .first('organization_id');
+    // Route it to whoever owns the contact, so own-scope agents see it and get reply notifications.
+    const owner = await trx('contacts').where({ id: contactId }).first('owner_id');
     return insertTicket(trx, ctx, {
       subject: input.subject,
       description: input.description,
@@ -471,7 +475,7 @@ export async function createTicketAsCustomer(
       channel: 'portal',
       contact_id: contactId,
       organization_id: (org?.organization_id as number | undefined) ?? null,
-      assignee_id: null,
+      assignee_id: (owner?.owner_id as number | null) ?? null,
       created_by: null,
     });
   });
