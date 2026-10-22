@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import type { Knex } from 'knex';
 import { z } from 'zod';
 import {
@@ -13,6 +13,7 @@ import {
   applyScope,
   logger,
   type AuthUser,
+  uploadSingle,
   isModuleEnabled,
   iso,
   newUuid,
@@ -29,6 +30,14 @@ import {
 import { customerQuotes, respondAsCustomer } from '../../quotes/api';
 import { customerInvoices } from '../../invoices/api';
 import { customerContracts } from '../../contracts/api';
+import { createTicketAsCustomer, customerTickets, replyAsCustomer } from '../../tickets/api';
+import {
+  customerDocument,
+  customerHasOpenRequest,
+  customerLibrary,
+  signAsCustomer,
+  submitFileAsCustomer,
+} from '../../documents/api';
 import * as m0001 from './migrations/0001_portal';
 
 const ACCOUNTS = 'm_portal_accounts';
@@ -107,7 +116,8 @@ async function emailLink(account: Account, purpose: 'login' | 'invite', ctx: Req
         .where({ account_id: account.id })
         .where('created_at', '>', new Date(Date.now() - 60_000))
         // Login links expire within LOGIN_LINK_MS; invitation links last longer and do not count.
-        .where('expires_at', '<=', new Date(Date.now() + LOGIN_LINK_MS))
+        // (+1 minute margin: DATETIME rounds to whole seconds.)
+        .where('expires_at', '<=', new Date(Date.now() + LOGIN_LINK_MS + 60_000))
         .first('id');
       if (recent) return false;
     } else {
@@ -159,6 +169,23 @@ const escapeHtml = (s: string) =>
 
 const loginLimiter = rateLimiter(5);
 const sessionLimiter = rateLimiter(20);
+const ticketLimiter = rateLimiter(20);
+
+/** Before multipart parsing: the caller must hold a portal session and own an open file request. */
+async function uploadGate(req: Request, res: Response, next: NextFunction) {
+  try {
+    const account = await currentAccount(req);
+    if (
+      !isModuleEnabled('documents') ||
+      !(await customerHasOpenRequest(account.contact_id, String(req.params.uuid)))
+    )
+      throw notFound('File request');
+    res.locals.portalAccount = account;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
 
 const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
   .add({
@@ -273,6 +300,8 @@ const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
           quotes: isModuleEnabled('quotes'),
           invoices: isModuleEnabled('invoices'),
           contracts: isModuleEnabled('contracts'),
+          tickets: isModuleEnabled('tickets'),
+          documents: isModuleEnabled('documents'),
         },
       };
     },
@@ -336,6 +365,119 @@ const publicRoutes = defineRoutes('/public/portal', ['portal'], 'portal')
         reason: body.reason ?? null,
       });
       return (await customerQuotes(matcherFor(account), params.uuid))[0];
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/tickets',
+    permission: 'public',
+    handler: async ({ req }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('tickets')) return { data: [] };
+      return { data: await customerTickets(matcherFor(account)) };
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/tickets',
+    permission: 'public',
+    before: [ticketLimiter],
+    body: z.object({
+      subject: z.string().trim().min(3).max(250),
+      description: z.string().trim().min(1).max(10000),
+    }),
+    status: 201,
+    summary:
+      'The customer raises a support ticket. It is linked to their contact (and primary organization).',
+    handler: async ({ req, ctx, body }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('tickets')) throw notFound('Ticket');
+      const uuid = await createTicketAsCustomer(portalCtx(ctx, account), account.contact_id, body);
+      return (await customerTickets(matcherFor(account), uuid))[0];
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/tickets/:uuid',
+    permission: 'public',
+    params: z.object({ uuid: z.uuid() }),
+    handler: async ({ req, params }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('tickets')) throw notFound('Ticket');
+      const [t] = await customerTickets(matcherFor(account), params.uuid);
+      if (!t) throw notFound('Ticket');
+      return t;
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/tickets/:uuid/replies',
+    permission: 'public',
+    before: [ticketLimiter],
+    params: z.object({ uuid: z.uuid() }),
+    body: z.object({ body: z.string().trim().min(1).max(10000) }),
+    handler: async ({ req, ctx, params, body }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('tickets')) throw notFound('Ticket');
+      await replyAsCustomer(
+        portalCtx(ctx, account),
+        matcherFor(account),
+        account.contact_id,
+        params.uuid,
+        body.body,
+      );
+      return (await customerTickets(matcherFor(account), params.uuid))[0];
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/library',
+    permission: 'public',
+    summary: 'Documents shared with the customer and files they have been asked for.',
+    handler: async ({ req }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('documents')) return { documents: [], requests: [] };
+      return customerLibrary(account.contact_id);
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/docs/:uuid',
+    permission: 'public',
+    params: z.object({ uuid: z.uuid() }),
+    handler: async ({ req, params }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('documents')) throw notFound('Document');
+      return customerDocument(account.contact_id, params.uuid);
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/docs/:uuid/sign',
+    permission: 'public',
+    before: [ticketLimiter],
+    params: z.object({ uuid: z.uuid() }),
+    body: z.object({ name: z.string().trim().min(2).max(200), agree: z.literal(true) }),
+    summary: 'Sign by typing a full name and confirming agreement.',
+    handler: async ({ req, ctx, params, body }) => {
+      const account = await currentAccount(req);
+      if (!isModuleEnabled('documents')) throw notFound('Document');
+      await signAsCustomer(portalCtx(ctx, account), account.contact_id, params.uuid, body.name);
+      return customerDocument(account.contact_id, params.uuid);
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/requests/:uuid/upload',
+    permission: 'public',
+    before: [ticketLimiter, uploadGate, uploadSingle()],
+    params: z.object({ uuid: z.uuid() }),
+    status: 201,
+    handler: async ({ req, res, ctx, params }) => {
+      const account = (res as Response).locals.portalAccount as Account;
+      if (!req.file) throw new AppError('VALIDATION_FAILED', 'Choose a file to upload');
+      await submitFileAsCustomer(portalCtx(ctx, account), account.contact_id, params.uuid, req.file);
+      return { ok: true };
     },
   })
   .add({

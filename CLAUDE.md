@@ -7,7 +7,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 ## Current status
 
 - Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
-- **Phases 1–3 complete.** Next: Phase 4 (bookings, tickets, documents, inventory/assets modules, then vertical modules).
+- **Phases 1–4 complete** (all planned phases). New work goes through the roadmap's Future list.
 
 ## Non-negotiables
 
@@ -94,6 +94,7 @@ Run test suites one workspace at a time on this machine; running all three in pa
 - **Route order:** static paths (`/deals/board`, `/contacts/export`) must be registered before `/:uuid` routes. A test fails on shadowed routes.
 - **Domain events** (`core/events/events.ts`) are emitted by services after commit; webhooks and automations subscribe and enqueue jobs. New record types must emit created/updated/deleted.
 - **Jobs:** `enqueue`/`registerJob` in `lib/jobs.ts` (in-process, or BullMQ with `REDIS_URL`); recurring work uses `every()`, which takes a Redis lock per tick.
+- **Captured test mail is shared across test files:** filter by recipient (`takeMail().filter(m => m.to === …)`), never assert on the whole mailbox.
 - **Tests share one database:** a test that creates a _required_ custom field must archive it before it ends, or other files' creates fail.
 - **Modules** import only from `@app/api/module-api`; tables are `m_<key>_*`; list new modules in `apps/api/src/modules/installed.ts`.
 - **Routes** are registered only through `defineRoute({ method, path, permission, schema, handler })`. `permission` is a key, `'public'`, or `'authenticated'`. A test fails if any Express layer lacks a registry entry.
@@ -141,7 +142,8 @@ Run test suites one workspace at a time on this machine; running all three in pa
 - **RTL-ready:** use logical properties (`ms-`, `pe-`, `start-`, `end-`), never `ml-`/`pr-`/`left-`/`right-`.
 - **Motion:** 120–200 ms ease-out, only in response to user actions.
 - **Auth tokens** live in httpOnly cookies only. Never use localStorage or sessionStorage for tokens. The API client sends `X-CSRF-Token` and does a single-flight refresh on 401.
-- **Module pages** link with absolute paths, and buttons inside forms that are not submits need `type="button"`. Restart `npm run dev` after adding a module folder (Vite globs module entries at startup).
+- **Module pages** link with absolute paths, and buttons inside forms that are not submits need `type="button"`. Restart `npm run dev` after adding a module folder (Vite globs module entries at startup). Module web entries live outside `apps/web`, so `styles.css` declares `@source '../../../modules'`; without it, Tailwind classes used only in modules are never generated.
+- **Shared-clock screens** (bookings board, front desk) show the workspace time zone via `lib/zoned.ts`, never the browser's, because the server validates in the workspace zone.
 - **Copy:** sentence case, active verbs. A button and its resulting toast use the same verb ("Archive" → "Archived").
 
 ## Testing

@@ -1,33 +1,33 @@
 {
   "key": "documents",
   "name": "Documents",
-  "version": "0.1.0",
-  "status": "stub",
-  "description": "Contracts and generated documents. Placeholder until Phase 4; declares permissions so blueprints can reference them.",
+  "version": "1.0.0",
+  "status": "available",
+  "description": "Generate letters and agreements from templates, have customers sign them, and collect files from customers through the portal.",
   "depends_on": [],
   "permissions": [
+    { "key": "documents.documents.view", "description": "View documents and file requests" },
+    { "key": "documents.documents.create", "description": "Generate documents and request files" },
+    { "key": "documents.documents.update", "description": "Edit, share and review documents and files" },
+    { "key": "documents.documents.delete", "description": "Void documents and cancel file requests" },
+    { "key": "documents.templates.manage", "description": "Manage document templates" }
+  ],
+  "menu_items": [
     {
-      "key": "documents.documents.view",
-      "description": "View documents"
-    },
-    {
-      "key": "documents.documents.create",
-      "description": "Create documents"
-    },
-    {
-      "key": "documents.documents.update",
-      "description": "Update documents"
-    },
-    {
-      "key": "documents.documents.delete",
-      "description": "Delete documents"
+      "key": "documents",
+      "label": "Documents",
+      "path": "/m/documents",
+      "icon": "file-text",
+      "permission": "documents.documents.view",
+      "order": 44
     }
   ],
-  "menu_items": [],
   "labels": {
-    "document": {
-      "singular": "Document",
-      "plural": "Documents"
-    }
-  }
+    "document": { "singular": "Document", "plural": "Documents" },
+    "document-request": { "singular": "File request", "plural": "File requests" }
+  },
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx",
+  "dashboard_widgets": [{ "type": "documents.awaiting", "title": "Documents awaiting action" }]
 }

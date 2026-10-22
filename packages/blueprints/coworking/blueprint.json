@@ -2,11 +2,15 @@
   "$schema": "../schema.json",
   "key": "coworking",
   "name": "Coworking space",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Members, companies and memberships for coworking and flexible-office operators, with front-desk roles.",
   "settings": {
-    "features": { "leads": false },
-    "general": { "currency": "GBP" },
+    "features": {
+      "leads": false
+    },
+    "general": {
+      "currency": "GBP"
+    },
     "contacts": {
       "sources": ["Walk-in", "Website", "Referral", "Broker", "Event", "Social", "Other"],
       "lifecycleStatuses": ["Enquirer", "Member", "Former member"]
@@ -16,14 +20,42 @@
     }
   },
   "vocabulary": {
-    "contact": { "singular": "Member", "plural": "Members" },
-    "organization": { "singular": "Company", "plural": "Companies" },
-    "deal": { "singular": "Membership", "plural": "Memberships" }
+    "contact": {
+      "singular": "Member",
+      "plural": "Members"
+    },
+    "organization": {
+      "singular": "Company",
+      "plural": "Companies"
+    },
+    "deal": {
+      "singular": "Membership",
+      "plural": "Memberships"
+    }
   },
-  "modules": ["bookings", "invoices", "tickets", "documents"],
+  "modules": [
+    "bookings",
+    "invoices",
+    "tickets",
+    "documents",
+    "contracts",
+    "portal",
+    "assets",
+    "coworking-checkins"
+  ],
   "custom_field_groups": {
-    "contact": [{ "key": "membership", "label": "Membership" }],
-    "deal": [{ "key": "terms", "label": "Terms" }]
+    "contact": [
+      {
+        "key": "membership",
+        "label": "Membership"
+      }
+    ],
+    "deal": [
+      {
+        "key": "terms",
+        "label": "Terms"
+      }
+    ]
   },
   "custom_fields": {
     "contact": [
@@ -43,10 +75,22 @@
         "filterable": true,
         "show_in_list": true,
         "options": [
-          { "key": "hot_desk", "label": "Hot desk" },
-          { "key": "dedicated_desk", "label": "Dedicated desk" },
-          { "key": "private_office", "label": "Private office" },
-          { "key": "virtual_office", "label": "Virtual office" }
+          {
+            "key": "hot_desk",
+            "label": "Hot desk"
+          },
+          {
+            "key": "dedicated_desk",
+            "label": "Dedicated desk"
+          },
+          {
+            "key": "private_office",
+            "label": "Private office"
+          },
+          {
+            "key": "virtual_office",
+            "label": "Virtual office"
+          }
         ]
       },
       {
@@ -55,11 +99,21 @@
         "type": "text",
         "group": "membership",
         "filterable": true,
-        "visibility": { "default": "write", "roles": { "front_desk": "write" } }
+        "visibility": {
+          "default": "write",
+          "roles": {
+            "front_desk": "write"
+          }
+        }
       }
     ],
     "deal": [
-      { "key": "desk_or_room", "label": "Desk or room", "type": "text", "group": "terms" },
+      {
+        "key": "desk_or_room",
+        "label": "Desk or room",
+        "type": "text",
+        "group": "terms"
+      },
       {
         "key": "start_date",
         "label": "Start date",
@@ -83,9 +137,18 @@
         "group": "terms",
         "filterable": true,
         "options": [
-          { "key": "monthly", "label": "Monthly" },
-          { "key": "quarterly", "label": "Quarterly" },
-          { "key": "annual", "label": "Annual" }
+          {
+            "key": "monthly",
+            "label": "Monthly"
+          },
+          {
+            "key": "quarterly",
+            "label": "Quarterly"
+          },
+          {
+            "key": "annual",
+            "label": "Annual"
+          }
         ]
       },
       {
@@ -112,12 +175,42 @@
       "entity": "deal",
       "is_default": true,
       "stages": [
-        { "key": "enquiry", "name": "Enquiry", "probability": 10, "rotting_days": 3 },
-        { "key": "tour_booked", "name": "Tour booked", "probability": 30, "rotting_days": 7 },
-        { "key": "proposal_sent", "name": "Proposal sent", "probability": 60, "rotting_days": 7 },
-        { "key": "contract_signed", "name": "Contract signed", "probability": 90, "rotting_days": 14 },
-        { "key": "active", "name": "Active", "probability": 100, "is_won": true },
-        { "key": "lost", "name": "Lost", "probability": 0, "is_lost": true }
+        {
+          "key": "enquiry",
+          "name": "Enquiry",
+          "probability": 10,
+          "rotting_days": 3
+        },
+        {
+          "key": "tour_booked",
+          "name": "Tour booked",
+          "probability": 30,
+          "rotting_days": 7
+        },
+        {
+          "key": "proposal_sent",
+          "name": "Proposal sent",
+          "probability": 60,
+          "rotting_days": 7
+        },
+        {
+          "key": "contract_signed",
+          "name": "Contract signed",
+          "probability": 90,
+          "rotting_days": 14
+        },
+        {
+          "key": "active",
+          "name": "Active",
+          "probability": 100,
+          "is_won": true
+        },
+        {
+          "key": "lost",
+          "name": "Lost",
+          "probability": 0,
+          "is_lost": true
+        }
       ]
     }
   ],
@@ -136,9 +229,14 @@
         "core.dashboard.*",
         "core.saved_views.share",
         "tickets.tickets.*",
-        "bookings.bookings.view"
+        "bookings.bookings.view",
+        "coworking-checkins.checkins.view",
+        "contracts.contracts.*",
+        "documents.documents.*"
       ],
-      "scopes": { "*": "all" }
+      "scopes": {
+        "*": "all"
+      }
     },
     {
       "key": "front_desk",
@@ -155,9 +253,15 @@
         "core.dashboard.view",
         "bookings.bookings.*",
         "tickets.tickets.create",
-        "tickets.tickets.view"
+        "tickets.tickets.view",
+        "coworking-checkins.checkins.*",
+        "assets.assets.*"
       ],
-      "scopes": { "core.contacts": "all", "core.organizations": "all", "core.activities": "own" }
+      "scopes": {
+        "core.contacts": "all",
+        "core.organizations": "all",
+        "core.activities": "own"
+      }
     }
   ],
   "layouts": [
@@ -183,23 +287,51 @@
   "dashboard": {
     "name": "Overview",
     "widgets": [
-      { "key": "occupancy", "type": "module:bookings.occupancy", "title": "Occupancy", "size": "sm" },
+      {
+        "key": "occupancy",
+        "type": "module:bookings.occupancy",
+        "title": "Occupancy",
+        "size": "sm"
+      },
+      {
+        "key": "in_building",
+        "type": "module:coworking-checkins.today",
+        "title": "In the building",
+        "size": "sm"
+      },
       {
         "key": "pipeline_value",
         "type": "pipeline_value",
         "title": "Membership pipeline",
         "size": "lg",
-        "params": { "pipeline": "memberships" }
+        "params": {
+          "pipeline": "memberships"
+        }
       },
       {
         "key": "renewals",
         "type": "date_window",
         "title": "Renewals in the next 30 days",
         "size": "md",
-        "params": { "entity": "deal", "field": "cf.end_date", "days": 30, "status": "won" }
+        "params": {
+          "entity": "deal",
+          "field": "cf.end_date",
+          "days": 30,
+          "status": "won"
+        }
       },
-      { "key": "open_tickets", "type": "module:tickets.open_count", "title": "Open tickets", "size": "sm" },
-      { "key": "tasks_due", "type": "tasks_due", "title": "My tasks due", "size": "md" }
+      {
+        "key": "open_tickets",
+        "type": "module:tickets.open_count",
+        "title": "Open tickets",
+        "size": "sm"
+      },
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      }
     ]
   },
   "templates": [],
@@ -226,7 +358,10 @@
         "email": "amara@northwind.test",
         "organization": "northwind",
         "lifecycle_status": "Member",
-        "custom": { "preferred_plan": "dedicated_desk", "id_verified": true }
+        "custom": {
+          "preferred_plan": "dedicated_desk",
+          "id_verified": true
+        }
       },
       {
         "ref": "lukas",
@@ -235,7 +370,10 @@
         "email": "lukas@fable-analytics.test",
         "organization": "fable",
         "lifecycle_status": "Enquirer",
-        "custom": { "preferred_plan": "private_office", "id_verified": false }
+        "custom": {
+          "preferred_plan": "private_office",
+          "id_verified": false
+        }
       },
       {
         "ref": "mei",
@@ -243,7 +381,9 @@
         "last_name": "Tanaka",
         "email": "mei.tanaka@example.test",
         "lifecycle_status": "Enquirer",
-        "custom": { "preferred_plan": "hot_desk" }
+        "custom": {
+          "preferred_plan": "hot_desk"
+        }
       }
     ],
     "deals": [
@@ -267,14 +407,20 @@
         "organization": "fable",
         "stage": "proposal_sent",
         "value": 2400,
-        "custom": { "start_date": "2026-12-01", "monthly_fee": 2400 }
+        "custom": {
+          "start_date": "2026-12-01",
+          "monthly_fee": 2400
+        }
       },
       {
         "title": "Mei – hot desk",
         "contact": "mei",
         "stage": "tour_booked",
         "value": 250,
-        "custom": { "start_date": "2026-11-15", "monthly_fee": 250 }
+        "custom": {
+          "start_date": "2026-11-15",
+          "monthly_fee": 250
+        }
       }
     ]
   }

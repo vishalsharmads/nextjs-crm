@@ -8,7 +8,7 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 | 1     | Foundation: auth, RBAC, branding, vocabulary, custom fields, contacts, organizations, deals, activities, views, import/export, dashboard, audit, notifications, blueprints, module loader | Done                           |
 | 2     | Configuration and communication: layout builder UI, workflow automation, templates manager, email integration, web forms, webhooks, API keys, BullMQ jobs                                 | Done                           |
 | 3     | Commercial: products, quotes, invoices, payments, contracts and renewals, client portal                                                                                                   | Done                           |
-| 4     | Operational and industry modules: bookings, tickets, documents, inventory/assets, vertical modules                                                                                        | Not started                    |
+| 4     | Operational and industry modules: bookings, tickets, documents, inventory/assets, vertical modules                                                                                        | Done                           |
 
 ## Future
 
@@ -35,3 +35,10 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - Quote and invoice panels on deal and organization record pages.
 - Scope-filter linked record names on commercial documents (a document's owner sees its linked contact or deal name even when that record is outside their scope), and re-check link scope when duplicating or converting.
 - Purge expired portal tokens and sessions on a schedule.
+- Recurring bookings and a member self-service booking page in the client portal.
+- Configurable ticket response targets (per priority and business hours), and email-to-ticket.
+- A rich-text template editor for documents, and drawn signatures.
+- Barcode scanning for asset tags and stock counts.
+- Visitor pre-registration and printed badges for the front desk.
+- Bookings and front desk show linked contact names to anyone with view access (shared calendar by design); add an option to hide names outside the viewer's contact scope.
+- Delete stored file data when an upload's database transaction fails (orphaned blobs).

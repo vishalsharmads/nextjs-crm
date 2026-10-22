@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, FileText, KeyRound, LogOut, Mail, Printer, Receipt, UserPlus, X } from 'lucide-react';
+import {
+  Check,
+  FileText,
+  KeyRound,
+  LifeBuoy,
+  LogOut,
+  Mail,
+  Plus,
+  Printer,
+  Receipt,
+  UserPlus,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import type { CommerceSettings } from '@app/shared';
 import type { WebModule } from '@app/module-sdk';
@@ -12,10 +24,11 @@ import { useBranding } from '@/app/branding';
 import { useBoot } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Field, Input } from '@/components/ui/input';
+import { Field, Input, Textarea } from '@/components/ui/input';
 import { Badge, EmptyState, ErrorState, PageHeader, Pane, Skeleton } from '@/components/ui/misc';
 import { RecordPicker } from '@/components/fields/pickers';
 import { DocumentPaper, type RecordRef } from '@/components/commerce/document-paper';
+import { DocumentBody } from '../../documents/web';
 import type { LineDto } from '@/components/commerce/line-items';
 
 // ======================= Staff: manage access =======================
@@ -256,7 +269,7 @@ interface Me {
   firstName: string;
   email: string;
   business: Pick<CommerceSettings, 'legalName' | 'address' | 'taxId' | 'email' | 'phone'> & { name: string };
-  features: { quotes: boolean; invoices: boolean; contracts: boolean };
+  features: { quotes: boolean; invoices: boolean; contracts: boolean; tickets: boolean; documents: boolean };
 }
 
 interface CustomerQuote {
@@ -498,7 +511,448 @@ function invoiceBadge(i: CustomerInvoice) {
 }
 
 function HomePage() {
-  return <Authed>{(me) => <Documents me={me} />}</Authed>;
+  return (
+    <Authed>
+      {(me) => (
+        <div className="flex flex-col gap-6">
+          <Documents me={me} />
+          {me.features.documents ? <LibrarySection /> : null}
+          {me.features.tickets ? <SupportSection /> : null}
+        </div>
+      )}
+    </Authed>
+  );
+}
+
+// ---------- Documents and file requests ----------
+
+interface LibraryDoc {
+  uuid: string;
+  number: string;
+  title: string;
+  status: 'shared' | 'signed';
+  requiresSignature: boolean;
+  sharedAt: string | null;
+  signedName: string | null;
+  signedAt: string | null;
+  bodyHtml?: string;
+}
+interface LibraryRequest {
+  uuid: string;
+  name: string;
+  description: string;
+  status: 'requested' | 'submitted' | 'approved' | 'rejected';
+  dueDate: string | null;
+  reviewNote: string | null;
+  fileName: string | null;
+}
+
+const REQUEST_STATUS: Record<LibraryRequest['status'], string> = {
+  requested: 'Needed',
+  submitted: 'Received, being checked',
+  approved: 'Accepted',
+  rejected: 'Please upload again',
+};
+
+function UploadButton({ request }: { request: LibraryRequest }) {
+  const qc = useQueryClient();
+  const input = useRef<HTMLInputElement>(null);
+  const upload = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      return portalApi(`${P}/requests/${request.uuid}/upload`, { method: 'POST', body: form });
+    },
+    onSuccess: () => {
+      toast.success('Uploaded. Thank you.');
+      void qc.invalidateQueries({ queryKey: ['portal', 'library'] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        className="sr-only"
+        aria-label={`Upload ${request.name}`}
+        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) upload.mutate(f);
+          e.target.value = '';
+        }}
+      />
+      <Button size="sm" variant="primary" loading={upload.isPending} onClick={() => input.current?.click()}>
+        Upload
+      </Button>
+    </>
+  );
+}
+
+function LibrarySection() {
+  const lib = useQuery({
+    queryKey: ['portal', 'library'],
+    queryFn: () => portalApi<{ documents: LibraryDoc[]; requests: LibraryRequest[] }>(`${P}/library`),
+  });
+  if (lib.isPending) return <Skeleton className="h-24" />;
+  if (lib.isError || (!lib.data.documents.length && !lib.data.requests.length)) return null;
+  const { documents, requests } = lib.data;
+  return (
+    <>
+      {requests.length ? (
+        <Pane
+          title={
+            <span className="flex items-center gap-2 [&_svg]:size-4 [&_svg]:text-faint">
+              <Mail /> Files we need from you
+            </span>
+          }
+          padded={false}
+        >
+          <ul className="divide-y divide-line">
+            {requests.map((r) => (
+              <li key={r.uuid} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{r.name}</span>
+                  <span className="text-xs text-muted">
+                    {r.description}
+                    {r.dueDate ? ` · by ${formatDate(r.dueDate)}` : ''}
+                    {r.fileName ? ` · ${r.fileName}` : ''}
+                  </span>
+                  {r.status === 'rejected' && r.reviewNote ? (
+                    <span className="block text-xs text-accent">{r.reviewNote}</span>
+                  ) : null}
+                </span>
+                <Badge
+                  tone={r.status === 'approved' ? 'primary' : r.status === 'rejected' ? 'accent' : 'neutral'}
+                >
+                  {REQUEST_STATUS[r.status]}
+                </Badge>
+                {r.status === 'requested' || r.status === 'rejected' ? <UploadButton request={r} /> : null}
+              </li>
+            ))}
+          </ul>
+        </Pane>
+      ) : null}
+      {documents.length ? (
+        <DocList title="Documents" icon={<FileText />}>
+          {documents.map((d) => (
+            <DocRow
+              key={d.uuid}
+              to={`${ROOT}/docs/${d.uuid}`}
+              number={d.number}
+              title={d.title}
+              badge={
+                d.status === 'signed' ? (
+                  <Badge tone="primary">Signed</Badge>
+                ) : d.requiresSignature ? (
+                  <Badge tone="accent">Please sign</Badge>
+                ) : (
+                  <Badge>Shared</Badge>
+                )
+              }
+              amount=""
+              date={formatDate(d.sharedAt)}
+            />
+          ))}
+        </DocList>
+      ) : null}
+    </>
+  );
+}
+
+function DocPage() {
+  return <Authed>{(me) => <DocView me={me} />}</Authed>;
+}
+
+function DocView({ me }: { me: Me }) {
+  const { uuid = '' } = useParams();
+  const qc = useQueryClient();
+  const [name, setName] = useState(me.name);
+  const [agree, setAgree] = useState(false);
+  const doc = useQuery({
+    queryKey: ['portal', 'doc', uuid],
+    queryFn: () => portalApi<LibraryDoc>(`${P}/docs/${uuid}`),
+  });
+  const sign = useMutation({
+    mutationFn: () => portalApi(`${P}/docs/${uuid}/sign`, { method: 'POST', body: { name, agree: true } }),
+    onSuccess: () => {
+      toast.success('Signed. Thank you.');
+      void qc.invalidateQueries({ queryKey: ['portal'] });
+    },
+  });
+  if (doc.isPending) return <Skeleton className="h-96" />;
+  if (doc.isError) return <ErrorState error={doc.error} />;
+  const d = doc.data;
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2 print:hidden">
+        <Link to={ROOT} className="text-sm text-primary hover:underline">
+          ← All documents
+        </Link>
+        <Button className="ms-auto" variant="ghost" onClick={() => window.print()}>
+          <Printer /> Print or save as PDF
+        </Button>
+      </div>
+      <DocumentBody html={d.bodyHtml ?? ''} signedName={d.signedName} signedAt={d.signedAt} />
+      {d.status === 'shared' && d.requiresSignature ? (
+        <Pane title="Sign this document" className="print:hidden">
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              sign.mutate();
+            }}
+          >
+            <Field label="Type your full name" required>
+              {(p) => (
+                <Input {...p} value={name} onChange={(e) => setName(e.target.value)} className="max-w-sm" />
+              )}
+            </Field>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={agree}
+                onChange={(e) => setAgree(e.target.checked)}
+                className="mt-0.5 size-4 accent-primary"
+              />
+              I have read this document and agree to it. Typing my name counts as my signature.
+            </label>
+            {sign.error ? (
+              <p role="alert" className="text-sm text-accent">
+                {sign.error.message}
+              </p>
+            ) : null}
+            <Button
+              type="submit"
+              variant="primary"
+              className="self-start"
+              disabled={!agree || name.trim().length < 2}
+              loading={sign.isPending}
+            >
+              Sign document
+            </Button>
+          </form>
+        </Pane>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------- Support tickets ----------
+
+interface CustomerTicket {
+  uuid: string;
+  number: string;
+  subject: string;
+  status: 'open' | 'pending' | 'resolved' | 'closed';
+  createdAt: string;
+  lastActivityAt: string;
+  description?: string | null;
+  comments?: {
+    uuid: string;
+    body: string;
+    fromCustomer: boolean;
+    author: { name: string } | null;
+    createdAt: string;
+  }[];
+}
+
+const TICKET_STATUS: Record<CustomerTicket['status'], string> = {
+  open: 'With our team',
+  pending: 'Waiting for you',
+  resolved: 'Resolved',
+  closed: 'Closed',
+};
+
+function SupportSection() {
+  const tickets = useQuery({
+    queryKey: ['portal', 'tickets'],
+    queryFn: () => portalApi<{ data: CustomerTicket[] }>(`${P}/tickets`).then((r) => r.data),
+  });
+  return (
+    <Pane
+      title={
+        <span className="flex items-center gap-2 [&_svg]:size-4 [&_svg]:text-faint">
+          <LifeBuoy /> Support
+        </span>
+      }
+      actions={
+        <Button size="sm" variant="primary" asChild>
+          <Link to={`${ROOT}/support/new`}>
+            <Plus /> New request
+          </Link>
+        </Button>
+      }
+      padded={!tickets.data?.length}
+    >
+      {tickets.isPending ? (
+        <Skeleton className="h-16" />
+      ) : !tickets.data?.length ? (
+        <p className="text-sm text-muted">
+          Need something? Send us a request and we will reply here and by email.
+        </p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {tickets.data.map((t) => (
+            <li key={t.uuid}>
+              <Link
+                to={`${ROOT}/support/${t.uuid}`}
+                className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm hover:bg-hover"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{t.subject}</span>
+                  <span className="font-mono text-xs text-muted">{t.number}</span>
+                </span>
+                <Badge tone={t.status === 'pending' ? 'accent' : t.status === 'open' ? 'outline' : 'neutral'}>
+                  {TICKET_STATUS[t.status]}
+                </Badge>
+                <span className="w-40 text-end text-xs text-muted">{formatDateTime(t.lastActivityAt)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Pane>
+  );
+}
+
+function NewTicketPage() {
+  return <Authed>{() => <NewTicket />}</Authed>;
+}
+
+function NewTicket() {
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
+  const create = useMutation({
+    mutationFn: () =>
+      portalApi<CustomerTicket>(`${P}/tickets`, { method: 'POST', body: { subject, description } }),
+    onSuccess: (t) => {
+      toast.success('Request sent. We will get back to you soon.');
+      void qc.invalidateQueries({ queryKey: ['portal', 'tickets'] });
+      nav(`${ROOT}/support/${t.uuid}`, { replace: true });
+    },
+  });
+  const errors = create.error instanceof ApiError ? create.error.fieldErrors() : {};
+  return (
+    <form
+      className="mx-auto flex max-w-2xl flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        create.mutate();
+      }}
+    >
+      <Link to={ROOT} className="text-sm text-primary hover:underline">
+        ← Back
+      </Link>
+      <h1 className="text-xl font-semibold tracking-tight">New support request</h1>
+      <Field label="What is it about?" required error={errors.subject}>
+        {(p) => <Input {...p} value={subject} onChange={(e) => setSubject(e.target.value)} autoFocus />}
+      </Field>
+      <Field label="Details" required error={errors.description}>
+        {(p) => (
+          <Textarea {...p} rows={6} value={description} onChange={(e) => setDescription(e.target.value)} />
+        )}
+      </Field>
+      <div className="flex justify-end">
+        <Button
+          type="submit"
+          variant="primary"
+          loading={create.isPending}
+          disabled={subject.trim().length < 3 || !description.trim()}
+        >
+          Send request
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function TicketPage() {
+  return <Authed>{() => <TicketThread />}</Authed>;
+}
+
+function TicketThread() {
+  const { uuid = '' } = useParams();
+  const qc = useQueryClient();
+  const [body, setBody] = useState('');
+  const ticket = useQuery({
+    queryKey: ['portal', 'ticket', uuid],
+    queryFn: () => portalApi<CustomerTicket>(`${P}/tickets/${uuid}`),
+  });
+  const reply = useMutation({
+    mutationFn: () => portalApi(`${P}/tickets/${uuid}/replies`, { method: 'POST', body: { body } }),
+    onSuccess: () => {
+      toast.success('Reply sent');
+      setBody('');
+      void qc.invalidateQueries({ queryKey: ['portal'] });
+    },
+  });
+  if (ticket.isPending) return <Skeleton className="h-64" />;
+  if (ticket.isError) return <ErrorState error={ticket.error} />;
+  const t = ticket.data;
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <Link to={ROOT} className="text-sm text-primary hover:underline">
+        ← Back
+      </Link>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">{t.subject}</h1>
+        <p className="text-sm text-muted">
+          <span className="font-mono">{t.number}</span> · {TICKET_STATUS[t.status]}
+        </p>
+      </div>
+      <ol className="flex flex-col gap-3">
+        {t.description ? (
+          <li className="rounded-md border border-line bg-surface p-3">
+            <p className="mb-1 text-xs text-muted">You · {formatDateTime(t.createdAt)}</p>
+            <p className="text-sm whitespace-pre-wrap">{t.description}</p>
+          </li>
+        ) : null}
+        {(t.comments ?? []).map((c) => (
+          <li
+            key={c.uuid}
+            className={
+              c.fromCustomer
+                ? 'rounded-md border border-line bg-surface p-3'
+                : 'rounded-md border border-primary-soft bg-primary-soft/40 p-3'
+            }
+          >
+            <p className="mb-1 text-xs text-muted">
+              {c.fromCustomer ? 'You' : (c.author?.name ?? 'Our team')} · {formatDateTime(c.createdAt)}
+            </p>
+            <p className="text-sm whitespace-pre-wrap">{c.body}</p>
+          </li>
+        ))}
+      </ol>
+      {t.status !== 'closed' ? (
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (body.trim()) reply.mutate();
+          }}
+        >
+          <Textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={4}
+            aria-label="Your reply"
+            placeholder="Write a reply"
+          />
+          <div className="flex justify-end">
+            <Button type="submit" variant="primary" disabled={!body.trim()} loading={reply.isPending}>
+              Send reply
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p className="text-sm text-muted">This request is closed. Start a new one if you need more help.</p>
+      )}
+    </div>
+  );
 }
 
 function Documents({ me }: { me: Me }) {
@@ -840,6 +1294,9 @@ const portalModule: WebModule = {
     { path: 'verify', element: <VerifyPage /> },
     { path: 'quotes/:uuid', element: <QuotePage /> },
     { path: 'invoices/:uuid', element: <InvoicePage /> },
+    { path: 'docs/:uuid', element: <DocPage /> },
+    { path: 'support/new', element: <NewTicketPage /> },
+    { path: 'support/:uuid', element: <TicketPage /> },
   ],
 };
 

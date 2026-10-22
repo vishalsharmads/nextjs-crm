@@ -1,0 +1,27 @@
+{
+  "key": "coworking-checkins",
+  "name": "Front desk check-ins",
+  "version": "1.0.0",
+  "status": "available",
+  "description": "Coworking front desk: check members and visitors in and out, see who is in the building, and tell hosts when their guests arrive.",
+  "depends_on": [],
+  "permissions": [
+    { "key": "coworking-checkins.checkins.view", "description": "See who is in the building" },
+    { "key": "coworking-checkins.checkins.manage", "description": "Check people in and out" }
+  ],
+  "menu_items": [
+    {
+      "key": "checkins",
+      "label": "Front desk",
+      "path": "/m/coworking-checkins",
+      "icon": "map-pin",
+      "permission": "coworking-checkins.checkins.view",
+      "order": 20
+    }
+  ],
+  "labels": { "visit": { "singular": "Visit", "plural": "Visits" } },
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx",
+  "dashboard_widgets": [{ "type": "coworking-checkins.today", "title": "In the building" }]
+}

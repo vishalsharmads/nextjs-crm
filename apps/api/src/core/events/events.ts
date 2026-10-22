@@ -43,6 +43,21 @@ export const EVENT_TYPES = [
   'contract.renewed',
   'contract.expired',
   'contract.cancelled',
+  'booking.created',
+  'booking.updated',
+  'booking.cancelled',
+  'ticket.created',
+  'ticket.updated',
+  'ticket.replied',
+  'ticket.resolved',
+  'ticket.deleted',
+  'document.shared',
+  'document.signed',
+  'document_request.submitted',
+  'document_request.reviewed',
+  'asset.assigned',
+  'asset.returned',
+  'stock.low',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

@@ -1,0 +1,31 @@
+{
+  "key": "assets",
+  "name": "Inventory and assets",
+  "version": "1.0.0",
+  "status": "available",
+  "description": "Track equipment, keys and other assets lent to people, and stock levels of consumables with reorder alerts.",
+  "depends_on": [],
+  "permissions": [
+    { "key": "assets.assets.view", "description": "View assets and stock" },
+    { "key": "assets.assets.manage", "description": "Add assets, lend and return them" },
+    { "key": "assets.stock.manage", "description": "Add stock items and record stock movements" }
+  ],
+  "menu_items": [
+    {
+      "key": "assets",
+      "label": "Inventory",
+      "path": "/m/assets",
+      "icon": "box",
+      "permission": "assets.assets.view",
+      "order": 45
+    }
+  ],
+  "labels": {
+    "asset": { "singular": "Asset", "plural": "Assets" },
+    "stock-item": { "singular": "Stock item", "plural": "Stock items" }
+  },
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx",
+  "dashboard_widgets": [{ "type": "assets.overview", "title": "Inventory" }]
+}

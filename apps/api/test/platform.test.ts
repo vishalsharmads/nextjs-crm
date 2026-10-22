@@ -24,11 +24,11 @@ describe('modules', () => {
     await client.post('/modules/notes-demo/disable').expect(204);
   });
 
-  it('refuses stub modules and hides module menus without permission', async () => {
+  it('refuses modules that are not in this build', async () => {
     const { client } = await clientWithRoles(['admin']);
-    expect((await client.post('/modules/tickets/enable')).status).toBe(409);
+    expect((await client.post('/modules/not-a-module/enable')).status).toBe(404);
     const list = await client.get('/modules').expect(200);
-    expect(list.body.data.find((m: { key: string }) => m.key === 'tickets').status).toBe('stub');
+    expect(list.body.data.every((m: { status: string }) => m.status === 'available')).toBe(true);
   });
 });
 
@@ -38,7 +38,7 @@ describe('blueprints over HTTP', () => {
     const list = await client.get('/blueprints').expect(200);
     expect(list.body.current.key).toBe('generic');
     expect(list.body.available.map((b: { key: string }) => b.key)).toEqual(
-      expect.arrayContaining(['generic', 'coworking']),
+      expect.arrayContaining(['generic', 'coworking', 'visa-consultancy']),
     );
     const exported = await client.get('/blueprints/export?key=client-preset&version=2.0.0').expect(200);
     expect(exported.body.key).toBe('client-preset');

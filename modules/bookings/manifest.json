@@ -1,33 +1,33 @@
 {
   "key": "bookings",
   "name": "Bookings",
-  "version": "0.1.0",
-  "status": "stub",
-  "description": "Book desks, rooms and resources. Placeholder until Phase 4; declares permissions so blueprints can reference them.",
+  "version": "1.0.0",
+  "status": "available",
+  "description": "Book desks, rooms and equipment by the hour, with clash checks and opening hours.",
   "depends_on": [],
   "permissions": [
+    { "key": "bookings.bookings.view", "description": "View bookings" },
+    { "key": "bookings.bookings.create", "description": "Create bookings" },
+    { "key": "bookings.bookings.update", "description": "Update bookings" },
+    { "key": "bookings.bookings.delete", "description": "Delete bookings" },
+    { "key": "bookings.resources.manage", "description": "Add and edit bookable resources" }
+  ],
+  "menu_items": [
     {
-      "key": "bookings.bookings.view",
-      "description": "View bookings"
-    },
-    {
-      "key": "bookings.bookings.create",
-      "description": "Create bookings"
-    },
-    {
-      "key": "bookings.bookings.update",
-      "description": "Update bookings"
-    },
-    {
-      "key": "bookings.bookings.delete",
-      "description": "Delete bookings"
+      "key": "bookings",
+      "label": "Bookings",
+      "path": "/m/bookings",
+      "icon": "calendar",
+      "permission": "bookings.bookings.view",
+      "order": 30
     }
   ],
-  "menu_items": [],
   "labels": {
-    "booking": {
-      "singular": "Booking",
-      "plural": "Bookings"
-    }
-  }
+    "booking": { "singular": "Booking", "plural": "Bookings" },
+    "resource": { "singular": "Resource", "plural": "Resources" }
+  },
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx",
+  "dashboard_widgets": [{ "type": "bookings.occupancy", "title": "Occupancy" }]
 }

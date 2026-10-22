@@ -78,6 +78,7 @@ export const SCOPED_RESOURCES = [
   'quotes.quotes',
   'invoices.invoices',
   'contracts.contracts',
+  'tickets.tickets',
 ] as const;
 
 /** Does a granted pattern cover a required permission key? */

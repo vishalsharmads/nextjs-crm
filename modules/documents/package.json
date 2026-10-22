@@ -1,0 +1,14 @@
+{
+  "name": "@app/module-documents",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@app/api": "*",
+    "@app/module-sdk": "*",
+    "@app/shared": "*",
+    "zod": "4.6.7",
+    "handlebars": "4.7.10"
+  },
+  "devDependencies": {}
+}
