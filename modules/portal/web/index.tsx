@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, FileText, KeyRound, LogOut, Mail, Printer, Receipt, UserPlus, X } from 'lucide-react';
+import {
+  Check,
+  FileText,
+  KeyRound,
+  LifeBuoy,
+  LogOut,
+  Mail,
+  Plus,
+  Printer,
+  Receipt,
+  UserPlus,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import type { CommerceSettings } from '@app/shared';
 import type { WebModule } from '@app/module-sdk';
@@ -12,7 +24,7 @@ import { useBranding } from '@/app/branding';
 import { useBoot } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Field, Input } from '@/components/ui/input';
+import { Field, Input, Textarea } from '@/components/ui/input';
 import { Badge, EmptyState, ErrorState, PageHeader, Pane, Skeleton } from '@/components/ui/misc';
 import { RecordPicker } from '@/components/fields/pickers';
 import { DocumentPaper, type RecordRef } from '@/components/commerce/document-paper';
@@ -256,7 +268,7 @@ interface Me {
   firstName: string;
   email: string;
   business: Pick<CommerceSettings, 'legalName' | 'address' | 'taxId' | 'email' | 'phone'> & { name: string };
-  features: { quotes: boolean; invoices: boolean; contracts: boolean };
+  features: { quotes: boolean; invoices: boolean; contracts: boolean; tickets: boolean };
 }
 
 interface CustomerQuote {
@@ -498,7 +510,232 @@ function invoiceBadge(i: CustomerInvoice) {
 }
 
 function HomePage() {
-  return <Authed>{(me) => <Documents me={me} />}</Authed>;
+  return (
+    <Authed>
+      {(me) => (
+        <div className="flex flex-col gap-6">
+          <Documents me={me} />
+          {me.features.tickets ? <SupportSection /> : null}
+        </div>
+      )}
+    </Authed>
+  );
+}
+
+// ---------- Support tickets ----------
+
+interface CustomerTicket {
+  uuid: string;
+  number: string;
+  subject: string;
+  status: 'open' | 'pending' | 'resolved' | 'closed';
+  createdAt: string;
+  lastActivityAt: string;
+  description?: string | null;
+  comments?: {
+    uuid: string;
+    body: string;
+    fromCustomer: boolean;
+    author: { name: string } | null;
+    createdAt: string;
+  }[];
+}
+
+const TICKET_STATUS: Record<CustomerTicket['status'], string> = {
+  open: 'With our team',
+  pending: 'Waiting for you',
+  resolved: 'Resolved',
+  closed: 'Closed',
+};
+
+function SupportSection() {
+  const tickets = useQuery({
+    queryKey: ['portal', 'tickets'],
+    queryFn: () => portalApi<{ data: CustomerTicket[] }>(`${P}/tickets`).then((r) => r.data),
+  });
+  return (
+    <Pane
+      title={
+        <span className="flex items-center gap-2 [&_svg]:size-4 [&_svg]:text-faint">
+          <LifeBuoy /> Support
+        </span>
+      }
+      actions={
+        <Button size="sm" variant="primary" asChild>
+          <Link to={`${ROOT}/support/new`}>
+            <Plus /> New request
+          </Link>
+        </Button>
+      }
+      padded={!tickets.data?.length}
+    >
+      {tickets.isPending ? (
+        <Skeleton className="h-16" />
+      ) : !tickets.data?.length ? (
+        <p className="text-sm text-muted">
+          Need something? Send us a request and we will reply here and by email.
+        </p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {tickets.data.map((t) => (
+            <li key={t.uuid}>
+              <Link
+                to={`${ROOT}/support/${t.uuid}`}
+                className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm hover:bg-hover"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{t.subject}</span>
+                  <span className="font-mono text-xs text-muted">{t.number}</span>
+                </span>
+                <Badge tone={t.status === 'pending' ? 'accent' : t.status === 'open' ? 'outline' : 'neutral'}>
+                  {TICKET_STATUS[t.status]}
+                </Badge>
+                <span className="w-40 text-end text-xs text-muted">{formatDateTime(t.lastActivityAt)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Pane>
+  );
+}
+
+function NewTicketPage() {
+  return <Authed>{() => <NewTicket />}</Authed>;
+}
+
+function NewTicket() {
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
+  const create = useMutation({
+    mutationFn: () =>
+      portalApi<CustomerTicket>(`${P}/tickets`, { method: 'POST', body: { subject, description } }),
+    onSuccess: (t) => {
+      toast.success('Request sent. We will get back to you soon.');
+      void qc.invalidateQueries({ queryKey: ['portal', 'tickets'] });
+      nav(`${ROOT}/support/${t.uuid}`, { replace: true });
+    },
+  });
+  const errors = create.error instanceof ApiError ? create.error.fieldErrors() : {};
+  return (
+    <form
+      className="mx-auto flex max-w-2xl flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        create.mutate();
+      }}
+    >
+      <Link to={ROOT} className="text-sm text-primary hover:underline">
+        ← Back
+      </Link>
+      <h1 className="text-xl font-semibold tracking-tight">New support request</h1>
+      <Field label="What is it about?" required error={errors.subject}>
+        {(p) => <Input {...p} value={subject} onChange={(e) => setSubject(e.target.value)} autoFocus />}
+      </Field>
+      <Field label="Details" required error={errors.description}>
+        {(p) => (
+          <Textarea {...p} rows={6} value={description} onChange={(e) => setDescription(e.target.value)} />
+        )}
+      </Field>
+      <div className="flex justify-end">
+        <Button
+          type="submit"
+          variant="primary"
+          loading={create.isPending}
+          disabled={subject.trim().length < 3 || !description.trim()}
+        >
+          Send request
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function TicketPage() {
+  return <Authed>{() => <TicketThread />}</Authed>;
+}
+
+function TicketThread() {
+  const { uuid = '' } = useParams();
+  const qc = useQueryClient();
+  const [body, setBody] = useState('');
+  const ticket = useQuery({
+    queryKey: ['portal', 'ticket', uuid],
+    queryFn: () => portalApi<CustomerTicket>(`${P}/tickets/${uuid}`),
+  });
+  const reply = useMutation({
+    mutationFn: () => portalApi(`${P}/tickets/${uuid}/replies`, { method: 'POST', body: { body } }),
+    onSuccess: () => {
+      toast.success('Reply sent');
+      setBody('');
+      void qc.invalidateQueries({ queryKey: ['portal'] });
+    },
+  });
+  if (ticket.isPending) return <Skeleton className="h-64" />;
+  if (ticket.isError) return <ErrorState error={ticket.error} />;
+  const t = ticket.data;
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <Link to={ROOT} className="text-sm text-primary hover:underline">
+        ← Back
+      </Link>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">{t.subject}</h1>
+        <p className="text-sm text-muted">
+          <span className="font-mono">{t.number}</span> · {TICKET_STATUS[t.status]}
+        </p>
+      </div>
+      <ol className="flex flex-col gap-3">
+        {t.description ? (
+          <li className="rounded-md border border-line bg-surface p-3">
+            <p className="mb-1 text-xs text-muted">You · {formatDateTime(t.createdAt)}</p>
+            <p className="text-sm whitespace-pre-wrap">{t.description}</p>
+          </li>
+        ) : null}
+        {(t.comments ?? []).map((c) => (
+          <li
+            key={c.uuid}
+            className={
+              c.fromCustomer
+                ? 'rounded-md border border-line bg-surface p-3'
+                : 'rounded-md border border-primary-soft bg-primary-soft/40 p-3'
+            }
+          >
+            <p className="mb-1 text-xs text-muted">
+              {c.fromCustomer ? 'You' : (c.author?.name ?? 'Our team')} · {formatDateTime(c.createdAt)}
+            </p>
+            <p className="text-sm whitespace-pre-wrap">{c.body}</p>
+          </li>
+        ))}
+      </ol>
+      {t.status !== 'closed' ? (
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (body.trim()) reply.mutate();
+          }}
+        >
+          <Textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={4}
+            aria-label="Your reply"
+            placeholder="Write a reply"
+          />
+          <div className="flex justify-end">
+            <Button type="submit" variant="primary" disabled={!body.trim()} loading={reply.isPending}>
+              Send reply
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p className="text-sm text-muted">This request is closed. Start a new one if you need more help.</p>
+      )}
+    </div>
+  );
 }
 
 function Documents({ me }: { me: Me }) {
@@ -840,6 +1077,8 @@ const portalModule: WebModule = {
     { path: 'verify', element: <VerifyPage /> },
     { path: 'quotes/:uuid', element: <QuotePage /> },
     { path: 'invoices/:uuid', element: <InvoicePage /> },
+    { path: 'support/new', element: <NewTicketPage /> },
+    { path: 'support/:uuid', element: <TicketPage /> },
   ],
 };
 
