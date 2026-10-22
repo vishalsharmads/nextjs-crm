@@ -5,10 +5,13 @@ import { db } from '../src/db/knex';
 const P = '/public/portal';
 const tokenFrom = (text: string) => decodeURIComponent(/token=([^\s&"]+)/.exec(text)![1]!);
 
-/** Sign-in mail is sent in the background; wait briefly for it. */
-async function nextMail() {
+/**
+ * Sign-in mail is sent in the background; wait briefly for it. Other test files share the
+ * captured mailbox, so only mail to `to` counts.
+ */
+async function nextMail(to: string) {
   for (let i = 0; i < 50; i++) {
-    const mails = takeMail();
+    const mails = takeMail().filter((m) => m.to === to);
     if (mails.length) return mails;
     await new Promise((r) => setTimeout(r, 20));
   }
@@ -19,7 +22,7 @@ async function signIn(email: string): Promise<Client> {
   takeMail();
   const customer = await anonymousClient();
   await customer.post(`${P}/login`, { email }).expect(200);
-  const [mail] = await nextMail();
+  const [mail] = await nextMail(email);
   if (!mail) throw new Error('no login mail');
   await customer.post(`${P}/session`, { token: tokenFrom(mail.text) }).expect(200);
   return customer;
@@ -42,7 +45,7 @@ describe('client portal', () => {
     takeMail();
     const acc = await staff.post('/m/portal/accounts', { contactUuid: c.body.uuid }).expect(201);
     expect(acc.body).toMatchObject({ status: 'active', email: 'paula.portal@example.test' });
-    const [invite] = takeMail();
+    const [invite] = takeMail().filter((m) => m.to === 'paula.portal@example.test');
     expect(invite!.to).toBe('paula.portal@example.test');
 
     const customer = await anonymousClient();
@@ -56,13 +59,13 @@ describe('client portal', () => {
     // Unknown and known emails get the same answer; only the known one gets mail.
     const anon = await anonymousClient();
     const unknown = await anon.post(`${P}/login`, { email: 'nobody@example.test' }).expect(200);
-    expect(await nextMail()).toHaveLength(0);
+    expect(await nextMail('nobody@example.test')).toHaveLength(0);
     const known = await anon.post(`${P}/login`, { email: 'PAULA.portal@example.test' }).expect(200);
     expect(known.body).toEqual(unknown.body);
-    expect(await nextMail()).toHaveLength(1);
+    expect(await nextMail('paula.portal@example.test')).toHaveLength(1);
     // A second request within a minute sends nothing (no inbox flooding).
     await anon.post(`${P}/login`, { email: 'paula.portal@example.test' }).expect(200);
-    expect(await nextMail()).toHaveLength(0);
+    expect(await nextMail('paula.portal@example.test')).toHaveLength(0);
 
     // A portal session is not a staff session, and a staff session is not a portal session.
     expect((await customer.get('/contacts')).status).toBe(401);
