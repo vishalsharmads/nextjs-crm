@@ -1,3 +1,4 @@
+import type { Knex } from 'knex';
 import { fileTypeFromBuffer } from 'file-type';
 import { env } from '../../config/env';
 import { db, type Db } from '../../db/knex';
@@ -93,6 +94,11 @@ export async function storeFile(
   }
   const key = newStorageKey();
   await storage.put(key, input.buffer);
+  // The bytes are written before the row commits: if the surrounding transaction rolls back,
+  // delete them so no orphaned file is left in storage.
+  const tx = conn as Partial<Knex.Transaction>;
+  if (tx.isTransaction && tx.executionPromise)
+    tx.executionPromise.catch(() => storage.delete(key).catch(() => undefined));
   const uuid = newUuid();
   const safeName = input.originalName.replace(/[\r\n"\\/]/g, '_').slice(0, 255) || 'file';
   const [id] = await conn('files').insert({
