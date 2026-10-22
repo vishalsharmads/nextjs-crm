@@ -3,6 +3,7 @@ import bookings from '../../../../modules/bookings/manifest.json' with { type: '
 import { bookings as bookingsApi } from '../../../../modules/bookings/api';
 import invoices from '../../../../modules/invoices/manifest.json' with { type: 'json' };
 import tickets from '../../../../modules/tickets/manifest.json' with { type: 'json' };
+import { tickets as ticketsApi } from '../../../../modules/tickets/api';
 import documents from '../../../../modules/documents/manifest.json' with { type: 'json' };
 import notesDemo from '../../../../modules/notes-demo/manifest.json' with { type: 'json' };
 import { notesDemo as notesDemoApi } from '../../../../modules/notes-demo/api';
@@ -23,7 +24,7 @@ import { portal as portalApi } from '../../../../modules/portal/api';
 export const installedModuleSources: InstalledModuleSource[] = [
   { manifest: bookings, api: bookingsApi },
   { manifest: invoices, api: invoicesApi },
-  { manifest: tickets },
+  { manifest: tickets, api: ticketsApi },
   { manifest: documents },
   { manifest: notesDemo, api: notesDemoApi },
   { manifest: products, api: productsApi },

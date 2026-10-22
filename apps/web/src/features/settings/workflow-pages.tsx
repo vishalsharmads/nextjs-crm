@@ -72,6 +72,8 @@ function useEventLabel() {
     renewed: 'is renewed',
     expired: 'expires',
     cancelled: 'is cancelled',
+    replied: 'gets a reply',
+    resolved: 'is resolved',
   };
   return (event: string) => {
     const [entity, action] = event.split('.') as [string, string];

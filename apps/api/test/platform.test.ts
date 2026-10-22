@@ -26,9 +26,9 @@ describe('modules', () => {
 
   it('refuses stub modules and hides module menus without permission', async () => {
     const { client } = await clientWithRoles(['admin']);
-    expect((await client.post('/modules/tickets/enable')).status).toBe(409);
+    expect((await client.post('/modules/documents/enable')).status).toBe(409);
     const list = await client.get('/modules').expect(200);
-    expect(list.body.data.find((m: { key: string }) => m.key === 'tickets').status).toBe('stub');
+    expect(list.body.data.find((m: { key: string }) => m.key === 'documents').status).toBe('stub');
   });
 });
 

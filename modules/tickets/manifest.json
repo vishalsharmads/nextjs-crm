@@ -1,33 +1,29 @@
 {
   "key": "tickets",
   "name": "Tickets",
-  "version": "0.1.0",
-  "status": "stub",
-  "description": "Support tickets for members and customers. Placeholder until Phase 4; declares permissions so blueprints can reference them.",
+  "version": "1.0.0",
+  "status": "available",
+  "description": "A support desk: tickets with priorities, response targets, internal notes and customer replies.",
   "depends_on": [],
   "permissions": [
+    { "key": "tickets.tickets.view", "description": "View tickets" },
+    { "key": "tickets.tickets.create", "description": "Create tickets" },
+    { "key": "tickets.tickets.update", "description": "Reply to, assign and resolve tickets" },
+    { "key": "tickets.tickets.delete", "description": "Delete tickets" }
+  ],
+  "menu_items": [
     {
-      "key": "tickets.tickets.view",
-      "description": "View tickets"
-    },
-    {
-      "key": "tickets.tickets.create",
-      "description": "Create tickets"
-    },
-    {
-      "key": "tickets.tickets.update",
-      "description": "Update tickets"
-    },
-    {
-      "key": "tickets.tickets.delete",
-      "description": "Delete tickets"
+      "key": "tickets",
+      "label": "Tickets",
+      "path": "/m/tickets",
+      "icon": "life-buoy",
+      "permission": "tickets.tickets.view",
+      "order": 35
     }
   ],
-  "menu_items": [],
-  "labels": {
-    "ticket": {
-      "singular": "Ticket",
-      "plural": "Tickets"
-    }
-  }
+  "labels": { "ticket": { "singular": "Ticket", "plural": "Tickets" } },
+  "migrations_dir": "api/migrations",
+  "api_entry": "api/index.ts",
+  "web_entry": "web/index.tsx",
+  "dashboard_widgets": [{ "type": "tickets.open_count", "title": "Open tickets" }]
 }
