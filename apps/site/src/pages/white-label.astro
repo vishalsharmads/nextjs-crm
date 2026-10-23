@@ -1,0 +1,114 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import Faq from '../components/Faq.astro';
+import LeadForm from '../components/LeadForm.astro';
+import { breadcrumbSchema, faqSchema } from '../data/schema';
+
+const points = [
+  {
+    title: 'Your brand on every screen',
+    body: 'Your client sees their own name, logo, colors, fonts and domain: in the app, in every email, on every quote and in their client portal. Ours appears nowhere.',
+  },
+  {
+    title: 'One instance per client',
+    body: 'Each of your clients gets their own installation and database. Nothing is shared between them, so one client’s data can never appear in another’s account.',
+  },
+  {
+    title: 'Templates you can reuse',
+    body: 'Set up a client once, export the configuration as a template, and install it for the next client in the same industry in minutes.',
+  },
+  {
+    title: 'Modules for your vertical',
+    body: 'Need something industry-specific? Modules add tables, screens and workflows without forking the product, so every client still gets updates.',
+  },
+];
+const faq = [
+  {
+    q: 'Can we resell Bespoq under our own brand?',
+    a: 'Yes. Every instance is fully white-label. Your clients see your brand, or their own, and never ours.',
+  },
+  {
+    q: 'Who hosts the client instances?',
+    a: 'You choose: you host them on your own servers, or we host them for you. Each instance is a separate install with its own database.',
+  },
+  {
+    q: 'Can we build our own modules?',
+    a: 'Yes. Modules follow a documented contract (data, API, screens and permissions) so your team can build industry features that survive product updates.',
+  },
+];
+---
+
+<Base
+  title="White-label CRM for agencies and resellers | Bespoq"
+  description="Resell Bespoq as your own CRM: your brand on every screen and email, one instance per client, reusable industry templates and custom modules."
+  schema={[
+    breadcrumbSchema([
+      { name: 'Home', path: '/' },
+      { name: 'For agencies', path: '/white-label' },
+    ]),
+    faqSchema(faq),
+  ]}
+>
+  <PageHero
+    title="A white-label CRM your clients will think you built"
+    lede="Agencies and consultants use Bespoq to deliver tailored CRMs under their own brand. You do the fitting; the product, updates and security come with it."
+  />
+  <section class="section">
+    <div class="wrap grid">
+      {
+        points.map((p) => (
+          <div class="point">
+            <h2 class="h3">{p.title}</h2>
+            <p class="muted">{p.body}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+  <Faq items={faq} heading="Partner questions" />
+  <section class="section">
+    <div class="wrap form-wrap">
+      <div class="intro">
+        <h2 class="h2">Talk to us about partnering</h2>
+        <p class="lede muted">Tell us about your clients and the industries you serve. We will show you how a partner setup works.</p>
+      </div>
+      <LeadForm source="partner" submitLabel="Talk to partnerships" />
+    </div>
+  </section>
+</Base>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    border-top: 2px dashed rgb(18 32 27 / 0.2);
+  }
+  .point {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+    padding: 32px 32px 36px 0;
+    border-bottom: 2px dashed rgb(18 32 27 / 0.2);
+  }
+  .point:nth-child(odd) {
+    padding-inline-end: 48px;
+  }
+  .form-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: clamp(32px, 6vw, 96px);
+  }
+  .intro {
+    display: grid;
+    gap: 16px;
+    align-content: start;
+  }
+  @media (max-width: 900px) {
+    .grid,
+    .form-wrap {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

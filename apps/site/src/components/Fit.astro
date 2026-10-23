@@ -1,0 +1,77 @@
+---
+/** Why generic CRMs fail, stated as three fittings. Not cards: a measured, ruled list. */
+const fittings = [
+  {
+    title: 'Your words',
+    body: 'Patients, matters, listings, members. Every screen, email and report uses the terms your team already uses, so nobody translates “opportunity” in their head.',
+  },
+  {
+    title: 'Your workflow',
+    body: 'Your stages, your fields, your documents. Quotes, invoices, bookings, a support desk and a client portal switch on only if you need them.',
+  },
+  {
+    title: 'Your data',
+    body: 'Your own instance and database, hosted where you choose. No shared multi-tenant cloud, no per-seat licence, and a full export any time.',
+  },
+];
+---
+
+<section class="section fit" aria-labelledby="fit-title">
+  <div class="wrap layout">
+    <div>
+      <h2 class="h2" id="fit-title">Off-the-rack CRMs make you change how you work.</h2>
+      <p class="lede muted">
+        General-purpose CRMs are built for everyone, so they fit no one well. Teams end up working around them in
+        spreadsheets. Bespoq starts from a template for your industry and is adjusted until it fits.
+      </p>
+    </div>
+    <dl class="list">
+      {
+        fittings.map((f) => (
+          <div class="row">
+            <dt class="h3">{f.title}</dt>
+            <dd class="muted">{f.body}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+</section>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: clamp(32px, 6vw, 96px);
+  }
+  .layout > div:first-child {
+    display: grid;
+    gap: 20px;
+    align-content: start;
+  }
+  .list {
+    margin: 0;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 24px;
+    padding-block: 26px;
+    border-top: 2px dashed rgb(18 32 27 / 0.22);
+  }
+  .row:last-child {
+    border-bottom: 2px dashed rgb(18 32 27 / 0.22);
+  }
+  dd {
+    margin: 0;
+  }
+  @media (max-width: 900px) {
+    .layout,
+    .row {
+      grid-template-columns: 1fr;
+    }
+    .row {
+      gap: 8px;
+    }
+  }
+</style>

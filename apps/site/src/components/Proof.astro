@@ -1,0 +1,114 @@
+---
+/** PLACEHOLDER proof. Every quote and logo here is marked until real, permissioned ones replace them. */
+const quotes = [
+  {
+    quote: 'We stopped translating our work into someone else’s software. The team calls things what they are, and they actually use it.',
+    who: 'Practice manager',
+    org: 'Dental group, Sydney',
+  },
+  {
+    quote: 'Quotes go out the same afternoon as the site visit, and we know which invoices are late without asking the bookkeeper.',
+    who: 'Operations lead',
+    org: 'Builder, Texas',
+  },
+  {
+    quote: 'Applicants upload their own documents now. That alone gave our case managers a day a week back.',
+    who: 'Director',
+    org: 'Visa consultancy, Melbourne',
+  },
+];
+---
+
+<section class="section" aria-labelledby="proof-title">
+  <div class="wrap">
+    <h2 class="h2" id="proof-title">What fitting feels like</h2>
+    <p class="flag">Placeholder testimonials. Replace with real, permissioned quotes before launch.</p>
+    <ul class="quotes">
+      {
+        quotes.map((q) => (
+          <li>
+            <figure>
+              <blockquote>
+                <p>{q.quote}</p>
+              </blockquote>
+              <figcaption>
+                <span class="who">{q.who}</span>
+                <span class="muted">{q.org}</span>
+              </figcaption>
+            </figure>
+          </li>
+        ))
+      }
+    </ul>
+    <div class="logos" aria-label="Customer logos (placeholder)">
+      {Array.from({ length: 6 }, () => <span class="logo-ph">Logo placeholder</span>)}
+    </div>
+  </div>
+</section>
+
+<style>
+  .flag {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--tape);
+    color: var(--tape-ink);
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+  .quotes {
+    list-style: none;
+    padding: 0;
+    margin: clamp(32px, 5vw, 56px) 0 0;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: clamp(24px, 3vw, 40px);
+  }
+  figure {
+    margin: 0;
+    display: grid;
+    gap: 20px;
+  }
+  blockquote {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(20px, 1.8vw, 24px);
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+  }
+  li:first-child blockquote {
+    font-size: clamp(24px, 2.6vw, 34px);
+  }
+  figcaption {
+    display: grid;
+    font-size: 15px;
+  }
+  .who {
+    font-weight: 600;
+  }
+  .logos {
+    margin-top: clamp(40px, 6vw, 72px);
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .logo-ph {
+    display: grid;
+    place-items: center;
+    height: 56px;
+    border: 1.5px dashed var(--line);
+    border-radius: 8px;
+    color: var(--steel);
+    font-size: 12.5px;
+  }
+  @media (max-width: 900px) {
+    .quotes {
+      grid-template-columns: 1fr;
+    }
+    .logos {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>

@@ -1,0 +1,35 @@
+---
+import Base from '../layouts/Base.astro';
+import Calculator from '../components/Calculator.astro';
+import Faq from '../components/Faq.astro';
+import { breadcrumbSchema, faqSchema } from '../data/schema';
+const faq = [
+  {
+    q: 'How is the yearly cost of admin calculated?',
+    a: 'Team size multiplied by hours lost per person each week, the cost of an hour, and 48 working weeks.',
+  },
+  {
+    q: 'Where does the 40% saving come from?',
+    a: 'It is a conservative planning assumption for time lost to re-typing, chasing documents and searching for information once those steps live in one system. Your result depends on your processes.',
+  },
+  {
+    q: 'What counts as admin time?',
+    a: 'Re-entering client details, chasing signatures and documents, building quotes and invoices by hand, updating spreadsheets, and answering “where is this up to?” questions.',
+  },
+];
+---
+
+<Base
+  title="Admin cost calculator for service businesses | Bespoq"
+  description="Work out what admin costs your team each year, and how much a CRM that fits your industry could give back. Free calculator with a downloadable report."
+  schema={[
+    breadcrumbSchema([
+      { name: 'Home', path: '/' },
+      { name: 'Admin cost calculator', path: '/roi-calculator' },
+    ]),
+    faqSchema(faq),
+  ]}
+>
+  <Calculator standalone />
+  <Faq items={faq} heading="How the calculator works" />
+</Base>

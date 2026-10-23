@@ -1,0 +1,89 @@
+---
+/** Question-style headings with direct answers (AEO). Pair with faqSchema() on the page. */
+interface Props {
+  items: { q: string; a: string }[];
+  heading?: string;
+}
+const { items, heading = 'Questions people ask' } = Astro.props;
+---
+
+<section class="section" aria-labelledby="faq-title">
+  <div class="wrap layout">
+    <h2 class="h2" id="faq-title">{heading}</h2>
+    <div class="list">
+      {
+        items.map((f) => (
+          <details>
+            <summary>
+              <h3>{f.q}</h3>
+              <span class="icon" aria-hidden="true" />
+            </summary>
+            <p class="muted">{f.a}</p>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: clamp(32px, 6vw, 96px);
+  }
+  details {
+    border-bottom: 1px solid var(--line);
+  }
+  details:first-child {
+    border-top: 1px solid var(--line);
+  }
+  summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding-block: 22px;
+    cursor: pointer;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary h3 {
+    font-family: var(--font-body);
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.35;
+  }
+  .icon {
+    position: relative;
+    flex: 0 0 22px;
+    height: 22px;
+  }
+  .icon::before,
+  .icon::after {
+    content: '';
+    position: absolute;
+    inset: 10px 3px auto;
+    height: 2px;
+    background: var(--ink);
+    transition: transform 200ms var(--ease-out);
+  }
+  .icon::after {
+    transform: rotate(90deg);
+  }
+  details[open] .icon::after {
+    transform: rotate(0deg);
+  }
+  details p {
+    padding-bottom: 22px;
+    max-width: 64ch;
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

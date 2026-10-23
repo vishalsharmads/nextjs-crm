@@ -1,0 +1,40 @@
+---
+/** Wordmark: "bespoq" with the q's tail drawn as a tape-yellow stitch. */
+interface Props {
+  tone?: 'light' | 'dark';
+}
+const { tone = 'dark' } = Astro.props;
+---
+
+<span class:list={['logo', tone]} aria-label="Bespoq">
+  <span aria-hidden="true">bespo<span class="q">q</span></span>
+</span>
+
+<style>
+  .logo {
+    font-family: var(--font-display);
+    font-weight: 750;
+    font-size: 26px;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+  .light {
+    color: var(--chalk);
+  }
+  .dark {
+    color: var(--ink);
+  }
+  .q {
+    position: relative;
+  }
+  .q::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0.42em;
+    bottom: -0.12em;
+    width: 0.62em;
+    height: 3px;
+    background-image: linear-gradient(90deg, var(--tape) 60%, transparent 0);
+    background-size: 6px 3px;
+  }
+</style>

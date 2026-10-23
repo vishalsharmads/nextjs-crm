@@ -1,0 +1,93 @@
+---
+import Base from '../../layouts/Base.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import { articles, type Article } from '../../data/articles';
+import { articleSchema, breadcrumbSchema } from '../../data/schema';
+
+export function getStaticPaths() {
+  return articles.map((article) => ({ params: { slug: article.slug }, props: { article } }));
+}
+const { article: a } = Astro.props as { article: Article };
+const fmt = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' });
+---
+
+<Base
+  title={`${a.title} | Bespoq`}
+  description={a.description}
+  schema={[
+    articleSchema({ title: a.title, description: a.description, path: `/resources/${a.slug}`, date: a.date }),
+    breadcrumbSchema([
+      { name: 'Home', path: '/' },
+      { name: 'Resources', path: '/resources' },
+      { name: a.title, path: `/resources/${a.slug}` },
+    ]),
+  ]}
+>
+  <article class="section">
+    <div class="wrap narrow">
+      <nav aria-label="Breadcrumb" class="crumbs"><a href="/resources">Resources</a></nav>
+      <h1 class="h1">{a.title}</h1>
+      <p class="meta">Published <time datetime={a.date}>{fmt.format(new Date(a.date))}</time></p>
+      <div class="answer">
+        <h2>The short answer</h2>
+        <p>{a.answer}</p>
+      </div>
+      {
+        a.sections.map((s) => (
+          <section>
+            <h2 class="h3">{s.heading}</h2>
+            {s.body.map((p) => (
+              <p>{p}</p>
+            ))}
+          </section>
+        ))
+      }
+    </div>
+  </article>
+  <CtaBand />
+</Base>
+
+<style>
+  .narrow {
+    max-width: 760px;
+    display: grid;
+    gap: 22px;
+  }
+  .crumbs a {
+    color: var(--mat);
+    font-weight: 600;
+  }
+  .meta {
+    color: var(--steel);
+    font-size: 15px;
+  }
+  .answer {
+    margin-block: 12px 20px;
+    padding: 24px 26px;
+    border-radius: 12px;
+    background: var(--mat);
+    color: var(--chalk);
+    display: grid;
+    gap: 8px;
+  }
+  .answer h2 {
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--tape);
+  }
+  .answer p {
+    font-size: 19px;
+    line-height: 1.55;
+  }
+  section {
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+  }
+  section p {
+    font-size: 18px;
+    line-height: 1.7;
+  }
+</style>

@@ -1,0 +1,43 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import CtaBand from '../components/CtaBand.astro';
+---
+
+<Base title="About Bespoq | The CRM, tailored" description="Bespoq builds CRMs that fit service businesses: configured per industry, owned by the business, and live in weeks.">
+  <PageHero
+    title="Software that fits, like a good suit"
+    lede="We started Bespoq after years of building custom CRMs for clinics, agencies, consultancies and coworking spaces. Every client needed something different, yet 90% of the work was the same. So we built that 90% once, and made the last 10% configuration."
+  />
+  <section class="section">
+    <div class="wrap prose">
+      <h2 class="h2">What we believe</h2>
+      <p>A CRM should use your words. Your team should never have to translate between how they work and how the software works.</p>
+      <p>Your data is yours. Every Bespoq customer gets their own instance and database, and can take everything with them at any time.</p>
+      <p>Good software is quiet. It does the admin so your team can do the work clients pay for.</p>
+      <p class="flag">Team, office locations and company details are placeholders until published.</p>
+    </div>
+  </section>
+  <CtaBand />
+</Base>
+
+<style>
+  .prose {
+    max-width: 760px;
+    display: grid;
+    gap: 18px;
+  }
+  .prose p {
+    font-size: 19px;
+    line-height: 1.65;
+  }
+  .flag {
+    justify-self: start;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--tape);
+    color: var(--tape-ink);
+    font-size: 13.5px !important;
+    font-weight: 600;
+  }
+</style>

@@ -1,0 +1,42 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import LeadForm from '../components/LeadForm.astro';
+import { site } from '../data/site';
+---
+
+<Base title="Contact Bespoq" description="Talk to the Bespoq team about a CRM tailored to your business, partnerships or support.">
+  <PageHero title="Talk to us" lede="Questions about fit, hosting, pricing or partnering. We reply within one business day." />
+  <section class="section">
+    <div class="wrap layout">
+      <div class="side">
+        <h2 class="h3">Email</h2>
+        <a class="link" href={`mailto:${site.email}`}>{site.email}</a>
+        <h2 class="h3">Offices</h2>
+        <p class="muted">United States and Australia (addresses placeholder).</p>
+      </div>
+      <LeadForm source="contact" submitLabel="Send message" successMessage="Thanks. We will reply within one business day." />
+    </div>
+  </section>
+</Base>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.6fr) minmax(0, 1.4fr);
+    gap: clamp(32px, 6vw, 96px);
+  }
+  .side {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+  .side h2:not(:first-child) {
+    margin-top: 20px;
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

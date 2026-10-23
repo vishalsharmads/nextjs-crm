@@ -1,0 +1,75 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import { site } from '../data/site';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Extra JSON-LD objects for this page (FAQPage, Product, BreadcrumbList…). */
+  schema?: object[];
+  ogImage?: string;
+}
+const { title, description, schema = [], ogImage = '/og.png' } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site).toString();
+const base = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: site.name,
+    url: Astro.site?.toString(),
+    logo: new URL('/favicon.svg', Astro.site).toString(),
+    email: site.email,
+    areaServed: ['US', 'AU'],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: site.name,
+    url: Astro.site?.toString(),
+  },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#0f3b2e" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={new URL(ogImage, Astro.site).toString()} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <script is:inline>
+      // Hide the hero's animated parts only when motion will run; release them after 3 s regardless.
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.documentElement.classList.add('motion');
+        setTimeout(() => document.documentElement.classList.add('motion-ready'), 3000);
+      }
+    </script>
+    {[...base, ...schema].map((s) => <script type="application/ld+json" set:html={JSON.stringify(s)} />)}
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <Nav />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+    <script>
+      import '../scripts/motion';
+    </script>
+  </body>
+</html>

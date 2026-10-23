@@ -1,0 +1,77 @@
+---
+import { features } from '../data/site';
+interface Props {
+  heading?: string;
+}
+const { heading = 'Everything a service business runs on, in one place' } = Astro.props;
+---
+
+<section class="section" aria-labelledby="modules-title">
+  <div class="wrap">
+    <div class="head">
+      <h2 class="h2" id="modules-title">{heading}</h2>
+      <p class="lede muted">Switch on what you need. Every module uses your industry’s words and the same records.</p>
+    </div>
+    <ul class="grid">
+      {
+        features.map((f, n) => (
+          <li class:list={['item', { wide: [0, 4, 6, 7].includes(n) }]}>
+            <h3 class="h3">{f.name}</h3>
+            <p class="muted">{f.body}</p>
+            <a class="link" href={`/features#${f.slug}`}>
+              More about {f.short.toLowerCase()}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .head {
+    display: grid;
+    gap: 16px;
+    max-width: 760px;
+    margin-bottom: clamp(32px, 5vw, 56px);
+  }
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: 1px solid var(--line);
+    border-inline-start: 1px solid var(--line);
+  }
+  .item {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+    padding: 28px 24px 32px;
+    border-inline-end: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .item.wide {
+    grid-column: span 2;
+    background: var(--chalk-2);
+  }
+  .item .link {
+    margin-top: 6px;
+    justify-self: start;
+    font-size: 15px;
+  }
+  @media (max-width: 1000px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 600px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+    .item.wide {
+      grid-column: auto;
+    }
+  }
+</style>

@@ -1,0 +1,196 @@
+---
+import Logo from './Logo.astro';
+import { nav } from '../data/site';
+const path = Astro.url.pathname;
+---
+
+<header class="nav" data-nav>
+  <div class="wrap bar">
+    <a href="/" class="home" aria-label="Bespoq home"><Logo /></a>
+    <nav aria-label="Main">
+      <ul class="links" id="nav-links">
+        {
+          nav.map((n) => (
+            <li>
+              <a href={n.href} aria-current={path.startsWith(n.href) ? 'page' : undefined}>
+                {n.label}
+              </a>
+            </li>
+          ))
+        }
+        <li class="mobile-only"><a href="/demo">Book a demo</a></li>
+      </ul>
+    </nav>
+    <div class="actions">
+      <a class="btn btn-ghost sm" href="/demo#live">Try a demo</a>
+      <a class="btn sm" href="/demo">Book a demo</a>
+      <button class="menu" type="button" aria-expanded="false" aria-controls="nav-links" data-menu>
+        <span class="visually-hidden">Menu</span>
+        <span class="bars" aria-hidden="true"></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<script>
+  const nav = document.querySelector<HTMLElement>('[data-nav]')!;
+  const button = nav.querySelector<HTMLButtonElement>('[data-menu]')!;
+  button.addEventListener('click', () => {
+    const open = button.getAttribute('aria-expanded') !== 'true';
+    button.setAttribute('aria-expanded', String(open));
+    nav.classList.toggle('open', open);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && nav.classList.contains('open')) {
+      nav.classList.remove('open');
+      button.setAttribute('aria-expanded', 'false');
+      button.focus();
+    }
+  });
+  // A hairline appears once the page scrolls under the bar.
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+</script>
+
+<style>
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgb(243 246 241 / 0.86);
+    backdrop-filter: saturate(140%) blur(12px);
+    border-bottom: 1px solid transparent;
+    transition: border-color 200ms ease;
+  }
+  .nav.scrolled {
+    border-bottom-color: var(--line);
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    height: 72px;
+  }
+  .home {
+    text-decoration: none;
+  }
+  .links {
+    display: flex;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .links a {
+    display: block;
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 15.5px;
+    color: var(--ink);
+    transition: background-color 160ms ease;
+  }
+  .links a[aria-current='page'] {
+    background: var(--chalk-2);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .links a:hover {
+      background: var(--chalk-2);
+    }
+  }
+  .actions {
+    margin-inline-start: auto;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .btn.sm {
+    min-height: 42px;
+    padding: 0 18px;
+    font-size: 15px;
+  }
+  .menu {
+    display: none;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .bars,
+  .bars::before,
+  .bars::after {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--ink);
+    margin-inline: auto;
+    transition: transform 200ms var(--ease-out);
+  }
+  .bars {
+    position: relative;
+  }
+  .bars::before,
+  .bars::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0;
+  }
+  .bars::before {
+    top: -7px;
+  }
+  .bars::after {
+    top: 7px;
+  }
+  .open .bars {
+    background: transparent;
+  }
+  .open .bars::before {
+    transform: translateY(7px) rotate(45deg);
+  }
+  .open .bars::after {
+    transform: translateY(-7px) rotate(-45deg);
+  }
+  .mobile-only {
+    display: none;
+  }
+
+  @media (max-width: 960px) {
+    .menu {
+      display: block;
+    }
+    .actions .btn-ghost {
+      display: none;
+    }
+    nav {
+      position: absolute;
+      inset-inline: 0;
+      top: 72px;
+    }
+    .links {
+      display: none;
+      flex-direction: column;
+      padding: 12px var(--gutter) 24px;
+      background: var(--chalk);
+      border-bottom: 1px solid var(--line);
+    }
+    .open .links {
+      display: flex;
+    }
+    .links a {
+      font-size: 20px;
+      padding: 12px 4px;
+    }
+    .mobile-only {
+      display: block;
+    }
+  }
+  @media (max-width: 480px) {
+    .actions .btn:not(.btn-ghost) {
+      display: none;
+    }
+  }
+</style>

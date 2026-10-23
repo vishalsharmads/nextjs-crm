@@ -1,0 +1,46 @@
+---
+interface Props {
+  heading?: string;
+  body?: string;
+}
+const {
+  heading = 'See it fitted to your business',
+  body = 'A 30-minute call: we set Bespoq up in your industry’s words while you watch, then answer every question about price, hosting and setup.',
+} = Astro.props;
+---
+
+<section class="section cta on-mat" aria-labelledby="cta-title">
+  <div class="wrap layout">
+    <h2 class="h1" id="cta-title">{heading}</h2>
+    <div class="side">
+      <p class="lede muted">{body}</p>
+      <div class="ctas">
+        <a class="btn btn-tape" href="/demo">Book a demo</a>
+        <a class="btn btn-ghost" href="/roi-calculator">Measure your admin cost</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: clamp(32px, 6vw, 88px);
+    align-items: end;
+  }
+  .side {
+    display: grid;
+    gap: 24px;
+  }
+  .ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

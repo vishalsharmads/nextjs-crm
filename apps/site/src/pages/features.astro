@@ -1,0 +1,146 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import Compare from '../components/Compare.astro';
+import CtaBand from '../components/CtaBand.astro';
+import { features } from '../data/site';
+import { breadcrumbSchema, softwareSchema } from '../data/schema';
+
+/** What each module does, in specifics a buyer can check off. */
+const detail: Record<string, string[]> = {
+  pipelines: [
+    'Rename people, organizations and deals to your industry’s words, everywhere',
+    'Your own pipeline stages, with Kanban and list views',
+    'Custom fields, layouts and saved views per team',
+    'Own, team or everyone access, set per role',
+  ],
+  'quotes-invoices': [
+    'A product and service price list with tax rates',
+    'Quotes clients accept online with a typed signature',
+    'One-click conversion from an accepted quote to an invoice',
+    'Partial payments, overdue alerts and a receivables widget',
+  ],
+  'client-portal': [
+    'Password-free sign-in with a single-use email link',
+    'Quotes, invoices, contracts and shared documents in one place',
+    'Online quote acceptance and document signing',
+    'File uploads and support requests from clients',
+  ],
+  bookings: [
+    'Rooms, desks, crews, chairs and equipment as bookable resources',
+    'Opening hours and capacity enforced',
+    'A day board in your business’s time zone',
+    'Double bookings refused, even when two people click at once',
+  ],
+  documents: [
+    'Templates with placeholders filled from the record',
+    'Drafts you edit, then share to the client portal',
+    'Signatures with name, time and a fingerprint of the content',
+    'Document checklists clients complete by uploading files',
+  ],
+  support: [
+    'Priorities with first-response and resolution targets',
+    'Internal notes and client-visible replies',
+    'Requests raised from the client portal',
+    'Overdue tickets flagged on the dashboard',
+  ],
+  automations: [
+    'When something happens, filter it, then act: update, notify, email, tag',
+    'Signed webhooks with retries for your other systems',
+    'A full REST API with scoped API keys',
+    'Web forms that create leads straight from your website',
+  ],
+  security: [
+    'Your own instance and database, hosted where you choose',
+    'Two-factor sign-in and enforced admin 2FA',
+    'An append-only audit log nobody can edit',
+    'Full export of your data at any time',
+  ],
+};
+---
+
+<Base
+  title="CRM features: quotes, invoices, client portal, bookings | Bespoq"
+  description="Everything in Bespoq: pipelines in your words, quotes to payments, a client portal, bookings, documents and e-signatures, a support desk, automations and data ownership."
+  schema={[
+    softwareSchema({ description: 'A configurable CRM with quotes, invoices, client portal, bookings, documents, support desk and automations.' }),
+    breadcrumbSchema([
+      { name: 'Home', path: '/' },
+      { name: 'Features', path: '/features' },
+    ]),
+  ]}
+>
+  <PageHero
+    title="Everything your service business runs on"
+    lede="Bespoq brings your clients, the work you win, the money you are owed and the documents you exchange into one system that uses your industry’s words. Switch modules on as you need them."
+  />
+  {
+    features.map((f) => (
+      <section class="section feature" id={f.slug} aria-labelledby={`${f.slug}-title`}>
+        <div class="wrap layout">
+          <div class="text">
+            <h2 class="h2" id={`${f.slug}-title`}>
+              {f.name}
+            </h2>
+            <p class="lede muted">{f.body}</p>
+          </div>
+          <ul class="points">
+            {detail[f.slug]!.map((p) => (
+              <li>{p}</li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    ))
+  }
+  <Compare />
+  <CtaBand />
+</Base>
+
+<style>
+  .feature {
+    scroll-margin-top: 72px;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(32px, 6vw, 96px);
+    align-items: start;
+  }
+  .text {
+    display: grid;
+    gap: 18px;
+  }
+  .points {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+  }
+  .points li {
+    position: relative;
+    padding: 16px 0 16px 34px;
+    border-top: 2px dashed rgb(18 32 27 / 0.2);
+    font-size: 18px;
+  }
+  .points li:last-child {
+    border-bottom: 2px dashed rgb(18 32 27 / 0.2);
+  }
+  /* a tailor's tick: a short stitched check */
+  .points li::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 4px;
+    top: 24px;
+    width: 14px;
+    height: 7px;
+    border-inline-start: 2.5px solid var(--mat);
+    border-bottom: 2.5px solid var(--mat);
+    transform: rotate(-45deg);
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

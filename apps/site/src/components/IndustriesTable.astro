@@ -1,0 +1,121 @@
+---
+/** The industries index as a real table: what each industry calls its clients and work, and its stages. */
+import { industries } from '../data/industries';
+interface Props {
+  heading?: string;
+  id?: string;
+}
+const { heading = 'Templates for nine industries', id = 'industries' } = Astro.props;
+---
+
+<section class="section" id={id} aria-labelledby={`${id}-title`}>
+  <div class="wrap">
+    <div class="head">
+      <h2 class="h2" id={`${id}-title`}>{heading}</h2>
+      <p class="lede muted">
+        Each template sets the vocabulary, pipeline, fields, roles and modules for that industry. It is a starting point;
+        everything can be adjusted.
+      </p>
+    </div>
+    <div class="scroll">
+      <table>
+        <caption class="visually-hidden">Industries Bespoq is set up for</caption>
+        <thead>
+          <tr>
+            <th scope="col">Industry</th>
+            <th scope="col">People you serve</th>
+            <th scope="col">Work you win</th>
+            <th scope="col">Pipeline stages</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            industries.map((i) => (
+              <tr>
+                <th scope="row">
+                  <a href={`/industries/${i.slug}`}>{i.name}</a>
+                </th>
+                <td>{i.vocab.contacts}</td>
+                <td>{i.vocab.deals}</td>
+                <td>
+                  <ol class="stages">
+                    {i.stages.map((s) => (
+                      <li>{s}</li>
+                    ))}
+                  </ol>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<style>
+  .head {
+    display: grid;
+    gap: 16px;
+    max-width: 760px;
+    margin-bottom: clamp(28px, 4vw, 48px);
+  }
+  .scroll {
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    min-width: 820px;
+    border-collapse: collapse;
+    font-size: 16px;
+  }
+  th,
+  td {
+    text-align: start;
+    padding: 18px 16px 18px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  thead th {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--steel);
+    border-bottom: 2px solid var(--ink);
+  }
+  tbody th a {
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-size: 21px;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+    background-image: linear-gradient(var(--tape), var(--tape));
+    background-size: 0% 0.32em;
+    background-position: 0 88%;
+    background-repeat: no-repeat;
+    transition: background-size 240ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    tbody tr:hover th a {
+      background-size: 100% 0.32em;
+    }
+  }
+  .stages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 14px;
+    color: var(--steel);
+  }
+  .stages li + li::before {
+    content: '';
+    display: inline-block;
+    width: 14px;
+    height: 0;
+    margin: 0 6px 4px;
+    border-top: 2px dashed rgb(18 32 27 / 0.3);
+    vertical-align: middle;
+  }
+</style>

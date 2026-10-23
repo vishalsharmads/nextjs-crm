@@ -1,0 +1,192 @@
+---
+/**
+ * Lead magnet: what admin costs a team today. Assumption (stated on the page): a fitted CRM
+ * removes 40% of the time lost to re-keying, chasing and searching. Email capture sends the report.
+ */
+import LeadForm from './LeadForm.astro';
+interface Props {
+  standalone?: boolean;
+}
+const { standalone = false } = Astro.props;
+const Heading = standalone ? 'h1' : 'h2';
+---
+
+<section class="section calc on-mat" id="calculator" aria-labelledby="calc-title" data-calc>
+  <div class="wrap layout">
+    <div class="intro">
+      <Heading class={standalone ? 'h1' : 'h2'} id="calc-title">Measure what admin is costing you</Heading>
+      <p class="lede muted">
+        Most service teams lose hours every week to re-typing details, chasing documents and hunting for the latest
+        version of a quote. Put in your numbers to see the yearly cost, and what a CRM that fits could give back.
+      </p>
+      <div class="inputs">
+        <div class="field">
+          <label for="calc-team">People on your team <output for="calc-team" data-out="team">12</output></label>
+          <input id="calc-team" type="range" min="1" max="200" value="12" data-in="team" />
+        </div>
+        <div class="field">
+          <label for="calc-hours">Hours each loses per week <output for="calc-hours" data-out="hours">5</output></label>
+          <input id="calc-hours" type="range" min="1" max="20" value="5" data-in="hours" />
+        </div>
+        <div class="field">
+          <label for="calc-rate">Cost of an hour, in dollars <output for="calc-rate" data-out="rate">$55</output></label>
+          <input id="calc-rate" type="range" min="20" max="250" step="5" value="55" data-in="rate" />
+        </div>
+      </div>
+    </div>
+    <div class="result">
+      <div class="readout">
+        <p class="muted">Admin costs you each year</p>
+        <p class="big" data-out="cost">$164,736</p>
+        <div class="stitch"></div>
+        <p class="muted">A CRM that fits could give back</p>
+        <p class="big tape-text" data-out="save">$65,894</p>
+        <p class="assume">Assumes 48 working weeks and a 40% cut in admin time. Your numbers will vary.</p>
+      </div>
+      <div class="report">
+        <h3 class="h3">Get the full report</h3>
+        <p class="muted">A one-page breakdown for your team, plus the setup checklist we use with new clients.</p>
+        <LeadForm source="calculator" compact tone="dark" submitLabel="Email me the report" successMessage="Sent. Check your inbox in the next few minutes." />
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const calc = document.querySelector<HTMLElement>('[data-calc]');
+  if (calc) {
+    const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    const val = (k: string) => Number(calc.querySelector<HTMLInputElement>(`[data-in="${k}"]`)!.value);
+    const out = (k: string, v: string) => calc.querySelectorAll(`[data-out="${k}"]`).forEach((o) => (o.textContent = v));
+    const update = () => {
+      const team = val('team');
+      const hours = val('hours');
+      const rate = val('rate');
+      const cost = team * hours * rate * 48;
+      out('team', String(team));
+      out('hours', String(hours));
+      out('rate', money.format(rate));
+      out('cost', money.format(cost));
+      out('save', money.format(cost * 0.4));
+      // Fill the range track to the thumb so the value reads at a glance.
+      calc.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((r) => {
+        const pct = ((Number(r.value) - Number(r.min)) / (Number(r.max) - Number(r.min))) * 100;
+        r.style.setProperty('--fill', `${pct}%`);
+      });
+    };
+    calc.addEventListener('input', update);
+    update();
+  }
+</script>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(32px, 6vw, 88px);
+  }
+  .intro {
+    display: grid;
+    gap: 24px;
+    align-content: start;
+  }
+  .inputs {
+    display: grid;
+    gap: 22px;
+    margin-top: 8px;
+  }
+  .field label {
+    display: flex;
+    justify-content: space-between;
+    color: var(--chalk);
+  }
+  output {
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    color: var(--tape);
+  }
+  input[type='range'] {
+    --fill: 50%;
+    appearance: none;
+    width: 100%;
+    height: 28px;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type='range']::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--tape) var(--fill), rgb(243 246 241 / 0.2) var(--fill));
+  }
+  input[type='range']::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--tape) var(--fill), rgb(243 246 241 / 0.2) var(--fill));
+  }
+  input[type='range']::-webkit-slider-thumb {
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    margin-top: -9px;
+    border-radius: 999px;
+    background: var(--chalk);
+    border: 3px solid var(--tape);
+    transition: transform 160ms var(--ease-out);
+  }
+  input[type='range']::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: var(--chalk);
+    border: 3px solid var(--tape);
+  }
+  input[type='range']:active::-webkit-slider-thumb {
+    transform: scale(1.12);
+  }
+  .result {
+    display: grid;
+    gap: 20px;
+    align-content: start;
+  }
+  .readout {
+    display: grid;
+    gap: 8px;
+    padding: clamp(24px, 3vw, 36px);
+    border-radius: 14px;
+    background: var(--mat-deep);
+    border: 1px solid var(--line-on-mat);
+  }
+  .big {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(40px, 5vw, 64px);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .tape-text {
+    color: var(--tape);
+  }
+  .stitch {
+    margin-block: 12px;
+    color: var(--chalk);
+  }
+  .assume {
+    font-size: 13.5px;
+    color: rgb(243 246 241 / 0.6);
+    margin-top: 6px;
+  }
+  .report {
+    display: grid;
+    gap: 12px;
+    padding: clamp(24px, 3vw, 36px);
+    border-radius: 14px;
+    border: 1px solid var(--line-on-mat);
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

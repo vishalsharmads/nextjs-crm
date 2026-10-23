@@ -1,0 +1,95 @@
+---
+/** Bespoq vs a generic CRM vs a custom build: a quotable comparison table (AEO/GEO). */
+interface Props {
+  subject?: string;
+}
+const { subject = 'your business' } = Astro.props;
+const rows: [string, string, string, string][] = [
+  ['Speaks your industry’s language', 'Yes, from day one', 'After consultant setup', 'Yes'],
+  ['Time to go live', 'Weeks', 'Weeks to months', 'Months'],
+  ['Quotes, invoices, bookings, client portal', 'Included modules', 'Add-ons or extra apps', 'Built to order'],
+  ['Pricing', 'Fixed quote, no per-seat fees', 'Per seat, per month', 'Large build cost plus upkeep'],
+  ['Where your data lives', 'Your own database', 'Shared vendor cloud', 'Wherever it was built'],
+  ['Product updates', 'Included', 'Included', 'Paid change requests'],
+];
+---
+
+<section class="section" aria-labelledby="compare-title">
+  <div class="wrap">
+    <div class="head">
+      <h2 class="h2" id="compare-title">Bespoq, a generic CRM or a custom build?</h2>
+      <p class="lede muted">
+        For {subject}, the choice usually comes down to fit, time and cost. Here is how the three options compare.
+      </p>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"><span class="visually-hidden">Question</span></th>
+            <th scope="col" class="us">Bespoq</th>
+            <th scope="col">Generic CRM</th>
+            <th scope="col">Custom build</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            rows.map(([q, a, b, c]) => (
+              <tr>
+                <th scope="row">{q}</th>
+                <td class="us">{a}</td>
+                <td>{b}</td>
+                <td>{c}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<style>
+  .head {
+    display: grid;
+    gap: 16px;
+    max-width: 760px;
+    margin-bottom: clamp(28px, 4vw, 48px);
+  }
+  .scroll {
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    min-width: 720px;
+    border-collapse: collapse;
+  }
+  th,
+  td {
+    text-align: start;
+    padding: 16px 16px 16px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-size: 20px;
+    border-bottom: 2px solid var(--ink);
+  }
+  tbody th {
+    font-weight: 600;
+    width: 32%;
+  }
+  td {
+    color: var(--steel);
+  }
+  td.us {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .us {
+    background: rgb(242 194 48 / 0.16);
+    padding-inline-start: 16px;
+  }
+</style>
