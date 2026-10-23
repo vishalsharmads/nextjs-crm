@@ -1,0 +1,227 @@
+---
+/**
+ * How it works: three real steps, so numbering is information here.
+ * The sticky visual on the right switches state as each step is read (scripts/motion.ts).
+ */
+const steps = [
+  {
+    id: 'template',
+    title: 'Pick your industry template',
+    body: 'Start from a template built for your industry: its vocabulary, pipeline stages, fields, roles and modules, with sample data so the team can explore on day one.',
+  },
+  {
+    id: 'tailor',
+    title: 'Tailor it with us',
+    body: 'In a working session we adjust stages, fields and documents to how you actually work, add your logo, colors and domain, and import your existing contacts.',
+  },
+  {
+    id: 'live',
+    title: 'Go live with your team and clients',
+    body: 'Your team works in one place, and your clients get a portal for quotes, invoices, documents and requests. Typical time from first call to live: three weeks (placeholder).',
+  },
+];
+---
+
+<section class="section" aria-labelledby="steps-title" data-steps>
+  <div class="wrap">
+    <h2 class="h2 title" id="steps-title">How a fitting works</h2>
+    <div class="layout">
+      <ol class="steps">
+        {
+          steps.map((s, n) => (
+            <li class:list={['step', { active: n === 0 }]} data-step={s.id}>
+              <span class="n" aria-hidden="true">
+                {n + 1}
+              </span>
+              <div>
+                <h3 class="h3">{s.title}</h3>
+                <p class="muted">{s.body}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+      <div class="visual-wrap" aria-hidden="true">
+        <div class="visual on-mat" data-steps-visual data-state="template">
+          <div class="sheet">
+            <div class="sheet-top">
+              <span class="dot"></span>
+              <span class="label generic">Contacts</span>
+              <span class="label tailored">Patients</span>
+            </div>
+            <div class="rows">
+              <span class="r"><b class="generic">Opportunity</b><b class="tailored">Treatment plan</b></span>
+              <span class="r"><b class="generic">Stage 1</b><b class="tailored">Consult booked</b></span>
+              <span class="r"><b class="generic">Custom field</b><b class="tailored">Referring dentist</b></span>
+            </div>
+            <div class="live">
+              <span class="pill">Quote accepted online</span>
+              <span class="pill">Consent form signed</span>
+              <span class="pill">Invoice paid</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .title {
+    margin-bottom: clamp(32px, 5vw, 64px);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(32px, 6vw, 96px);
+  }
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: clamp(48px, 12vh, 140px);
+    padding-block: 4vh 20vh;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 20px;
+    opacity: 0.4;
+    transition: opacity 240ms ease;
+  }
+  .step.active {
+    opacity: 1;
+  }
+  .step > div {
+    display: grid;
+    gap: 12px;
+  }
+  .n {
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    border: 2px solid var(--ink);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 20px;
+  }
+  .step.active .n {
+    background: var(--tape);
+    border-color: var(--tape);
+    color: var(--tape-ink);
+  }
+  .visual-wrap {
+    position: relative;
+  }
+  .visual {
+    position: sticky;
+    top: 120px;
+    border-radius: 16px;
+    padding: clamp(24px, 4vw, 48px);
+    min-height: 380px;
+    display: grid;
+    place-items: center;
+  }
+  .sheet {
+    width: 100%;
+    max-width: 420px;
+    background: #fbfcfa;
+    color: var(--ink);
+    border-radius: 12px;
+    padding: 20px;
+    display: grid;
+    gap: 16px;
+    box-shadow: 0 24px 50px -20px rgb(0 0 0 / 0.55);
+  }
+  .sheet-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-size: 20px;
+  }
+  .dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: var(--steel);
+    transition: background-color 300ms ease;
+  }
+  .rows {
+    display: grid;
+    gap: 8px;
+  }
+  .r {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #f1f4f0;
+    font-size: 15px;
+  }
+  .r b {
+    font-weight: 600;
+  }
+  .live {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pill {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #dbe7e0;
+    color: var(--mat);
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+      opacity 240ms ease,
+      transform 240ms var(--ease-out);
+  }
+  /* State machine: template shows generic words; tailor swaps to the industry's; live adds activity. */
+  .tailored {
+    display: none;
+  }
+  [data-state='tailor'] .generic,
+  [data-state='live'] .generic {
+    display: none;
+  }
+  [data-state='tailor'] .tailored,
+  [data-state='live'] .tailored {
+    display: inline;
+  }
+  [data-state='tailor'] .dot,
+  [data-state='live'] .dot {
+    background: var(--tape);
+  }
+  [data-state='live'] .pill {
+    opacity: 1;
+    transform: none;
+  }
+  [data-state='live'] .pill:nth-child(2) {
+    transition-delay: 60ms;
+  }
+  [data-state='live'] .pill:nth-child(3) {
+    transition-delay: 120ms;
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+    .visual-wrap {
+      display: none;
+    }
+    .steps {
+      padding-block: 0;
+      gap: 40px;
+    }
+    .step {
+      opacity: 1;
+    }
+  }
+</style>

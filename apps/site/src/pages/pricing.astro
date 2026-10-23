@@ -1,0 +1,149 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import Faq from '../components/Faq.astro';
+import LeadForm from '../components/LeadForm.astro';
+import { breadcrumbSchema, faqSchema } from '../data/schema';
+
+const included = [
+  'Your industry template, configured with you',
+  'Your branding, domain and email sender',
+  'Every core module: pipelines, tasks, calendar, import and export, reports',
+  'Unlimited users: no per-seat fees',
+  'Product updates and security fixes',
+  'Data export at any time',
+];
+const factors = [
+  { title: 'Hosting', body: 'We host your instance, or you run it on your own server.' },
+  { title: 'Modules', body: 'Quotes and invoices, client portal, bookings, documents, support desk and inventory.' },
+  { title: 'Setup help', body: 'From a guided template setup to a full migration from your current system.' },
+];
+const faq = [
+  {
+    q: 'Why is there no price list?',
+    a: 'Because each business needs a different mix of hosting, modules and setup help. You get a fixed written quote after a 30-minute call, with no per-seat fees.',
+  },
+  {
+    q: 'Do you charge per user?',
+    a: 'No. Add as many team members as you need. Pricing is based on your instance, not your headcount.',
+  },
+  {
+    q: 'Is there a long contract?',
+    a: 'Plans run month to month or yearly. Your data is always exportable, so you are never locked in.',
+  },
+];
+---
+
+<Base
+  title="Pricing: fixed quotes, no per-seat fees | Bespoq"
+  description="Bespoq pricing is a fixed quote based on hosting, modules and setup help, with unlimited users and no per-seat fees. Book a call for your quote."
+  schema={[
+    breadcrumbSchema([
+      { name: 'Home', path: '/' },
+      { name: 'Pricing', path: '/pricing' },
+    ]),
+    faqSchema(faq),
+  ]}
+>
+  <PageHero
+    title="One fixed quote. No per-seat fees."
+    lede="Bespoq is priced per business, not per person. Tell us how you work and we will send a fixed written quote within one business day."
+  />
+  <section class="section">
+    <div class="wrap layout">
+      <div>
+        <h2 class="h2">Always included</h2>
+        <ul class="checks">
+          {included.map((i) => <li>{i}</li>)}
+        </ul>
+      </div>
+      <div>
+        <h2 class="h2">What changes the price</h2>
+        <dl class="factors">
+          {
+            factors.map((f) => (
+              <div>
+                <dt class="h3">{f.title}</dt>
+                <dd class="muted">{f.body}</dd>
+              </div>
+            ))
+          }
+        </dl>
+      </div>
+    </div>
+  </section>
+  <section class="section">
+    <div class="wrap form-wrap">
+      <div class="intro">
+        <h2 class="h2">Get your quote</h2>
+        <p class="lede muted">A 30-minute call, then a fixed written quote. No obligation.</p>
+      </div>
+      <LeadForm source="pricing" submitLabel="Get my quote" />
+    </div>
+  </section>
+  <Faq items={faq} heading="Pricing questions" />
+</Base>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(32px, 6vw, 96px);
+  }
+  .layout > div {
+    display: grid;
+    gap: 24px;
+    align-content: start;
+  }
+  .checks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .checks li {
+    position: relative;
+    padding: 14px 0 14px 34px;
+    border-top: 2px dashed rgb(18 32 27 / 0.2);
+    font-size: 18px;
+  }
+  .checks li::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 4px;
+    top: 22px;
+    width: 14px;
+    height: 7px;
+    border-inline-start: 2.5px solid var(--mat);
+    border-bottom: 2.5px solid var(--mat);
+    transform: rotate(-45deg);
+  }
+  .factors {
+    margin: 0;
+    display: grid;
+  }
+  .factors > div {
+    display: grid;
+    gap: 6px;
+    padding-block: 18px;
+    border-top: 2px dashed rgb(18 32 27 / 0.2);
+  }
+  dd {
+    margin: 0;
+  }
+  .form-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: clamp(32px, 6vw, 96px);
+  }
+  .intro {
+    display: grid;
+    gap: 16px;
+    align-content: start;
+  }
+  @media (max-width: 900px) {
+    .layout,
+    .form-wrap {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

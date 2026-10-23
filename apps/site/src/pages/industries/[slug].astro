@@ -1,0 +1,378 @@
+---
+import Base from '../../layouts/Base.astro';
+import Mockup from '../../components/Mockup.astro';
+import Faq from '../../components/Faq.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import Compare from '../../components/Compare.astro';
+import { industries, type Industry } from '../../data/industries';
+import { demoLinks } from '../../data/site';
+import { breadcrumbSchema, faqSchema, softwareSchema } from '../../data/schema';
+
+export function getStaticPaths() {
+  return industries.map((industry) => ({ params: { slug: industry.slug }, props: { industry } }));
+}
+const { industry: i } = Astro.props as { industry: Industry };
+const demo = demoLinks[i.slug];
+const others = industries.filter((o) => o.slug !== i.slug);
+const lower = i.name.charAt(0).toLowerCase() + i.name.slice(1);
+const short = i.short.toLowerCase();
+---
+
+<Base
+  title={i.metaTitle}
+  description={i.metaDescription}
+  schema={[
+    softwareSchema({ description: i.answer, audience: i.name }),
+    breadcrumbSchema([
+      { name: 'Home', path: '/' },
+      { name: 'Industries', path: '/industries' },
+      { name: i.name, path: `/industries/${i.slug}` },
+    ]),
+    faqSchema(i.faq),
+  ]}
+>
+  <section class="hero on-mat">
+    <div class="wrap layout">
+      <div class="copy">
+        <nav aria-label="Breadcrumb" class="crumbs">
+          <a href="/industries">Industries</a>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">{i.name}</span>
+        </nav>
+        <h1 class="h1 title">The CRM for {lower}</h1>
+        <p class="lede muted">{i.answer}</p>
+        <div class="ctas">
+          <a class="btn btn-tape" href="/demo">Book a demo</a>
+          {
+            demo ? (
+              <a class="btn btn-ghost" href={demo}>
+                Try the {i.short.toLowerCase()} demo
+              </a>
+            ) : (
+              <a class="btn btn-ghost" href="/demo#live" title="Live demo link coming soon (placeholder)">
+                Try the {i.short.toLowerCase()} demo
+              </a>
+            )
+          }
+        </div>
+      </div>
+      <div class="product">
+        <Mockup industry={i} />
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap two">
+      <h2 class="h2">Where {i.short.toLowerCase()} teams lose time</h2>
+      <dl class="ruled">
+        {
+          i.pains.map((p) => (
+            <div class="row">
+              <dt class="h3">{p.title}</dt>
+              <dd class="muted">{p.body}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="head">
+        <h2 class="h2">Your pipeline, in your words</h2>
+        <p class="lede muted">
+          In Bespoq your team works with {i.vocab.contacts.toLowerCase()} and {i.vocab.deals.toLowerCase()}, not
+          “contacts” and “deals”. The {short} template starts with these stages, and you can rename, add or remove any of
+          them.
+        </p>
+      </div>
+      <ol class="track">
+        {
+          i.stages.map((s, n) => (
+            <li>
+              <span class="dot" aria-hidden="true" />
+              <span class="step">Stage {n + 1}</span>
+              <span class="stage">{s}</span>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap two">
+      <div class="stack">
+        <h2 class="h2">What the {short} template includes</h2>
+        <p class="lede muted">Modules switched on for {short}. Anything else can be added later.</p>
+      </div>
+      <ul class="mods">
+        {
+          i.modules.map((m) => (
+            <li>
+              <h3>{m.name}</h3>
+              <p class="muted">{m.use}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="section day-section">
+    <div class="wrap two">
+      <h2 class="h2">A day with Bespoq</h2>
+      <ol class="day">
+        {
+          i.day.map((d) => (
+            <li>
+              <span class="time">{d.time}</span>
+              <p>{d.what}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <Compare subject={lower} />
+
+  <Faq items={i.faq} heading={`Questions from ${i.short.toLowerCase()} teams`} />
+
+  <section class="section">
+    <div class="wrap">
+      <h2 class="h3 more-title">Other industries</h2>
+      <ul class="others">
+        {
+          others.map((o) => (
+            <li>
+              <a href={`/industries/${o.slug}`}>{o.name}</a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <CtaBand heading={`See Bespoq set up for ${lower}`} />
+</Base>
+
+<style>
+  .hero {
+    padding-block: clamp(40px, 6vw, 88px) clamp(64px, 8vw, 112px);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
+    gap: clamp(32px, 5vw, 72px);
+    align-items: center;
+  }
+  .copy {
+    display: grid;
+    gap: 22px;
+  }
+  .title {
+    font-size: clamp(38px, 4.6vw, 64px);
+  }
+  .copy .lede {
+    font-size: clamp(17px, 1.35vw, 19px);
+  }
+  .crumbs {
+    display: flex;
+    gap: 8px;
+    font-size: 14.5px;
+    color: rgb(243 246 241 / 0.72);
+  }
+  .crumbs a {
+    color: var(--tape);
+  }
+  .ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .two {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(32px, 6vw, 96px);
+    align-items: start;
+  }
+  .stack,
+  .head {
+    display: grid;
+    gap: 16px;
+  }
+  .head {
+    max-width: 760px;
+    margin-bottom: clamp(32px, 5vw, 56px);
+  }
+  .ruled {
+    margin: 0;
+  }
+  .row {
+    display: grid;
+    gap: 8px;
+    padding-block: 22px;
+    border-top: 2px dashed rgb(18 32 27 / 0.22);
+  }
+  .row:last-child {
+    border-bottom: 2px dashed rgb(18 32 27 / 0.22);
+  }
+  dd {
+    margin: 0;
+  }
+  /* The pipeline as a stitched track */
+  .track {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    position: relative;
+  }
+  .track::before {
+    content: '';
+    position: absolute;
+    inset: 11px 0 auto;
+    height: 2px;
+    background-image: linear-gradient(90deg, var(--ink) 60%, transparent 0);
+    background-size: 14px 2px;
+    opacity: 0.35;
+  }
+  .track li {
+    position: relative;
+    display: grid;
+    gap: 6px;
+    padding-inline-end: 16px;
+  }
+  .dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--chalk);
+    border: 3px solid var(--mat);
+    margin-bottom: 10px;
+  }
+  .track li:last-child .dot {
+    background: var(--tape);
+    border-color: var(--tape-ink);
+  }
+  .step {
+    font-size: 14px;
+    color: var(--steel);
+  }
+  .stage {
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-size: clamp(20px, 2vw, 26px);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .mods {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .mods li {
+    background: var(--chalk);
+    padding: 22px;
+    display: grid;
+    gap: 6px;
+    align-content: start;
+  }
+  .mods li:last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+  .mods h3 {
+    font-size: 20px;
+    letter-spacing: -0.015em;
+  }
+  .day {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+  }
+  .day li {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 20px;
+    padding-block: 18px;
+    border-top: 1px solid var(--line);
+  }
+  .time {
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-size: 20px;
+    font-variant-numeric: tabular-nums;
+  }
+  .more-title {
+    margin-bottom: 20px;
+  }
+  .others {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .others a {
+    display: inline-block;
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 1.5px solid var(--line);
+    text-decoration: none;
+    font-weight: 500;
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .others a:hover {
+      border-color: var(--ink);
+      background: #fff;
+    }
+  }
+  @media (max-width: 1000px) {
+    .layout,
+    .two {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 760px) {
+    .track {
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+    .track::before {
+      inset: 0 auto 0 11px;
+      width: 2px;
+      height: auto;
+      background-image: linear-gradient(180deg, var(--ink) 60%, transparent 0);
+      background-size: 2px 14px;
+    }
+    .track li {
+      grid-template-columns: 24px 1fr;
+      column-gap: 16px;
+    }
+    .dot {
+      grid-row: span 2;
+      margin: 0;
+    }
+    .mods {
+      grid-template-columns: 1fr;
+    }
+    .day li {
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+  }
+</style>

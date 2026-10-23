@@ -1,0 +1,84 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageHero from '../../components/PageHero.astro';
+import { articles } from '../../data/articles';
+import { breadcrumbSchema } from '../../data/schema';
+const fmt = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' });
+---
+
+<Base
+  title="CRM guides for service businesses | Bespoq resources"
+  description="Practical guides on choosing, setting up and owning a CRM for a service business, from the team behind Bespoq."
+  schema={[
+    breadcrumbSchema([
+      { name: 'Home', path: '/' },
+      { name: 'Resources', path: '/resources' },
+    ]),
+  ]}
+>
+  <PageHero
+    title="Guides for choosing and running a CRM"
+    lede="Plain answers to the questions service businesses ask before they change CRM: what to look for, what it costs, and how to keep control of their data."
+  />
+  <section class="section">
+    <div class="wrap">
+      <ul class="list">
+        {
+          articles.map((a) => (
+            <li>
+              <a href={`/resources/${a.slug}`}>
+                <time datetime={a.date}>{fmt.format(new Date(a.date))}</time>
+                <h2 class="h3">{a.title}</h2>
+                <p class="muted">{a.description}</p>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--line);
+  }
+  .list a {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 32px;
+    row-gap: 8px;
+    padding-block: 28px;
+    border-bottom: 1px solid var(--line);
+    text-decoration: none;
+  }
+  time {
+    grid-row: span 2;
+    color: var(--steel);
+    font-size: 15px;
+    padding-top: 4px;
+  }
+  .list p {
+    max-width: 70ch;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .list a:hover h2 {
+      text-decoration: underline;
+      text-decoration-color: var(--tape);
+      text-decoration-thickness: 2px;
+      text-underline-offset: 5px;
+    }
+  }
+  @media (max-width: 700px) {
+    .list a {
+      grid-template-columns: 1fr;
+    }
+    time {
+      grid-row: auto;
+    }
+  }
+</style>

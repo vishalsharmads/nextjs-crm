@@ -1,0 +1,102 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageHero from '../../components/PageHero.astro';
+import IndustriesTable from '../../components/IndustriesTable.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import { industries } from '../../data/industries';
+import { breadcrumbSchema } from '../../data/schema';
+---
+
+<Base
+  title="Industry CRM templates for service businesses | Bespoq"
+  description="Bespoq CRM templates for real estate, clinics, law firms, advisers and brokers, construction, education, recruitment, immigration and coworking."
+  schema={[
+    breadcrumbSchema([
+      { name: 'Home', path: '/' },
+      { name: 'Industries', path: '/industries' },
+    ]),
+    {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      itemListElement: industries.map((i, n) => ({
+        '@type': 'ListItem',
+        position: n + 1,
+        name: `CRM for ${i.name.toLowerCase()}`,
+        url: `/industries/${i.slug}`,
+      })),
+    },
+  ]}
+>
+  <PageHero
+    title="A CRM cut for your industry"
+    lede="Pick your industry to see the vocabulary, pipeline and modules Bespoq starts with. Every template is a starting point that we tailor with you, so it fits how your team actually works."
+  />
+  <section class="section">
+    <div class="wrap">
+      <ul class="cards">
+        {
+          industries.map((i) => (
+            <li>
+              <a href={`/industries/${i.slug}`}>
+                <h2 class="h3">{i.name}</h2>
+                <p class="muted">
+                  {i.vocab.contacts} and {i.vocab.deals.toLowerCase()}, from {i.stages[0]!.toLowerCase()} to{' '}
+                  {i.stages.at(-1)!.toLowerCase()}.
+                </p>
+                <span class="go">See the {i.short.toLowerCase()} CRM</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+  <IndustriesTable heading="Compare the templates" id="compare-templates" />
+  <CtaBand heading="Not on the list? We tailor that too" body="Bespoq’s templates cover nine industries, but any service business with clients, work to win and documents to send can be fitted. Tell us how you work." />
+</Base>
+
+<style>
+  .cards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .cards a {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+    height: 100%;
+    padding: 28px 24px 30px;
+    background: var(--chalk);
+    text-decoration: none;
+    transition: background-color 200ms ease;
+  }
+  .go {
+    margin-top: 8px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--tape);
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 4px;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .cards a:hover {
+      background: #fff;
+    }
+  }
+  @media (max-width: 900px) {
+    .cards {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (max-width: 600px) {
+    .cards {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

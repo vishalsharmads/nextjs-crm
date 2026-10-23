@@ -1,0 +1,201 @@
+---
+/**
+ * Lead capture. Posts to the CRM's public web-form endpoint (PUBLIC_LEAD_ENDPOINT), so every
+ * lead lands in Bespoq itself. Map firstName, lastName, email, phone, companyName and the
+ * cf.industry / cf.team_size / cf.message / cf.source fields in that web form.
+ */
+import { industries } from '../data/industries';
+import { site } from '../data/site';
+interface Props {
+  source: string;
+  submitLabel?: string;
+  /** Shorter form for the report download. */
+  compact?: boolean;
+  successMessage?: string;
+  tone?: 'light' | 'dark';
+}
+const {
+  source,
+  submitLabel = 'Book a demo',
+  compact = false,
+  successMessage = 'Thanks. We will email you within one business day to find a time.',
+  tone = 'light',
+} = Astro.props;
+---
+
+<form class:list={['lead', tone]} data-lead data-endpoint={site.leadEndpoint} data-source={source} novalidate>
+  <div class="grid">
+    <div class="field">
+      <label for={`${source}-first`}>First name</label>
+      <input class="input" id={`${source}-first`} name="firstName" autocomplete="given-name" required />
+    </div>
+    {
+      !compact && (
+        <div class="field">
+          <label for={`${source}-last`}>Last name</label>
+          <input class="input" id={`${source}-last`} name="lastName" autocomplete="family-name" />
+        </div>
+      )
+    }
+    <div class="field">
+      <label for={`${source}-email`}>Work email</label>
+      <input class="input" id={`${source}-email`} name="email" type="email" autocomplete="email" required />
+    </div>
+    {
+      !compact && (
+        <>
+          <div class="field">
+            <label for={`${source}-company`}>Company</label>
+            <input class="input" id={`${source}-company`} name="companyName" autocomplete="organization" />
+          </div>
+          <div class="field">
+            <label for={`${source}-industry`}>Industry</label>
+            <select class="select input" id={`${source}-industry`} name="cf.industry">
+              <option value="">Choose one</option>
+              {industries.map((i) => (
+                <option value={i.slug}>{i.name}</option>
+              ))}
+              <option value="other">Something else</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for={`${source}-size`}>Team size</label>
+            <select class="select input" id={`${source}-size`} name="cf.team_size">
+              <option value="">Choose one</option>
+              <option>1–10</option>
+              <option>11–50</option>
+              <option>51–200</option>
+              <option>200+</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for={`${source}-message`}>What should your CRM do that today’s doesn’t? (optional)</label>
+            <textarea class="textarea" id={`${source}-message`} name="cf.message" />
+          </div>
+        </>
+      )
+    }
+  </div>
+  <div class="hp" aria-hidden="true">
+    <label>Leave this empty <input name="website_url" tabindex="-1" autocomplete="off" /></label>
+  </div>
+  <div class="foot">
+    <button class="btn btn-tape" type="submit">{submitLabel}</button>
+    <p class="note">We reply within one business day. No newsletters unless you ask.</p>
+  </div>
+  <p class="status" role="status" aria-live="polite" data-status></p>
+  <template data-success>{successMessage}</template>
+</form>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>('form[data-lead]').forEach((form) => {
+    const status = form.querySelector<HTMLElement>('[data-status]')!;
+    const success = form.querySelector<HTMLTemplateElement>('[data-success]')!.innerHTML;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = form.querySelector<HTMLInputElement>('input[name="email"]')!;
+      const first = form.querySelector<HTMLInputElement>('input[name="firstName"]')!;
+      for (const input of [first, email]) input.removeAttribute('aria-invalid');
+      if (!first.value.trim()) {
+        first.setAttribute('aria-invalid', 'true');
+        status.textContent = 'Add your first name so we know who to reply to.';
+        first.focus();
+        return;
+      }
+      if (!email.validity.valid || !email.value) {
+        email.setAttribute('aria-invalid', 'true');
+        status.textContent = 'Enter a work email like name@company.com.';
+        email.focus();
+        return;
+      }
+      const data: Record<string, string> = { 'cf.source': form.dataset.source ?? 'website' };
+      new FormData(form).forEach((v, k) => {
+        if (typeof v === 'string' && v.trim()) data[k] = v.trim();
+      });
+      const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+      button.disabled = true;
+      status.textContent = 'Sending…';
+      try {
+        const endpoint = form.dataset.endpoint;
+        if (endpoint) {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', accept: 'application/json' },
+            body: JSON.stringify(data),
+          });
+          if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            throw new Error(body?.error?.message ?? 'The form could not be sent.');
+          }
+        } else {
+          // PLACEHOLDER: no endpoint configured yet (set PUBLIC_LEAD_ENDPOINT). Nothing is sent.
+          console.info('Lead form (not sent, no endpoint configured):', data);
+        }
+        form.classList.add('sent');
+        status.innerHTML = success;
+      } catch (err) {
+        status.textContent = `${(err as Error).message} Try again, or email us directly.`;
+        button.disabled = false;
+      }
+    });
+  });
+</script>
+
+<style>
+  .lead {
+    display: grid;
+    gap: 20px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .full {
+    grid-column: 1 / -1;
+  }
+  .dark label {
+    color: var(--chalk);
+  }
+  .dark .note {
+    color: rgb(243 246 241 / 0.7);
+  }
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+  }
+  .note {
+    font-size: 14px;
+    color: var(--steel);
+  }
+  .status {
+    font-weight: 600;
+    min-height: 1.6em;
+  }
+  .hp {
+    position: absolute;
+    inset-inline-start: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  .sent .grid,
+  .sent .foot {
+    display: none;
+  }
+  .sent .status {
+    font-family: var(--font-display);
+    font-size: 24px;
+    line-height: 1.25;
+  }
+  [aria-invalid='true'] {
+    border-color: #b42318 !important;
+  }
+  @media (max-width: 640px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

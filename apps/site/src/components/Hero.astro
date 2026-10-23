@@ -1,0 +1,206 @@
+---
+/**
+ * Home hero: the cutting mat, the product and the measuring tape.
+ * Picking an industry on the tape re-tailors the product mockup in place (see scripts/motion.ts).
+ */
+import Mockup from './Mockup.astro';
+import { industries } from '../data/industries';
+const first = industries[0]!;
+const data = industries.map((i) => ({
+  slug: i.slug,
+  name: i.name,
+  short: i.short,
+  vocab: i.vocab,
+  stages: i.stages,
+  cards: i.cards,
+}));
+const caption = (i: (typeof industries)[number]) =>
+  `Set up for ${i.name.toLowerCase()}: ${i.vocab.contacts.toLowerCase()}, ${i.vocab.deals.toLowerCase()} and five stages from ${i.stages[0]!.toLowerCase()} to ${i.stages.at(-1)!.toLowerCase()}.`;
+---
+
+<section class="hero on-mat" data-hero>
+  <div class="wrap layout">
+    <div class="copy">
+      <h1 class="display" data-hero-title>
+        <span class="line"><span>The CRM,</span></span>
+        <span class="line"><span>tailored.</span></span>
+      </h1>
+      <p class="lede muted" data-hero-fade>
+        Bespoq is a CRM cut to fit your industry: your words, your workflow and your own database. Quotes, invoices,
+        bookings and a client portal included. Live in weeks, not months.
+      </p>
+      <div class="ctas" data-hero-fade>
+        <a class="btn btn-tape" href="/demo">Book a demo</a>
+        <a class="btn btn-ghost" href="#industries">See your industry</a>
+      </div>
+    </div>
+    <div class="product" data-hero-product>
+      <Mockup industry={first} id="hero-mockup" />
+      <p class="caption muted" data-k="caption" aria-live="polite">{caption(first)}</p>
+    </div>
+  </div>
+
+  <div class="tape-zone">
+    <p class="wrap tape-hint">Pick your industry. Watch the CRM re-tailor itself.</p>
+    <div class="tape" role="group" aria-label="Choose an industry to preview" data-tape>
+      <div class="ticks" aria-hidden="true"></div>
+      <div class="wrap marks">
+        {
+          industries.map((i, n) => (
+            <button type="button" class="mark" data-slug={i.slug} aria-pressed={n === 0 ? 'true' : 'false'}>
+              <span class="num" aria-hidden="true">
+                {(n + 1) * 10}
+              </span>
+              <span class="name">{i.short}</span>
+            </button>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+  <script type="application/json" id="tailor-data" set:html={JSON.stringify(data)} />
+</section>
+
+<style>
+  .hero {
+    position: relative;
+    overflow: hidden;
+    padding-top: clamp(40px, 5vw, 72px);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.25fr);
+    gap: clamp(32px, 5vw, 72px);
+    align-items: center;
+  }
+  .copy {
+    display: grid;
+    gap: 24px;
+  }
+  .display {
+    color: var(--chalk);
+  }
+  .line {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    padding-bottom: 0.06em;
+  }
+  .line > span {
+    display: inline-block;
+  }
+  .ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .product {
+    display: grid;
+    gap: 14px;
+  }
+  .caption {
+    font-size: 14.5px;
+    min-height: 2.6em;
+  }
+
+  /* ---------- The measuring tape ---------- */
+  .tape-zone {
+    margin-top: clamp(40px, 4.5vw, 64px);
+  }
+  .tape-hint {
+    font-size: 14.5px;
+    color: rgb(243 246 241 / 0.72);
+    margin-bottom: 10px;
+  }
+  .tape {
+    position: relative;
+    background: var(--tape);
+    color: var(--tape-ink);
+    box-shadow:
+      0 -1px 0 rgb(0 0 0 / 0.15) inset,
+      0 12px 30px -12px rgb(0 0 0 / 0.5);
+  }
+  /* ticks every 8px, longer every 40px: a real tape's markings */
+  .ticks {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 18px;
+    background-image:
+      repeating-linear-gradient(90deg, rgb(43 34 6 / 0.7) 0 1.5px, transparent 1.5px 40px),
+      repeating-linear-gradient(90deg, rgb(43 34 6 / 0.45) 0 1px, transparent 1px 8px);
+    background-size:
+      100% 18px,
+      100% 9px;
+    background-repeat: no-repeat;
+    pointer-events: none;
+  }
+  .marks {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+  }
+  .mark {
+    position: relative;
+    display: grid;
+    gap: 2px;
+    justify-items: start;
+    padding: 24px 8px 14px;
+    border: 0;
+    border-inline-start: 1.5px solid rgb(43 34 6 / 0.55);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: background-color 160ms ease;
+  }
+  .num {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.6;
+  }
+  .name {
+    font-weight: 600;
+    font-size: 14.5px;
+    line-height: 1.2;
+  }
+  .mark[aria-pressed='true'] {
+    background: var(--tape-ink);
+    color: var(--tape);
+  }
+  .mark[aria-pressed='true'] .num {
+    opacity: 1;
+  }
+  .mark:active {
+    transform: scale(0.98);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .mark[aria-pressed='false']:hover {
+      background: rgb(43 34 6 / 0.08);
+    }
+  }
+  .mark:focus-visible {
+    outline: 3px solid var(--chalk);
+    outline-offset: -3px;
+  }
+
+  @media (max-width: 1000px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 900px) {
+    .marks {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+      padding-inline: 0;
+    }
+    .mark {
+      flex: 0 0 132px;
+      scroll-snap-align: start;
+    }
+  }
+</style>

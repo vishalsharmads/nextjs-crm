@@ -1,0 +1,38 @@
+---
+import Base from '../layouts/Base.astro';
+import Hero from '../components/Hero.astro';
+import Fit from '../components/Fit.astro';
+import Steps from '../components/Steps.astro';
+import Modules from '../components/Modules.astro';
+import IndustriesTable from '../components/IndustriesTable.astro';
+import Calculator from '../components/Calculator.astro';
+import Proof from '../components/Proof.astro';
+import Faq from '../components/Faq.astro';
+import CtaBand from '../components/CtaBand.astro';
+import { homeFaq, site } from '../data/site';
+import { faqSchema, howToSchema, softwareSchema } from '../data/schema';
+---
+
+<Base
+  title="Bespoq | The CRM tailored to your industry"
+  description={site.description}
+  schema={[
+    softwareSchema({ description: site.description, audience: 'Service businesses in the US and Australia' }),
+    howToSchema('How to get a CRM tailored to your industry', [
+      'Pick your industry template',
+      'Tailor stages, fields, documents and branding',
+      'Go live with your team and clients',
+    ]),
+    faqSchema(homeFaq),
+  ]}
+>
+  <Hero />
+  <Fit />
+  <Steps />
+  <IndustriesTable />
+  <Modules />
+  <Calculator />
+  <Proof />
+  <Faq items={homeFaq} />
+  <CtaBand />
+</Base>
