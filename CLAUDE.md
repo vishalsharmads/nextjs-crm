@@ -12,7 +12,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 ## Non-negotiables
 
 1. **Not SaaS, not multi-tenant.** No `tenant_id`/`org_id`, no tenant scoping, no subdomain routing, billing, or super-admin. The top role is the org's Admin. The `organizations` table holds the client's _customers_, not tenants.
-2. **White-label.** No vendor, product, or company names anywhere user-visible (UI, titles, emails, PDFs, errors, API responses, docs). Everything comes from `settings`. Workspace packages are named `@app/*`. The fallback app name is "CRM".
+2. **White-label.** No vendor, product, or company names anywhere user-visible in the product (the marketing site in `apps/site` is the one place the vendor name "Bespoq" appears; it is on the brand deny list for the product) (UI, titles, emails, PDFs, errors, API responses, docs). Everything comes from `settings`. Workspace packages are named `@app/*`. The fallback app name is "CRM".
 3. **No hardcoded colors** in `apps/web/src`: no hex/rgb literals and no Tailwind palette classes (`bg-blue-500`). Use theme tokens (`bg-primary`, `text-ink`, `border-line`). The only exception is `theme/defaults.ts`.
 4. **Vocabulary everywhere.** All user-facing copy goes through i18n keys that interpolate entity labels (`"New {{entity.deal.singular}}"`). Never put an article before an entity name ("a/an Member").
 5. **Fixed core entities + custom fields.** No dynamic "define any entity" engine. Industry tables ship as modules (`m_<key>_*` tables).
@@ -51,6 +51,9 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 | i18next, react-i18next                                                                          | Locale files + vocabulary interpolation                                         |
 | qrcode                                                                                          | 2FA setup QR code                                                               |
 | @fontsource/*                                                                                   | Self-hosted fonts selectable from branding (no external font CDN)               |
+| astro, @astrojs/sitemap, @astrojs/check                                                         | Static marketing site (`apps/site`), sitemap, type checks                       |
+| gsap                                                                                            | Marketing-site animation (hero intro, industry re-tailoring)                    |
+| @fontsource-variable/*                                                                          | Self-hosted marketing-site fonts                                                |
 | vitest, supertest, @testing-library/*, jsdom, @playwright/test                                  | Tests                                                                           |
 | eslint, typescript-eslint, prettier, husky, lint-staged, commitlint, concurrently               | Tooling                                                                         |
 
@@ -59,6 +62,7 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 ```
 apps/api          Express API: src/{config,core,modules,blueprints,http,middleware,db,lib,cli}
 apps/web          React SPA: src/{app,components/{ui,data,fields,record},features,lib,modules}
+apps/site         Bespoq marketing site (Astro + GSAP), independent of the product; see apps/site/README.md
 packages/shared   Zod schemas, DTO types, permission keys, error codes, filter AST, contrast utils
 packages/blueprints  <key>/blueprint.json + schema + validator
 packages/module-sdk  manifest + ModuleContext types
@@ -71,6 +75,7 @@ scripts/ docs/
 
 ```
 npm run dev                      # API :4000 + web :5173 (web proxies /api)
+npm run dev:site | build:site    # Bespoq marketing site :4321 (apps/site)
 npm run build | lint | typecheck | test | test:e2e
 npm run db:migrate | db:rollback
 npm run install:instance -- --blueprint=coworking --admin-email=a@b.c --admin-password='...' [--app-name=..] [--sample-data]
