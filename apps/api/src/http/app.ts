@@ -12,10 +12,13 @@ import { apiLimiter } from '../middleware/rate-limit';
 import { errorHandler, notFoundHandler } from '../middleware/error-handler';
 import { createApiRouter, mountGroups, routeRegistry, type RouteGroup } from './routes';
 import { coreRouteGroups } from '../core/routes';
+import { mountStatic, type StaticOptions } from './static';
 
 export interface AppOptions {
   /** Extra route groups (enabled modules). */
   extraGroups?: RouteGroup[];
+  /** Also serve the built SPA (and optionally a static site) from this process. */
+  static?: StaticOptions;
 }
 
 export function createApp(opts: AppOptions = {}): Express {
@@ -78,6 +81,7 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use('/api/v1', router);
 
   app.use('/api', notFoundHandler);
+  if (opts.static) mountStatic(app, opts.static);
   app.use(errorHandler);
   return app;
 }

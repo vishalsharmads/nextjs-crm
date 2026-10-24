@@ -48,6 +48,10 @@ const schema = z.object({
   API_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(60).max(1_000_000).default(600),
   /** Show demo accounts (seeded with `demo:seed`) on the sign-in screen. Never on a client instance. */
   DEMO_MODE: bool.default(false),
+  /** Serve the built SPA from this process (hosts without nginx). Its path comes from APP_URL. */
+  WEB_DIR: z.string().default(''),
+  /** Serve a built static site (the marketing site) at the root, next to the SPA under APP_URL's path. */
+  SITE_DIR: z.string().default(''),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 
