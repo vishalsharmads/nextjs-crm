@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { ArrowDown, ArrowUp, Copy, ExternalLink, Plus, Trash2, Workflow, FileInput } from 'lucide-react';
 import type { CoreEntity, FilterCondition, FilterNode } from '@app/shared';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { appUrl } from '@/lib/app-url';
 import { formatDateTime, formatRelative } from '@/lib/format';
 import { useBoot, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
@@ -693,7 +694,7 @@ function FormEditor({
     mutationFn: () => apiDelete(`/forms/${form!.uuid}`),
     onSuccess: () => (onSaved(), onClose()),
   });
-  const publicUrl = form ? `${window.location.origin}/f/${form.uuid}` : null;
+  const publicUrl = form ? appUrl(`/f/${form.uuid}`) : null;
   const embed = publicUrl
     ? `<iframe src="${publicUrl}?embed=1" style="width:100%;min-height:560px;border:0" title="${name}"></iframe>`
     : '';

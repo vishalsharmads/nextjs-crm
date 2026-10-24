@@ -9,6 +9,7 @@ import { SettingsLayout } from '@/features/settings/layout';
 import { RecordListPage } from '@/features/records/list-page';
 import { RecordPage } from '@/features/records/record-page';
 import { ModuleOutlet, PublicModuleOutlet } from '@/modules/loader';
+import { basePath } from '@/lib/app-url';
 
 const lazyPage = <T extends Record<string, unknown>>(loader: () => Promise<T>, name: keyof T) =>
   lazy(() => loader().then((m) => ({ default: m[name] as React.ComponentType })));
@@ -114,41 +115,44 @@ function RouteError() {
   );
 }
 
-export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/forgot-password', element: <ForgotPasswordPage /> },
-  { path: '/reset-password', element: <ResetPasswordPage /> },
-  { path: '/accept-invite', element: <AcceptInvitePage /> },
-  { path: '/f/:uuid', element: page(<PublicFormPage />) },
-  { path: '/p/:moduleKey/*', element: <PublicModuleOutlet />, errorElement: <RouteError /> },
-  {
-    element: <RequireAuth />,
-    errorElement: <RouteError />,
-    children: [
-      {
-        element: <AppShell />,
-        children: [
-          { index: true, element: page(<DashboardPage />) },
-          { path: 'import/:route', element: page(<ImportPage />) },
-          { path: 'm/:moduleKey/*', element: <ModuleOutlet /> },
-          { path: 'contacts', element: <RecordListPage entity="contact" /> },
-          { path: 'contacts/:uuid', element: <RecordPage entity="contact" /> },
-          { path: 'organizations', element: <RecordListPage entity="organization" /> },
-          { path: 'organizations/:uuid', element: <RecordPage entity="organization" /> },
-          { path: 'leads', element: <RecordListPage entity="lead" /> },
-          { path: 'leads/:uuid', element: <RecordPage entity="lead" /> },
-          { path: 'deals', element: page(<DealsPage />) },
-          { path: 'deals/:uuid', element: <RecordPage entity="deal" /> },
-          { path: 'tasks', element: page(<TasksPage />) },
-          { path: 'calendar', element: page(<CalendarPage />) },
-          {
-            path: 'settings',
-            element: <SettingsLayout available={settingsPages.map((p) => p.path)} />,
-            children: settingsPages.map((p) => ({ path: p.path, element: page(p.element) })),
-          },
-          { path: '*', element: <Navigate to="/" replace /> },
-        ],
-      },
-    ],
-  },
-]);
+export const router = createBrowserRouter(
+  [
+    { path: '/login', element: <LoginPage /> },
+    { path: '/forgot-password', element: <ForgotPasswordPage /> },
+    { path: '/reset-password', element: <ResetPasswordPage /> },
+    { path: '/accept-invite', element: <AcceptInvitePage /> },
+    { path: '/f/:uuid', element: page(<PublicFormPage />) },
+    { path: '/p/:moduleKey/*', element: <PublicModuleOutlet />, errorElement: <RouteError /> },
+    {
+      element: <RequireAuth />,
+      errorElement: <RouteError />,
+      children: [
+        {
+          element: <AppShell />,
+          children: [
+            { index: true, element: page(<DashboardPage />) },
+            { path: 'import/:route', element: page(<ImportPage />) },
+            { path: 'm/:moduleKey/*', element: <ModuleOutlet /> },
+            { path: 'contacts', element: <RecordListPage entity="contact" /> },
+            { path: 'contacts/:uuid', element: <RecordPage entity="contact" /> },
+            { path: 'organizations', element: <RecordListPage entity="organization" /> },
+            { path: 'organizations/:uuid', element: <RecordPage entity="organization" /> },
+            { path: 'leads', element: <RecordListPage entity="lead" /> },
+            { path: 'leads/:uuid', element: <RecordPage entity="lead" /> },
+            { path: 'deals', element: page(<DealsPage />) },
+            { path: 'deals/:uuid', element: <RecordPage entity="deal" /> },
+            { path: 'tasks', element: page(<TasksPage />) },
+            { path: 'calendar', element: page(<CalendarPage />) },
+            {
+              path: 'settings',
+              element: <SettingsLayout available={settingsPages.map((p) => p.path)} />,
+              children: settingsPages.map((p) => ({ path: p.path, element: page(p.element) })),
+            },
+            { path: '*', element: <Navigate to="/" replace /> },
+          ],
+        },
+      ],
+    },
+  ],
+  { basename: basePath || '/' },
+);
