@@ -76,6 +76,7 @@ scripts/ docs/
 ```
 npm run dev                      # API :4000 + web :5173 (web proxies /api)
 npm run dev:site | build:site    # Bespoq marketing site :4321 (apps/site)
+npm run build:single | start:single  # site at /, app at /app, API, one port (demo / shared hosting; docs/deploy-single-server.md)
 npm run build | lint | typecheck | test | test:e2e
 npm run db:migrate | db:rollback
 npm run install:instance -- --blueprint=coworking --admin-email=a@b.c --admin-password='...' [--app-name=..] [--sample-data]
@@ -148,6 +149,7 @@ Run test suites one workspace at a time on this machine; running all three in pa
 - **Motion:** 120–200 ms ease-out, only in response to user actions.
 - **Auth tokens** live in httpOnly cookies only. Never use localStorage or sessionStorage for tokens. The API client sends `X-CSRF-Token` and does a single-flight refresh on 401.
 - **Module pages** link with absolute paths, and buttons inside forms that are not submits need `type="button"`. Restart `npm run dev` after adding a module folder (Vite globs module entries at startup). Module web entries live outside `apps/web`, so `styles.css` declares `@source '../../../modules'`; without it, Tailwind classes used only in modules are never generated.
+- **The app may run under a sub-path** (`/app` in the single-server setup, `APP_BASE_PATH`). Navigate with the router; links that leave it (new tabs, copyable URLs) use `appUrl()`/`basePath` from `lib/app-url.ts`, never a bare `/path` or `window.location.origin`.
 - **Shared-clock screens** (bookings board, front desk) show the workspace time zone via `lib/zoned.ts`, never the browser's, because the server validates in the workspace zone.
 - **Copy:** sentence case, active verbs. A button and its resulting toast use the same verb ("Archive" → "Archived").
 

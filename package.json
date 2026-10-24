@@ -14,6 +14,8 @@
     "dev": "concurrently -k -n api,web -c auto \"npm:dev -w @app/api\" \"npm:dev -w @app/web\"",
     "dev:site": "npm run dev -w @app/site",
     "build:site": "npm run build -w @app/site",
+    "build:single": "APP_BASE_PATH=/app npm run build -w @app/web && npm run build -w @app/api && npm run build -w @app/site",
+    "start:single": "WEB_DIR=../web/dist SITE_DIR=../site/dist npm run start -w @app/api",
     "build": "npm run build -w @app/api && npm run build -w @app/web",
     "lint": "eslint .",
     "format": "prettier --write .",

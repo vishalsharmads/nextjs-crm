@@ -2,6 +2,8 @@
 
 Each client gets their own instance: a directory (or server), a MySQL database, an `.env`, a systemd unit and an nginx server block. No containers are used.
 
+Demo servers and hosts without nginx (shared hosting) can run the website and the app from one Node process on one port instead: see [deploy-single-server.md](deploy-single-server.md). Client instances use the setup below.
+
 ## Requirements
 
 |               | Minimum                                                                                                                                               |
