@@ -52,13 +52,7 @@ const base = [
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <link rel="sitemap" href="/sitemap-index.xml" />
-    <script is:inline>
-      // Hide the hero's animated parts only when motion will run; release them after 3 s regardless.
-      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        document.documentElement.classList.add('motion');
-        setTimeout(() => document.documentElement.classList.add('motion-ready'), 3000);
-      }
-    </script>
+    <script is:inline src="/motion-flag.js"></script>
     {[...base, ...schema].map((s) => <script type="application/ld+json" set:html={JSON.stringify(s)} />)}
   </head>
   <body>

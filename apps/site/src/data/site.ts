@@ -6,14 +6,14 @@ export const site = {
     'Bespoq is a CRM configured around your industry: your words, your workflow and your data. Built for service businesses in the US and Australia, live in weeks without a custom build.',
   url: import.meta.env.SITE ?? 'https://bespoq.example',
   email: 'hello@bespoq.example',
-  /** Sign-in link for existing customers (their own instance). */
-  signInUrl: '/demo',
+  /** The demo app's sign-in page. Served at /app when the site and app share one server. */
+  signInUrl: import.meta.env.PUBLIC_APP_URL ?? '/app',
   /** Where lead forms post. Set PUBLIC_LEAD_ENDPOINT to the CRM web form submit URL. */
   leadEndpoint: import.meta.env.PUBLIC_LEAD_ENDPOINT ?? '',
 };
 
-/** PLACEHOLDER: live demo links per industry, to be supplied. */
-export const demoLinks: Record<string, string> = {};
+/** Live demo links per industry. PLACEHOLDER: add each industry as its demo instance goes live. */
+export const demoLinks: Record<string, string> = { coworking: site.signInUrl };
 
 export const nav = [
   { href: '/industries', label: 'Industries' },

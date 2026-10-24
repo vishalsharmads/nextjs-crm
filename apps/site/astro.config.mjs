@@ -9,4 +9,6 @@ export default defineConfig({
   build: { format: 'file' },
   integrations: [sitemap()],
   devToolbar: { enabled: false },
+  // Emit every script as a file so the strict CSP (script-src 'self') allows it.
+  vite: { build: { assetsInlineLimit: 0 } },
 });

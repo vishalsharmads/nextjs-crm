@@ -1,6 +1,6 @@
 ---
 import Logo from './Logo.astro';
-import { nav } from '../data/site';
+import { nav, site } from '../data/site';
 const path = Astro.url.pathname;
 ---
 
@@ -19,9 +19,11 @@ const path = Astro.url.pathname;
           ))
         }
         <li class="mobile-only"><a href="/demo">Book a demo</a></li>
+        <li class="mobile-only"><a href={site.signInUrl}>Sign in</a></li>
       </ul>
     </nav>
     <div class="actions">
+      <a class="signin" href={site.signInUrl}>Sign in</a>
       <a class="btn btn-ghost sm" href="/demo#live">Try a demo</a>
       <a class="btn sm" href="/demo">Book a demo</a>
       <button class="menu" type="button" aria-expanded="false" aria-controls="nav-links" data-menu>
@@ -106,6 +108,20 @@ const path = Astro.url.pathname;
     gap: 10px;
     align-items: center;
   }
+  .signin {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 15.5px;
+    color: var(--ink);
+    text-decoration: none;
+    transition: background-color 160ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .signin:hover {
+      background: var(--chalk-2);
+    }
+  }
   .btn.sm {
     min-height: 42px;
     padding: 0 18px;
@@ -162,7 +178,8 @@ const path = Astro.url.pathname;
     .menu {
       display: block;
     }
-    .actions .btn-ghost {
+    .actions .btn-ghost,
+    .signin {
       display: none;
     }
     nav {
