@@ -71,20 +71,31 @@ export function setMfaCookie(res: Response, token: string) {
   });
 }
 
+/** What a rotated session carries over from the row it replaces. */
+export interface SessionCarry {
+  familyId: string;
+  familyStartedAt: Date;
+  /** Last user activity, so a background refresh does not count as activity. */
+  lastUsedAt: Date;
+}
+
 /** Create a session (refresh-token family member) and set cookies. */
 export async function startSession(
   conn: Db,
   res: Response,
   req: Request,
   user: { id: number; uuid: string },
-  familyId = newUuid(),
+  carry?: SessionCarry,
 ): Promise<number> {
   const refresh = randomToken(32);
+  const now = new Date();
   const [sessionId] = await conn('sessions').insert({
     uuid: newUuid(),
     user_id: user.id,
     refresh_hash: sha256(refresh),
-    family_id: familyId,
+    family_id: carry?.familyId ?? newUuid(),
+    family_started_at: carry?.familyStartedAt ?? now,
+    last_used_at: carry?.lastUsedAt ?? now,
     user_agent: req.get('user-agent')?.slice(0, 500) ?? null,
     ip: req.ip ?? null,
     expires_at: new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 86_400_000),

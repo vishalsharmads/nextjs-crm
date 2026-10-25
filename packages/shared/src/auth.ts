@@ -12,6 +12,21 @@ export const loginSchema = z.object({
 
 export const totpCodeSchema = z.object({ code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code') });
 
+/** Second sign-in step: an authenticator code or a one-time recovery code. */
+export const mfaVerifySchema = z
+  .object({
+    code: z
+      .string()
+      .regex(/^\d{6}$/, 'Enter the 6-digit code')
+      .optional(),
+    recoveryCode: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9]{5}-?[A-Za-z0-9]{5}$/, 'Enter a recovery code like abcde-12345')
+      .optional(),
+  })
+  .refine((v) => !!v.code !== !!v.recoveryCode, 'Enter a code or a recovery code');
+
 export const forgotPasswordSchema = z.object({
   email: z
     .email()
@@ -37,6 +52,7 @@ export interface MeDto {
   locale: string | null;
   timezone: string | null;
   totpEnabled: boolean;
+  recoveryCodesLeft: number;
   roles: { key: string; name: string }[];
 }
 

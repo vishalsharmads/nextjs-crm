@@ -47,6 +47,8 @@ export interface PublicBranding extends Omit<Branding, 'emailFromAddress' | 'ema
   installed: boolean;
   /** Demo instances only (`DEMO_MODE=true` + `demo:seed`): accounts shown on the sign-in screen. Empty otherwise. */
   demoAccounts: { label: string; email: string; password: string }[];
+  /** Admin-written notice shown on the sign-in screen (compliance settings). Empty when unset. */
+  loginNotice: string;
 }
 
 /** Neutral factory theme. Every instance overrides it from settings. */

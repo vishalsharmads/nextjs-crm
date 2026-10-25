@@ -5,6 +5,7 @@ export * from './custom-fields';
 export * from './filters';
 export * from './branding';
 export * from './settings';
+export * from './compliance';
 export * from './auth';
 export * from './meta';
 export * from './records';

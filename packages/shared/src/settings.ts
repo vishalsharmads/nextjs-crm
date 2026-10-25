@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { complianceSettingsSchema } from './compliance';
 
 export const generalSettingsSchema = z.object({
   locale: z.string().min(2).max(10).default('en'),
@@ -74,6 +75,7 @@ export const SETTINGS_GROUPS = {
   deals: dealSettingsSchema,
   contacts: contactSettingsSchema,
   commerce: commerceSettingsSchema,
+  compliance: complianceSettingsSchema,
 } as const;
 export type SettingsGroup = keyof typeof SETTINGS_GROUPS;
 

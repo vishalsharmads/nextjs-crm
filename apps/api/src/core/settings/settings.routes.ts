@@ -3,9 +3,13 @@ import multer from 'multer';
 import {
   BRANDING_ASSET_SLOTS,
   SETTINGS_GROUPS,
+  applyFloors,
   brandingSchema,
   checkPaletteContrast,
+  floorViolations,
+  type ComplianceSettings,
   type PublicBranding,
+  type SecuritySettings,
   type SettingsGroup,
 } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
@@ -50,6 +54,7 @@ async function publicBranding(): Promise<PublicBranding> {
     locale: general.locale,
     installed: await isInstalled(),
     demoAccounts: await getDemoAccounts(),
+    loginNotice: (await getGroup('compliance').catch(() => ({ loginNotice: '' }))).loginNotice,
     assets: Object.fromEntries(
       Object.entries(assets).map(([slot, uuid]) => [
         slot,
@@ -247,9 +252,31 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
     body: z.record(z.string(), z.unknown()),
     handler: async ({ ctx, user, params, body }) => {
       const current = (await getRaw(params.group)) ?? {};
-      const next = SETTINGS_GROUPS[params.group].parse({ ...(current as object), ...body });
+      let next: object = SETTINGS_GROUPS[params.group].parse({ ...(current as object), ...body });
+      const before = await getGroup('compliance');
+      const profile = params.group === 'compliance' ? (next as ComplianceSettings).profile : before.profile;
+      // Changing the profile raises stored values to its floors; any other edit may not go below them.
+      const profileChanged = profile !== before.profile;
+      let raisedSecurity: SecuritySettings | null = null;
+      if (params.group === 'security' || params.group === 'compliance') {
+        if (profileChanged) {
+          next = applyFloors(params.group, next, profile);
+          raisedSecurity = applyFloors('security', await getGroup('security'), profile);
+        } else {
+          const issues = floorViolations(params.group, next, profile);
+          if (issues.length) throw new AppError('VALIDATION_FAILED', issues[0]!.message, issues);
+        }
+      }
       await db.transaction(async (trx) => {
         await setRaw(params.group, params.group, next, { userId: user.id, conn: trx });
+        if (raisedSecurity) {
+          await setRaw('security', 'security', raisedSecurity, { userId: user.id, conn: trx });
+          await audit(trx, ctx, {
+            action: 'settings.updated',
+            entity: 'settings',
+            diff: { group: 'security', reason: `profile:${profile}`, after: raisedSecurity },
+          });
+        }
         await audit(trx, ctx, {
           action: 'settings.updated',
           entity: 'settings',

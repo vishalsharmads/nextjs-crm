@@ -7,6 +7,7 @@ import type {
   FeatureSettings,
   GeneralSettings,
 } from './settings';
+import type { ComplianceProfile } from './compliance';
 
 export interface StageDto {
   uuid: string;
@@ -71,6 +72,8 @@ export interface BootstrapDto {
     deals: DealSettings;
     contacts: ContactSettings;
     commerce: CommerceSettings;
+    /** Effective session limits (after the compliance profile's floors), for the client idle timer. */
+    session: { idleTimeoutMinutes: number; profile: ComplianceProfile };
   };
   customFields: (CustomFieldDef & { level: VisibilityLevel })[];
   fieldGroups: FieldGroupDto[];
