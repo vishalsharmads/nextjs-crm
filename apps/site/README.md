@@ -21,6 +21,7 @@ npm run typecheck -w @app/site
 | `SITE_URL`             | Public URL, used for canonical links, sitemap, Open Graph and `llms.txt` (default `https://bespoq.example`)                                                                                     |
 | `PUBLIC_LEAD_ENDPOINT` | Where lead forms post: the CRM's public web form submit URL, e.g. `https://crm.bespoq.example/api/v1/public/forms/<form-uuid>/submit`. Unset: forms show success but send nothing (placeholder) |
 | `PUBLIC_APP_URL`       | The demo app's sign-in page, linked from "Sign in" and the coworking demo (default `/app`, the single-server setup)                                                                             |
+| `PUBLIC_DEMO_INFO_URL` | Where the site asks which industry the demo app shows (default `/api/v1/public/demo`, same server). Set empty to turn it off                                                                    |
 
 In the CRM web form, map `firstName`, `lastName`, `email`, `companyName` and the custom fields
 `cf.industry`, `cf.team_size`, `cf.message`, `cf.source`. When the site is served by the demo app's server
@@ -34,11 +35,11 @@ Pages run under a strict CSP (`script-src 'self'`), so every script is a file: n
 
 - Industries (pages, hero tape, tables, `llms.txt`): `src/data/industries.ts`
 - Features, home FAQ, nav, placeholders: `src/data/site.ts`
-- Live demo links per industry (coworking points at the demo app; add others as they go live): `demoLinks` in `src/data/site.ts`
+- Live demo: the site asks the demo app (`PUBLIC_DEMO_INFO_URL`, default `/api/v1/public/demo`) which industry it shows and links that one live; the others point to the booking form. `demoLinks` in `src/data/site.ts` holds fixed links for industries with their own always-on demo
 - Guides: `src/data/articles.ts`
 
 Placeholders to replace before launch: testimonials and logos (`src/components/Proof.astro`), the
-"three weeks" figure, demo links, office details, privacy and terms text, and `site.email`.
+"three weeks" figure, office details, privacy and terms text, and `site.email`.
 
 ## Deploy
 
