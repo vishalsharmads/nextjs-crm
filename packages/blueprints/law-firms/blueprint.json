@@ -1,0 +1,1654 @@
+{
+  "$schema": "../schema.json",
+  "key": "law-firms",
+  "name": "Law firm",
+  "version": "1.0.0",
+  "description": "Clients and matters from intake and conflict check to engagement and close, with engagement letters, client file requests, fee estimates, invoices and client questions.",
+  "settings": {
+    "features": {
+      "leads": true
+    },
+    "general": {
+      "currency": "USD"
+    },
+    "contacts": {
+      "sources": [
+        "Web form",
+        "Phone",
+        "Referral",
+        "Bar referral",
+        "Past client",
+        "Directory",
+        "Event",
+        "Other"
+      ],
+      "lifecycleStatuses": ["Prospective client", "Client", "Former client"]
+    },
+    "deals": {
+      "lostReasons": [
+        "Conflict of interest",
+        "Outside our practice areas",
+        "Chose another firm",
+        "Fees",
+        "No response"
+      ]
+    }
+  },
+  "vocabulary": {
+    "contact": {
+      "singular": "Client",
+      "plural": "Clients"
+    },
+    "organization": {
+      "singular": "Company",
+      "plural": "Companies"
+    },
+    "deal": {
+      "singular": "Matter",
+      "plural": "Matters"
+    }
+  },
+  "modules": ["documents", "portal", "quotes", "invoices", "tickets"],
+  "custom_field_groups": {
+    "contact": [
+      {
+        "key": "intake",
+        "label": "Intake"
+      }
+    ],
+    "deal": [
+      {
+        "key": "matter",
+        "label": "Matter details"
+      }
+    ]
+  },
+  "custom_fields": {
+    "contact": [
+      {
+        "key": "client_type",
+        "label": "Client type",
+        "type": "select",
+        "group": "intake",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "individual",
+            "label": "Individual"
+          },
+          {
+            "key": "business",
+            "label": "Business"
+          }
+        ]
+      },
+      {
+        "key": "id_verified",
+        "label": "ID verified",
+        "type": "boolean",
+        "group": "intake",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ],
+    "deal": [
+      {
+        "key": "practice_area",
+        "label": "Practice area",
+        "type": "select",
+        "group": "matter",
+        "required": true,
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "family",
+            "label": "Family"
+          },
+          {
+            "key": "estate_planning",
+            "label": "Wills and estates"
+          },
+          {
+            "key": "real_estate",
+            "label": "Real estate"
+          },
+          {
+            "key": "commercial",
+            "label": "Commercial"
+          },
+          {
+            "key": "employment",
+            "label": "Employment"
+          },
+          {
+            "key": "litigation",
+            "label": "Litigation"
+          },
+          {
+            "key": "immigration",
+            "label": "Immigration"
+          }
+        ]
+      },
+      {
+        "key": "fee_arrangement",
+        "label": "Fee arrangement",
+        "type": "select",
+        "group": "matter",
+        "filterable": true,
+        "options": [
+          {
+            "key": "hourly",
+            "label": "Hourly"
+          },
+          {
+            "key": "fixed_fee",
+            "label": "Fixed fee"
+          },
+          {
+            "key": "retainer",
+            "label": "Retainer"
+          },
+          {
+            "key": "contingency",
+            "label": "Contingency"
+          }
+        ]
+      },
+      {
+        "key": "conflict_cleared",
+        "label": "Conflict cleared",
+        "type": "boolean",
+        "group": "matter",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "opposing_party",
+        "label": "Opposing party",
+        "type": "text",
+        "group": "matter",
+        "filterable": true
+      },
+      {
+        "key": "next_key_date",
+        "label": "Next key date",
+        "type": "date",
+        "group": "matter",
+        "filterable": true,
+        "show_in_list": true,
+        "help_text": "Next hearing, filing deadline or closing date"
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "matters",
+      "name": "Matters",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        {
+          "key": "intake",
+          "name": "Intake",
+          "probability": 10,
+          "rotting_days": 3
+        },
+        {
+          "key": "conflict_check",
+          "name": "Conflict check",
+          "probability": 30,
+          "rotting_days": 2
+        },
+        {
+          "key": "engaged",
+          "name": "Engaged",
+          "probability": 80,
+          "rotting_days": 14
+        },
+        {
+          "key": "in_progress",
+          "name": "In progress",
+          "probability": 90,
+          "rotting_days": 30
+        },
+        {
+          "key": "closed",
+          "name": "Closed",
+          "probability": 100,
+          "is_won": true
+        },
+        {
+          "key": "declined",
+          "name": "Declined",
+          "probability": 0,
+          "is_lost": true
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "attorney",
+      "name": "Attorney",
+      "description": "Runs their own clients and matters, sends fee estimates and engagement letters",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.*",
+        "documents.documents.*",
+        "quotes.quotes.*",
+        "invoices.invoices.view",
+        "invoices.invoices.create",
+        "tickets.tickets.*"
+      ],
+      "scopes": {
+        "*": "own",
+        "core.organizations": "all"
+      }
+    },
+    {
+      "key": "paralegal",
+      "name": "Paralegal",
+      "description": "Handles intake and conflict checks, collects client files and answers client questions",
+      "permissions": [
+        "core.contacts.view",
+        "core.contacts.create",
+        "core.contacts.update",
+        "core.organizations.view",
+        "core.leads.*",
+        "core.deals.view",
+        "core.deals.update",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.view",
+        "documents.documents.*",
+        "quotes.quotes.view",
+        "invoices.invoices.view",
+        "tickets.tickets.*",
+        "portal.accounts.manage"
+      ],
+      "scopes": {
+        "*": "all",
+        "core.activities": "own"
+      }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": [
+        "full_name",
+        "email",
+        "phone",
+        "organization",
+        "cf.client_type",
+        "cf.id_verified",
+        "lifecycle_status",
+        "owner"
+      ]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": [
+        "title",
+        "contact",
+        "stage",
+        "cf.practice_area",
+        "cf.conflict_cleared",
+        "cf.next_key_date",
+        "value",
+        "owner"
+      ]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "pipeline_value",
+        "type": "pipeline_value",
+        "title": "Matters by stage",
+        "size": "lg",
+        "params": {
+          "pipeline": "matters"
+        }
+      },
+      {
+        "key": "key_dates",
+        "type": "date_window",
+        "title": "Key dates in the next 30 days",
+        "size": "md",
+        "params": {
+          "entity": "deal",
+          "field": "cf.next_key_date",
+          "days": 30,
+          "status": "open"
+        }
+      },
+      {
+        "key": "documents",
+        "type": "module:documents.awaiting",
+        "title": "Letters and files awaiting action",
+        "size": "md"
+      },
+      {
+        "key": "receivables",
+        "type": "module:invoices.receivables",
+        "title": "Outstanding fees",
+        "size": "sm"
+      },
+      {
+        "key": "open_tickets",
+        "type": "module:tickets.open_count",
+        "title": "Open client questions",
+        "size": "sm"
+      },
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      }
+    ]
+  },
+  "templates": [],
+  "sample_data": {
+    "organizations": [
+      {
+        "ref": "brightwater",
+        "name": "Brightwater Logistics",
+        "website": "https://brightwater-logistics.test",
+        "industry": "Transportation",
+        "days": -230,
+        "owner": "admin"
+      },
+      {
+        "ref": "cedar",
+        "name": "Cedar Hollow Builders",
+        "website": "https://cedarhollow.test",
+        "industry": "Construction",
+        "days": -190,
+        "owner": "attorney"
+      },
+      {
+        "ref": "quillfeather",
+        "name": "Quillfeather Bakery Co.",
+        "website": "https://quillfeather.test",
+        "industry": "Food and beverage",
+        "days": -120,
+        "owner": "attorney"
+      },
+      {
+        "ref": "ridgeline",
+        "name": "Ridgeline Dental Group",
+        "website": "https://ridgeline-dental.test",
+        "industry": "Healthcare",
+        "days": -10
+      },
+      {
+        "ref": "pinecrest",
+        "name": "Pinecrest Property Management",
+        "website": "https://pinecrest-pm.test",
+        "industry": "Real estate",
+        "days": -260,
+        "owner": "admin"
+      },
+      {
+        "ref": "northgate",
+        "name": "Northgate Credit Union",
+        "website": "https://northgate-cu.test",
+        "industry": "Financial services",
+        "days": -200,
+        "owner": "paralegal"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "hughes",
+        "first_name": "Evelyn",
+        "last_name": "Hughes",
+        "email": "evelyn.hughes@example.test",
+        "phone": "+1 312 555 0100",
+        "lifecycle_status": "Prospective client",
+        "source": "Web form",
+        "custom": {
+          "client_type": "individual",
+          "id_verified": false
+        },
+        "days": -2,
+        "owner": "paralegal"
+      },
+      {
+        "ref": "lena",
+        "first_name": "Lena",
+        "last_name": "Ortiz",
+        "email": "lena@ridgeline-dental.test",
+        "phone": "+1 312 555 0101",
+        "job_title": "Practice owner",
+        "organization": "ridgeline",
+        "lifecycle_status": "Prospective client",
+        "source": "Referral",
+        "custom": {
+          "client_type": "business",
+          "id_verified": false
+        },
+        "days": -6,
+        "owner": "attorney"
+      },
+      {
+        "ref": "okafor",
+        "first_name": "Chidi",
+        "last_name": "Okafor",
+        "email": "chidi.okafor@example.test",
+        "phone": "+1 312 555 0102",
+        "lifecycle_status": "Prospective client",
+        "source": "Referral",
+        "custom": {
+          "client_type": "individual",
+          "id_verified": true
+        },
+        "days": -9,
+        "owner": "attorney"
+      },
+      {
+        "ref": "darren",
+        "first_name": "Darren",
+        "last_name": "Cole",
+        "email": "darren.cole@brightwater-logistics.test",
+        "phone": "+1 312 555 0103",
+        "job_title": "Chief financial officer",
+        "organization": "brightwater",
+        "lifecycle_status": "Client",
+        "source": "Past client",
+        "custom": {
+          "client_type": "business",
+          "id_verified": true
+        },
+        "days": -225,
+        "owner": "admin"
+      },
+      {
+        "ref": "brandt",
+        "first_name": "Lukas",
+        "last_name": "Brandt",
+        "email": "lukas.brandt@example.test",
+        "phone": "+1 312 555 0104",
+        "lifecycle_status": "Client",
+        "source": "Web form",
+        "custom": {
+          "client_type": "individual",
+          "id_verified": true
+        },
+        "days": -32,
+        "owner": "attorney"
+      },
+      {
+        "ref": "delgado",
+        "first_name": "Maria",
+        "last_name": "Delgado",
+        "email": "maria.delgado@example.test",
+        "phone": "+1 312 555 0105",
+        "lifecycle_status": "Client",
+        "source": "Phone",
+        "custom": {
+          "client_type": "individual",
+          "id_verified": true
+        },
+        "days": -26,
+        "owner": "attorney"
+      },
+      {
+        "ref": "tanaka",
+        "first_name": "Kenji",
+        "last_name": "Tanaka",
+        "email": "kenji.tanaka@example.test",
+        "phone": "+1 312 555 0106",
+        "lifecycle_status": "Client",
+        "source": "Bar referral",
+        "custom": {
+          "client_type": "individual",
+          "id_verified": true
+        },
+        "days": -95,
+        "owner": "attorney"
+      },
+      {
+        "ref": "ruth",
+        "first_name": "Ruth",
+        "last_name": "Abernathy",
+        "email": "ruth@cedarhollow.test",
+        "phone": "+1 312 555 0107",
+        "job_title": "Owner",
+        "organization": "cedar",
+        "lifecycle_status": "Client",
+        "source": "Referral",
+        "custom": {
+          "client_type": "business",
+          "id_verified": true
+        },
+        "days": -185,
+        "owner": "attorney"
+      },
+      {
+        "ref": "sam",
+        "first_name": "Sam",
+        "last_name": "Whitlock",
+        "email": "sam@quillfeather.test",
+        "phone": "+1 312 555 0108",
+        "job_title": "Founder",
+        "organization": "quillfeather",
+        "lifecycle_status": "Client",
+        "source": "Event",
+        "custom": {
+          "client_type": "business",
+          "id_verified": true
+        },
+        "days": -118,
+        "owner": "attorney"
+      },
+      {
+        "ref": "silva",
+        "first_name": "Rafael",
+        "last_name": "Silva",
+        "email": "rafael.silva@example.test",
+        "phone": "+1 312 555 0109",
+        "lifecycle_status": "Former client",
+        "source": "Referral",
+        "custom": {
+          "client_type": "individual",
+          "id_verified": true
+        },
+        "days": -140,
+        "owner": "paralegal"
+      },
+      {
+        "ref": "whitfield",
+        "first_name": "Dorothy",
+        "last_name": "Whitfield",
+        "email": "dorothy.whitfield@example.test",
+        "phone": "+1 312 555 0110",
+        "lifecycle_status": "Former client",
+        "source": "Past client",
+        "custom": {
+          "client_type": "individual",
+          "id_verified": true
+        },
+        "days": -170,
+        "owner": "admin"
+      },
+      {
+        "ref": "arjun",
+        "first_name": "Arjun",
+        "last_name": "Mehta",
+        "email": "arjun@pinecrest-pm.test",
+        "phone": "+1 312 555 0111",
+        "job_title": "Director of operations",
+        "organization": "pinecrest",
+        "lifecycle_status": "Client",
+        "source": "Directory",
+        "custom": {
+          "client_type": "business",
+          "id_verified": true
+        },
+        "days": -255,
+        "owner": "admin"
+      },
+      {
+        "ref": "tessa",
+        "first_name": "Tessa",
+        "last_name": "Grant",
+        "email": "tessa@pinecrest-pm.test",
+        "job_title": "Leasing coordinator",
+        "organization": "pinecrest",
+        "lifecycle_status": "Client",
+        "source": "Directory",
+        "custom": {
+          "client_type": "business"
+        },
+        "days": -240,
+        "owner": "paralegal"
+      },
+      {
+        "ref": "noel",
+        "first_name": "Noel",
+        "last_name": "Barrett",
+        "email": "noel@northgate-cu.test",
+        "phone": "+1 312 555 0112",
+        "job_title": "Member services manager",
+        "organization": "northgate",
+        "lifecycle_status": "Client",
+        "source": "Event",
+        "custom": {
+          "client_type": "business"
+        },
+        "days": -198,
+        "owner": "admin"
+      },
+      {
+        "ref": "garrett",
+        "first_name": "Garrett",
+        "last_name": "Lyle",
+        "email": "garrett.lyle@example.test",
+        "lifecycle_status": "Former client",
+        "source": "Web form",
+        "custom": {
+          "client_type": "individual",
+          "id_verified": false
+        },
+        "days": -60,
+        "owner": "paralegal"
+      },
+      {
+        "ref": "priscilla",
+        "first_name": "Priscilla",
+        "last_name": "Wynn",
+        "email": "priscilla.wynn@example.test",
+        "phone": "+1 312 555 0113",
+        "lifecycle_status": "Former client",
+        "source": "Phone",
+        "custom": {
+          "client_type": "individual"
+        },
+        "days": -45,
+        "owner": "attorney"
+      },
+      {
+        "ref": "victor",
+        "first_name": "Victor",
+        "last_name": "Huang",
+        "email": "victor.huang@example.test",
+        "phone": "+1 312 555 0114",
+        "lifecycle_status": "Client",
+        "source": "Referral",
+        "custom": {
+          "client_type": "individual",
+          "id_verified": true
+        },
+        "days": -15,
+        "owner": "attorney"
+      },
+      {
+        "ref": "amelia",
+        "first_name": "Amelia",
+        "last_name": "Ross",
+        "email": "amelia.ross@brightwater-logistics.test",
+        "job_title": "General counsel",
+        "organization": "brightwater",
+        "lifecycle_status": "Client",
+        "source": "Past client",
+        "custom": {
+          "client_type": "business"
+        },
+        "days": -220,
+        "owner": "paralegal"
+      },
+      {
+        "ref": "jonas",
+        "first_name": "Jonas",
+        "last_name": "Park",
+        "email": "jonas.park@example.test",
+        "lifecycle_status": "Prospective client",
+        "source": "Directory",
+        "custom": {
+          "client_type": "individual"
+        },
+        "days": -3
+      }
+    ],
+    "leads": [
+      {
+        "ref": "l_mercer",
+        "first_name": "Dana",
+        "last_name": "Mercer",
+        "email": "dana.mercer@example.test",
+        "phone": "+1 312 555 0115",
+        "source": "Web form",
+        "status": "new",
+        "days": -1,
+        "owner": "paralegal"
+      },
+      {
+        "ref": "l_fontaine",
+        "first_name": "Luc",
+        "last_name": "Fontaine",
+        "email": "luc@fontaine-cafe.test",
+        "company_name": "Fontaine Cafe LLC",
+        "job_title": "Owner",
+        "source": "Phone",
+        "status": "contacted",
+        "days": -4,
+        "owner": "paralegal"
+      },
+      {
+        "ref": "l_osei",
+        "first_name": "Ama",
+        "last_name": "Osei",
+        "email": "ama.osei@example.test",
+        "phone": "+1 312 555 0116",
+        "source": "Referral",
+        "status": "qualified",
+        "days": -7,
+        "owner": "attorney"
+      },
+      {
+        "ref": "l_burke",
+        "first_name": "Colin",
+        "last_name": "Burke",
+        "email": "colin.burke@example.test",
+        "source": "Directory",
+        "status": "unqualified",
+        "days": -19
+      },
+      {
+        "ref": "l_harlow",
+        "first_name": "Nina",
+        "last_name": "Harlow",
+        "email": "nina@harlow-design.test",
+        "company_name": "Harlow Design Studio",
+        "source": "Event",
+        "status": "contacted",
+        "days": -12,
+        "owner": "attorney"
+      }
+    ],
+    "deals": [
+      {
+        "ref": "hughes",
+        "title": "Hughes v. Marlow – security deposit dispute",
+        "contact": "hughes",
+        "stage": "intake",
+        "value": 3500,
+        "days": -2,
+        "owner": "paralegal",
+        "custom": {
+          "practice_area": "litigation",
+          "fee_arrangement": "fixed_fee",
+          "opposing_party": "Marlow Rentals LLC"
+        }
+      },
+      {
+        "ref": "ridgeline",
+        "title": "Ridgeline Dental – associate employment agreements",
+        "contact": "lena",
+        "organization": "ridgeline",
+        "stage": "intake",
+        "value": 6000,
+        "days": -6,
+        "owner": "attorney",
+        "custom": {
+          "practice_area": "employment",
+          "fee_arrangement": "fixed_fee"
+        }
+      },
+      {
+        "ref": "okafor",
+        "title": "Okafor estate – probate",
+        "contact": "okafor",
+        "stage": "conflict_check",
+        "value": 9500,
+        "days": -9,
+        "stage_days": -1,
+        "owner": "attorney",
+        "custom": {
+          "practice_area": "estate_planning",
+          "fee_arrangement": "hourly",
+          "conflict_cleared": false,
+          "next_key_date": "{{date:+21}}"
+        }
+      },
+      {
+        "ref": "brightwater",
+        "title": "Brightwater – acquisition of Lakeshore Freight",
+        "contact": "darren",
+        "organization": "brightwater",
+        "stage": "conflict_check",
+        "value": 48000,
+        "days": -12,
+        "stage_days": -3,
+        "expected_close": "{{date:+90}}",
+        "owner": "admin",
+        "custom": {
+          "practice_area": "commercial",
+          "fee_arrangement": "hourly",
+          "conflict_cleared": false,
+          "opposing_party": "Lakeshore Freight Inc."
+        }
+      },
+      {
+        "ref": "brandt",
+        "title": "Brandt – commercial lease review",
+        "contact": "brandt",
+        "stage": "engaged",
+        "value": 4200,
+        "days": -30,
+        "stage_days": -8,
+        "owner": "attorney",
+        "custom": {
+          "practice_area": "real_estate",
+          "fee_arrangement": "fixed_fee",
+          "conflict_cleared": true,
+          "opposing_party": "Westgate Plaza Partners",
+          "next_key_date": "{{date:+9}}"
+        }
+      },
+      {
+        "ref": "delgado",
+        "title": "Delgado – custody modification",
+        "contact": "delgado",
+        "stage": "engaged",
+        "value": 12500,
+        "days": -25,
+        "stage_days": -5,
+        "owner": "attorney",
+        "custom": {
+          "practice_area": "family",
+          "fee_arrangement": "retainer",
+          "conflict_cleared": true,
+          "opposing_party": "Marco Delgado",
+          "next_key_date": "{{date:+18}}"
+        }
+      },
+      {
+        "ref": "tanaka",
+        "title": "Tanaka – visa refusal appeal",
+        "contact": "tanaka",
+        "stage": "in_progress",
+        "value": 8800,
+        "days": -92,
+        "stage_days": -70,
+        "owner": "attorney",
+        "custom": {
+          "practice_area": "immigration",
+          "fee_arrangement": "fixed_fee",
+          "conflict_cleared": true,
+          "next_key_date": "{{date:+12}}"
+        }
+      },
+      {
+        "ref": "cedar",
+        "title": "Cedar Hollow v. Summit Framing – unpaid invoices",
+        "contact": "ruth",
+        "organization": "cedar",
+        "stage": "in_progress",
+        "value": 22000,
+        "days": -180,
+        "stage_days": -150,
+        "owner": "attorney",
+        "custom": {
+          "practice_area": "litigation",
+          "fee_arrangement": "hourly",
+          "conflict_cleared": true,
+          "opposing_party": "Summit Framing LLC",
+          "next_key_date": "{{date:+26}}"
+        }
+      },
+      {
+        "ref": "quillfeather",
+        "title": "Quillfeather – trademark registration",
+        "contact": "sam",
+        "organization": "quillfeather",
+        "stage": "in_progress",
+        "value": 3200,
+        "days": -115,
+        "stage_days": -100,
+        "owner": "attorney",
+        "custom": {
+          "practice_area": "commercial",
+          "fee_arrangement": "fixed_fee",
+          "conflict_cleared": true,
+          "next_key_date": "{{date:+55}}"
+        }
+      },
+      {
+        "ref": "victor",
+        "title": "Huang – wrongful termination claim",
+        "contact": "victor",
+        "stage": "in_progress",
+        "value": 15000,
+        "days": -14,
+        "stage_days": -6,
+        "owner": "attorney",
+        "custom": {
+          "practice_area": "employment",
+          "fee_arrangement": "contingency",
+          "conflict_cleared": true,
+          "opposing_party": "Allbright Fulfillment Inc.",
+          "next_key_date": "{{date:+4}}"
+        }
+      },
+      {
+        "ref": "silva",
+        "title": "Silva – residential purchase, 418 Larch St",
+        "contact": "silva",
+        "stage": "closed",
+        "value": 1250,
+        "days": -135,
+        "stage_days": -62,
+        "owner": "paralegal",
+        "custom": {
+          "practice_area": "real_estate",
+          "fee_arrangement": "fixed_fee",
+          "conflict_cleared": true,
+          "next_key_date": "{{date:-62}}"
+        }
+      },
+      {
+        "ref": "whitfield",
+        "title": "Whitfield – will and revocable trust",
+        "contact": "whitfield",
+        "stage": "closed",
+        "value": 2400,
+        "days": -165,
+        "stage_days": -120,
+        "owner": "admin",
+        "custom": {
+          "practice_area": "estate_planning",
+          "fee_arrangement": "fixed_fee",
+          "conflict_cleared": true
+        }
+      },
+      {
+        "ref": "pinecrest",
+        "title": "Pinecrest – residential lease templates",
+        "contact": "arjun",
+        "organization": "pinecrest",
+        "stage": "closed",
+        "value": 5600,
+        "days": -250,
+        "stage_days": -190,
+        "owner": "admin",
+        "custom": {
+          "practice_area": "real_estate",
+          "fee_arrangement": "hourly",
+          "conflict_cleared": true
+        }
+      },
+      {
+        "ref": "lyle",
+        "title": "Lyle – landlord dispute",
+        "contact": "garrett",
+        "stage": "declined",
+        "value": 2500,
+        "days": -58,
+        "stage_days": -55,
+        "lost_reason": "Conflict of interest",
+        "owner": "paralegal",
+        "custom": {
+          "practice_area": "litigation",
+          "conflict_cleared": false,
+          "opposing_party": "Pinecrest Property Management"
+        }
+      },
+      {
+        "ref": "wynn",
+        "title": "Wynn – divorce",
+        "contact": "priscilla",
+        "stage": "declined",
+        "value": 9000,
+        "days": -44,
+        "stage_days": -30,
+        "lost_reason": "Fees",
+        "owner": "attorney",
+        "custom": {
+          "practice_area": "family",
+          "fee_arrangement": "retainer",
+          "conflict_cleared": true
+        }
+      }
+    ],
+    "activities": [
+      {
+        "type": "note",
+        "related": "deal:hughes",
+        "body": "<p>Web enquiry. Tenant moved out in August; landlord kept the full $3,200 deposit citing carpet damage. Has move-out photos and the signed lease.</p>",
+        "days": -2,
+        "owner": "paralegal"
+      },
+      {
+        "type": "call",
+        "related": "deal:hughes",
+        "subject": "Intake call with Evelyn Hughes",
+        "due_days": 0,
+        "priority": "high",
+        "days": -2,
+        "owner": "paralegal"
+      },
+      {
+        "type": "task",
+        "related": "deal:ridgeline",
+        "subject": "Run conflict check on Ridgeline Dental and its two associates",
+        "due_days": 1,
+        "days": -6,
+        "owner": "paralegal"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:ridgeline",
+        "subject": "Consultation with Lena Ortiz",
+        "due_days": 3,
+        "hour": 15,
+        "days": -5,
+        "owner": "attorney"
+      },
+      {
+        "type": "note",
+        "related": "deal:okafor",
+        "body": "<p>Father died in May without updating the 2009 will. Two siblings out of state; one may contest. Need the original will and death certificate.</p>",
+        "days": -8,
+        "owner": "attorney"
+      },
+      {
+        "type": "task",
+        "related": "deal:okafor",
+        "subject": "Clear conflict check: search all three siblings",
+        "due_days": -1,
+        "priority": "high",
+        "days": -8,
+        "owner": "paralegal"
+      },
+      {
+        "type": "task",
+        "related": "deal:brightwater",
+        "subject": "Conflict search on Lakeshore Freight and its officers",
+        "due_days": 0,
+        "priority": "high",
+        "days": -3,
+        "owner": "paralegal"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:brightwater",
+        "subject": "Deal kickoff with Darren and Amelia",
+        "due_days": 5,
+        "hour": 14,
+        "days": -2,
+        "owner": "admin"
+      },
+      {
+        "type": "call",
+        "related": "deal:brandt",
+        "subject": "Walk Lukas through the landlord's redlines",
+        "due_days": -2,
+        "done": true,
+        "outcome": "Wants to push back on the personal guarantee",
+        "days": -6,
+        "owner": "attorney"
+      },
+      {
+        "type": "task",
+        "related": "deal:brandt",
+        "subject": "Send marked-up lease to Westgate's counsel",
+        "due_days": 2,
+        "days": -1,
+        "owner": "attorney"
+      },
+      {
+        "type": "note",
+        "related": "deal:delgado",
+        "body": "<p>Engagement letter signed. Retainer of $5,000 received. Ex-spouse relocating to Denver; we file the motion to modify before the move date.</p>",
+        "days": -5,
+        "owner": "attorney"
+      },
+      {
+        "type": "task",
+        "related": "deal:delgado",
+        "subject": "Draft motion to modify parenting time",
+        "due_days": 6,
+        "priority": "high",
+        "days": -4,
+        "owner": "attorney"
+      },
+      {
+        "type": "note",
+        "related": "deal:tanaka",
+        "body": "<p>Refusal letter cites insufficient evidence of the employment offer. New employer letter and payslips uploaded through the portal.</p>",
+        "days": -20,
+        "owner": "attorney"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:tanaka",
+        "subject": "Hearing prep with Kenji",
+        "due_days": 8,
+        "hour": 16,
+        "days": -3,
+        "owner": "attorney"
+      },
+      {
+        "type": "task",
+        "related": "deal:tanaka",
+        "subject": "File supplementary evidence bundle",
+        "due_days": -3,
+        "priority": "high",
+        "days": -10,
+        "owner": "attorney"
+      },
+      {
+        "type": "call",
+        "related": "deal:cedar",
+        "subject": "Call Summit Framing's counsel about settlement",
+        "due_days": -6,
+        "done": true,
+        "outcome": "Offered 60% of the claim; client to decide",
+        "days": -9,
+        "owner": "attorney"
+      },
+      {
+        "type": "note",
+        "related": "deal:cedar",
+        "body": "<p>Ruth is open to 75% if paid within 30 days. Mediation set for next month if no deal.</p>",
+        "days": -6,
+        "owner": "attorney"
+      },
+      {
+        "type": "task",
+        "related": "deal:quillfeather",
+        "subject": "Respond to the trademark office action",
+        "due_days": 20,
+        "days": -12,
+        "owner": "attorney"
+      },
+      {
+        "type": "call",
+        "related": "deal:victor",
+        "subject": "Collect timeline of termination from Victor",
+        "due_days": -1,
+        "done": true,
+        "outcome": "Timeline received; two witnesses named",
+        "days": -6,
+        "owner": "attorney"
+      },
+      {
+        "type": "task",
+        "related": "deal:victor",
+        "subject": "Send demand letter to Allbright",
+        "due_days": 4,
+        "priority": "high",
+        "days": -2,
+        "owner": "attorney"
+      },
+      {
+        "type": "note",
+        "related": "deal:silva",
+        "body": "<p>Closed on schedule. Title policy issued; deed recorded with the county.</p>",
+        "days": -62,
+        "owner": "paralegal"
+      },
+      {
+        "type": "task",
+        "related": "deal:whitfield",
+        "subject": "Fund the revocable trust: send deed transfer to Dorothy",
+        "due_days": -110,
+        "done": true,
+        "days": -125,
+        "owner": "admin"
+      },
+      {
+        "type": "note",
+        "related": "deal:lyle",
+        "body": "<p>Declined: the landlord is an existing client (Pinecrest). Referred Garrett to the county bar referral service.</p>",
+        "days": -55,
+        "owner": "paralegal"
+      },
+      {
+        "type": "note",
+        "related": "deal:wynn",
+        "body": "<p>Priscilla chose a lower-cost mediator-only option. Keep the file in case mediation fails.</p>",
+        "days": -30,
+        "owner": "attorney"
+      },
+      {
+        "type": "call",
+        "related": "contact:jonas",
+        "subject": "Return Jonas's call about a small claims matter",
+        "due_days": -1,
+        "priority": "high",
+        "days": -3
+      },
+      {
+        "type": "task",
+        "related": "contact:tessa",
+        "subject": "Send updated late-fee clause to Tessa",
+        "due_days": 9,
+        "days": -2,
+        "owner": "paralegal"
+      },
+      {
+        "type": "note",
+        "related": "organization:northgate",
+        "body": "<p>Northgate refers members for wills and home closings. Quarterly referral lunch with Noel.</p>",
+        "days": -90,
+        "owner": "admin"
+      },
+      {
+        "type": "meeting",
+        "related": "organization:northgate",
+        "subject": "Quarterly referral lunch with Noel",
+        "due_days": 7,
+        "hour": 17,
+        "days": -5,
+        "owner": "admin"
+      },
+      {
+        "type": "task",
+        "subject": "Review trust-account reconciliation for the month",
+        "due_days": 3,
+        "days": -1,
+        "owner": "admin"
+      },
+      {
+        "type": "task",
+        "subject": "Update engagement letter template for the new hourly rates",
+        "due_days": -4,
+        "days": -15,
+        "owner": "admin"
+      }
+    ],
+    "requests": [
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "HR-PARTNER",
+          "name": "Partner time",
+          "unit": "hour",
+          "unitPrice": 450
+        },
+        "ref": "p_partner"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "HR-ASSOC",
+          "name": "Associate time",
+          "unit": "hour",
+          "unitPrice": 295
+        },
+        "ref": "p_assoc"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "HR-PARA",
+          "name": "Paralegal time",
+          "unit": "hour",
+          "unitPrice": 140
+        },
+        "ref": "p_para"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "FF-ESTATE",
+          "name": "Estate plan package",
+          "description": "Will, revocable trust, powers of attorney and healthcare directive",
+          "unit": "package",
+          "unitPrice": 2400
+        },
+        "ref": "p_estate"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "FF-CLOSING",
+          "name": "Residential closing",
+          "unit": "closing",
+          "unitPrice": 1250
+        },
+        "ref": "p_closing"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Fee estimate: commercial lease review",
+          "contactUuid": "{{contact:brandt}}",
+          "dealUuid": "{{deal:brandt}}",
+          "issueDate": "{{date:-14}}",
+          "validUntil": "{{date:+16}}",
+          "terms": "Fixed fee covers review, one round of redlines and a call with the landlord's counsel.",
+          "lines": [
+            {
+              "name": "Commercial lease review (fixed fee)",
+              "quantity": 1,
+              "unitPrice": 4200
+            }
+          ]
+        },
+        "ref": "q_brandt"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_brandt}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_brandt}}/accept",
+        "body": {
+          "acceptedByName": "Lukas Brandt"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Fee estimate: custody modification",
+          "contactUuid": "{{contact:delgado}}",
+          "dealUuid": "{{deal:delgado}}",
+          "issueDate": "{{date:-12}}",
+          "validUntil": "{{date:+18}}",
+          "terms": "Billed hourly against a $5,000 retainer. Court filing fees are passed through at cost.",
+          "lines": [
+            {
+              "productUuid": "{{req:p_partner}}",
+              "name": "Partner time",
+              "quantity": 18,
+              "unitPrice": 450
+            },
+            {
+              "productUuid": "{{req:p_para}}",
+              "name": "Paralegal time",
+              "quantity": 25,
+              "unitPrice": 140
+            }
+          ]
+        },
+        "ref": "q_delgado"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_delgado}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_delgado}}/accept",
+        "body": {
+          "acceptedByName": "Maria Delgado"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Fee estimate: acquisition of Lakeshore Freight",
+          "contactUuid": "{{contact:darren}}",
+          "organizationUuid": "{{organization:brightwater}}",
+          "dealUuid": "{{deal:brightwater}}",
+          "issueDate": "{{date:-2}}",
+          "validUntil": "{{date:+28}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_partner}}",
+              "name": "Partner time: due diligence and negotiation",
+              "quantity": 60,
+              "unitPrice": 450
+            },
+            {
+              "productUuid": "{{req:p_assoc}}",
+              "name": "Associate time: document review",
+              "quantity": 70,
+              "unitPrice": 295
+            }
+          ]
+        },
+        "ref": "q_brightwater"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_brightwater}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Fee estimate: Okafor estate probate",
+          "contactUuid": "{{contact:okafor}}",
+          "dealUuid": "{{deal:okafor}}",
+          "issueDate": "{{date:0}}",
+          "validUntil": "{{date:+30}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_assoc}}",
+              "name": "Associate time",
+              "quantity": 24,
+              "unitPrice": 295
+            },
+            {
+              "productUuid": "{{req:p_para}}",
+              "name": "Paralegal time",
+              "quantity": 15,
+              "unitPrice": 140
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Residential closing: 418 Larch St",
+          "contactUuid": "{{contact:silva}}",
+          "dealUuid": "{{deal:silva}}",
+          "issueDate": "{{date:-62}}",
+          "dueDate": "{{date:-48}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_closing}}",
+              "name": "Residential closing",
+              "quantity": 1,
+              "unitPrice": 1250
+            }
+          ]
+        },
+        "ref": "inv_silva"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_silva}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_silva}}/payments",
+        "body": {
+          "amount": 1250,
+          "paidOn": "{{date:-62}}",
+          "method": "bank_transfer",
+          "reference": "Paid from closing proceeds"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Visa appeal: second installment",
+          "contactUuid": "{{contact:tanaka}}",
+          "dealUuid": "{{deal:tanaka}}",
+          "issueDate": "{{date:-35}}",
+          "dueDate": "{{date:-5}}",
+          "lines": [
+            {
+              "name": "Visa refusal appeal (fixed fee), installment 2 of 2",
+              "quantity": 1,
+              "unitPrice": 4400
+            }
+          ]
+        },
+        "ref": "inv_tanaka"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_tanaka}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Cedar Hollow v. Summit Framing: last month",
+          "contactUuid": "{{contact:ruth}}",
+          "organizationUuid": "{{organization:cedar}}",
+          "dealUuid": "{{deal:cedar}}",
+          "issueDate": "{{date:-4}}",
+          "dueDate": "{{date:+26}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_partner}}",
+              "name": "Partner time",
+              "quantity": 6.5,
+              "unitPrice": 450
+            },
+            {
+              "productUuid": "{{req:p_assoc}}",
+              "name": "Associate time",
+              "quantity": 11,
+              "unitPrice": 295
+            },
+            {
+              "productUuid": "{{req:p_para}}",
+              "name": "Paralegal time",
+              "quantity": 4,
+              "unitPrice": 140
+            }
+          ]
+        },
+        "ref": "inv_cedar"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_cedar}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Commercial lease review",
+          "contactUuid": "{{contact:brandt}}",
+          "dealUuid": "{{deal:brandt}}",
+          "lines": [
+            {
+              "name": "Commercial lease review (fixed fee)",
+              "quantity": 1,
+              "unitPrice": 4200
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/templates",
+        "body": {
+          "name": "Engagement letter",
+          "description": "Scope, fees and terms of engagement for a new matter",
+          "requiresSignature": true,
+          "body": "<p>{{today}}</p><p>Dear {{contact.firstName}},</p><h2>Re: {{deal.title}}</h2><p>Thank you for choosing {{business.name}}. This letter confirms the scope of our engagement and the terms on which we will act for you.</p><h3>Scope</h3><p>We will advise and represent you on the matter named above. Work outside this scope needs a new or amended letter.</p><h3>Fees</h3><p>Our fees are set out in the fee estimate we sent you. We bill monthly and invoices are due within 30 days.</p><h3>Your responsibilities</h3><p>Please give us complete and accurate information and tell us promptly about any change.</p><p>Please sign below to confirm you accept these terms.</p><p>{{user.name}}</p>"
+        },
+        "ref": "t_engage"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:t_engage}}",
+          "contactUuid": "{{contact:delgado}}",
+          "dealUuid": "{{deal:delgado}}",
+          "title": "Engagement letter: Delgado custody modification"
+        },
+        "ref": "d_delgado"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents/{{req:d_delgado}}/share",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:t_engage}}",
+          "contactUuid": "{{contact:brandt}}",
+          "dealUuid": "{{deal:brandt}}",
+          "title": "Engagement letter: Brandt lease review"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:okafor}}",
+          "dealUuid": "{{deal:okafor}}",
+          "items": [
+            {
+              "name": "Death certificate",
+              "description": "Certified copy",
+              "dueDate": "{{date:+10}}"
+            },
+            {
+              "name": "Original will",
+              "description": "A scan now; bring the original to the office",
+              "dueDate": "{{date:+10}}"
+            },
+            {
+              "name": "Photo ID",
+              "description": "Driver license or passport",
+              "dueDate": "{{date:+5}}"
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "When is my hearing and do I need to attend?",
+          "description": "I got a letter from the tribunal but I am not sure what the date means for me.",
+          "priority": "high",
+          "category": "Hearing",
+          "channel": "email",
+          "contactUuid": "{{contact:tanaka}}",
+          "assigneeUuid": "{{user:attorney}}"
+        },
+        "ref": "t_tanaka"
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets/{{req:t_tanaka}}/comments",
+        "body": {
+          "body": "Your hearing is listed for the date in the letter at 9:30am. Yes, please attend; we will meet 30 minutes before in the lobby.",
+          "status": "pending"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "Uploaded the wrong bank statement",
+          "priority": "normal",
+          "category": "Documents",
+          "channel": "phone",
+          "contactUuid": "{{contact:delgado}}",
+          "assigneeUuid": "{{user:paralegal}}"
+        }
+      }
+    ]
+  }
+}
