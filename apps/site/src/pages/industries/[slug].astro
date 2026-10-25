@@ -5,7 +5,7 @@ import Faq from '../../components/Faq.astro';
 import CtaBand from '../../components/CtaBand.astro';
 import Compare from '../../components/Compare.astro';
 import { industries, type Industry } from '../../data/industries';
-import { demoLinks } from '../../data/site';
+import { demoLinks, site } from '../../data/site';
 import { breadcrumbSchema, faqSchema, softwareSchema } from '../../data/schema';
 
 export function getStaticPaths() {
@@ -43,17 +43,9 @@ const short = i.short.toLowerCase();
         <p class="lede muted">{i.answer}</p>
         <div class="ctas">
           <a class="btn btn-tape" href="/demo">Book a demo</a>
-          {
-            demo ? (
-              <a class="btn btn-ghost" href={demo}>
-                Try the {i.short.toLowerCase()} demo
-              </a>
-            ) : (
-              <a class="btn btn-ghost" href="/demo#live" title="Live demo link coming soon (placeholder)">
-                Try the {i.short.toLowerCase()} demo
-              </a>
-            )
-          }
+          <a class="btn btn-ghost" href={demo ?? '/demo#live'} data-demo-link={i.slug} data-live-href={site.signInUrl}>
+            Try the {i.short.toLowerCase()} demo
+          </a>
         </div>
       </div>
       <div class="product">

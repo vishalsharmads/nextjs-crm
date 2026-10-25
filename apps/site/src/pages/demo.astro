@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import PageHero from '../components/PageHero.astro';
 import LeadForm from '../components/LeadForm.astro';
 import { industries } from '../data/industries';
-import { demoLinks } from '../data/site';
+import { demoLinks, site } from '../data/site';
 import { breadcrumbSchema } from '../data/schema';
 ---
 
@@ -22,7 +22,7 @@ import { breadcrumbSchema } from '../data/schema';
     lede="In 30 minutes we set Bespoq up in your industry’s words while you watch, walk through your workflow, and answer every question about price, hosting and setup."
   />
   <section class="section">
-    <div class="wrap layout">
+    <div class="wrap layout" id="book">
       <div class="intro">
         <h2 class="h2">Book your demo</h2>
         <ol class="next">
@@ -40,23 +40,28 @@ import { breadcrumbSchema } from '../data/schema';
         <h2 class="h2">Try a live demo</h2>
         <p class="lede muted">
           Each demo is a real Bespoq instance with sample data, set up for one industry. Sign in with one click as any role.
+          The industry marked live is open now; book any other and we set it up for your call.
         </p>
-        <p class="flag">Demo links are placeholders until the live demos are published.</p>
       </div>
       <ul class="demos">
         {
           industries.map((i) => {
             const href = demoLinks[i.slug];
             return (
-              <li>
-                <span class="name">{i.name}</span>
-                {href ? (
-                  <a class="btn btn-ghost sm" href={href}>
-                    Open demo
-                  </a>
-                ) : (
-                  <span class="soon">Coming soon</span>
-                )}
+              <li data-demo={i.slug}>
+                <span class="name">
+                  {i.name}
+                  <span class="live" hidden={!href}>Live now</span>
+                </span>
+                <a
+                  class="btn btn-ghost sm"
+                  href={href ?? '#book'}
+                  data-demo-link={i.slug}
+                  data-live-href={site.signInUrl}
+                  data-live-label="Open live demo"
+                >
+                  {href ? 'Open live demo' : 'Book this demo'}
+                </a>
               </li>
             );
           })
@@ -90,14 +95,18 @@ import { breadcrumbSchema } from '../data/schema';
     max-width: 760px;
     margin-bottom: 32px;
   }
-  .flag {
-    justify-self: start;
-    padding: 4px 10px;
+  .live {
+    margin-inline-start: 10px;
+    padding: 2px 8px;
     border-radius: 6px;
     background: var(--tape);
     color: var(--tape-ink);
-    font-size: 13.5px;
+    font-size: 12.5px;
     font-weight: 600;
+    white-space: nowrap;
+  }
+  .live[hidden] {
+    display: none;
   }
   .demos {
     list-style: none;
@@ -118,12 +127,8 @@ import { breadcrumbSchema } from '../data/schema';
   .name {
     font-weight: 600;
   }
-  .soon {
-    white-space: nowrap;
-    font-size: 14px;
-    color: var(--steel);
-  }
   .btn.sm {
+    white-space: nowrap;
     min-height: 40px;
     padding: 0 16px;
     font-size: 14.5px;
