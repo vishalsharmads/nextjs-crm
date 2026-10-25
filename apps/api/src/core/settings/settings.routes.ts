@@ -21,6 +21,7 @@ import {
   getBranding,
   getBrandingAssets,
   getDemoAccounts,
+  getDemoIndustry,
   getGroup,
   getRaw,
   isInstalled,
@@ -67,6 +68,18 @@ export const publicRoutes = defineRoutes('/public', ['public'])
     handler: async ({ res }) => {
       res.set('Cache-Control', 'no-cache');
       return publicBranding();
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/demo',
+    permission: 'public',
+    summary: 'Which industry this demo instance shows (404 unless it is a demo)',
+    handler: async ({ res }) => {
+      const industry = await getDemoIndustry();
+      if (!industry) throw notFound('Demo');
+      res.set('Cache-Control', 'no-cache');
+      return { industry };
     },
   })
   .add({
