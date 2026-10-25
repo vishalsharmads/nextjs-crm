@@ -31,6 +31,7 @@
     "blueprint:apply": "npm run cli -w @app/api -- blueprint:apply",
     "crm:export-blueprint": "npm run cli -w @app/api -- blueprint:export",
     "doctor": "npm run cli -w @app/api -- doctor",
+    "demo:reset": "npm run cli -w @app/api -- demo:reset",
     "check:brand": "node scripts/check-brand-strings.mjs",
     "prepare": "husky"
   },

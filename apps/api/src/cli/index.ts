@@ -124,55 +124,66 @@ const commands: Record<string, Command> = {
       args,
       options: { password: { type: 'string' }, domain: { type: 'string' }, roles: { type: 'string' } },
     });
-    const password = values.password ?? 'DemoAccess2026!';
-    await validatePassword(password);
-    const domain = (values.domain ?? 'demo.test').toLowerCase();
-    const wanted = values.roles?.split(',').map((r) => r.trim());
-    const roles = await db('roles')
-      .modify((q) => (wanted ? q.whereIn('key', wanted) : q))
-      .orderBy('id')
-      .select('id', 'key', 'name');
-    if (!roles.length) throw new Error('No matching roles. Apply a blueprint first.');
-    const hash = await hashPassword(password);
-    const accounts: { label: string; email: string; password: string }[] = [];
-    for (const role of roles) {
-      const email = `demo.${String(role.key).replace(/_/g, '-')}@${domain}`;
-      const existing = await db('users').where({ email }).first('id');
-      let id = existing?.id as number | undefined;
-      if (id) {
-        await db('users').where({ id }).update({
-          password_hash: hash,
-          status: 'active',
-          failed_login_count: 0,
-          locked_until: null,
-          deleted_at: null,
-        });
-      } else {
-        [id] = await db('users').insert({
-          uuid: newUuid(),
-          email,
-          first_name: 'Demo',
-          last_name: role.name,
-          status: 'active',
-          password_hash: hash,
-        });
-      }
-      await db('user_roles').where({ user_id: id }).delete();
-      await db('user_roles').insert({ user_id: id, role_id: role.id });
-      accounts.push({ label: role.name as string, email, password });
-    }
-    await db('settings')
-      .insert({ key: 'demo_login', group: 'system', value: JSON.stringify({ accounts }), is_public: false })
-      .onConflict('key')
-      .merge();
-    clearSettingsCache();
+    const { seedDemoUsers, DEMO_PASSWORD } = await import('./demo');
+    const accounts = await seedDemoUsers(db, {
+      password: values.password,
+      domain: values.domain,
+      roles: values.roles?.split(',').map((r) => r.trim()),
+    });
     for (const a of accounts) out(`${a.label.padEnd(24)} ${a.email}`);
-    out(`Password for all: ${password}`);
+    out(`Password for all: ${values.password ?? DEMO_PASSWORD}`);
     out(
       env.DEMO_MODE
         ? 'Shown on the sign-in screen (DEMO_MODE=true).'
         : 'Hidden until you set DEMO_MODE=true in .env and restart the API.',
     );
+  },
+
+  /**
+   * Wipe the demo database and install one industry with sample data and demo users.
+   * Refuses unless DEMO_MODE=true, the database name contains "demo", and the database is empty or was
+   * created by an earlier demo:reset. Usage: demo:reset --industry=law-firms [--yes] [--restart-file=tmp/restart.txt]
+   */
+  async 'demo:reset'(args) {
+    const { values } = parseArgs({
+      args,
+      options: {
+        industry: { type: 'string' },
+        password: { type: 'string' },
+        yes: { type: 'boolean', default: false },
+        'restart-file': { type: 'string' },
+      },
+    });
+    if (!values.industry) throw new Error('Pass --industry=<slug>, e.g. --industry=coworking');
+    const { assertDemoResetAllowed, resetDemo } = await import('./demo');
+    const { blueprint } = await assertDemoResetAllowed(env.DATABASE_URL, values.industry);
+    const name = new URL(env.DATABASE_URL).pathname.slice(1);
+    if (!values.yes) {
+      const { createInterface } = await import('node:readline/promises');
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const answer = await rl.question(
+        `This deletes everything in "${name}" and its uploaded files. Type the industry (${values.industry}) to continue: `,
+      );
+      rl.close();
+      if (answer.trim() !== values.industry) {
+        out('Nothing changed.');
+        return;
+      }
+    }
+    const accounts = await resetDemo({ url: env.DATABASE_URL, blueprint, password: values.password }, out);
+    out('');
+    out(`Demo for "${values.industry}" is ready in "${name}".`);
+    for (const a of accounts) out(`  ${a.label.padEnd(24)} ${a.email}`);
+    out(`  Password for all: ${accounts[0]?.password}`);
+    if (values['restart-file']) {
+      const { mkdirSync, writeFileSync } = await import('node:fs');
+      const { dirname } = await import('node:path');
+      mkdirSync(dirname(values['restart-file']), { recursive: true });
+      writeFileSync(values['restart-file'], new Date().toISOString());
+      out(`Touched ${values['restart-file']}: the app restarts on its next request.`);
+    } else {
+      out('Restart the app now so it picks up the new industry.');
+    }
   },
 
   /** Show one existing account on the sign-in screen (while DEMO_MODE=true). */
