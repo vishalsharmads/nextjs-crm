@@ -78,3 +78,4 @@ export function blueprintForIndustry(industry: string): string {
 export function industryForBlueprint(key: string): string {
   return Object.entries(INDUSTRY_ALIASES).find(([, k]) => k === key)?.[0] ?? key;
 }
+export * from './check-sample';

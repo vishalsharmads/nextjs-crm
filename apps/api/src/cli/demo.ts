@@ -1,7 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Knex } from 'knex';
-import { blueprintForIndustry, industryForBlueprint, listBlueprintKeys } from '@app/blueprints';
+import {
+  blueprintForIndustry,
+  industryForBlueprint,
+  listBlueprintKeys,
+  loadBlueprint,
+} from '@app/blueprints';
+import { seedSampleData } from '../blueprints/sample-data';
+import { runSampleRequests } from '../blueprints/sample-requests';
 import { env, isTest } from '../config/env';
 import { createKnex, databaseExists, db, ensureDatabase } from '../db/knex';
 import { migrateCore } from '../db/migrate';
@@ -171,14 +178,14 @@ export async function resetDemo(
   out: (msg: string) => void,
 ): Promise<DemoAccount[]> {
   const password = opts.password ?? DEMO_PASSWORD;
-  out('1/5  Emptying the demo database and uploaded files');
+  out('1/6  Emptying the demo database and uploaded files');
   const dropped = await emptyDatabase(opts.url);
   emptyStorage(env.STORAGE_DIR);
   // Create it only when missing: hosting accounts often may not create databases at all.
   if (dropped === null) await ensureDatabase(opts.url);
   out(dropped === null ? '     Created the database' : `     ${dropped} tables removed`);
 
-  out('2/5  Running migrations');
+  out('2/6  Running migrations');
   await migrateCore(db);
   // Mark it as a demo straight away, so a failed install can still be reset.
   await db('settings')
@@ -191,7 +198,7 @@ export async function resetDemo(
     .onConflict('key')
     .merge();
 
-  out('3/5  Installing core configuration');
+  out('3/6  Installing core configuration');
   await installCore(db, {
     adminEmail: 'admin@demo.test',
     adminPassword: password,
@@ -199,12 +206,25 @@ export async function resetDemo(
     adminLastName: 'Admin',
   });
 
-  out(`4/5  Applying "${opts.blueprint}" with sample data`);
+  out(`4/6  Applying "${opts.blueprint}"`);
   const { applyBlueprintByKey } = await import('../blueprints/applier');
-  const report = await applyBlueprintByKey(db, opts.blueprint, { sampleData: true });
+  const report = await applyBlueprintByKey(db, opts.blueprint, {});
   out(`     ${report.summary}`);
   for (const w of report.warnings) out(`     note: ${w}`);
   await markInstalled(db, opts.blueprint);
+
+  // Users first, so sample records can be owned by (and created as) the demo roles.
+  out('5/6  Creating demo users');
+  const accounts = await seedDemoUsers(db, { password });
+
+  out('6/6  Adding sample data');
+  const bp = loadBlueprint(opts.blueprint);
+  const { count, refs } = await seedSampleData(db, bp);
+  const admin = accounts.find((a) => a.email.startsWith('demo.admin@'));
+  const requests = bp.sample_data?.requests ?? [];
+  const created = admin ? await runSampleRequests(requests, refs, admin) : 0;
+  out(`     ${count} records and ${created} module records`);
+
   await db('settings')
     .where({ key: DEMO_KEY })
     .update({
@@ -214,7 +234,5 @@ export async function resetDemo(
         resetAt: new Date().toISOString(),
       }),
     });
-
-  out('5/5  Creating demo users');
-  return seedDemoUsers(db, { password });
+  return accounts;
 }
