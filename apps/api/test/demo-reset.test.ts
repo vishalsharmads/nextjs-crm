@@ -108,6 +108,25 @@ describe('demo:reset', () => {
     }
   }, 120_000);
 
+  it('installs every industry on the website, with sample and module records', async () => {
+    const { industryForBlueprint, listBlueprintKeys } = await import('@app/blueprints');
+    const industries = listBlueprintKeys()
+      .filter((k) => k !== 'generic')
+      .map(industryForBlueprint);
+    const demo = knexFactory({ client: 'mysql2', connection: urlFor(DEMO_DB) });
+    try {
+      for (const industry of industries) {
+        const r = await reset(industry);
+        expect(r.ok, `${industry}: ${r.out}`).toBe(true);
+        expect(r.out, industry).toMatch(/\d+ records and [1-9]\d* module records/);
+        const deals = (await demo('deals').count('* as n').first())?.n;
+        expect(deals, industry).toBeGreaterThanOrEqual(10);
+      }
+    } finally {
+      await demo.destroy();
+    }
+  }, 600_000);
+
   it('never wipes a database it did not create', async () => {
     await server.raw('CREATE DATABASE ??', [`${DEMO_DB}_client`]);
     await server.raw('CREATE TABLE ??.contacts (id INT)', [`${DEMO_DB}_client`]);
