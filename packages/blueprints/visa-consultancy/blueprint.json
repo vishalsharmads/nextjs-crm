@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "visa-consultancy",
   "name": "Visa consultancy",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Applicants, cases through an application pipeline, document checklists collected in the client portal, quotes and invoices for fees.",
   "settings": {
     "features": { "leads": true },
@@ -234,38 +234,1400 @@
   },
   "templates": [],
   "sample_data": {
+    "organizations": [
+      {
+        "ref": "coastline",
+        "name": "Coastline Civil Engineering",
+        "website": "https://coastline-civil.test",
+        "industry": "Engineering",
+        "days": -260,
+        "owner": "case_manager"
+      },
+      {
+        "ref": "redgum",
+        "name": "Redgum Aged Care",
+        "website": "https://redgum-care.test",
+        "industry": "Healthcare",
+        "days": -240,
+        "owner": "case_manager"
+      },
+      {
+        "ref": "lakeview",
+        "name": "Lakeview Software",
+        "website": "https://lakeview-software.test",
+        "industry": "Software",
+        "days": -200,
+        "owner": "admin"
+      },
+      {
+        "ref": "northbay",
+        "name": "Northbay Institute of Technology",
+        "website": "https://northbay-institute.test",
+        "industry": "Education",
+        "days": -180,
+        "owner": "consultant"
+      },
+      {
+        "ref": "maple",
+        "name": "Maple & Finch Consulting",
+        "website": "https://maplefinch.test",
+        "industry": "Consulting",
+        "days": -120,
+        "owner": "case_manager"
+      },
+      {
+        "ref": "harvest",
+        "name": "Harvest Table Hospitality",
+        "website": "https://harvest-table.test",
+        "industry": "Hospitality",
+        "days": -75,
+        "owner": "consultant"
+      }
+    ],
     "contacts": [
       {
         "ref": "ana",
         "first_name": "Ana",
         "last_name": "Ribeiro",
         "email": "ana.ribeiro@example.test",
+        "phone": "+1 206 555 0110",
+        "lifecycle_status": "Enquiry",
+        "source": "Website",
+        "days": -4,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "Brazilian",
+          "passport_number": "FX482913",
+          "passport_expiry": "{{date:+1300}}",
+          "date_of_birth": "{{date:-8760}}",
+          "marital_status": "single",
+          "dependants": 0
+        }
+      },
+      {
+        "ref": "raj",
+        "first_name": "Raj",
+        "last_name": "Menon",
+        "email": "raj.menon@example.test",
+        "phone": "+1 206 555 0111",
+        "lifecycle_status": "Enquiry",
+        "source": "Referral",
+        "days": -7,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "Indian",
+          "dependants": 0,
+          "marital_status": "married"
+        }
+      },
+      {
+        "ref": "javier",
+        "first_name": "Javier",
+        "last_name": "Morales",
+        "email": "javier.morales@example.test",
+        "phone": "+1 206 555 0112",
+        "job_title": "Management consultant",
+        "organization": "maple",
         "lifecycle_status": "Applicant",
-        "custom": { "nationality": "Brazilian", "passport_expiry": "2030-04-12", "dependants": 0 }
+        "source": "Agent",
+        "days": -22,
+        "owner": "case_manager",
+        "custom": {
+          "nationality": "Mexican",
+          "passport_number": "G51827340",
+          "passport_expiry": "{{date:+2100}}",
+          "date_of_birth": "{{date:-12045}}",
+          "marital_status": "married",
+          "dependants": 1
+        }
+      },
+      {
+        "ref": "chloe",
+        "first_name": "Chloe",
+        "last_name": "Dubois",
+        "email": "chloe.dubois@example.test",
+        "phone": "0491 570 010",
+        "lifecycle_status": "Applicant",
+        "source": "Website",
+        "days": -18,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "French",
+          "passport_number": "19AV40271",
+          "passport_expiry": "{{date:+2900}}",
+          "date_of_birth": "{{date:-10585}}",
+          "marital_status": "partner",
+          "dependants": 0
+        }
       },
       {
         "ref": "omar",
         "first_name": "Omar",
         "last_name": "Haddad",
         "email": "omar.haddad@example.test",
+        "phone": "+1 206 555 0113",
+        "lifecycle_status": "Applicant",
+        "source": "Referral",
+        "days": -45,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "Jordanian",
+          "passport_number": "N804512",
+          "passport_expiry": "{{date:+1600}}",
+          "date_of_birth": "{{date:-13870}}",
+          "marital_status": "married",
+          "dependants": 2
+        }
+      },
+      {
+        "ref": "wei",
+        "first_name": "Wei",
+        "last_name": "Zhang",
+        "email": "wei.zhang@example.test",
+        "phone": "+1 206 555 0114",
+        "organization": "northbay",
+        "lifecycle_status": "Applicant",
+        "source": "Agent",
+        "days": -38,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "Chinese",
+          "passport_number": "EH7302915",
+          "passport_expiry": "{{date:+2400}}",
+          "date_of_birth": "{{date:-7665}}",
+          "marital_status": "single",
+          "dependants": 0
+        }
+      },
+      {
+        "ref": "fatima",
+        "first_name": "Fatima",
+        "last_name": "Khan",
+        "email": "fatima.khan@example.test",
+        "phone": "+1 206 555 0115",
+        "lifecycle_status": "Applicant",
+        "source": "Walk-in",
+        "days": -60,
+        "owner": "case_manager",
+        "custom": {
+          "nationality": "Pakistani",
+          "passport_number": "AK4921835",
+          "passport_expiry": "{{date:+140}}",
+          "date_of_birth": "{{date:-14965}}",
+          "marital_status": "married",
+          "dependants": 3
+        }
+      },
+      {
+        "ref": "mei",
+        "first_name": "Mei",
+        "last_name": "Tanaka",
+        "email": "mei.tanaka@example.test",
+        "phone": "0491 570 011",
+        "job_title": "Civil engineer",
+        "organization": "coastline",
+        "lifecycle_status": "Applicant",
+        "source": "Website",
+        "days": -95,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "Japanese",
+          "passport_number": "TR6618204",
+          "passport_expiry": "{{date:+1900}}",
+          "date_of_birth": "{{date:-11315}}",
+          "marital_status": "single",
+          "dependants": 0
+        }
+      },
+      {
+        "ref": "daniel",
+        "first_name": "Daniel",
+        "last_name": "Okonkwo",
+        "email": "daniel.okonkwo@example.test",
+        "phone": "0491 570 012",
+        "job_title": "Registered nurse",
+        "organization": "redgum",
+        "lifecycle_status": "Applicant",
+        "source": "Agent",
+        "days": -88,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "Nigerian",
+          "passport_number": "B03847261",
+          "passport_expiry": "{{date:+2200}}",
+          "date_of_birth": "{{date:-12775}}",
+          "marital_status": "married",
+          "dependants": 2
+        }
+      },
+      {
+        "ref": "lukas",
+        "first_name": "Lukas",
+        "last_name": "Brandt",
+        "email": "lukas.brandt@example.test",
+        "phone": "+1 206 555 0116",
+        "job_title": "Software engineer",
+        "organization": "lakeview",
+        "lifecycle_status": "Applicant",
+        "source": "Referral",
+        "days": -120,
+        "owner": "case_manager",
+        "custom": {
+          "nationality": "German",
+          "passport_number": "C7KX29F41",
+          "passport_expiry": "{{date:+2600}}",
+          "date_of_birth": "{{date:-10950}}",
+          "marital_status": "single",
+          "dependants": 0
+        }
+      },
+      {
+        "ref": "linh",
+        "first_name": "Linh",
+        "last_name": "Nguyen",
+        "email": "linh.nguyen@example.test",
+        "phone": "+1 206 555 0117",
+        "lifecycle_status": "Applicant",
+        "source": "Event",
+        "days": -70,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "Vietnamese",
+          "passport_number": "C4419027",
+          "passport_expiry": "{{date:+1700}}",
+          "date_of_birth": "{{date:-8030}}",
+          "marital_status": "single",
+          "dependants": 0
+        }
+      },
+      {
+        "ref": "sofia",
+        "first_name": "Sofia",
+        "last_name": "Petrova",
+        "email": "sofia.petrova@example.test",
+        "phone": "+1 206 555 0118",
+        "job_title": "Restaurant owner",
+        "lifecycle_status": "Applicant",
+        "source": "Referral",
+        "days": -110,
+        "owner": "case_manager",
+        "custom": {
+          "nationality": "Bulgarian",
+          "passport_number": "382019447",
+          "passport_expiry": "{{date:+3100}}",
+          "date_of_birth": "{{date:-16425}}",
+          "marital_status": "married",
+          "dependants": 2
+        }
+      },
+      {
+        "ref": "priya",
+        "first_name": "Priya",
+        "last_name": "Rao",
+        "email": "priya.rao@example.test",
+        "phone": "0491 570 013",
+        "job_title": "Registered nurse",
+        "organization": "redgum",
+        "lifecycle_status": "Visa granted",
+        "source": "Referral",
+        "days": -230,
+        "owner": "case_manager",
+        "custom": {
+          "nationality": "Indian",
+          "passport_number": "Z5512094",
+          "passport_expiry": "{{date:+2500}}",
+          "date_of_birth": "{{date:-10220}}",
+          "marital_status": "single",
+          "dependants": 0
+        }
+      },
+      {
+        "ref": "kenji",
+        "first_name": "Kenji",
+        "last_name": "Watanabe",
+        "email": "kenji.watanabe@example.test",
+        "phone": "0491 570 014",
+        "job_title": "Head chef",
+        "organization": "harvest",
+        "lifecycle_status": "Visa granted",
+        "source": "Website",
+        "days": -205,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "Japanese",
+          "passport_number": "TK2290471",
+          "passport_expiry": "{{date:+2000}}",
+          "date_of_birth": "{{date:-17155}}",
+          "marital_status": "married",
+          "dependants": 1
+        }
+      },
+      {
+        "ref": "carlos",
+        "first_name": "Carlos",
+        "last_name": "Mendes",
+        "email": "carlos.mendes@example.test",
+        "phone": "+1 206 555 0119",
+        "lifecycle_status": "Former applicant",
+        "source": "Social",
+        "days": -150,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "Brazilian",
+          "passport_number": "YB903377",
+          "passport_expiry": "{{date:+900}}",
+          "date_of_birth": "{{date:-18980}}",
+          "marital_status": "divorced",
+          "dependants": 0
+        }
+      },
+      {
+        "ref": "emma",
+        "first_name": "Emma",
+        "last_name": "Clarke",
+        "email": "emma.clarke@example.test",
+        "phone": "0491 570 015",
+        "lifecycle_status": "Former applicant",
+        "source": "Website",
+        "days": -130,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "British",
+          "passport_number": "553108274",
+          "passport_expiry": "{{date:+1500}}",
+          "date_of_birth": "{{date:-12410}}",
+          "marital_status": "partner",
+          "dependants": 0
+        }
+      },
+      {
+        "ref": "aisha",
+        "first_name": "Aisha",
+        "last_name": "Bello",
+        "email": "aisha.bello@example.test",
+        "phone": "+1 206 555 0120",
         "lifecycle_status": "Enquiry",
-        "custom": { "nationality": "Jordanian", "dependants": 2 }
+        "source": "Social",
+        "days": -3,
+        "owner": "consultant",
+        "custom": {
+          "nationality": "Nigerian",
+          "dependants": 1
+        }
+      },
+      {
+        "ref": "tomas",
+        "first_name": "Tomas",
+        "last_name": "Silva",
+        "email": "tomas.silva@example.test",
+        "phone": "0491 570 016",
+        "lifecycle_status": "Former applicant",
+        "source": "Referral",
+        "days": -270,
+        "owner": "case_manager",
+        "custom": {
+          "nationality": "Portuguese",
+          "passport_number": "CB118204",
+          "passport_expiry": "{{date:+600}}",
+          "date_of_birth": "{{date:-14235}}",
+          "marital_status": "married",
+          "dependants": 2
+        }
+      }
+    ],
+    "leads": [
+      {
+        "ref": "hiroshi",
+        "first_name": "Hiroshi",
+        "last_name": "Mori",
+        "email": "hiroshi.mori@example.test",
+        "phone": "0491 570 017",
+        "source": "Website",
+        "status": "new",
+        "days": -1,
+        "owner": "consultant"
+      },
+      {
+        "ref": "grace",
+        "first_name": "Grace",
+        "last_name": "Mwangi",
+        "email": "grace.mwangi@example.test",
+        "phone": "+1 206 555 0121",
+        "source": "Social",
+        "status": "contacted",
+        "days": -5,
+        "owner": "consultant"
+      },
+      {
+        "ref": "harvest_hr",
+        "first_name": "Leah",
+        "last_name": "Sutton",
+        "email": "leah.sutton@harvest-table.test",
+        "phone": "0491 570 018",
+        "company_name": "Harvest Table Hospitality",
+        "job_title": "HR manager",
+        "source": "Referral",
+        "status": "qualified",
+        "days": -9,
+        "owner": "case_manager"
+      },
+      {
+        "ref": "ivan",
+        "first_name": "Ivan",
+        "last_name": "Kowalski",
+        "email": "ivan.kowalski@example.test",
+        "source": "Event",
+        "status": "new",
+        "days": -2,
+        "owner": "case_manager"
+      },
+      {
+        "ref": "rosa",
+        "first_name": "Rosa",
+        "last_name": "Delgado",
+        "email": "rosa.delgado@example.test",
+        "phone": "+1 206 555 0122",
+        "source": "Website",
+        "status": "unqualified",
+        "days": -30,
+        "owner": "consultant"
       }
     ],
     "deals": [
       {
+        "ref": "ana_student",
         "title": "Student visa: MSc 2027 intake",
         "contact": "ana",
-        "stage": "documents",
+        "stage": "consultation",
         "value": 1800,
-        "custom": { "visa_type": "student", "destination": "United Kingdom" }
+        "days": -4,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "student",
+          "destination": "United Kingdom",
+          "government_fee": 640
+        },
+        "expected_close": "{{date:+90}}"
       },
       {
-        "title": "Family visa consultation",
-        "contact": "omar",
+        "ref": "raj_visitor",
+        "title": "Visitor visa: family visit to Seattle",
+        "contact": "raj",
         "stage": "consultation",
-        "value": 2400,
-        "custom": { "visa_type": "family", "destination": "Canada" }
+        "value": 600,
+        "days": -7,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "visitor",
+          "destination": "United States",
+          "government_fee": 185
+        },
+        "expected_close": "{{date:+45}}"
+      },
+      {
+        "ref": "javier_work",
+        "title": "Work permit: senior consultant transfer",
+        "contact": "javier",
+        "organization": "maple",
+        "stage": "engaged",
+        "value": 4500,
+        "days": -22,
+        "owner": "case_manager",
+        "custom": {
+          "visa_type": "work",
+          "destination": "Canada",
+          "government_fee": 1100
+        },
+        "stage_days": -10,
+        "expected_close": "{{date:+100}}"
+      },
+      {
+        "ref": "chloe_partner",
+        "title": "Partner visa: onshore application",
+        "contact": "chloe",
+        "stage": "engaged",
+        "value": 4200,
+        "days": -18,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "family",
+          "destination": "Australia",
+          "government_fee": 5900
+        },
+        "stage_days": -6,
+        "expected_close": "{{date:+200}}"
+      },
+      {
+        "ref": "omar_family",
+        "title": "Family sponsorship: spouse and two children",
+        "contact": "omar",
+        "stage": "documents",
+        "value": 4200,
+        "days": -45,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "family",
+          "destination": "Canada",
+          "government_fee": 1450
+        },
+        "stage_days": -20,
+        "expected_close": "{{date:+160}}"
+      },
+      {
+        "ref": "wei_student",
+        "title": "Student visa: Bachelor of Engineering",
+        "contact": "wei",
+        "organization": "northbay",
+        "stage": "documents",
+        "value": 1800,
+        "days": -38,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "student",
+          "destination": "Australia",
+          "government_fee": 1600
+        },
+        "stage_days": -15,
+        "expected_close": "{{date:+60}}"
+      },
+      {
+        "ref": "fatima_settlement",
+        "title": "Settlement: indefinite leave to remain",
+        "contact": "fatima",
+        "stage": "documents",
+        "value": 3200,
+        "days": -60,
+        "owner": "case_manager",
+        "custom": {
+          "visa_type": "settlement",
+          "destination": "United Kingdom",
+          "government_fee": 3400
+        },
+        "stage_days": -25,
+        "expected_close": "{{date:+120}}"
+      },
+      {
+        "ref": "mei_skilled",
+        "title": "Employer-sponsored skilled visa: civil engineer",
+        "contact": "mei",
+        "organization": "coastline",
+        "stage": "review",
+        "value": 3800,
+        "days": -95,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "work",
+          "destination": "Australia",
+          "government_fee": 3100,
+          "biometrics_booked": true
+        },
+        "stage_days": -5,
+        "expected_close": "{{date:+75}}"
+      },
+      {
+        "ref": "daniel_nurse",
+        "title": "Employer-sponsored skilled visa: registered nurse",
+        "contact": "daniel",
+        "organization": "redgum",
+        "stage": "review",
+        "value": 4500,
+        "days": -88,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "work",
+          "destination": "Australia",
+          "government_fee": 3100,
+          "biometrics_booked": false
+        },
+        "stage_days": -3,
+        "expected_close": "{{date:+80}}"
+      },
+      {
+        "ref": "lukas_work",
+        "title": "Specialty occupation work visa: software engineer",
+        "contact": "lukas",
+        "organization": "lakeview",
+        "stage": "submitted",
+        "value": 4500,
+        "days": -120,
+        "owner": "case_manager",
+        "custom": {
+          "visa_type": "work",
+          "destination": "United States",
+          "government_fee": 2800,
+          "application_ref": "WAC-27-041-55120",
+          "submitted_on": "{{date:-23}}",
+          "decision_due": "{{date:+20}}",
+          "biometrics_booked": true
+        },
+        "stage_days": -23,
+        "expected_close": "{{date:+20}}"
+      },
+      {
+        "ref": "linh_student",
+        "title": "Student visa: fall semester",
+        "contact": "linh",
+        "stage": "submitted",
+        "value": 1800,
+        "days": -70,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "student",
+          "destination": "United States",
+          "government_fee": 535,
+          "application_ref": "SEV-N0048213",
+          "submitted_on": "{{date:-12}}",
+          "decision_due": "{{date:+9}}",
+          "biometrics_booked": true
+        },
+        "stage_days": -12,
+        "expected_close": "{{date:+9}}"
+      },
+      {
+        "ref": "sofia_business",
+        "title": "Business visa: restaurant investment",
+        "contact": "sofia",
+        "stage": "submitted",
+        "value": 6500,
+        "days": -110,
+        "owner": "case_manager",
+        "custom": {
+          "visa_type": "business",
+          "destination": "Canada",
+          "government_fee": 1600,
+          "application_ref": "E004418290",
+          "submitted_on": "{{date:-40}}",
+          "decision_due": "{{date:+45}}",
+          "biometrics_booked": true
+        },
+        "stage_days": -40,
+        "expected_close": "{{date:+45}}"
+      },
+      {
+        "ref": "priya_granted",
+        "title": "Employer-sponsored skilled visa: aged-care nurse",
+        "contact": "priya",
+        "organization": "redgum",
+        "stage": "approved",
+        "value": 4500,
+        "days": -230,
+        "owner": "case_manager",
+        "custom": {
+          "visa_type": "work",
+          "destination": "Australia",
+          "government_fee": 3100,
+          "application_ref": "TRN-EGO7720419",
+          "submitted_on": "{{date:-120}}",
+          "decision_due": "{{date:-30}}",
+          "biometrics_booked": true
+        },
+        "stage_days": -34
+      },
+      {
+        "ref": "kenji_citizenship",
+        "title": "Citizenship application",
+        "contact": "kenji",
+        "organization": "harvest",
+        "stage": "approved",
+        "value": 2200,
+        "days": -205,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "citizenship",
+          "destination": "Australia",
+          "government_fee": 560,
+          "application_ref": "CIT-55190372",
+          "submitted_on": "{{date:-150}}",
+          "decision_due": "{{date:-20}}"
+        },
+        "stage_days": -21
+      },
+      {
+        "ref": "carlos_visitor",
+        "title": "Visitor visa: conference and tourism",
+        "contact": "carlos",
+        "stage": "refused",
+        "value": 600,
+        "days": -150,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "visitor",
+          "destination": "United States",
+          "government_fee": 185,
+          "application_ref": "AA00C9XK41",
+          "submitted_on": "{{date:-110}}",
+          "biometrics_booked": true
+        },
+        "stage_days": -95,
+        "lost_reason": "Refused by authority"
+      },
+      {
+        "ref": "emma_partner",
+        "title": "Partner visa: offshore application",
+        "contact": "emma",
+        "stage": "refused",
+        "value": 4200,
+        "days": -130,
+        "owner": "consultant",
+        "custom": {
+          "visa_type": "family",
+          "destination": "Australia",
+          "government_fee": 5900
+        },
+        "stage_days": -100,
+        "lost_reason": "Chose another adviser"
+      }
+    ],
+    "activities": [
+      {
+        "type": "note",
+        "related": "deal:ana_student",
+        "body": "<p>Offer from a London university for the MSc 2027 intake. Needs 28 days of funds in her account before applying. Sent the student-visa checklist.</p>",
+        "days": -3,
+        "owner": "consultant"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:ana_student",
+        "subject": "Follow-up consultation with Ana",
+        "due_days": 5,
+        "days": -3,
+        "owner": "consultant",
+        "hour": 11
+      },
+      {
+        "type": "call",
+        "related": "deal:raj_visitor",
+        "subject": "Initial call with Raj",
+        "due_days": -6,
+        "days": -7,
+        "owner": "consultant",
+        "done": true,
+        "outcome": "Wants to visit his daughter for 3 months; send fee quote"
+      },
+      {
+        "type": "task",
+        "related": "deal:raj_visitor",
+        "subject": "Send visitor visa quote to Raj",
+        "due_days": -2,
+        "days": -6,
+        "owner": "consultant",
+        "priority": "high"
+      },
+      {
+        "type": "note",
+        "related": "deal:javier_work",
+        "body": "<p>Maple & Finch will provide the support letter and job offer. Javier's wife and son join as dependants.</p>",
+        "days": -10,
+        "owner": "case_manager"
+      },
+      {
+        "type": "task",
+        "related": "deal:javier_work",
+        "subject": "Request employer support letter from Maple & Finch",
+        "due_days": 3,
+        "days": -9,
+        "owner": "case_manager"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:chloe_partner",
+        "subject": "Relationship evidence planning with Chloe",
+        "due_days": 6,
+        "days": -4,
+        "owner": "consultant",
+        "hour": 14
+      },
+      {
+        "type": "note",
+        "related": "deal:omar_family",
+        "body": "<p>4 of 9 documents in. Still missing: marriage certificate translation, police certificates for both adults, and the children's birth certificates.</p>",
+        "days": -2,
+        "owner": "consultant"
+      },
+      {
+        "type": "task",
+        "related": "deal:omar_family",
+        "subject": "Chase Omar for police certificates",
+        "due_days": -3,
+        "days": -10,
+        "owner": "consultant",
+        "priority": "high"
+      },
+      {
+        "type": "call",
+        "related": "deal:omar_family",
+        "subject": "Explain translation requirements to Omar",
+        "due_days": -8,
+        "days": -9,
+        "owner": "consultant",
+        "done": true,
+        "outcome": "Will use a certified translator; pages to us next week"
+      },
+      {
+        "type": "note",
+        "related": "deal:wei_student",
+        "body": "<p>Confirmation of enrolment received from Northbay. Health cover for the full course still needed.</p>",
+        "days": -6,
+        "owner": "consultant"
+      },
+      {
+        "type": "task",
+        "related": "deal:fatima_settlement",
+        "subject": "Check Fatima's passport expiry before lodging",
+        "due_days": 2,
+        "days": -5,
+        "owner": "case_manager",
+        "priority": "high"
+      },
+      {
+        "type": "note",
+        "related": "contact:fatima",
+        "body": "<p>Passport expires in under 5 months. Advised renewing before we lodge so the new details appear on the residence permit.</p>",
+        "days": -5,
+        "owner": "case_manager"
+      },
+      {
+        "type": "note",
+        "related": "deal:mei_skilled",
+        "body": "<p>Skills assessment positive. Coastline nomination approved. Final review of the application before lodging this week.</p>",
+        "days": -5,
+        "owner": "consultant"
+      },
+      {
+        "type": "task",
+        "related": "deal:mei_skilled",
+        "subject": "Final review of Mei's application",
+        "due_days": 1,
+        "days": -5,
+        "owner": "case_manager",
+        "priority": "high"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:daniel_nurse",
+        "subject": "Review English test results with Daniel",
+        "due_days": 4,
+        "days": -3,
+        "owner": "consultant",
+        "hour": 10
+      },
+      {
+        "type": "call",
+        "related": "organization:redgum",
+        "subject": "Redgum: nomination for Daniel",
+        "due_days": -1,
+        "days": -4,
+        "owner": "case_manager",
+        "done": true,
+        "outcome": "Nomination lodged by employer"
+      },
+      {
+        "type": "note",
+        "related": "deal:lukas_work",
+        "body": "<p>Lodged with premium processing. Receipt number recorded. Lakeview HR asked for weekly updates.</p>",
+        "days": -23,
+        "owner": "case_manager"
+      },
+      {
+        "type": "task",
+        "related": "deal:lukas_work",
+        "subject": "Weekly status update to Lakeview HR",
+        "due_days": 1,
+        "days": -2,
+        "owner": "case_manager"
+      },
+      {
+        "type": "call",
+        "related": "deal:linh_student",
+        "subject": "Interview preparation call with Linh",
+        "due_days": 2,
+        "days": -3,
+        "owner": "consultant"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:sofia_business",
+        "subject": "Respond to request for more information: business plan",
+        "due_days": 8,
+        "days": -2,
+        "owner": "case_manager",
+        "hour": 15
+      },
+      {
+        "type": "note",
+        "related": "deal:priya_granted",
+        "body": "<p>Visa granted. Priya starts at Redgum next month. Grant letter shared in the portal.</p>",
+        "days": -34,
+        "owner": "case_manager"
+      },
+      {
+        "type": "task",
+        "related": "deal:priya_granted",
+        "subject": "Send post-grant checklist to Priya",
+        "due_days": -30,
+        "days": -33,
+        "owner": "case_manager",
+        "done": true
+      },
+      {
+        "type": "note",
+        "related": "deal:kenji_citizenship",
+        "body": "<p>Citizenship approved. Ceremony date to be confirmed by the council.</p>",
+        "days": -21,
+        "owner": "consultant"
+      },
+      {
+        "type": "note",
+        "related": "deal:carlos_visitor",
+        "body": "<p>Refused: insufficient ties to home country. Discussed a fresh application with stronger employment evidence in 6 months.</p>",
+        "days": -95,
+        "owner": "consultant"
+      },
+      {
+        "type": "task",
+        "related": "contact:carlos",
+        "subject": "Check in with Carlos about reapplying",
+        "due_days": 15,
+        "days": -60,
+        "owner": "consultant"
+      },
+      {
+        "type": "note",
+        "related": "deal:emma_partner",
+        "body": "<p>Emma decided to use an adviser closer to her partner's family. Files returned.</p>",
+        "days": -100,
+        "owner": "consultant"
+      },
+      {
+        "type": "note",
+        "related": "organization:lakeview",
+        "body": "<p>Lakeview plans to sponsor 3 more engineers next year. Ask about a fixed-fee arrangement.</p>",
+        "days": -40,
+        "owner": "admin"
+      },
+      {
+        "type": "call",
+        "related": "contact:aisha",
+        "subject": "Call Aisha about her study options",
+        "due_days": 0,
+        "days": -2,
+        "owner": "consultant"
+      },
+      {
+        "type": "task",
+        "subject": "Update the student-visa checklist for the new financial requirement",
+        "due_days": 7,
+        "days": -1,
+        "owner": "case_manager"
+      }
+    ],
+    "requests": [
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "CONSULT",
+          "name": "Initial consultation",
+          "unit": "session",
+          "unitPrice": 250
+        },
+        "ref": "p_consult"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "FEE-VISIT",
+          "name": "Visitor visa: professional fee",
+          "unit": "case",
+          "unitPrice": 600
+        },
+        "ref": "p_visit"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "FEE-STUDY",
+          "name": "Student visa: professional fee",
+          "unit": "case",
+          "unitPrice": 1800
+        },
+        "ref": "p_study"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "FEE-WORK",
+          "name": "Work visa: professional fee",
+          "unit": "case",
+          "unitPrice": 4500
+        },
+        "ref": "p_work"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "FEE-FAMILY",
+          "name": "Family or partner visa: professional fee",
+          "unit": "case",
+          "unitPrice": 4200
+        },
+        "ref": "p_family"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "TRANSL",
+          "name": "Certified translation",
+          "unit": "page",
+          "unitPrice": 45
+        },
+        "ref": "p_transl"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Work permit for Javier Morales",
+          "contactUuid": "{{contact:javier}}",
+          "organizationUuid": "{{organization:maple}}",
+          "dealUuid": "{{deal:javier_work}}",
+          "issueDate": "{{date:-20}}",
+          "validUntil": "{{date:+10}}",
+          "terms": "50% on engagement, 50% before lodgement. Government fees are paid by the applicant directly.",
+          "lines": [
+            {
+              "productUuid": "{{req:p_work}}",
+              "name": "Work visa: professional fee",
+              "quantity": 1,
+              "unitPrice": 4500
+            },
+            {
+              "productUuid": "{{req:p_transl}}",
+              "name": "Certified translation",
+              "quantity": 6,
+              "unitPrice": 45
+            }
+          ]
+        },
+        "ref": "q_javier"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_javier}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_javier}}/accept",
+        "body": {
+          "acceptedByName": "Javier Morales"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Partner visa for Chloe Dubois",
+          "contactUuid": "{{contact:chloe}}",
+          "dealUuid": "{{deal:chloe_partner}}",
+          "issueDate": "{{date:-6}}",
+          "validUntil": "{{date:+24}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_family}}",
+              "name": "Family or partner visa: professional fee",
+              "quantity": 1,
+              "unitPrice": 4200
+            },
+            {
+              "productUuid": "{{req:p_consult}}",
+              "name": "Initial consultation",
+              "quantity": 1,
+              "unitPrice": 250,
+              "discountPct": 100
+            }
+          ]
+        },
+        "ref": "q_chloe"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_chloe}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Visitor visa for Raj Menon",
+          "contactUuid": "{{contact:raj}}",
+          "dealUuid": "{{deal:raj_visitor}}",
+          "issueDate": "{{date:0}}",
+          "validUntil": "{{date:+30}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_visit}}",
+              "name": "Visitor visa: professional fee",
+              "quantity": 1,
+              "unitPrice": 600
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Priya Rao: final professional fee",
+          "contactUuid": "{{contact:priya}}",
+          "organizationUuid": "{{organization:redgum}}",
+          "dealUuid": "{{deal:priya_granted}}",
+          "issueDate": "{{date:-60}}",
+          "dueDate": "{{date:-46}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_work}}",
+              "name": "Work visa: professional fee",
+              "quantity": 1,
+              "unitPrice": 4500
+            }
+          ]
+        },
+        "ref": "inv_priya"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_priya}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_priya}}/payments",
+        "body": {
+          "amount": 4500,
+          "paidOn": "{{date:-50}}",
+          "method": "bank_transfer",
+          "reference": "REDGUM-EFT-8812"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Lukas Brandt: lodgement instalment",
+          "contactUuid": "{{contact:lukas}}",
+          "organizationUuid": "{{organization:lakeview}}",
+          "dealUuid": "{{deal:lukas_work}}",
+          "issueDate": "{{date:-30}}",
+          "dueDate": "{{date:-9}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_work}}",
+              "name": "Work visa: professional fee (50% before lodgement)",
+              "quantity": 1,
+              "unitPrice": 2250
+            }
+          ]
+        },
+        "ref": "inv_lukas"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_lukas}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Mei Tanaka: professional fee",
+          "contactUuid": "{{contact:mei}}",
+          "organizationUuid": "{{organization:coastline}}",
+          "dealUuid": "{{deal:mei_skilled}}",
+          "issueDate": "{{date:-5}}",
+          "dueDate": "{{date:+9}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_work}}",
+              "name": "Work visa: professional fee",
+              "quantity": 1,
+              "unitPrice": 3800
+            }
+          ]
+        },
+        "ref": "inv_mei"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_mei}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Omar Haddad: engagement deposit",
+          "contactUuid": "{{contact:omar}}",
+          "dealUuid": "{{deal:omar_family}}",
+          "issueDate": "{{date:-40}}",
+          "dueDate": "{{date:-26}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_family}}",
+              "name": "Family or partner visa: professional fee (50% on engagement)",
+              "quantity": 1,
+              "unitPrice": 2100
+            },
+            {
+              "productUuid": "{{req:p_transl}}",
+              "name": "Certified translation",
+              "quantity": 8,
+              "unitPrice": 45
+            }
+          ]
+        },
+        "ref": "inv_omar"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_omar}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_omar}}/payments",
+        "body": {
+          "amount": 2460,
+          "paidOn": "{{date:-33}}",
+          "method": "card",
+          "reference": "Card ending 4417"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/templates",
+        "body": {
+          "name": "Engagement agreement",
+          "description": "Scope of services and fees, signed before work starts.",
+          "requiresSignature": true,
+          "body": "<h1>Engagement agreement</h1><p>Between {{business.name}} and {{contact.fullName}}.</p><p>We will advise on and prepare your application: {{deal.title}}. Professional fees are set out in our quote. Government fees are payable by you directly to the authority. We cannot guarantee the outcome of any application.</p><p>Signed by {{contact.fullName}} on {{today}}.</p><p>{{user.name}}<br>{{business.name}}</p>"
+        },
+        "ref": "tpl_engage"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:tpl_engage}}",
+          "contactUuid": "{{contact:omar}}",
+          "dealUuid": "{{deal:omar_family}}",
+          "title": "Engagement agreement: Omar Haddad"
+        },
+        "ref": "doc_omar"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents/{{req:doc_omar}}/share",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:omar}}",
+          "dealUuid": "{{deal:omar_family}}",
+          "items": [
+            {
+              "name": "Marriage certificate (certified translation)",
+              "dueDate": "{{date:+4}}"
+            },
+            {
+              "name": "Police certificate: Omar",
+              "description": "From every country lived in for 6 months or more since age 18.",
+              "dueDate": "{{date:+10}}"
+            },
+            {
+              "name": "Police certificate: spouse",
+              "dueDate": "{{date:+10}}"
+            },
+            {
+              "name": "Children's birth certificates",
+              "dueDate": "{{date:+4}}"
+            },
+            {
+              "name": "Passport photo pages for all family members",
+              "dueDate": "{{date:-2}}"
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:ana}}",
+          "dealUuid": "{{deal:ana_student}}",
+          "items": [
+            {
+              "name": "Passport photo page",
+              "dueDate": "{{date:+7}}"
+            },
+            {
+              "name": "University offer letter",
+              "dueDate": "{{date:+7}}"
+            },
+            {
+              "name": "Bank statements (28 days)",
+              "description": "Statements showing funds held for 28 consecutive days.",
+              "dueDate": "{{date:+21}}"
+            },
+            {
+              "name": "English test result",
+              "dueDate": "{{date:+14}}"
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "When is my biometrics appointment?",
+          "description": "I have not received a date for the fingerprint appointment yet.",
+          "priority": "normal",
+          "category": "Appointments",
+          "channel": "email",
+          "contactUuid": "{{contact:linh}}",
+          "assigneeUuid": "{{user:case_manager}}"
+        },
+        "ref": "t_linh"
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets/{{req:t_linh}}/comments",
+        "body": {
+          "body": "Your appointment is booked for next Tuesday at 9:30. The confirmation is in your portal.",
+          "status": "resolved"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "Uploaded the wrong bank statement",
+          "priority": "high",
+          "category": "Documents",
+          "channel": "phone",
+          "contactUuid": "{{contact:wei}}",
+          "organizationUuid": "{{organization:northbay}}",
+          "assigneeUuid": "{{user:consultant}}"
+        }
       }
     ]
   }
