@@ -93,6 +93,26 @@ function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
           </Field>
         </div>
       </Pane>
+      <Pane title="API keys">
+        <Field
+          label="Maximum key age (days)"
+          help={
+            hint('apiKeyMaxDays') ??
+            'New keys must expire within this many days, and older keys stop working. 0 turns this off.'
+          }
+        >
+          {(p) => (
+            <Input
+              {...p}
+              type="number"
+              min={0}
+              max={3650}
+              className="sm:max-w-48"
+              {...form.register('apiKeyMaxDays', num)}
+            />
+          )}
+        </Field>
+      </Pane>
       <Pane title="Two-factor authentication">
         <div className="flex flex-col gap-3 text-sm">
           <label className="flex items-center gap-3">
