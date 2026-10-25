@@ -1,4 +1,5 @@
 import type { ApiErrorBody, ErrorCode } from '@app/shared';
+import { idleMs } from './activity';
 
 export class ApiError extends Error {
   constructor(
@@ -49,7 +50,7 @@ function refreshSession(): Promise<boolean> {
     const res = await fetch(`${BASE}/auth/refresh`, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'x-csrf-token': await csrfToken() },
+      headers: { 'x-csrf-token': await csrfToken(), 'x-idle-ms': String(idleMs()) },
     });
     return res.ok;
   })().finally(() => {
@@ -85,7 +86,7 @@ export function buildUrl(path: string, query?: RequestOptions['query']) {
 export async function api<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
   const method = opts.method ?? 'GET';
   const isForm = opts.body instanceof FormData;
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = { Accept: 'application/json', 'x-idle-ms': String(idleMs()) };
   if (method !== 'GET') headers['x-csrf-token'] = await csrfToken();
   if (opts.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
 

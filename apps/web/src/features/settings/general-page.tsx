@@ -4,11 +4,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import type {
+  ComplianceSettings,
   ContactSettings,
   DealSettings,
   FeatureSettings,
   GeneralSettings,
   SecuritySettings,
+  ComplianceProfile,
 } from '@app/shared';
 import { apiDelete, apiGet, apiPatch } from '@/lib/api';
 import { useBranding } from '@/app/branding';
@@ -18,6 +20,7 @@ import { Field, Input, NativeSelect } from '@/components/ui/input';
 import { Pane, Skeleton } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/checkbox';
 import { SettingsPage } from './layout';
+import { floorHint } from './compliance-floors';
 
 interface AllSettings {
   general: GeneralSettings;
@@ -25,13 +28,14 @@ interface AllSettings {
   features: FeatureSettings;
   deals: DealSettings;
   contacts: ContactSettings;
+  compliance: ComplianceSettings;
 }
 
-function useSettings() {
+export function useSettings() {
   return useQuery({ queryKey: ['settings', 'all'], queryFn: () => apiGet<AllSettings>('/settings') });
 }
 
-function useSaveGroup<G extends keyof AllSettings>(group: G) {
+export function useSaveGroup<G extends keyof AllSettings>(group: G) {
   const qc = useQueryClient();
   const t = useT();
   return useMutation({
@@ -248,21 +252,26 @@ export function SecuritySettingsPage() {
       title={t('settings.security')}
       description="Password rules, account lockout and two-factor authentication."
     >
-      {q.data ? <SecurityForm initial={q.data.security} /> : <Skeleton className="h-80" />}
+      {q.data ? (
+        <SecurityForm initial={q.data.security} profile={q.data.compliance.profile} />
+      ) : (
+        <Skeleton className="h-80" />
+      )}
       <DemoLoginPane />
     </SettingsPage>
   );
 }
 
-function SecurityForm({ initial }: { initial: SecuritySettings }) {
+function SecurityForm({ initial, profile }: { initial: SecuritySettings; profile: ComplianceProfile }) {
   const form = useForm({ defaultValues: initial });
+  const hint = (key: keyof SecuritySettings) => floorHint('security', key, profile);
   const save = useSaveGroup('security');
   const num = { valueAsNumber: true } as const;
   return (
     <form onSubmit={form.handleSubmit((v) => save.mutate(v))} className="flex flex-col gap-6">
       <Pane title="Passwords">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Minimum length">
+          <Field label="Minimum length" help={hint('passwordMinLength')}>
             {(p) => (
               <Input {...p} type="number" min={8} max={128} {...form.register('passwordMinLength', num)} />
             )}
@@ -274,12 +283,15 @@ function SecurityForm({ initial }: { initial: SecuritySettings }) {
               {...form.register('passwordRequireMixed')}
             />
             Require upper and lowercase letters and a digit
+            {hint('passwordRequireMixed') ? (
+              <span className="text-xs text-muted">({hint('passwordRequireMixed')})</span>
+            ) : null}
           </label>
         </div>
       </Pane>
       <Pane title="Lockout">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Failed attempts before lockout">
+          <Field label="Failed attempts before lockout" help={hint('lockoutMaxAttempts')}>
             {(p) => (
               <Input {...p} type="number" min={3} max={50} {...form.register('lockoutMaxAttempts', num)} />
             )}
@@ -309,6 +321,7 @@ function SecurityForm({ initial }: { initial: SecuritySettings }) {
             />
             Require it for admins
           </label>
+          <p className="text-xs text-muted">Require it for other roles, or for everyone, under Compliance.</p>
         </div>
       </Pane>
       <div>
