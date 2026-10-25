@@ -1,11 +1,12 @@
 /**
- * Last keyboard/pointer input, shared across this browser's tabs. Sent with every API call
- * (`x-idle-ms`) so the server's idle timeout ignores background requests such as polling and
- * token refresh, and read by the idle sign-out timer.
+ * Last keyboard/pointer input, shared across this browser's tabs. The time since the last input
+ * is sent with every API call (`x-idle-ms`) so the server can move its idle clock forward only for
+ * real use, never for background requests such as polling and token refresh.
  */
 const KEY = 'ui.lastInput';
 const EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const;
-let lastInput = Date.now();
+const pageLoadedAt = Date.now();
+let lastInput = 0;
 let lastShared = 0;
 
 function share(at: number) {
@@ -35,7 +36,17 @@ if (typeof window !== 'undefined') {
   for (const e of EVENTS) window.addEventListener(e, mark, { passive: true, capture: true });
 }
 
-export const idleMs = () => Math.max(0, Date.now() - Math.max(lastInput, sharedInput()));
+/** Time of the last real input in any tab, or 0 if there has been none. */
+export const lastInputAt = () => Math.max(lastInput, sharedInput());
+
+/** Value for the `x-idle-ms` header, or undefined before any input (a page load is not activity). */
+export function idleHeader(): string | undefined {
+  const at = lastInputAt();
+  return at ? String(Math.max(0, Date.now() - at)) : undefined;
+}
+
+/** Idle time for the sign-out timer. Opening the page starts the clock. */
+export const idleMs = () => Math.max(0, Date.now() - Math.max(lastInputAt(), pageLoadedAt));
 
 /** Treat a deliberate action (for example "Stay signed in") as input. */
 export function markActive() {

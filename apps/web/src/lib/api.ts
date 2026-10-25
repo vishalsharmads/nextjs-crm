@@ -1,5 +1,5 @@
 import type { ApiErrorBody, ErrorCode } from '@app/shared';
-import { idleMs } from './activity';
+import { idleHeader } from './activity';
 
 export class ApiError extends Error {
   constructor(
@@ -43,6 +43,11 @@ async function csrfToken(): Promise<string> {
   return csrfPromise;
 }
 
+function idleHeaders(): Record<string, string> {
+  const idle = idleHeader();
+  return idle === undefined ? {} : { 'x-idle-ms': idle };
+}
+
 let refreshPromise: Promise<boolean> | null = null;
 /** Single-flight refresh: concurrent 401s share one refresh request. */
 function refreshSession(): Promise<boolean> {
@@ -50,7 +55,7 @@ function refreshSession(): Promise<boolean> {
     const res = await fetch(`${BASE}/auth/refresh`, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'x-csrf-token': await csrfToken(), 'x-idle-ms': String(idleMs()) },
+      headers: { 'x-csrf-token': await csrfToken(), ...idleHeaders() },
     });
     return res.ok;
   })().finally(() => {
@@ -86,7 +91,7 @@ export function buildUrl(path: string, query?: RequestOptions['query']) {
 export async function api<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
   const method = opts.method ?? 'GET';
   const isForm = opts.body instanceof FormData;
-  const headers: Record<string, string> = { Accept: 'application/json', 'x-idle-ms': String(idleMs()) };
+  const headers: Record<string, string> = { Accept: 'application/json', ...idleHeaders() };
   if (method !== 'GET') headers['x-csrf-token'] = await csrfToken();
   if (opts.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
 

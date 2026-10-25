@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import i18n from 'i18next';
 
 const logout = vi.fn(() => Promise.resolve());
-vi.mock('@/lib/api', () => ({ apiPost: () => logout() }));
+vi.mock('@/lib/api', () => ({
+  apiPost: (path: string) => (path === '/auth/logout' ? logout() : Promise.resolve()),
+}));
 vi.mock('@/app/session', () => ({
   bootstrapKey: ['bootstrap'],
   useBoot: () => ({ settings: { session: { idleTimeoutMinutes: 2, profile: 'hipaa' } } }),

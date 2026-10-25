@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBoot, useT, bootstrapKey } from '@/app/session';
 import { apiPost } from '@/lib/api';
-import { idleMs, markActive } from '@/lib/activity';
+import { idleMs, lastInputAt, markActive } from '@/lib/activity';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
@@ -21,7 +21,14 @@ export function IdleTimeout() {
   useEffect(() => {
     if (!limitMs) return;
     let done = false;
+    let pingedAt = Date.now();
     const tick = () => {
+      // The server judges idleness by its own record, so report real input at most once a minute.
+      const input = lastInputAt();
+      if (input > pingedAt && Date.now() - pingedAt >= 60_000) {
+        pingedAt = Date.now();
+        void apiPost('/me/activity').catch(() => undefined);
+      }
       const remaining = limitMs - idleMs();
       if (remaining <= 0 && !done) {
         done = true;
@@ -43,6 +50,7 @@ export function IdleTimeout() {
   const stay = () => {
     markActive();
     setLeft(null);
+    void apiPost('/me/activity').catch(() => undefined);
   };
 
   return (
