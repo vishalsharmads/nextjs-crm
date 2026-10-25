@@ -1,0 +1,1435 @@
+{
+  "$schema": "../schema.json",
+  "key": "healthcare-clinics",
+  "name": "Healthcare clinic",
+  "version": "1.0.0",
+  "description": "Patients, referrers and treatment plans for private dental, physio and skin clinics, from first enquiry to completed treatment and recall.",
+  "settings": {
+    "features": { "leads": true },
+    "general": { "currency": "USD" },
+    "contacts": {
+      "sources": ["Website", "Phone", "Referral", "Walk-in", "Search", "Social", "Employer program", "Other"],
+      "lifecycleStatuses": ["Enquirer", "New patient", "Active patient", "Completed", "Inactive"]
+    },
+    "deals": {
+      "lostReasons": [
+        "Cost",
+        "Chose another clinic",
+        "Timing",
+        "Not covered by insurance",
+        "Not suitable for treatment",
+        "No response"
+      ]
+    }
+  },
+  "vocabulary": {
+    "contact": { "singular": "Patient", "plural": "Patients" },
+    "organization": { "singular": "Referrer", "plural": "Referrers" },
+    "deal": { "singular": "Treatment plan", "plural": "Treatment plans" }
+  },
+  "modules": ["bookings", "quotes", "invoices", "documents", "portal"],
+  "custom_field_groups": {
+    "contact": [{ "key": "patient", "label": "Patient details" }],
+    "deal": [{ "key": "plan", "label": "Plan details" }]
+  },
+  "custom_fields": {
+    "contact": [
+      {
+        "key": "payment_type",
+        "label": "Payment type",
+        "type": "select",
+        "group": "patient",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          { "key": "self_pay", "label": "Self-pay" },
+          { "key": "insurance", "label": "Insurance" },
+          { "key": "payment_plan", "label": "Payment plan" },
+          { "key": "employer", "label": "Employer program" }
+        ]
+      },
+      {
+        "key": "intake_complete",
+        "label": "Intake forms complete",
+        "type": "boolean",
+        "group": "patient",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "recall_due",
+        "label": "Recall due",
+        "type": "date",
+        "group": "patient",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ],
+    "deal": [
+      {
+        "key": "service_line",
+        "label": "Service",
+        "type": "select",
+        "group": "plan",
+        "required": true,
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          { "key": "general_dental", "label": "General dental" },
+          { "key": "implants", "label": "Implants" },
+          { "key": "orthodontics", "label": "Orthodontics" },
+          { "key": "physiotherapy", "label": "Physiotherapy" },
+          { "key": "skin", "label": "Skin" }
+        ]
+      },
+      {
+        "key": "practitioner",
+        "label": "Practitioner",
+        "type": "text",
+        "group": "plan",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "sessions_planned",
+        "label": "Sessions planned",
+        "type": "number",
+        "group": "plan",
+        "validation": { "min": 1, "max": 60 }
+      },
+      {
+        "key": "next_appointment",
+        "label": "Next appointment",
+        "type": "date",
+        "group": "plan",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "consent_signed",
+        "label": "Consent signed",
+        "type": "boolean",
+        "group": "plan",
+        "filterable": true
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "treatment_plans",
+      "name": "Treatment plans",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        { "key": "enquiry", "name": "Enquiry", "probability": 10, "rotting_days": 2 },
+        { "key": "consult_booked", "name": "Consult booked", "probability": 30, "rotting_days": 10 },
+        { "key": "plan_proposed", "name": "Plan proposed", "probability": 55, "rotting_days": 7 },
+        { "key": "in_treatment", "name": "In treatment", "probability": 90, "rotting_days": 45 },
+        { "key": "completed", "name": "Completed", "probability": 100, "is_won": true },
+        { "key": "lost", "name": "Lost", "probability": 0, "is_lost": true }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "practitioner",
+      "name": "Practitioner",
+      "description": "Sees every patient, runs their own treatment plans, quotes and consent forms",
+      "permissions": [
+        "core.contacts.view",
+        "core.contacts.update",
+        "core.organizations.view",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.view",
+        "core.files.*",
+        "core.dashboard.view",
+        "quotes.quotes.*",
+        "documents.documents.*",
+        "bookings.bookings.view",
+        "invoices.invoices.view"
+      ],
+      "scopes": {
+        "core.contacts": "all",
+        "core.organizations": "all",
+        "core.deals": "own",
+        "core.activities": "own"
+      }
+    },
+    {
+      "key": "front_desk",
+      "name": "Front desk",
+      "description": "Answers enquiries, books consults, collects forms and takes payments",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.leads.*",
+        "core.deals.view",
+        "core.deals.create",
+        "core.deals.update",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.view",
+        "core.saved_views.share",
+        "bookings.bookings.*",
+        "documents.documents.*",
+        "quotes.quotes.view",
+        "invoices.invoices.*",
+        "invoices.payments.manage",
+        "portal.accounts.manage"
+      ],
+      "scopes": { "*": "all" }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": [
+        "full_name",
+        "email",
+        "phone",
+        "lifecycle_status",
+        "cf.payment_type",
+        "cf.intake_complete",
+        "cf.recall_due",
+        "owner"
+      ]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": [
+        "title",
+        "contact",
+        "stage",
+        "value",
+        "cf.service_line",
+        "cf.practitioner",
+        "cf.next_appointment",
+        "owner"
+      ]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "occupancy",
+        "type": "module:bookings.occupancy",
+        "title": "Room and chair use",
+        "size": "sm"
+      },
+      {
+        "key": "forms",
+        "type": "module:documents.awaiting",
+        "title": "Forms awaiting action",
+        "size": "sm"
+      },
+      {
+        "key": "pipeline_value",
+        "type": "pipeline_value",
+        "title": "Treatment plans by stage",
+        "size": "lg",
+        "params": { "pipeline": "treatment_plans" }
+      },
+      {
+        "key": "appointments",
+        "type": "date_window",
+        "title": "Appointments in the next 14 days",
+        "size": "md",
+        "params": { "entity": "deal", "field": "cf.next_appointment", "days": 14, "status": "open" }
+      },
+      {
+        "key": "recalls",
+        "type": "date_window",
+        "title": "Recalls due in the next 60 days",
+        "size": "md",
+        "params": { "entity": "contact", "field": "cf.recall_due", "days": 60 }
+      },
+      {
+        "key": "receivables",
+        "type": "module:invoices.receivables",
+        "title": "Outstanding balances",
+        "size": "sm"
+      },
+      { "key": "tasks_due", "type": "tasks_due", "title": "My tasks due", "size": "md" }
+    ]
+  },
+  "templates": [
+    {
+      "key": "clinic.plan_follow_up",
+      "channel": "email",
+      "name": "Plan follow-up",
+      "subject": "Any questions about your plan?",
+      "body": "<p>Hi {{contact.firstName}},</p><p>Thanks for coming in to see us. We know a new plan is a lot to take in, so we wanted to check whether you have any questions about the steps, timing or costs.</p><p>Reply to this email or call the front desk and we will be happy to talk it through or book your first session.</p>"
+    },
+    {
+      "key": "clinic.recall_reminder",
+      "channel": "email",
+      "name": "Recall reminder",
+      "subject": "Time to book your next check-in",
+      "body": "<p>Hi {{contact.firstName}},</p><p>It has been a while since your last visit, and you are now due for a check-in. Reply to this email or call the front desk to choose a time that suits you.</p>"
+    }
+  ],
+  "sample_data": {
+    "organizations": [
+      {
+        "ref": "oakridge",
+        "name": "Oakridge Family Medicine",
+        "website": "https://oakridgefm.test",
+        "industry": "Primary care",
+        "days": -260
+      },
+      {
+        "ref": "northgate",
+        "name": "Northgate Dental Group",
+        "website": "https://northgatedental.test",
+        "industry": "General dentistry",
+        "days": -230,
+        "owner": "practitioner"
+      },
+      {
+        "ref": "cascade",
+        "name": "Cascade Rowing Club",
+        "website": "https://cascaderowing.test",
+        "industry": "Sports club",
+        "days": -170,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "timberline",
+        "name": "Timberline Logistics",
+        "website": "https://timberline-logistics.test",
+        "industry": "Employer wellness program",
+        "days": -120,
+        "owner": "admin"
+      },
+      {
+        "ref": "fernhill",
+        "name": "Fernhill Senior Living",
+        "website": "https://fernhill-living.test",
+        "industry": "Senior living",
+        "days": -200,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "hawthorne",
+        "name": "Hawthorne Chiropractic",
+        "website": "https://hawthornechiro.test",
+        "industry": "Chiropractic",
+        "days": -45,
+        "owner": "practitioner"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "maya",
+        "first_name": "Maya",
+        "last_name": "Chen",
+        "email": "maya.chen@example.test",
+        "phone": "+1 503 555 0111",
+        "lifecycle_status": "Enquirer",
+        "source": "Website",
+        "custom": { "payment_type": "insurance", "intake_complete": false },
+        "days": -3,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "nate",
+        "first_name": "Nate",
+        "last_name": "Sullivan",
+        "email": "nate.s@example.test",
+        "phone": "+1 503 555 0112",
+        "job_title": "Rower",
+        "organization": "cascade",
+        "lifecycle_status": "Enquirer",
+        "source": "Walk-in",
+        "custom": { "payment_type": "self_pay" },
+        "days": -1,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "tom",
+        "first_name": "Tom",
+        "last_name": "Riley",
+        "email": "tom.riley@example.test",
+        "phone": "+1 503 555 0113",
+        "lifecycle_status": "New patient",
+        "source": "Phone",
+        "custom": { "payment_type": "payment_plan", "intake_complete": true },
+        "days": -9,
+        "owner": "practitioner"
+      },
+      {
+        "ref": "priya",
+        "first_name": "Priya",
+        "last_name": "Raman",
+        "email": "priya.raman@example.test",
+        "lifecycle_status": "New patient",
+        "source": "Social",
+        "custom": { "payment_type": "self_pay", "intake_complete": false },
+        "days": -6,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "ana",
+        "first_name": "Ana",
+        "last_name": "Ruiz",
+        "email": "ana.ruiz@example.test",
+        "phone": "+1 503 555 0114",
+        "organization": "northgate",
+        "lifecycle_status": "New patient",
+        "source": "Referral",
+        "custom": { "payment_type": "payment_plan", "intake_complete": true },
+        "days": -32,
+        "owner": "practitioner"
+      },
+      {
+        "ref": "rosa",
+        "first_name": "Rosa",
+        "last_name": "Delgado",
+        "email": "rosa.delgado@timberline-logistics.test",
+        "phone": "+1 503 555 0115",
+        "job_title": "Warehouse supervisor",
+        "organization": "timberline",
+        "lifecycle_status": "New patient",
+        "source": "Employer program",
+        "custom": { "payment_type": "employer", "intake_complete": true },
+        "days": -20
+      },
+      {
+        "ref": "jorge",
+        "first_name": "Jorge",
+        "last_name": "Medina",
+        "email": "jorge.medina@example.test",
+        "lifecycle_status": "New patient",
+        "source": "Search",
+        "custom": { "payment_type": "self_pay", "intake_complete": true },
+        "days": -14,
+        "owner": "practitioner"
+      },
+      {
+        "ref": "sam",
+        "first_name": "Sam",
+        "last_name": "Patel",
+        "email": "sam.patel@example.test",
+        "phone": "+1 503 555 0116",
+        "job_title": "Rower",
+        "organization": "cascade",
+        "lifecycle_status": "Active patient",
+        "source": "Referral",
+        "custom": { "payment_type": "insurance", "intake_complete": true },
+        "days": -60,
+        "owner": "practitioner"
+      },
+      {
+        "ref": "grace",
+        "first_name": "Grace",
+        "last_name": "Whitfield",
+        "email": "grace.w@example.test",
+        "phone": "+1 503 555 0117",
+        "lifecycle_status": "Active patient",
+        "source": "Social",
+        "custom": { "payment_type": "payment_plan", "intake_complete": true },
+        "days": -150,
+        "owner": "practitioner"
+      },
+      {
+        "ref": "henry",
+        "first_name": "Henry",
+        "last_name": "Calder",
+        "email": "henry.calder@fernhill-living.test",
+        "phone": "+1 503 555 0118",
+        "organization": "fernhill",
+        "lifecycle_status": "Active patient",
+        "source": "Referral",
+        "custom": { "payment_type": "insurance", "intake_complete": true },
+        "days": -75,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "claire",
+        "first_name": "Claire",
+        "last_name": "Donovan",
+        "email": "claire.donovan@example.test",
+        "phone": "+1 503 555 0119",
+        "organization": "northgate",
+        "lifecycle_status": "Active patient",
+        "source": "Referral",
+        "custom": { "payment_type": "payment_plan", "intake_complete": true },
+        "days": -95,
+        "owner": "practitioner"
+      },
+      {
+        "ref": "lee",
+        "first_name": "Lee",
+        "last_name": "Park",
+        "email": "lee.park@example.test",
+        "phone": "+1 503 555 0120",
+        "lifecycle_status": "Completed",
+        "source": "Website",
+        "custom": { "payment_type": "insurance", "intake_complete": true, "recall_due": "{{date:+24}}" },
+        "days": -190
+      },
+      {
+        "ref": "daniel",
+        "first_name": "Daniel",
+        "last_name": "Okoye",
+        "email": "daniel.okoye@example.test",
+        "lifecycle_status": "Completed",
+        "source": "Search",
+        "custom": { "payment_type": "self_pay", "intake_complete": true, "recall_due": "{{date:+45}}" },
+        "days": -140,
+        "owner": "practitioner"
+      },
+      {
+        "ref": "hannah",
+        "first_name": "Hannah",
+        "last_name": "Lee",
+        "email": "hannah.lee@example.test",
+        "phone": "+1 503 555 0121",
+        "lifecycle_status": "Inactive",
+        "source": "Website",
+        "custom": { "payment_type": "self_pay", "intake_complete": true, "recall_due": "{{date:-12}}" },
+        "days": -250,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "marcus",
+        "first_name": "Marcus",
+        "last_name": "Bell",
+        "email": "marcus.bell@example.test",
+        "lifecycle_status": "Inactive",
+        "source": "Phone",
+        "custom": { "payment_type": "self_pay", "intake_complete": true },
+        "days": -110
+      },
+      {
+        "ref": "olivia",
+        "first_name": "Olivia",
+        "last_name": "Grant",
+        "email": "olivia.grant@example.test",
+        "phone": "+1 503 555 0122",
+        "lifecycle_status": "Inactive",
+        "source": "Social",
+        "custom": { "payment_type": "payment_plan" },
+        "days": -80,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "ben",
+        "first_name": "Ben",
+        "last_name": "Foster",
+        "email": "ben.foster@example.test",
+        "phone": "+1 503 555 0123",
+        "organization": "oakridge",
+        "lifecycle_status": "Active patient",
+        "source": "Referral",
+        "custom": { "payment_type": "insurance", "intake_complete": true, "recall_due": "{{date:+8}}" },
+        "days": -220
+      },
+      {
+        "ref": "aisha",
+        "first_name": "Aisha",
+        "last_name": "Bello",
+        "email": "aisha.bello@example.test",
+        "lifecycle_status": "Enquirer",
+        "source": "Website",
+        "custom": { "intake_complete": false },
+        "days": -2,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "elaine",
+        "first_name": "Elaine",
+        "last_name": "Morgan",
+        "email": "e.morgan@oakridgefm.test",
+        "phone": "+1 503 555 0130",
+        "job_title": "Family physician",
+        "organization": "oakridge",
+        "source": "Referral",
+        "days": -260,
+        "owner": "admin"
+      },
+      {
+        "ref": "kevin",
+        "first_name": "Kevin",
+        "last_name": "Tran",
+        "email": "kevin.tran@northgatedental.test",
+        "phone": "+1 503 555 0131",
+        "job_title": "General dentist",
+        "organization": "northgate",
+        "source": "Referral",
+        "days": -230,
+        "owner": "practitioner"
+      },
+      {
+        "ref": "rachel",
+        "first_name": "Rachel",
+        "last_name": "Byrne",
+        "email": "coach@cascaderowing.test",
+        "phone": "+1 503 555 0132",
+        "job_title": "Head coach",
+        "organization": "cascade",
+        "source": "Referral",
+        "days": -170,
+        "owner": "front_desk"
+      }
+    ],
+    "leads": [
+      {
+        "ref": "lucy",
+        "first_name": "Lucy",
+        "last_name": "Hart",
+        "email": "lucy.hart@example.test",
+        "phone": "+1 503 555 0140",
+        "source": "Website",
+        "status": "new",
+        "days": 0,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "victor",
+        "first_name": "Victor",
+        "last_name": "Alvarez",
+        "email": "victor.alvarez@example.test",
+        "phone": "+1 503 555 0141",
+        "source": "Phone",
+        "status": "contacted",
+        "days": -2,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "megan",
+        "first_name": "Megan",
+        "last_name": "Price",
+        "email": "megan.price@example.test",
+        "source": "Search",
+        "status": "qualified",
+        "days": -4
+      },
+      {
+        "ref": "derek",
+        "first_name": "Derek",
+        "last_name": "Shaw",
+        "email": "derek.shaw@timberline-logistics.test",
+        "company_name": "Timberline Logistics",
+        "job_title": "HR manager",
+        "source": "Employer program",
+        "status": "contacted",
+        "days": -8,
+        "owner": "admin"
+      },
+      {
+        "ref": "fatima",
+        "first_name": "Fatima",
+        "last_name": "Haddad",
+        "email": "fatima.h@example.test",
+        "source": "Social",
+        "status": "unqualified",
+        "days": -15,
+        "owner": "front_desk"
+      }
+    ],
+    "deals": [
+      {
+        "ref": "maya",
+        "title": "Maya Chen – implant enquiry",
+        "contact": "maya",
+        "stage": "enquiry",
+        "value": 4200,
+        "days": -3,
+        "owner": "front_desk",
+        "custom": { "service_line": "implants" }
+      },
+      {
+        "ref": "nate",
+        "title": "Nate Sullivan – physio course",
+        "contact": "nate",
+        "organization": "cascade",
+        "stage": "enquiry",
+        "value": 720,
+        "days": -1,
+        "owner": "front_desk",
+        "custom": { "service_line": "physiotherapy" }
+      },
+      {
+        "ref": "tom",
+        "title": "Tom Riley – clear aligners",
+        "contact": "tom",
+        "stage": "consult_booked",
+        "value": 5600,
+        "days": -9,
+        "stage_days": -6,
+        "owner": "practitioner",
+        "custom": {
+          "service_line": "orthodontics",
+          "practitioner": "Dr. Lena Ortiz",
+          "next_appointment": "{{date:+2}}"
+        }
+      },
+      {
+        "ref": "priya",
+        "title": "Priya Raman – whitening",
+        "contact": "priya",
+        "stage": "consult_booked",
+        "value": 450,
+        "days": -6,
+        "stage_days": -4,
+        "owner": "front_desk",
+        "custom": {
+          "service_line": "general_dental",
+          "practitioner": "Dr. Samuel Reid",
+          "next_appointment": "{{date:+4}}"
+        }
+      },
+      {
+        "ref": "ana",
+        "title": "Ana Ruiz – single implant",
+        "contact": "ana",
+        "organization": "northgate",
+        "stage": "plan_proposed",
+        "value": 4800,
+        "days": -32,
+        "stage_days": -10,
+        "expected_close": "{{date:+7}}",
+        "owner": "practitioner",
+        "custom": {
+          "service_line": "implants",
+          "practitioner": "Dr. Samuel Reid",
+          "sessions_planned": 4,
+          "consent_signed": false
+        }
+      },
+      {
+        "ref": "rosa",
+        "title": "Rosa Delgado – physio, 8 sessions",
+        "contact": "rosa",
+        "organization": "timberline",
+        "stage": "plan_proposed",
+        "value": 960,
+        "days": -20,
+        "stage_days": -5,
+        "expected_close": "{{date:+5}}",
+        "custom": {
+          "service_line": "physiotherapy",
+          "practitioner": "Jordan Blake, PT",
+          "sessions_planned": 8
+        }
+      },
+      {
+        "ref": "jorge",
+        "title": "Jorge Medina – skin course",
+        "contact": "jorge",
+        "stage": "plan_proposed",
+        "value": 1200,
+        "days": -14,
+        "stage_days": -9,
+        "expected_close": "{{date:+3}}",
+        "owner": "practitioner",
+        "custom": { "service_line": "skin", "practitioner": "Nina Alvarez, NP", "sessions_planned": 4 }
+      },
+      {
+        "ref": "sam",
+        "title": "Sam Patel – physio, 6 sessions",
+        "contact": "sam",
+        "organization": "cascade",
+        "stage": "in_treatment",
+        "value": 720,
+        "days": -60,
+        "stage_days": -35,
+        "owner": "practitioner",
+        "custom": {
+          "service_line": "physiotherapy",
+          "practitioner": "Jordan Blake, PT",
+          "sessions_planned": 6,
+          "next_appointment": "{{date:+3}}",
+          "consent_signed": true
+        }
+      },
+      {
+        "ref": "grace",
+        "title": "Grace Whitfield – clear aligners",
+        "contact": "grace",
+        "stage": "in_treatment",
+        "value": 5600,
+        "days": -150,
+        "stage_days": -120,
+        "owner": "practitioner",
+        "custom": {
+          "service_line": "orthodontics",
+          "practitioner": "Dr. Lena Ortiz",
+          "sessions_planned": 10,
+          "next_appointment": "{{date:+12}}",
+          "consent_signed": true
+        }
+      },
+      {
+        "ref": "henry",
+        "title": "Henry Calder – dentures and hygiene",
+        "contact": "henry",
+        "organization": "fernhill",
+        "stage": "in_treatment",
+        "value": 2600,
+        "days": -75,
+        "stage_days": -40,
+        "owner": "admin",
+        "custom": {
+          "service_line": "general_dental",
+          "practitioner": "Dr. Samuel Reid",
+          "sessions_planned": 5,
+          "next_appointment": "{{date:+5}}",
+          "consent_signed": true
+        }
+      },
+      {
+        "ref": "claire",
+        "title": "Claire Donovan – two implants",
+        "contact": "claire",
+        "organization": "northgate",
+        "stage": "in_treatment",
+        "value": 9200,
+        "days": -95,
+        "stage_days": -50,
+        "owner": "practitioner",
+        "custom": {
+          "service_line": "implants",
+          "practitioner": "Dr. Samuel Reid",
+          "sessions_planned": 6,
+          "next_appointment": "{{date:+9}}",
+          "consent_signed": true
+        }
+      },
+      {
+        "ref": "lee",
+        "title": "Lee Park – crown and hygiene",
+        "contact": "lee",
+        "stage": "completed",
+        "value": 1650,
+        "days": -190,
+        "stage_days": -20,
+        "custom": {
+          "service_line": "general_dental",
+          "practitioner": "Dr. Samuel Reid",
+          "sessions_planned": 3,
+          "consent_signed": true
+        }
+      },
+      {
+        "ref": "daniel",
+        "title": "Daniel Okoye – skin course",
+        "contact": "daniel",
+        "stage": "completed",
+        "value": 1200,
+        "days": -140,
+        "stage_days": -45,
+        "owner": "practitioner",
+        "custom": {
+          "service_line": "skin",
+          "practitioner": "Nina Alvarez, NP",
+          "sessions_planned": 4,
+          "consent_signed": true
+        }
+      },
+      {
+        "ref": "hannah",
+        "title": "Hannah Lee – whitening",
+        "contact": "hannah",
+        "stage": "completed",
+        "value": 450,
+        "days": -250,
+        "stage_days": -200,
+        "owner": "front_desk",
+        "custom": {
+          "service_line": "general_dental",
+          "practitioner": "Dr. Samuel Reid",
+          "sessions_planned": 1,
+          "consent_signed": true
+        }
+      },
+      {
+        "ref": "marcus",
+        "title": "Marcus Bell – implant bridge",
+        "contact": "marcus",
+        "stage": "lost",
+        "value": 11500,
+        "days": -110,
+        "stage_days": -70,
+        "lost_reason": "Cost",
+        "owner": "practitioner",
+        "custom": { "service_line": "implants", "practitioner": "Dr. Samuel Reid", "sessions_planned": 6 }
+      },
+      {
+        "ref": "olivia",
+        "title": "Olivia Grant – clear aligners",
+        "contact": "olivia",
+        "stage": "lost",
+        "value": 5600,
+        "days": -80,
+        "stage_days": -50,
+        "lost_reason": "Chose another clinic",
+        "owner": "front_desk",
+        "custom": { "service_line": "orthodontics", "practitioner": "Dr. Lena Ortiz" }
+      }
+    ],
+    "activities": [
+      {
+        "type": "task",
+        "related": "deal:maya",
+        "subject": "Call Maya back about her web enquiry",
+        "due_days": 0,
+        "priority": "high",
+        "days": -1,
+        "owner": "front_desk"
+      },
+      {
+        "type": "note",
+        "related": "contact:maya",
+        "body": "<p>Asked about implant options and whether her insurance helps with the cost. Prefers a call after 4pm.</p>",
+        "days": -3,
+        "owner": "front_desk"
+      },
+      {
+        "type": "call",
+        "related": "deal:nate",
+        "subject": "Book Nate’s first physio assessment",
+        "due_days": 1,
+        "days": -1,
+        "owner": "front_desk"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:tom",
+        "subject": "Aligner consult with Tom Riley",
+        "due_days": 2,
+        "hour": 15,
+        "days": -6,
+        "owner": "practitioner"
+      },
+      {
+        "type": "note",
+        "related": "deal:tom",
+        "body": "<p>Tom wants to know the monthly payment-plan amount before the consult. Bring the finance sheet.</p>",
+        "days": -5,
+        "owner": "front_desk"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:priya",
+        "subject": "Whitening consult: Priya Raman",
+        "due_days": 4,
+        "hour": 10,
+        "days": -4,
+        "owner": "practitioner"
+      },
+      {
+        "type": "task",
+        "related": "contact:priya",
+        "subject": "Send intake form to Priya before her consult",
+        "due_days": -1,
+        "priority": "high",
+        "days": -4,
+        "owner": "front_desk"
+      },
+      {
+        "type": "note",
+        "related": "deal:ana",
+        "body": "<p>Consult done. Four-visit plan quoted, about four months end to end. Ana wants to start after her vacation and asked about a payment plan.</p>",
+        "days": -10,
+        "owner": "practitioner"
+      },
+      {
+        "type": "call",
+        "related": "deal:ana",
+        "subject": "Follow up on Ana’s plan quote",
+        "due_days": -2,
+        "priority": "high",
+        "days": -9,
+        "owner": "practitioner"
+      },
+      {
+        "type": "call",
+        "related": "deal:rosa",
+        "subject": "Confirm employer program covers 8 sessions",
+        "due_days": -3,
+        "done": true,
+        "outcome": "Approved by HR, form to follow",
+        "days": -5
+      },
+      {
+        "type": "task",
+        "related": "deal:jorge",
+        "subject": "Check in with Jorge about the skin plan",
+        "due_days": -1,
+        "days": -7,
+        "owner": "practitioner"
+      },
+      {
+        "type": "note",
+        "related": "deal:sam",
+        "body": "<p>Session 3 of 6 done. Sam can only make early mornings during rowing season; keep the 7am slot.</p>",
+        "days": -4,
+        "owner": "practitioner"
+      },
+      {
+        "type": "task",
+        "related": "deal:sam",
+        "subject": "Chase Sam’s unpaid physio invoice",
+        "due_days": 1,
+        "priority": "high",
+        "days": -2,
+        "owner": "front_desk"
+      },
+      {
+        "type": "note",
+        "related": "deal:grace",
+        "body": "<p>Tray 6 of 10 handed over. Next review in two weeks. Grace asked to move evening visits to Thursdays.</p>",
+        "days": -16,
+        "owner": "practitioner"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:grace",
+        "subject": "Aligner review: Grace Whitfield",
+        "due_days": 12,
+        "hour": 16,
+        "days": -16,
+        "owner": "practitioner"
+      },
+      {
+        "type": "call",
+        "related": "deal:henry",
+        "subject": "Arrange transport with Fernhill for Henry’s visit",
+        "due_days": -6,
+        "done": true,
+        "outcome": "Shuttle booked for 1:30pm",
+        "days": -8,
+        "owner": "front_desk"
+      },
+      {
+        "type": "note",
+        "related": "deal:claire",
+        "body": "<p>Plan accepted and deposit paid. Stage 2 visit booked; Claire prefers late-morning appointments.</p>",
+        "days": -48,
+        "owner": "practitioner"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:claire",
+        "subject": "Implant visit 3: Claire Donovan",
+        "due_days": 9,
+        "hour": 11,
+        "days": -20,
+        "owner": "practitioner"
+      },
+      {
+        "type": "task",
+        "related": "deal:henry",
+        "subject": "Prepare draft invoice for Henry’s dentures",
+        "due_days": 4,
+        "days": -1,
+        "owner": "front_desk"
+      },
+      {
+        "type": "note",
+        "related": "deal:lee",
+        "body": "<p>Plan completed. Recall set for six months; Lee asked for an email reminder rather than a text.</p>",
+        "days": -20,
+        "owner": "front_desk"
+      },
+      {
+        "type": "task",
+        "related": "contact:hannah",
+        "subject": "Recall overdue: invite Hannah to book a check-in",
+        "due_days": -5,
+        "days": -12,
+        "owner": "front_desk"
+      },
+      {
+        "type": "task",
+        "related": "contact:ben",
+        "subject": "Book Ben’s recall appointment",
+        "due_days": 3,
+        "days": -1,
+        "owner": "front_desk"
+      },
+      {
+        "type": "note",
+        "related": "deal:marcus",
+        "body": "<p>Marcus decided the bridge is outside his budget this year. Happy for us to contact him again in the spring.</p>",
+        "days": -70,
+        "owner": "practitioner"
+      },
+      {
+        "type": "note",
+        "related": "deal:olivia",
+        "body": "<p>Olivia went with a clinic closer to her office. Mentioned our evening hours did not suit.</p>",
+        "days": -50,
+        "owner": "front_desk"
+      },
+      {
+        "type": "meeting",
+        "related": "organization:northgate",
+        "subject": "Lunch with Northgate dentists: referral update",
+        "due_days": 6,
+        "hour": 12,
+        "days": -7,
+        "owner": "admin"
+      },
+      {
+        "type": "note",
+        "related": "organization:cascade",
+        "body": "<p>Rachel will share our physio flyer with the squad before the spring season. Three rowers referred so far.</p>",
+        "days": -30,
+        "owner": "front_desk"
+      },
+      {
+        "type": "call",
+        "related": "contact:elaine",
+        "subject": "Thank Dr. Morgan for her referrals",
+        "due_days": -10,
+        "done": true,
+        "outcome": "Wants a quarterly referral summary",
+        "days": -11,
+        "owner": "admin"
+      },
+      {
+        "type": "call",
+        "related": "lead:victor",
+        "subject": "Call Victor back about weekend hours",
+        "due_days": 0,
+        "days": -2,
+        "owner": "front_desk"
+      },
+      {
+        "type": "task",
+        "related": "lead:derek",
+        "subject": "Send employer program pricing to Timberline HR",
+        "due_days": 2,
+        "days": -8,
+        "owner": "admin"
+      },
+      {
+        "type": "task",
+        "subject": "Review this week’s unconverted enquiries",
+        "due_days": 1,
+        "days": -1,
+        "owner": "admin"
+      },
+      {
+        "type": "task",
+        "subject": "Restock consent and intake packs at reception",
+        "due_days": 0,
+        "days": -1,
+        "owner": "front_desk"
+      }
+    ],
+    "requests": [
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "CONS-NEW", "name": "New patient consult", "unit": "visit", "unitPrice": 150 },
+        "ref": "p_consult"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "IMP-1", "name": "Single implant and crown", "unit": "tooth", "unitPrice": 4200 },
+        "ref": "p_implant"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "ORTHO-ALN", "name": "Clear aligner course", "unit": "course", "unitPrice": 5600 },
+        "ref": "p_aligners"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "PHYS-S", "name": "Physiotherapy session", "unit": "session", "unitPrice": 120 },
+        "ref": "p_physio"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "SKIN-S", "name": "Skin treatment session", "unit": "session", "unitPrice": 300 },
+        "ref": "p_skin"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": {
+          "name": "Consult room",
+          "kind": "room",
+          "location": "Ground floor",
+          "capacity": 3,
+          "openTime": "08:00",
+          "closeTime": "18:00"
+        },
+        "ref": "r_consult"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": {
+          "name": "Dental chair 1",
+          "kind": "chair",
+          "location": "Ground floor",
+          "capacity": 1,
+          "openTime": "08:00",
+          "closeTime": "18:00"
+        },
+        "ref": "r_chair"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": {
+          "name": "Physio studio",
+          "kind": "room",
+          "location": "Level 1",
+          "capacity": 2,
+          "openTime": "07:00",
+          "closeTime": "19:00"
+        },
+        "ref": "r_physio"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_consult}}",
+          "contactUuid": "{{contact:tom}}",
+          "title": "Aligner consult: Tom Riley",
+          "startsAt": "{{datetime:+2@15}}",
+          "endsAt": "{{datetime:+2@16}}",
+          "attendees": 1
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_physio}}",
+          "contactUuid": "{{contact:sam}}",
+          "organizationUuid": "{{organization:cascade}}",
+          "title": "Physio session 4: Sam Patel",
+          "startsAt": "{{datetime:+3@7}}",
+          "endsAt": "{{datetime:+3@8}}",
+          "attendees": 1
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_chair}}",
+          "contactUuid": "{{contact:claire}}",
+          "title": "Implant visit 3: Claire Donovan",
+          "startsAt": "{{datetime:+9@11}}",
+          "endsAt": "{{datetime:+9@12:30}}",
+          "attendees": 1
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Ana Ruiz – single implant plan",
+          "contactUuid": "{{contact:ana}}",
+          "organizationUuid": "{{organization:northgate}}",
+          "dealUuid": "{{deal:ana}}",
+          "issueDate": "{{date:-10}}",
+          "validUntil": "{{date:+20}}",
+          "notes": "Four visits over about four months. Payment plan available on request.",
+          "lines": [
+            {
+              "productUuid": "{{req:p_consult}}",
+              "name": "New patient consult",
+              "quantity": 1,
+              "unitPrice": 150
+            },
+            {
+              "productUuid": "{{req:p_implant}}",
+              "name": "Single implant and crown",
+              "quantity": 1,
+              "unitPrice": 4200
+            },
+            { "name": "3D scan and planning", "quantity": 1, "unitPrice": 450 }
+          ]
+        },
+        "ref": "q_ana"
+      },
+      { "method": "post", "path": "/m/quotes/quotes/{{req:q_ana}}/send", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Claire Donovan – two implants",
+          "contactUuid": "{{contact:claire}}",
+          "organizationUuid": "{{organization:northgate}}",
+          "dealUuid": "{{deal:claire}}",
+          "issueDate": "{{date:-52}}",
+          "validUntil": "{{date:-22}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_implant}}",
+              "name": "Single implant and crown",
+              "quantity": 2,
+              "unitPrice": 4200
+            },
+            { "name": "Surgical guide", "quantity": 1, "unitPrice": 800 }
+          ]
+        },
+        "ref": "q_claire"
+      },
+      { "method": "post", "path": "/m/quotes/quotes/{{req:q_claire}}/send", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_claire}}/accept",
+        "body": { "acceptedByName": "Claire Donovan" }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Marcus Bell – implant bridge",
+          "contactUuid": "{{contact:marcus}}",
+          "dealUuid": "{{deal:marcus}}",
+          "issueDate": "{{date:-90}}",
+          "validUntil": "{{date:-60}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_implant}}",
+              "name": "Single implant and crown",
+              "quantity": 2,
+              "unitPrice": 4200
+            },
+            { "name": "Three-unit bridge", "quantity": 1, "unitPrice": 3100 }
+          ]
+        },
+        "ref": "q_marcus"
+      },
+      { "method": "post", "path": "/m/quotes/quotes/{{req:q_marcus}}/send", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_marcus}}/decline",
+        "body": { "reason": "Outside budget this year; revisit in spring" }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Claire Donovan – implant deposit",
+          "contactUuid": "{{contact:claire}}",
+          "organizationUuid": "{{organization:northgate}}",
+          "dealUuid": "{{deal:claire}}",
+          "issueDate": "{{date:-48}}",
+          "dueDate": "{{date:-34}}",
+          "lines": [{ "name": "Deposit: two implants (50%)", "quantity": 1, "unitPrice": 4600 }]
+        },
+        "ref": "inv_claire"
+      },
+      { "method": "post", "path": "/m/invoices/invoices/{{req:inv_claire}}/issue", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_claire}}/payments",
+        "body": { "amount": 4600, "paidOn": "{{date:-46}}", "method": "card", "reference": "POS-30418" }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Sam Patel – physio sessions",
+          "contactUuid": "{{contact:sam}}",
+          "organizationUuid": "{{organization:cascade}}",
+          "dealUuid": "{{deal:sam}}",
+          "issueDate": "{{date:-30}}",
+          "dueDate": "{{date:-16}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_physio}}",
+              "name": "Physiotherapy session",
+              "quantity": 3,
+              "unitPrice": 120
+            }
+          ]
+        },
+        "ref": "inv_sam"
+      },
+      { "method": "post", "path": "/m/invoices/invoices/{{req:inv_sam}}/issue", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Henry Calder – dentures and hygiene",
+          "contactUuid": "{{contact:henry}}",
+          "organizationUuid": "{{organization:fernhill}}",
+          "dealUuid": "{{deal:henry}}",
+          "issueDate": "{{date:0}}",
+          "dueDate": "{{date:+14}}",
+          "lines": [
+            { "name": "Full upper denture", "quantity": 1, "unitPrice": 2240 },
+            { "name": "Hygiene visit", "quantity": 2, "unitPrice": 180 }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/templates",
+        "body": {
+          "name": "Treatment consent",
+          "description": "Consent to the agreed treatment plan, signed before the first session.",
+          "requiresSignature": true,
+          "body": "<h2>Treatment consent</h2><p>Patient: {{contact.fullName}}</p><p>Plan: {{deal.title}}</p><p>I confirm that {{business.name}} has explained the steps, expected number of visits, costs and alternatives for this plan, and that I have had the chance to ask questions.</p><p>I understand I can withdraw my consent at any time before a session.</p><p>Date: {{today}}</p>"
+        },
+        "ref": "tpl_consent"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/templates",
+        "body": {
+          "name": "New patient intake",
+          "description": "Contact details, preferred appointment times and how the patient heard about us.",
+          "requiresSignature": true,
+          "body": "<h2>New patient intake</h2><p>Name: {{contact.fullName}}</p><p>Email: {{contact.email}}</p><p>Please confirm your contact details, preferred appointment times and payment arrangements, and bring your insurance card to your first visit.</p><p>Date: {{today}}</p>"
+        },
+        "ref": "tpl_intake"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:tpl_consent}}",
+          "contactUuid": "{{contact:ana}}",
+          "dealUuid": "{{deal:ana}}",
+          "title": "Treatment consent – Ana Ruiz"
+        },
+        "ref": "doc_ana"
+      },
+      { "method": "post", "path": "/m/documents/documents/{{req:doc_ana}}/share", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:maya}}",
+          "dealUuid": "{{deal:maya}}",
+          "items": [
+            {
+              "name": "Insurance card (front and back)",
+              "description": "A clear photo of both sides.",
+              "dueDate": "{{date:+5}}"
+            },
+            {
+              "name": "Referral letter",
+              "description": "If your doctor or dentist referred you.",
+              "dueDate": "{{date:+5}}"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
