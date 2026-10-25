@@ -1,8 +1,14 @@
 import type { CoreEntity, TimelineItem } from '@app/shared';
+import type { Knex } from 'knex';
 import { db } from '../../db/knex';
 import type { AuthUser } from '../../http/context';
 import { activitiesDef } from '../activities/activities.def';
+import { contactsDef } from '../contacts/contacts.def';
+import { dealsDef } from '../deals/deals.def';
+import { can } from '../rbac/access';
 import { customContext } from '../records/common';
+import { scopedQuery } from '../records/service';
+import type { ResourceDef } from '../records/types';
 import { redactDiff } from '../records/custom';
 import { userRefs } from '../records/hydrate';
 
@@ -23,6 +29,36 @@ const NOISE = new Set([
   'domain',
 ]);
 
+/**
+ * Records whose activities also belong on this record's timeline: a contact's deals, an organization's
+ * contacts and deals. Limited to records the user may view, so notes on out-of-scope deals never leak.
+ */
+async function rolledUpIds(entity: CoreEntity, id: number, user: AuthUser) {
+  const visible = async (def: ResourceDef, link: (qb: Knex.QueryBuilder) => void) => {
+    if (!can(user, `${def.resource}.view`)) return [];
+    const { qb } = await scopedQuery(def, user);
+    link(qb);
+    return (await qb.pluck(`${def.table}.id`)) as number[];
+  };
+  const deals = dealsDef as unknown as ResourceDef;
+  const contacts = contactsDef as unknown as ResourceDef;
+  if (entity === 'contact') {
+    return { deal: await visible(deals, (qb) => qb.where('deals.contact_id', id)), contact: [] };
+  }
+  if (entity === 'organization') {
+    return {
+      deal: await visible(deals, (qb) => qb.where('deals.organization_id', id)),
+      contact: await visible(contacts, (qb) =>
+        qb.whereIn(
+          'contacts.id',
+          db('contact_organization').where('organization_id', id).select('contact_id'),
+        ),
+      ),
+    };
+  }
+  return { deal: [], contact: [] };
+}
+
 export async function recordTimeline(
   entity: CoreEntity,
   row: Record<string, unknown>,
@@ -38,8 +74,15 @@ export async function recordTimeline(
 
   // Activities on this record are visible to anyone who can see the record (decision D9).
   if (want('activity') && entity !== 'activity') {
+    const related = await rolledUpIds(entity, id, user);
     const acts = await db('activities')
-      .where({ related_type: entity, related_id: id })
+      .where((w) => {
+        w.where({ related_type: entity, related_id: id });
+        if (related.deal.length)
+          w.orWhere((o) => o.where('related_type', 'deal').whereIn('related_id', related.deal));
+        if (related.contact.length)
+          w.orWhere((o) => o.where('related_type', 'contact').whereIn('related_id', related.contact));
+      })
       .whereNull('deleted_at')
       .where('created_at', '<', before)
       .orderBy('created_at', 'desc')

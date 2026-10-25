@@ -58,7 +58,8 @@ export function Timeline({ config, uuid }: { config: EntityConfig; uuid: string 
           return (
             <li key={item.id} className="border-b border-line last:border-0">
               <ul>
-                <ActivityItem a={item.activity} />
+                {/* Rolled up from a related record (a contact's deal): say where it was logged. */}
+                <ActivityItem a={item.activity} showRelated={item.activity.related?.uuid !== uuid} />
               </ul>
             </li>
           );
