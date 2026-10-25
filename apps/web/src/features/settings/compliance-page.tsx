@@ -72,8 +72,8 @@ function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
           )}
         </Field>
         <p className="mt-3 text-xs text-muted">
-          A profile gives you the technical controls. It does not make the workspace compliant on its own:
-          your organization still needs the agreements, policies and hosting safeguards the law requires.
+          A profile gives you the technical controls. It does not make the workspace compliant on its own: you
+          still need the agreements, policies and hosting safeguards the law requires.
         </p>
       </Pane>
       <Pane title="Sessions">

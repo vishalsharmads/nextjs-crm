@@ -1,6 +1,6 @@
 # Compliance readiness
 
-This CRM ships the technical controls that privacy and health-data laws expect. It does not make an organization compliant by itself: the operator still needs the agreements (DPA, BAA), policies, hosting safeguards and staff training the law requires. This document describes what the software does. The operator decides how to use it.
+This CRM ships the technical controls that privacy and health-data laws expect. It does not make a workspace compliant by itself: the operator still needs the agreements (DPA, BAA), policies, hosting safeguards and staff training the law requires. This document describes what the software does. The operator decides how to use it.
 
 ## Profiles
 
