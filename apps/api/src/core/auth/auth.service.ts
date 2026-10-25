@@ -89,17 +89,19 @@ export async function login(req: Request, res: Response, email: string, password
   return { mfaRequired: false as const };
 }
 
-async function completeLogin(req: Request, res: Response, user: { id: number; uuid: string }) {
-  await db.transaction(async (trx) => {
-    await startSession(trx, res, req, user);
-    await trx('users').where({ id: user.id }).update({ last_login_at: new Date() });
-    await audit(trx, req.ctx, {
-      action: 'auth.login',
-      entity: 'user',
-      entityId: user.id,
-      entityUuid: user.uuid,
-    });
+async function openSession(trx: Db, req: Request, res: Response, user: { id: number; uuid: string }) {
+  await startSession(trx, res, req, user);
+  await trx('users').where({ id: user.id }).update({ last_login_at: new Date() });
+  await audit(trx, req.ctx, {
+    action: 'auth.login',
+    entity: 'user',
+    entityId: user.id,
+    entityUuid: user.uuid,
   });
+}
+
+async function completeLogin(req: Request, res: Response, user: { id: number; uuid: string }) {
+  await db.transaction((trx) => openSession(trx, req, res, user));
 }
 
 export async function verifyMfa(
@@ -154,27 +156,30 @@ export async function verifyMfa(
         : 'That code is not valid. Check your authenticator app and try again.',
     );
   }
-  const userId = await consumeOneTimeToken(db, token, 'mfa');
-  if (userId !== user.id) throw new AppError('UNAUTHENTICATED', 'Sign in again to continue');
-  if (recoveryId !== null) {
-    const used = await db('user_recovery_codes')
-      .where({ id: recoveryId })
-      .whereNull('used_at')
-      .update({ used_at: new Date() });
-    if (used !== 1) throw new AppError('MFA_INVALID', 'That recovery code is not valid or was already used.');
-    const remaining = await unusedRecoveryCodeCount(user.id);
-    await audit(db, req.ctx, {
-      action: 'auth.recovery_code_used',
-      entity: 'user',
-      entityId: user.id,
-      entityUuid: user.uuid,
-      diff: { remaining },
-    });
-    await db('users').where({ id: user.id }).update({ failed_login_count: 0 });
-  } else {
-    await db('users').where({ id: user.id }).update({ totp_last_step: step, failed_login_count: 0 });
-  }
-  await completeLogin(req, res, user);
+  // Spending the token or recovery code and opening the session commit together.
+  await db.transaction(async (trx) => {
+    const userId = await consumeOneTimeToken(trx, token, 'mfa');
+    if (userId !== user.id) throw new AppError('UNAUTHENTICATED', 'Sign in again to continue');
+    if (recoveryId !== null) {
+      const used = await trx('user_recovery_codes')
+        .where({ id: recoveryId })
+        .whereNull('used_at')
+        .update({ used_at: new Date() });
+      if (used !== 1)
+        throw new AppError('MFA_INVALID', 'That recovery code is not valid or was already used.');
+      await audit(trx, req.ctx, {
+        action: 'auth.recovery_code_used',
+        entity: 'user',
+        entityId: user.id,
+        entityUuid: user.uuid,
+        diff: { remaining: await unusedRecoveryCodeCount(user.id, trx) },
+      });
+      await trx('users').where({ id: user.id }).update({ failed_login_count: 0 });
+    } else {
+      await trx('users').where({ id: user.id }).update({ totp_last_step: step, failed_login_count: 0 });
+    }
+    await openSession(trx, req, res, user);
+  });
 }
 
 const RECOVERY_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -198,8 +203,8 @@ async function matchRecoveryCode(userId: number, code: string): Promise<number |
   return null;
 }
 
-export async function unusedRecoveryCodeCount(userId: number): Promise<number> {
-  const row = await db('user_recovery_codes')
+export async function unusedRecoveryCodeCount(userId: number, conn: Db = db): Promise<number> {
+  const row = await conn('user_recovery_codes')
     .where({ user_id: userId })
     .whereNull('used_at')
     .count<{ n: number }[]>('id as n')
@@ -236,18 +241,20 @@ export async function refresh(req: Request, res: Response) {
   }
   const { sessionIdleDays } = await effectiveSecurity();
   const activity = activityAt(req);
-  const ended = sessionEndReason(session, await effectiveCompliance(), activity);
+  const ended = sessionEndReason(session, await effectiveCompliance());
   // Each refresh rotates the session row, so its creation time is the last activity.
   const idle = Date.now() - new Date(session.created_at).getTime() > sessionIdleDays * 86_400_000;
   if (new Date(session.expires_at) < new Date() || idle || ended) {
-    await revokeFamily(session.family_id);
-    if (ended)
-      await audit(db, req.ctx, {
-        action: 'auth.session_expired',
-        entity: 'user',
-        entityId: session.user_id,
-        diff: { reason: ended },
-      });
+    await db.transaction(async (trx) => {
+      await revokeFamily(session.family_id, trx);
+      if (ended)
+        await audit(trx, req.ctx, {
+          action: 'auth.session_expired',
+          entity: 'user',
+          entityId: session.user_id,
+          diff: { reason: ended },
+        });
+    });
     clearAuthCookies(res);
     throw new AppError('UNAUTHENTICATED', 'Your session expired. Sign in again.');
   }
@@ -264,7 +271,7 @@ export async function refresh(req: Request, res: Response) {
     await startSession(trx, res, req, user, {
       familyId: session.family_id,
       familyStartedAt: new Date(session.family_started_at),
-      lastUsedAt: new Date(Math.max(new Date(session.last_used_at).getTime(), activity)),
+      lastUsedAt: new Date(Math.max(new Date(session.last_used_at).getTime(), activity ?? 0)),
     });
   });
 }
@@ -386,8 +393,11 @@ export async function setupTotp(ctx: RequestContext, userId: number, email: stri
 export async function enableTotp(ctx: RequestContext, userId: number, code: string) {
   const user = await db('users').where({ id: userId }).first();
   if (!user?.totp_secret_enc) throw new AppError('VALIDATION_FAILED', 'Start two-factor setup first');
+  // Re-enabling would replace the recovery codes without the password check that regeneration needs.
+  if (user.totp_enabled) throw new AppError('CONFLICT', 'Two-factor authentication is already on');
   const step = matchTotpStep(decrypt(user.totp_secret_enc), code);
-  if (step === null) throw new AppError('MFA_INVALID', 'That code is not valid');
+  if (step === null || (user.totp_last_step !== null && step <= Number(user.totp_last_step)))
+    throw new AppError('MFA_INVALID', 'That code is not valid');
   return db.transaction(async (trx) => {
     await trx('users').where({ id: userId }).update({ totp_enabled: true, totp_last_step: step });
     await audit(trx, ctx, { action: 'auth.mfa_enabled', entity: 'user', entityId: userId });

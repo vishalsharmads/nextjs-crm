@@ -1,9 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { mfaRequiredFor } from '@app/shared';
-import { ACCESS_COOKIE, revokeFamily, verifyAccessToken } from '../core/auth/tokens';
+import { ACCESS_COOKIE, verifyAccessToken } from '../core/auth/tokens';
 import { activityAt, sessionEndReason } from '../core/auth/session-policy';
-import { audit } from '../core/audit/audit.service';
 import { loadAccess } from '../core/rbac/access';
 import { db } from '../db/knex';
 import { authenticateApiKey } from '../core/api-keys/api-keys';
@@ -24,7 +23,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   try {
     const bearer = req.get('authorization');
     if (bearer?.startsWith('Bearer ')) {
-      req.ctx.user = await authenticateApiKey(bearer.slice(7).trim());
+      req.ctx.user = await authenticateApiKey(bearer.slice(7).trim(), await effectiveCompliance());
       return next();
     }
     const token = req.cookies?.[ACCESS_COOKIE] as string | undefined;
@@ -54,21 +53,11 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       );
     if (!row) return next();
     const compliance = await effectiveCompliance();
+    // An ended session is simply not authenticated here; the client's refresh then revokes and audits it.
+    if (sessionEndReason(row, compliance)) return next();
+    // Record reported user input, at most once a minute.
     const activity = activityAt(req);
-    const ended = sessionEndReason(row, compliance, activity);
-    if (ended) {
-      await revokeFamily(row.family_id);
-      await audit(db, req.ctx, {
-        action: 'auth.session_expired',
-        entity: 'user',
-        entityId: row.id,
-        entityUuid: row.uuid,
-        diff: { reason: ended },
-      });
-      return next();
-    }
-    // Record activity at most once a minute.
-    if (activity - new Date(row.last_used_at).getTime() > 60_000) {
+    if (activity !== null && activity - new Date(row.last_used_at).getTime() > 60_000) {
       await db('sessions')
         .where({ id: result.claims.sid })
         .update({ last_used_at: new Date(activity) });

@@ -145,6 +145,14 @@ export const meRoutes = defineRoutes('/me', ['me'])
   })
   .add({
     method: 'post',
+    path: '/activity',
+    permission: 'authenticated',
+    summary: 'Heartbeat after user input; the x-idle-ms header moves the idle clock forward',
+    // authenticate() already recorded the reported input.
+    handler: () => undefined,
+  })
+  .add({
+    method: 'post',
     path: '/password',
     permission: 'authenticated',
     before: [authLimiter],

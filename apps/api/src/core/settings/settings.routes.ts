@@ -251,19 +251,32 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
     params: groupParam,
     body: z.record(z.string(), z.unknown()),
     handler: async ({ ctx, user, params, body }) => {
+      // Security and compliance settings can weaken every account's protection: admins only.
+      if ((params.group === 'security' || params.group === 'compliance') && !user.isAdmin)
+        throw new AppError('FORBIDDEN', 'Only admins can change security and compliance settings');
       const current = (await getRaw(params.group)) ?? {};
       let next: object = SETTINGS_GROUPS[params.group].parse({ ...(current as object), ...body });
       const before = await getGroup('compliance');
       const profile = params.group === 'compliance' ? (next as ComplianceSettings).profile : before.profile;
       // Changing the profile raises stored values to its floors; any other edit may not go below them.
       const profileChanged = profile !== before.profile;
+      if (params.group === 'compliance') {
+        const keys = (next as ComplianceSettings).mfaRequiredRoles;
+        const known = keys.length ? await db('roles').whereIn('key', keys).pluck('key') : [];
+        const unknown = keys.filter((k) => !known.includes(k));
+        if (unknown.length)
+          throw new AppError('VALIDATION_FAILED', `Unknown role: ${unknown.join(', ')}`, [
+            { path: 'mfaRequiredRoles', message: 'Choose existing roles' },
+          ]);
+      }
       let raisedSecurity: SecuritySettings | null = null;
       if (params.group === 'security' || params.group === 'compliance') {
         if (profileChanged) {
           next = applyFloors(params.group, next, profile);
           raisedSecurity = applyFloors('security', await getGroup('security'), profile);
         } else {
-          const issues = floorViolations(params.group, next, profile);
+          // Only the fields this request changes; stored values below a floor are already raised on read.
+          const issues = floorViolations(params.group, next, profile).filter((i) => i.path in body);
           if (issues.length) throw new AppError('VALIDATION_FAILED', issues[0]!.message, issues);
         }
       }

@@ -21,6 +21,8 @@ export const complianceSettingsSchema = z.object({
     .array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/))
     .max(100)
     .default([]),
+  /** API keys stop working this many days after creation, and new keys must expire within it. 0 = no limit. */
+  apiKeyMaxDays: z.number().int().min(0).max(3650).default(0),
   /** Shown on the sign-in screen (for example an authorized-use warning). */
   loginNotice: z.string().trim().max(2000).default(''),
 });
@@ -51,6 +53,7 @@ export const PROFILE_FLOORS: Record<ComplianceProfile, ProfileFloors> = {
       mfaRequiredForAll: { kind: 'on' },
       idleTimeoutMinutes: { kind: 'atMost', value: 15 },
       sessionMaxHours: { kind: 'atMost', value: 12 },
+      apiKeyMaxDays: { kind: 'atMost', value: 365 },
     },
   },
 };

@@ -131,6 +131,13 @@ describe('recovery codes', () => {
     expect(reused.body.error.code).toBe('MFA_INVALID');
   });
 
+  it('cannot re-enable 2FA to get new codes without the password', async () => {
+    const user = await createUser({ roleKeys: ['read_only'] });
+    const { client, secret } = await enrol(user);
+    const again = await client.post('/me/2fa/enable', { code: totpAt(secret, Date.now() + 30_000) });
+    expect(again.status).toBe(409);
+  });
+
   it('regenerating replaces the old codes', async () => {
     const user = await createUser({ roleKeys: ['read_only'] });
     const { client, codes } = await enrol(user);
@@ -146,32 +153,38 @@ describe('recovery codes', () => {
 });
 
 describe('automatic logoff', () => {
-  it('ends an idle session and its refresh family', async () => {
+  it('ends an idle session, even when the request claims recent input', async () => {
     await setCompliance({ idleTimeoutMinutes: 5 });
     const user = await createUser({ roleKeys: ['read_only'] });
     const c = await loginAs(user);
-    // A background poll from a browser that has seen no input for 6 minutes.
     await db('sessions')
       .where({ user_id: user.id })
       .update({ last_used_at: new Date(Date.now() - 6 * 60_000) });
-    const res = await c.get('/me').set('x-idle-ms', String(6 * 60_000));
-    expect(res.status).toBe(401);
-    expect((await c.post('/auth/refresh')).status).toBe(401);
+    // A stolen cookie or a freshly reloaded tab reports "no idle time"; the stored clock still wins.
+    expect((await c.get('/me').set('x-idle-ms', '0')).status).toBe(401);
+    expect((await c.get('/me')).status).toBe(401);
+    expect((await c.post('/auth/refresh').set('x-idle-ms', '0')).status).toBe(401);
+    const expired = await db('audit_logs').where({ action: 'auth.session_expired', entity_id: user.id });
+    expect(expired).toHaveLength(1);
     expect(
-      await db('audit_logs').where({ action: 'auth.session_expired', entity_id: user.id }).first(),
-    ).toBeTruthy();
+      await db('audit_logs').where({ action: 'auth.refresh_reuse', entity_id: user.id }).first(),
+    ).toBeUndefined();
   });
 
-  it('keeps an active session alive and records the activity', async () => {
+  it('moves the idle clock forward only for reported input', async () => {
     await setCompliance({ idleTimeoutMinutes: 5 });
     const user = await createUser({ roleKeys: ['read_only'] });
     const c = await loginAs(user);
-    await db('sessions')
-      .where({ user_id: user.id })
-      .update({ last_used_at: new Date(Date.now() - 4 * 60_000) });
-    await c.get('/me').set('x-idle-ms', '1000').expect(200);
-    const s = await db('sessions').where({ user_id: user.id }).whereNull('revoked_at').first();
-    expect(Date.now() - new Date(s.last_used_at).getTime()).toBeLessThan(60_000);
+    const fourMinutesAgo = new Date(Date.now() - 4 * 60_000);
+    await db('sessions').where({ user_id: user.id }).update({ last_used_at: fourMinutesAgo });
+    const current = () => db('sessions').where({ user_id: user.id }).whereNull('revoked_at').first();
+
+    await c.get('/me').expect(200); // no header: not activity
+    expect(new Date((await current()).last_used_at).getTime()).toBe(
+      Math.floor(fourMinutesAgo.getTime() / 1000) * 1000,
+    );
+    await c.post('/me/activity').set('x-idle-ms', '1000').expect(204);
+    expect(Date.now() - new Date((await current()).last_used_at).getTime()).toBeLessThan(60_000);
   });
 
   it('a background refresh does not count as activity', async () => {
@@ -196,6 +209,45 @@ describe('automatic logoff', () => {
       .where({ user_id: user.id })
       .update({ family_started_at: new Date(Date.now() - 2 * 3_600_000) });
     expect((await c.get('/me')).status).toBe(401);
+    expect((await c.post('/auth/refresh')).status).toBe(401);
+  });
+});
+
+describe('who can change compliance settings', () => {
+  it('limits security and compliance settings to admins and rejects unknown roles', async () => {
+    const role = await createRole(['core.settings.manage']);
+    const { client } = await clientWithRoles([role]);
+    await client.patch('/settings/compliance', { profile: 'standard' }).expect(403);
+    await client.patch('/settings/security', { lockoutMaxAttempts: 50 }).expect(403);
+    await client.patch('/settings/general', { locale: 'en' }).expect(200);
+
+    const { client: admin } = await clientWithRoles(['admin']);
+    const res = await admin.patch('/settings/compliance', { mfaRequiredRoles: ['no_such_role'] });
+    expect(res.status).toBe(422);
+    expect(res.body.error.details[0].path).toBe('mfaRequiredRoles');
+  });
+});
+
+describe('API keys under a compliance profile', () => {
+  it('requires an expiry within the limit and stops keys older than it', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const legacy = await client.post('/api-keys', { name: 'Legacy', roleKey: 'read_only' }).expect(201);
+    await setCompliance({ apiKeyMaxDays: 30 });
+
+    expect((await client.post('/api-keys', { name: 'No expiry', roleKey: 'read_only' })).status).toBe(422);
+    const far = new Date(Date.now() + 60 * 86_400_000).toISOString();
+    expect(
+      (await client.post('/api-keys', { name: 'Too long', roleKey: 'read_only', expiresAt: far })).status,
+    ).toBe(422);
+    const soon = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    await client.post('/api-keys', { name: 'Ok', roleKey: 'read_only', expiresAt: soon }).expect(201);
+
+    const anon = await anonymousClient();
+    await anon.get('/me').set('authorization', `Bearer ${legacy.body.secret}`).expect(200);
+    await db('api_keys')
+      .where({ uuid: legacy.body.uuid })
+      .update({ created_at: new Date(Date.now() - 31 * 86_400_000) });
+    expect((await anon.get('/me').set('authorization', `Bearer ${legacy.body.secret}`)).status).toBe(401);
   });
 });
 

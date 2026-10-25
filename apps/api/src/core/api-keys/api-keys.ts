@@ -8,6 +8,8 @@ import { newUuid } from '../../lib/ids';
 import { audit } from '../audit/audit.service';
 import { loadAccess } from '../rbac/access';
 import { assertCanAssignRoles } from '../rbac/grants';
+import { effectiveCompliance } from '../settings/settings.service';
+import type { ComplianceSettings } from '@app/shared';
 
 const KEY_PREFIX = 'sk_';
 
@@ -15,14 +17,21 @@ const KEY_PREFIX = 'sk_';
  * Authenticate `Authorization: Bearer sk_…`. The key acts as a service identity with
  * its role's permissions and scopes (never more than the role), attributed to its creator.
  */
-export async function authenticateApiKey(token: string): Promise<AuthUser | null> {
+export async function authenticateApiKey(
+  token: string,
+  compliance: Pick<ComplianceSettings, 'apiKeyMaxDays'>,
+): Promise<AuthUser | null> {
   if (!token.startsWith(KEY_PREFIX)) return null;
+  // The compliance profile caps key age, including keys created before it was turned on.
+  const minCreated =
+    compliance.apiKeyMaxDays > 0 ? new Date(Date.now() - compliance.apiKeyMaxDays * 86_400_000) : new Date(0);
   const row = await db('api_keys as k')
     .join('roles as r', 'r.id', 'k.role_id')
     .join('users as u', 'u.id', 'k.created_by')
     .where('k.key_hash', sha256(token))
     .whereNull('k.revoked_at')
     .where((w) => w.whereNull('k.expires_at').orWhere('k.expires_at', '>', new Date()))
+    .where('k.created_at', '>', minCreated)
     .where('u.status', 'active')
     .first(
       'k.id',
@@ -107,6 +116,17 @@ export const apiKeysRoutes = defineRoutes('/api-keys', ['api-keys'])
           { path: 'roleKey', message: 'Unknown role' },
         ]);
       await assertCanAssignRoles(user, [role.id]);
+      const { apiKeyMaxDays } = await effectiveCompliance();
+      if (
+        apiKeyMaxDays > 0 &&
+        (!body.expiresAt || new Date(body.expiresAt).getTime() > Date.now() + apiKeyMaxDays * 86_400_000)
+      )
+        throw new AppError('VALIDATION_FAILED', `Choose an expiry date within ${apiKeyMaxDays} days`, [
+          {
+            path: 'expiresAt',
+            message: `The compliance profile requires keys to expire within ${apiKeyMaxDays} days`,
+          },
+        ]);
       const secret = `${KEY_PREFIX}${randomToken(32)}`;
       const uuid = newUuid();
       await db.transaction(async (trx) => {
