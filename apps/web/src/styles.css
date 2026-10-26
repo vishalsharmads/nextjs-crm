@@ -212,6 +212,17 @@ html.dark {
 .anim-fade[data-state='closed'] {
   animation: fade-out 120ms var(--ease-out) forwards;
 }
+/* A card that was just moved on the board: a ring and tint that fade out, so the eye can follow it. */
+@keyframes card-settle {
+  from {
+    box-shadow: 0 0 0 2px var(--primary);
+    background-color: var(--primary-soft);
+  }
+}
+.anim-settle {
+  /* Plain ease: a fade needs its time to be seen, the strong ease-out would be gone in a few frames. */
+  animation: card-settle 600ms ease;
+}
 /* A tooltip opened right after another one skips the entrance. */
 .anim-fade[data-state='instant-open'] {
   animation: none;
