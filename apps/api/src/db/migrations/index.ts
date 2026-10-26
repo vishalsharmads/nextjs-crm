@@ -11,6 +11,7 @@ import * as m0009 from './0009_compliance_auth';
 import * as m0010 from './0010_access_audit';
 import * as m0011 from './0011_privacy';
 import * as m0012 from './0012_encryption';
+import * as m0013 from './0013_open_entities';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -31,4 +32,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0010_access_audit': m0010,
   '0011_privacy': m0011,
   '0012_encryption': m0012,
+  '0013_open_entities': m0013,
 };
