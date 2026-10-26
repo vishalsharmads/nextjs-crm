@@ -176,13 +176,18 @@ export async function exportCsv(
     }
     if (rows.length < batch) break;
   }
-  csv.end();
   await audit(db, ctx, {
     action: `${entity}.exported`,
     entity,
     diff: { count, filter: query.filter ?? null, q: query.q ?? null },
   });
   await logAccess(ctx, { action: 'export', entity, detail: { count } });
+  // Recorded before the response ends, so the client never has a file the log does not show.
+  await new Promise<void>((resolve) => {
+    res.once('finish', resolve);
+    res.once('close', resolve);
+    csv.end();
+  });
 }
 
 // ---------------- Import ----------------
