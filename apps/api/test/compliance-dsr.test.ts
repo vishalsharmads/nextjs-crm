@@ -476,3 +476,31 @@ describe('review fixes: merged duplicates, scope and staff audit', () => {
     expect(JSON.stringify(rows.map((r) => r.diff))).not.toContain(target.email);
   });
 });
+
+describe('review fixes: restriction reaches every channel', () => {
+  it('blocks email to a restricted person through another record, and their deal events', async () => {
+    const c = await admin
+      .post('/contacts', { firstName: 'Quiet', email: 'quiet-two@example.test' })
+      .expect(201);
+    const deal = await admin.post('/deals', { title: 'Their deal', contactUuid: c.body.uuid }).expect(201);
+    await admin.post(`/privacy/contact/${c.body.uuid}/restriction`, { restricted: true }).expect(204);
+    const sent = await admin.post('/email/send', {
+      to: ['Quiet-Two@example.test'],
+      subject: 'Hi',
+      body: '<p>Hi</p>',
+      related: { type: 'deal', uuid: deal.body.uuid },
+    });
+    expect(sent.status).toBe(403);
+
+    const hook = await admin
+      .post('/webhooks', { name: 'Deal hook', url: 'http://127.0.0.1:9/deal', events: ['deal.updated'] })
+      .expect(201);
+    await admin.patch(`/deals/${deal.body.uuid}`, { title: 'Renamed' }).expect(200);
+    const deliveries = await db('webhook_deliveries').whereRaw(
+      "JSON_UNQUOTE(JSON_EXTRACT(payload, '$.data.uuid')) = ?",
+      [deal.body.uuid],
+    );
+    expect(deliveries).toHaveLength(0);
+    await admin.delete(`/webhooks/${hook.body.uuid}`).expect(204);
+  });
+});

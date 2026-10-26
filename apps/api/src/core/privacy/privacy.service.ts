@@ -8,7 +8,7 @@ import { logger } from '../../lib/logger';
 import { storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
 import { logAccess } from '../audit/access-log';
-import { daysOf, resealDays } from '../audit/integrity';
+import { brokenSealedDays, daysOf, resealDays } from '../audit/integrity';
 import { getRow } from '../records/service';
 import { recordDefs } from '../records/registry';
 import { escapeLike } from '../records/filters';
@@ -71,6 +71,7 @@ async function redactAudit(trx: Db, entity: string, id: number, activityIds: num
     : [];
   for (const r of activityRows)
     days.add(typeof r.day === 'string' ? r.day : new Date(r.day).toISOString().slice(0, 10));
+  const brokenBefore = await brokenSealedDays(trx, 'audit', [...days]);
   await trx.raw('SET @audit_redaction = 1');
   try {
     const blank = { diff: JSON.stringify({ redacted: true }), ip: null, user_agent: null };
@@ -80,7 +81,7 @@ async function redactAudit(trx: Db, entity: string, id: number, activityIds: num
   } finally {
     await trx.raw('SET @audit_redaction = 0');
   }
-  await resealDays(trx, 'audit', [...days]);
+  await resealDays(trx, 'audit', [...days], brokenBefore);
 }
 
 /** Core tables outside the record itself that copy the person's data. */
@@ -431,6 +432,41 @@ export async function setRestriction(
       entityUuid: uuid,
     });
   });
+}
+
+/**
+ * Whether an event concerns a restricted person: the record itself, the person linked to a deal,
+ * or the record an activity belongs to.
+ */
+export async function eventTouchesRestricted(e: {
+  entity: string;
+  uuid: string;
+  record?: Record<string, unknown> | null;
+}): Promise<boolean> {
+  if (await isRestricted(e.entity, e.uuid)) return true;
+  const r = e.record ?? {};
+  const contact = r.contact as { uuid?: string } | null | undefined;
+  if (e.entity === 'deal' && contact?.uuid) return isRestricted('contact', contact.uuid);
+  const related = r.related as { type?: string; uuid?: string } | null | undefined;
+  if (e.entity === 'activity' && related?.type && related.uuid)
+    return isRestricted(related.type, related.uuid);
+  return false;
+}
+
+/** Restricted contacts or leads among email recipients (GDPR Art. 18 covers every channel). */
+export async function restrictedRecipients(addresses: string[], conn: Db = db): Promise<number> {
+  const list = [...new Set(addresses.map((a) => a.trim().toLowerCase()).filter(Boolean))];
+  if (!list.length) return 0;
+  let n = 0;
+  for (const table of ['contacts', 'leads']) {
+    const row = await conn(table)
+      .where({ processing_restricted: true })
+      .whereRaw(`LOWER(email) IN (${list.map(() => '?').join(', ')})`, list)
+      .count({ c: '*' })
+      .first();
+    n += Number((row as { c: number }).c);
+  }
+  return n;
 }
 
 /** Whether automations, webhooks and outgoing email must skip this record. */

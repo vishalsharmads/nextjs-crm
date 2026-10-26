@@ -17,7 +17,7 @@ import { createRecord, updateRecord } from '../records/service';
 import { ensureTags } from '../records/hydrate';
 import { sendMail } from '../../lib/mailer';
 import { getBranding } from '../settings/settings.service';
-import { isRestricted } from '../privacy/privacy.service';
+import { eventTouchesRestricted } from '../privacy/privacy.service';
 import { unsubscribeToken } from '../privacy/unsubscribe';
 import { env } from '../../config/env';
 
@@ -271,7 +271,11 @@ registerJob('automation.run', async (job) => {
   const log: string[] = [];
   let status: 'succeeded' | 'skipped' | 'failed' = 'succeeded';
   try {
-    if (!matches(automation.conditions as FilterNode | null, event)) {
+    // Re-checked here: a restriction may have been set after the job was queued.
+    if (await eventTouchesRestricted(event)) {
+      status = 'skipped';
+      log.push('processing restricted');
+    } else if (!matches(automation.conditions as FilterNode | null, event)) {
       status = 'skipped';
       log.push('conditions not met');
     } else {
@@ -310,7 +314,7 @@ registerJob('automation.run', async (job) => {
 onEvent(async (e) => {
   if (e.depth >= MAX_DEPTH) return;
   // GDPR Art. 18: a restricted record is stored, not processed.
-  if (await isRestricted(e.entity, e.uuid)) return;
+  if (await eventTouchesRestricted(e)) return;
   const rules = await db('automations').where({ trigger_event: e.type, active: true }).select('id');
   for (const r of rules)
     await enqueue('automation.run', { automationId: r.id, event: e as unknown as Record<string, unknown> });

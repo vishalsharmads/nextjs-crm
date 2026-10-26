@@ -19,6 +19,7 @@ import { getRow } from '../records/service';
 import { recordDefs } from '../records/registry';
 import { sanitizeBody } from '../activities/activities.def';
 import { getBranding } from '../settings/settings.service';
+import { restrictedRecipients } from '../privacy/privacy.service';
 
 const server = z.object({
   host: z.string().min(1).max(255),
@@ -109,16 +110,17 @@ export async function sendEmail(ctx: RequestContext, user: AuthUser, input: z.in
         AccountRow | undefined);
   if (input.accountUuid && !account) throw notFound('Mail account');
   const related = await resolveRelated(user, input.related, [...input.to, ...input.cc]);
-  if (related && (related.type === 'contact' || related.type === 'lead')) {
-    const row = await db(recordDefs[related.type].table)
-      .where({ id: related.id })
-      .first('processing_restricted');
-    if (row?.processing_restricted)
-      throw new AppError(
-        'FORBIDDEN',
-        'Processing of this record is restricted. Lift the restriction before emailing.',
-      );
-  }
+  if (
+    (await restrictedRecipients([...input.to, ...input.cc])) ||
+    (related &&
+      (related.type === 'contact' || related.type === 'lead') &&
+      (await isRestrictedId(related.type, related.id)))
+  )
+    throw new AppError(
+      'FORBIDDEN',
+      'Processing is restricted for a recipient or the linked record. Lift the restriction before emailing.',
+    );
+
   const html = sanitizeBody(input.body) ?? '';
   const text = html
     .replace(/<br\s*\/?>/g, '\n')
@@ -376,3 +378,8 @@ export const emailRoutes = defineRoutes('/email', ['email'])
     status: 201,
     handler: ({ ctx, user, body }) => sendEmail(ctx, user, body),
   });
+
+async function isRestrictedId(type: 'contact' | 'lead', id: number) {
+  const row = await db(recordDefs[type].table).where({ id }).first('processing_restricted');
+  return !!row?.processing_restricted;
+}

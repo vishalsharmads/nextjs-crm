@@ -159,3 +159,33 @@ describe('data minimization', () => {
     expect(redactQuery('/api/v1/health')).toBe('/api/v1/health');
   });
 });
+
+describe('review fixes: retention and exports', () => {
+  it('keeps an inactive contact who still has an open deal', async () => {
+    const c = await admin
+      .post('/contacts', { firstName: 'Open deal', email: 'opendeal@example.test' })
+      .expect(201);
+    await admin.post('/deals', { title: 'Still open', contactUuid: c.body.uuid }).expect(201);
+    await db('contacts')
+      .where({ uuid: c.body.uuid })
+      .update({ updated_at: ago(500) });
+    await db('deals')
+      .whereIn('contact_id', db('contacts').where({ uuid: c.body.uuid }).select('id'))
+      .update({ updated_at: ago(500) });
+    await setSettingsGroup('compliance', {
+      retentionRules: [{ entity: 'contact', condition: 'inactive', days: 365, action: 'anonymize' }],
+    });
+    await admin.post('/privacy/retention/run').expect(200);
+    expect((await db('contacts').where({ uuid: c.body.uuid }).first()).email).toBe('opendeal@example.test');
+  });
+
+  it('guards exported cells against spreadsheet formulas', async () => {
+    const { csvSafe } = await import('../src/lib/csv');
+    expect(csvSafe('=HYPERLINK("x")')).toBe(`'=HYPERLINK("x")`);
+    expect(csvSafe('@SUM(A1)')).toBe(`'@SUM(A1)`);
+    expect(csvSafe('Plain')).toBe('Plain');
+    await admin.post('/contacts', { firstName: '=1+2', lastName: 'Formula' }).expect(201);
+    const csv = await admin.get('/contacts/export').expect(200);
+    expect(csv.text).toContain(`'=1+2`);
+  });
+});

@@ -22,3 +22,12 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false,
   handler,
 });
+
+/** Expensive maintenance endpoints (audit integrity check). */
+export const verifyLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: isTest ? 1000 : 3,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler,
+});

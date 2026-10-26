@@ -186,8 +186,23 @@ describe('integrity digests and retention', () => {
   });
 
   it('reseals days that a privacy erasure redacted, and audits it', async () => {
+    // Tamper with a sealed row first: the erasure must record it, not silently reseal it.
+    const target = await db('audit_logs')
+      .where({ entity_uuid: contactUuid, action: 'contact.updated' })
+      .where('created_at', '<', daysAgo(2))
+      .first();
+    await db.transaction(async (trx) => {
+      await trx.raw('SET @audit_redaction = 1');
+      await trx('audit_logs').where({ id: target.id }).update({ action: 'contact.tampered' });
+      await trx.raw('SET @audit_redaction = 0');
+    });
     const { client } = await clientWithRoles(['admin']);
     await client.post(`/privacy/contact/${contactUuid}/anonymize`).expect(200);
+    const failure = await db('audit_logs')
+      .where({ action: 'audit.integrity_failed' })
+      .orderBy('id', 'desc')
+      .first();
+    expect(failure.diff.days).toContain(dayKey(new Date(target.created_at)));
     expect((await verifyIntegrity()).problems).toEqual([]);
     const resealed = await db('audit_logs').where({ action: 'audit.resealed' }).orderBy('id', 'desc').first();
     expect(resealed.diff.changes.length).toBeGreaterThan(0);

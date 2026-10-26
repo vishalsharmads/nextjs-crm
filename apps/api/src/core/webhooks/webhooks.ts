@@ -11,7 +11,7 @@ import { newUuid } from '../../lib/ids';
 import { logger } from '../../lib/logger';
 import { enqueue, every, registerJob } from '../../lib/jobs';
 import { audit } from '../audit/audit.service';
-import { isRestricted } from '../privacy/privacy.service';
+import { eventTouchesRestricted } from '../privacy/privacy.service';
 import { effectiveCompliance } from '../settings/settings.service';
 import { EVENT_TYPES, onEvent, type DomainEvent } from '../events/events';
 
@@ -141,7 +141,7 @@ registerJob('webhook.deliver', async (job) => {
 /** Fan out every domain event to subscribed, active webhooks. */
 onEvent(async (e: DomainEvent) => {
   // GDPR Art. 18: do not pass a restricted record on to other systems.
-  if (await isRestricted(e.entity, e.uuid)) return;
+  if (await eventTouchesRestricted(e)) return;
   const hooks = await db('webhooks').where({ active: true });
   const minimal = hooks.length ? (await effectiveCompliance()).webhookMinimal : false;
   for (const h of hooks) {

@@ -51,7 +51,7 @@ export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
     path: '/retention/run',
     permission: 'core.privacy.manage',
     summary: 'Apply retention now instead of waiting for the next scheduled run',
-    handler: () => runRetention(),
+    handler: ({ ctx }) => runRetention(new Date(), ctx),
   })
   .add({
     method: 'get',

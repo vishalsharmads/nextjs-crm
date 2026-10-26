@@ -13,6 +13,8 @@ import { redactDiff } from '../records/custom';
 import { audit } from './audit.service';
 import { logAccess } from './access-log';
 import { verifyIntegrity } from './integrity';
+import { csvSafe } from '../../lib/csv';
+import { verifyLimiter } from '../../middleware/rate-limit';
 
 const EXPORT_MAX_ROWS = 100_000;
 
@@ -115,7 +117,7 @@ async function streamCsv(
     const pageQb = qb.clone().orderBy(`${alias}.id`, 'desc').limit(1000);
     if (beforeId !== null) pageQb.where(`${alias}.id`, '<', beforeId);
     const rows = (await pageQb) as Record<string, unknown>[];
-    for (const r of rows) csv.write(toRow(r));
+    for (const r of rows) csv.write(toRow(r).map(csvSafe));
     count += rows.length;
     if (rows.length < 1000) break;
     beforeId = rows[rows.length - 1]!.id as number;
@@ -220,6 +222,8 @@ export const auditRoutes = defineRoutes('/audit-logs', ['audit'])
     method: 'post',
     path: '/verify',
     permission: 'core.audit.view',
+    // Rescans every sealed day: a few per minute is plenty.
+    before: [verifyLimiter],
     summary: 'Recompute the sealed daily digests of the audit and access logs',
     handler: async ({ ctx }) => {
       const result = await verifyIntegrity();

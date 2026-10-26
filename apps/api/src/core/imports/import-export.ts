@@ -15,6 +15,7 @@ import { enqueue, registerJob } from '../../lib/jobs';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { logAccess } from '../audit/access-log';
 import { readStoredFile } from '../files/files.service';
+import { csvSafe } from '../../lib/csv';
 import { audit } from '../audit/audit.service';
 import { assertCan, loadAccess } from '../rbac/access';
 import { customContext } from '../records/common';
@@ -174,10 +175,11 @@ export async function exportCsv(
     if (!rows.length) break;
     const dtos = (await def.toDtos(rows, { user, conn: db })) as Dto[];
     for (const d of dtos) {
-      csv.write([
-        ...columns.map((c) => c.get(d) ?? ''),
-        ...visible.map((f) => exportValue(f, d.custom[f.key])),
-      ]);
+      csv.write(
+        [...columns.map((c) => c.get(d) ?? ''), ...visible.map((f) => exportValue(f, d.custom[f.key]))].map(
+          csvSafe,
+        ),
+      );
       count++;
     }
     if (rows.length < batch) break;
