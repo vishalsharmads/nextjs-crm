@@ -307,6 +307,7 @@ export const usersRoutes = defineRoutes('/users', ['users'])
         await trx('users')
           .where({ id: u.id })
           .update({ totp_enabled: false, totp_secret_enc: null, totp_last_step: null });
+        await trx('user_recovery_codes').where({ user_id: u.id }).delete();
         await audit(trx, ctx, { action: 'user.mfa_reset', entity: 'user', entityId: u.id });
       });
     },

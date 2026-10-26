@@ -33,6 +33,7 @@ import { DialogContent, Dialog } from '@/components/ui/dialog';
 import { buildNav, type NavItem } from './nav';
 import { CommandPaletteProvider, usePalette, type PaletteCommand } from './command-palette';
 import { useHotkeys } from './hotkeys';
+import { IdleTimeout } from './idle-timeout';
 import { NotificationsBell } from '@/features/notifications/notifications-bell';
 
 const COLLAPSE_KEY = 'ui.sidebarCollapsed';
@@ -129,11 +130,12 @@ function ShellLayout({ nav }: { nav: NavItem[] }) {
         </main>
       </div>
       <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} nav={nav} />
+      <IdleTimeout />
     </div>
   );
 }
 
-/** When the workspace requires 2FA for admins, keep them on their profile until they enrol. */
+/** When the workspace requires 2FA for this user's role, keep them on their profile until they enrol. */
 function MfaRequiredBanner() {
   const { access } = useBoot();
   const location = useLocation();
@@ -141,7 +143,7 @@ function MfaRequiredBanner() {
   if (!location.pathname.startsWith('/settings/profile')) return <Navigate to="/settings/profile" replace />;
   return (
     <div role="status" className="border-b border-accent bg-accent-soft px-4 py-2 text-sm">
-      This workspace requires two-factor authentication for admins. Turn it on below to continue.
+      This workspace requires two-factor authentication for your account. Turn it on below to continue.
     </div>
   );
 }

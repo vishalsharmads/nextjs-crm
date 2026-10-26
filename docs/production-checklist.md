@@ -35,6 +35,8 @@ Use this before the first client goes live, and for each new client instance. De
 - [ ] Uptime monitor on `https://<domain>/api/v1/health/ready` with alerts to you.
 - [ ] Log retention: `journalctl` for the unit, or ship logs to your logging service.
 - [ ] Admin account has 2FA turned on, and **Settings → Security** has "Require 2FA for admins" on.
+- [ ] **Settings → Compliance** has the right profile for the data you hold (Privacy for personal data under GDPR-style laws, Health data for HIPAA). See [compliance/overview.md](compliance/overview.md).
+- [ ] Every admin has saved their 2FA recovery codes somewhere other than the device that runs the authenticator app.
 - [ ] Branding, business details (**Settings → Sales documents**) and vocabulary checked with the client.
 
 ## Demo instances

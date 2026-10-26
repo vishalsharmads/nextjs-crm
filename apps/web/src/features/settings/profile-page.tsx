@@ -112,6 +112,8 @@ function TwoFactor() {
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [disableOpen, setDisableOpen] = useState(false);
+  const [regenOpen, setRegenOpen] = useState(false);
+  const [codes, setCodes] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (setup) void QRCode.toDataURL(setup.otpauthUrl, { margin: 1, width: 184 }).then(setQr);
@@ -122,11 +124,22 @@ function TwoFactor() {
     onSuccess: setSetup,
   });
   const enable = useMutation({
-    mutationFn: () => apiPost('/me/2fa/enable', { code }),
-    onSuccess: () => {
+    mutationFn: () => apiPost<{ recoveryCodes: string[] }>('/me/2fa/enable', { code }),
+    onSuccess: (res) => {
       toast.success('Two-factor authentication is on');
       setSetup(null);
       setCode('');
+      setCodes(res.recoveryCodes);
+      void qc.invalidateQueries({ queryKey: bootstrapKey });
+    },
+  });
+  const regenerate = useMutation({
+    mutationFn: () => apiPost<{ recoveryCodes: string[] }>('/me/2fa/recovery-codes', { password }),
+    onSuccess: (res) => {
+      toast.success('Recovery codes replaced');
+      setRegenOpen(false);
+      setPassword('');
+      setCodes(res.recoveryCodes);
       void qc.invalidateQueries({ queryKey: bootstrapKey });
     },
   });
@@ -155,12 +168,22 @@ function TwoFactor() {
     >
       {me.totpEnabled ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted">
-            You'll be asked for a code from your authenticator app when you sign in.
-          </p>
-          <Button variant="secondary" onClick={() => setDisableOpen(true)}>
-            Turn off
-          </Button>
+          <div className="text-sm text-muted">
+            <p>You'll be asked for a code from your authenticator app when you sign in.</p>
+            <p className={me.recoveryCodesLeft <= 2 ? 'text-accent' : undefined}>
+              {me.recoveryCodesLeft === 1
+                ? '1 recovery code left.'
+                : `${me.recoveryCodesLeft} recovery codes left.`}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setRegenOpen(true)}>
+              Replace recovery codes
+            </Button>
+            <Button variant="secondary" onClick={() => setDisableOpen(true)}>
+              Turn off
+            </Button>
+          </div>
         </div>
       ) : setup ? (
         <div className="flex flex-col gap-4 sm:flex-row">
@@ -206,6 +229,50 @@ function TwoFactor() {
           </Button>
         </div>
       )}
+      <Dialog open={codes !== null} onOpenChange={(open) => !open && setCodes(null)}>
+        <DialogContent
+          title="Save your recovery codes"
+          description="Use one of these if you lose your authenticator app. Each code works once, and you won't see them again."
+          footer={
+            <>
+              <Button onClick={() => void navigator.clipboard?.writeText(codes?.join('\n') ?? '')}>
+                Copy
+              </Button>
+              <Button variant="primary" onClick={() => setCodes(null)}>
+                I saved them
+              </Button>
+            </>
+          }
+        >
+          <ul className="grid grid-cols-2 gap-2 font-mono text-sm" aria-label="Recovery codes">
+            {codes?.map((c) => (
+              <li key={c} className="rounded-sm border border-line bg-canvas px-2 py-1 text-center">
+                {c}
+              </li>
+            ))}
+          </ul>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={regenOpen} onOpenChange={setRegenOpen}>
+        <DialogContent
+          title="Replace recovery codes"
+          description="Your current codes stop working. Confirm with your password."
+          footer={
+            <>
+              <Button onClick={() => setRegenOpen(false)}>Cancel</Button>
+              <Button variant="primary" onClick={() => regenerate.mutate()} loading={regenerate.isPending}>
+                Replace
+              </Button>
+            </>
+          }
+        >
+          <Field label="Password">
+            {(p) => (
+              <Input {...p} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            )}
+          </Field>
+        </DialogContent>
+      </Dialog>
       <Dialog open={disableOpen} onOpenChange={setDisableOpen}>
         <DialogContent
           title="Turn off two-factor authentication"

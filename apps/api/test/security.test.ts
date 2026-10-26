@@ -74,7 +74,7 @@ describe('account lifecycle', () => {
     const user = await createUser();
     const c = await loginAs(user);
     const setup = await c.post('/me/2fa/setup').expect(200);
-    await c.post('/me/2fa/enable', { code: totpAt(setup.body.secret, Date.now()) }).expect(204);
+    await c.post('/me/2fa/enable', { code: totpAt(setup.body.secret, Date.now()) }).expect(200);
     const fresh = await anonymousClient();
     await fresh.post('/auth/login', { email: user.email, password: user.password }).expect(200);
     for (let i = 0; i < 5; i++) await fresh.post('/auth/2fa/verify', { code: '000000' });

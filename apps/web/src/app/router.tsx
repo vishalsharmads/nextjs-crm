@@ -21,6 +21,10 @@ const SecuritySettingsPage = lazyPage(
   () => import('@/features/settings/general-page'),
   'SecuritySettingsPage',
 );
+const ComplianceSettingsPage = lazyPage(
+  () => import('@/features/settings/compliance-page'),
+  'ComplianceSettingsPage',
+);
 const VocabularyPage = lazyPage(() => import('@/features/settings/vocabulary-page'), 'VocabularyPage');
 const UsersPage = lazyPage(() => import('@/features/settings/people-pages'), 'UsersPage');
 const TeamsPage = lazyPage(() => import('@/features/settings/people-pages'), 'TeamsPage');
@@ -83,6 +87,7 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'branding', element: <BrandingPage /> },
   { path: 'vocabulary', element: <VocabularyPage /> },
   { path: 'security', element: <SecuritySettingsPage /> },
+  { path: 'compliance', element: <ComplianceSettingsPage /> },
   { path: 'users', element: <UsersPage /> },
   { path: 'teams', element: <TeamsPage /> },
   { path: 'roles', element: <RolesPage /> },

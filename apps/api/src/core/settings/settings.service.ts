@@ -1,10 +1,13 @@
 import { env } from '../../config/env';
 import type { z } from 'zod';
 import {
+  applyFloors,
   brandingSchema,
   DEFAULT_BRANDING,
   SETTINGS_GROUPS,
   type Branding,
+  type ComplianceSettings,
+  type SecuritySettings,
   type SettingsGroup,
 } from '@app/shared';
 import { db, type Db } from '../../db/knex';
@@ -50,6 +53,18 @@ export async function getGroup<G extends SettingsGroup>(
 ): Promise<z.output<(typeof SETTINGS_GROUPS)[G]>> {
   const raw = (await getRaw(group, conn)) ?? {};
   return SETTINGS_GROUPS[group].parse(raw) as z.output<(typeof SETTINGS_GROUPS)[G]>;
+}
+
+/** Compliance settings with the profile's floors applied. Every enforcement point reads this. */
+export async function effectiveCompliance(conn: Db = db): Promise<ComplianceSettings> {
+  const c = await getGroup('compliance', conn);
+  return applyFloors('compliance', c, c.profile);
+}
+
+/** Security settings with the compliance profile's floors applied. */
+export async function effectiveSecurity(conn: Db = db): Promise<SecuritySettings> {
+  const { profile } = await getGroup('compliance', conn);
+  return applyFloors('security', await getGroup('security', conn), profile);
 }
 
 export async function getBranding(conn: Db = db): Promise<Branding> {

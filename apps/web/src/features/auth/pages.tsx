@@ -38,8 +38,19 @@ export function LoginPage() {
       z.object({ email: z.email('Enter a valid email'), password: z.string().min(1, 'Enter your password') }),
     ),
   });
+  const [useRecovery, setUseRecovery] = useState(false);
   const mfa = useForm({
     resolver: zodResolver(z.object({ code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code') })),
+  });
+  const recovery = useForm({
+    resolver: zodResolver(
+      z.object({
+        recoveryCode: z
+          .string()
+          .trim()
+          .regex(/^[A-Za-z0-9]{5}-?[A-Za-z0-9]{5}$/, 'Enter a recovery code like abcde-12345'),
+      }),
+    ),
   });
 
   useEffect(() => setDocumentTitle(t('auth.signIn'), branding.appName), [t, branding.appName]);
@@ -66,20 +77,59 @@ export function LoginPage() {
     }
   });
 
-  const onCode = mfa.handleSubmit(async (values) => {
+  const verify = async (body: { code: string } | { recoveryCode: string }) => {
     setError(null);
     try {
-      await api('/auth/2fa/verify', { method: 'POST', body: values, noRetry: true });
+      await api('/auth/2fa/verify', { method: 'POST', body, noRetry: true });
       await done();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Verification failed');
     }
-  });
+  };
+  const onCode = mfa.handleSubmit(verify);
+  const onRecovery = recovery.handleSubmit(verify);
 
   if (!branding.installed) {
     return (
       <AuthLayout title={branding.appName}>
         <p className="text-sm text-muted">{t('auth.notInstalled')}</p>
+      </AuthLayout>
+    );
+  }
+
+  if (step === 'mfa' && useRecovery) {
+    return (
+      <AuthLayout title={t('auth.mfaTitle')} description={t('auth.mfaRecoveryHelp')}>
+        <FormError error={error} />
+        <form onSubmit={onRecovery} className="flex flex-col gap-4" noValidate>
+          <Field label={t('auth.recoveryCode')} error={recovery.formState.errors.recoveryCode?.message}>
+            {(p) => (
+              <Input
+                {...p}
+                {...recovery.register('recoveryCode')}
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                autoFocus
+                maxLength={11}
+                className="h-10 text-center text-lg tracking-widest"
+              />
+            )}
+          </Field>
+          <Button type="submit" variant="primary" size="lg" loading={recovery.formState.isSubmitting}>
+            {t('auth.verify')}
+          </Button>
+          <Button
+            type="button"
+            variant="link"
+            onClick={() => {
+              setError(null);
+              setUseRecovery(false);
+            }}
+          >
+            {t('auth.useAuthenticator')}
+          </Button>
+        </form>
       </AuthLayout>
     );
   }
@@ -105,6 +155,16 @@ export function LoginPage() {
           <Button type="submit" variant="primary" size="lg" loading={mfa.formState.isSubmitting}>
             {t('auth.verify')}
           </Button>
+          <Button
+            type="button"
+            variant="link"
+            onClick={() => {
+              setError(null);
+              setUseRecovery(true);
+            }}
+          >
+            {t('auth.useRecoveryCode')}
+          </Button>
           <Button type="button" variant="link" onClick={() => setStep('password')}>
             {t('auth.backToSignIn')}
           </Button>
@@ -118,6 +178,11 @@ export function LoginPage() {
       title={t('auth.signInTo', { app: branding.appName })}
       description={branding.tagline || undefined}
     >
+      {params.get('reason') === 'idle' && !error ? (
+        <p role="status" className="mb-4 rounded-sm bg-primary-soft px-3 py-2 text-sm">
+          {t('auth.signedOutIdle')}
+        </p>
+      ) : null}
       <FormError error={error} />
       <form onSubmit={onPassword} className="flex flex-col gap-4" noValidate>
         <Field label={t('auth.email')} error={form.formState.errors.email?.message}>
@@ -150,6 +215,11 @@ export function LoginPage() {
           {t('auth.forgot')}
         </Link>
       </form>
+      {branding.loginNotice ? (
+        <p className="mt-6 border-t border-line pt-4 text-xs whitespace-pre-line text-muted">
+          {branding.loginNotice}
+        </p>
+      ) : null}
       {branding.demoAccounts.length ? (
         <DemoAccounts
           accounts={branding.demoAccounts}

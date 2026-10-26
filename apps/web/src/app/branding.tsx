@@ -20,6 +20,7 @@ const FALLBACK: PublicBranding = {
   locale: 'en',
   installed: true,
   demoAccounts: [],
+  loginNotice: '',
 };
 const BrandingContext = createContext<BrandingContextValue | null>(null);
 const MODE_KEY = 'ui.colorMode';

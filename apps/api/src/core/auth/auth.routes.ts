@@ -3,6 +3,7 @@ import {
   changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
+  mfaVerifySchema,
   resetPasswordSchema,
   totpCodeSchema,
   type MeDto,
@@ -38,9 +39,9 @@ export const authRoutes = defineRoutes('/auth', ['auth'])
     path: '/2fa/verify',
     permission: 'public',
     before: [authLimiter],
-    body: totpCodeSchema,
+    body: mfaVerifySchema,
     handler: async ({ req, res, body }) => {
-      await auth.verifyMfa(req, res, body.code);
+      await auth.verifyMfa(req, res, body);
       return { ok: true };
     },
   })
@@ -109,6 +110,7 @@ export async function getMe(userId: number): Promise<MeDto> {
     locale: u.locale,
     timezone: u.timezone,
     totpEnabled: !!u.totp_enabled,
+    recoveryCodesLeft: u.totp_enabled ? await auth.unusedRecoveryCodeCount(userId) : 0,
     roles: roles.map((r) => ({ key: r.key, name: r.name })),
   };
 }
@@ -143,6 +145,14 @@ export const meRoutes = defineRoutes('/me', ['me'])
   })
   .add({
     method: 'post',
+    path: '/activity',
+    permission: 'authenticated',
+    summary: 'Heartbeat after user input; the x-idle-ms header moves the idle clock forward',
+    // authenticate() already recorded the reported input.
+    handler: () => undefined,
+  })
+  .add({
+    method: 'post',
     path: '/password',
     permission: 'authenticated',
     before: [authLimiter],
@@ -164,6 +174,15 @@ export const meRoutes = defineRoutes('/me', ['me'])
     before: [authLimiter],
     body: totpCodeSchema,
     handler: ({ ctx, user, body }) => auth.enableTotp(ctx, user.id, body.code),
+  })
+  .add({
+    method: 'post',
+    path: '/2fa/recovery-codes',
+    permission: 'authenticated',
+    before: [authLimiter],
+    summary: 'Replace your 2FA recovery codes (shown once)',
+    body: z.object({ password: z.string().min(1).max(256) }),
+    handler: ({ ctx, user, body }) => auth.regenerateRecoveryCodes(ctx, user.id, body.password),
   })
   .add({
     method: 'post',

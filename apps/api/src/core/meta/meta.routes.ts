@@ -4,7 +4,7 @@ import type { AuthUser } from '../../http/context';
 import { db } from '../../db/knex';
 import { getMe } from '../auth/auth.routes';
 import { getLabels } from '../labels/labels.service';
-import { getGroup } from '../settings/settings.service';
+import { effectiveCompliance, getGroup } from '../settings/settings.service';
 import { fieldAccessMap, getDefinitions, fieldLevel } from '../custom-fields/definitions';
 import { listPipelines } from '../pipelines/pipelines.repository';
 import { enabledModuleKeys, moduleMenu } from '../../modules/registry';
@@ -52,6 +52,10 @@ export const metaRoutes = defineRoutes('/meta', ['meta']).add({
         deals: await getGroup('deals'),
         contacts: await getGroup('contacts'),
         commerce: await getGroup('commerce'),
+        session: await effectiveCompliance().then((c) => ({
+          idleTimeoutMinutes: c.idleTimeoutMinutes,
+          profile: c.profile,
+        })),
       },
       customFields,
       fieldGroups: groups.map((g) => ({

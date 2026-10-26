@@ -3,9 +3,13 @@ import multer from 'multer';
 import {
   BRANDING_ASSET_SLOTS,
   SETTINGS_GROUPS,
+  applyFloors,
   brandingSchema,
   checkPaletteContrast,
+  floorViolations,
+  type ComplianceSettings,
   type PublicBranding,
+  type SecuritySettings,
   type SettingsGroup,
 } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
@@ -50,6 +54,7 @@ async function publicBranding(): Promise<PublicBranding> {
     locale: general.locale,
     installed: await isInstalled(),
     demoAccounts: await getDemoAccounts(),
+    loginNotice: (await getGroup('compliance').catch(() => ({ loginNotice: '' }))).loginNotice,
     assets: Object.fromEntries(
       Object.entries(assets).map(([slot, uuid]) => [
         slot,
@@ -246,10 +251,45 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
     params: groupParam,
     body: z.record(z.string(), z.unknown()),
     handler: async ({ ctx, user, params, body }) => {
+      // Security and compliance settings can weaken every account's protection: admins only.
+      if ((params.group === 'security' || params.group === 'compliance') && !user.isAdmin)
+        throw new AppError('FORBIDDEN', 'Only admins can change security and compliance settings');
       const current = (await getRaw(params.group)) ?? {};
-      const next = SETTINGS_GROUPS[params.group].parse({ ...(current as object), ...body });
+      let next: object = SETTINGS_GROUPS[params.group].parse({ ...(current as object), ...body });
+      const before = await getGroup('compliance');
+      const profile = params.group === 'compliance' ? (next as ComplianceSettings).profile : before.profile;
+      // Changing the profile raises stored values to its floors; any other edit may not go below them.
+      const profileChanged = profile !== before.profile;
+      if (params.group === 'compliance') {
+        const keys = (next as ComplianceSettings).mfaRequiredRoles;
+        const known = keys.length ? await db('roles').whereIn('key', keys).pluck('key') : [];
+        const unknown = keys.filter((k) => !known.includes(k));
+        if (unknown.length)
+          throw new AppError('VALIDATION_FAILED', `Unknown role: ${unknown.join(', ')}`, [
+            { path: 'mfaRequiredRoles', message: 'Choose existing roles' },
+          ]);
+      }
+      let raisedSecurity: SecuritySettings | null = null;
+      if (params.group === 'security' || params.group === 'compliance') {
+        if (profileChanged) {
+          next = applyFloors(params.group, next, profile);
+          raisedSecurity = applyFloors('security', await getGroup('security'), profile);
+        } else {
+          // Only the fields this request changes; stored values below a floor are already raised on read.
+          const issues = floorViolations(params.group, next, profile).filter((i) => i.path in body);
+          if (issues.length) throw new AppError('VALIDATION_FAILED', issues[0]!.message, issues);
+        }
+      }
       await db.transaction(async (trx) => {
         await setRaw(params.group, params.group, next, { userId: user.id, conn: trx });
+        if (raisedSecurity) {
+          await setRaw('security', 'security', raisedSecurity, { userId: user.id, conn: trx });
+          await audit(trx, ctx, {
+            action: 'settings.updated',
+            entity: 'settings',
+            diff: { group: 'security', reason: `profile:${profile}`, after: raisedSecurity },
+          });
+        }
         await audit(trx, ctx, {
           action: 'settings.updated',
           entity: 'settings',

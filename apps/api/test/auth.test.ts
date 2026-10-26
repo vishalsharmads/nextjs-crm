@@ -98,7 +98,7 @@ describe('auth', () => {
     const setup = await c.post('/me/2fa/setup').expect(200);
     expect(setup.body.otpauthUrl).toContain('otpauth://totp/');
     await c.post('/me/2fa/enable', { code: '000000' }).expect(401);
-    await c.post('/me/2fa/enable', { code: totpAt(setup.body.secret, Date.now()) }).expect(204);
+    await c.post('/me/2fa/enable', { code: totpAt(setup.body.secret, Date.now()) }).expect(200);
 
     const fresh = await anonymousClient();
     const first = await fresh.post('/auth/login', { email: user.email, password: user.password }).expect(200);
