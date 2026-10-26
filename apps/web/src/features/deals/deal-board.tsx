@@ -22,15 +22,14 @@ import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
 import type { DealDto, FilterCondition } from '@app/shared';
-import { apiGet, apiPatch } from '@/lib/api';
+import { apiGet } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { cn } from '@/lib/cn';
 import { formatDate, formatMoney } from '@/lib/format';
 import { useBoot, useCan } from '@/app/session';
 import { Avatar, ErrorState, Skeleton } from '@/components/ui/misc';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { ListSelect } from '@/components/fields/pickers';
+import { LostReasonDialog } from './lost-reason-dialog';
+import { patchDealStage } from './stage-move';
 
 interface Column {
   stage: {
@@ -95,13 +94,7 @@ export function DealBoard({
   const canMove = can('core.deals.update');
 
   const move = useMutation({
-    mutationFn: (v: {
-      uuid: string;
-      stageUuid: string;
-      beforeUuid?: string;
-      afterUuid?: string;
-      lostReason?: string;
-    }) => apiPatch<DealDto>(`/deals/${v.uuid}/stage`, v),
+    mutationFn: patchDealStage,
     onMutate: async (v) => {
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<Board>(key);
@@ -323,41 +316,5 @@ function DealCard({ deal, onOpen, overlay }: { deal: DealDto; onOpen?: () => voi
         </span>
       </div>
     </article>
-  );
-}
-
-function LostReasonDialog({
-  deal,
-  onCancel,
-  onConfirm,
-}: {
-  deal: DealDto;
-  onCancel: () => void;
-  onConfirm: (reason: string) => void;
-}) {
-  const boot = useBoot();
-  const [reason, setReason] = useState<string | null>(null);
-  return (
-    <Dialog open onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent
-        title={`Why was “${deal.title}” lost?`}
-        description="Knowing why helps you see patterns later."
-        footer={
-          <>
-            <Button onClick={onCancel}>Cancel</Button>
-            <Button variant="primary" disabled={!reason} onClick={() => reason && onConfirm(reason)}>
-              Mark as lost
-            </Button>
-          </>
-        }
-      >
-        <ListSelect
-          value={reason}
-          onChange={setReason}
-          options={boot.settings.deals.lostReasons}
-          placeholder="Choose a reason"
-        />
-      </DialogContent>
-    </Dialog>
   );
 }
