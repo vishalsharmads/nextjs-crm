@@ -36,11 +36,15 @@ const year = new Date().getFullYear();
         <li><a href="/contact">Contact</a></li>
         <li><a href="/privacy">Privacy</a></li>
         <li><a href="/terms">Terms</a></li>
+        <li><a href={site.company.url} target="_blank" rel="noopener">{site.company.name}</a></li>
       </ul>
     </nav>
   </div>
   <div class="wrap base">
     <p>© {year} Bespoq. All rights reserved.</p>
+    <p>
+      Bespoq is a product of <a href={site.company.url} target="_blank" rel="noopener">{site.company.name}</a>
+    </p>
   </div>
 </footer>
 
@@ -101,6 +105,20 @@ const year = new Date().getFullYear();
     border-top: 1px solid var(--line-on-mat);
     font-size: 14px;
     color: rgb(243 246 241 / 0.6);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 24px;
+  }
+  .base a {
+    color: rgb(243 246 241 / 0.82);
+    text-underline-offset: 3px;
+    transition: color 160ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .base a:hover {
+      color: var(--chalk);
+    }
   }
   @media (max-width: 860px) {
     .grid {

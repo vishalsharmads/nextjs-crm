@@ -6,6 +6,8 @@ export const site = {
     'Bespoq is a CRM configured around your industry: your words, your workflow and your data. Built for service businesses in the US and Australia, live in weeks without a custom build.',
   url: import.meta.env.SITE ?? 'https://bespoq.example',
   email: 'hello@bespoq.example',
+  /** The company that builds and supports Bespoq. Credited on the site only, never in the product. */
+  company: { name: 'Dotsquares', url: 'https://www.dotsquares.com/' },
   /** The demo app's sign-in page. Served at /app when the site and app share one server. */
   signInUrl: import.meta.env.PUBLIC_APP_URL ?? '/app',
   /** Where lead forms post. Set PUBLIC_LEAD_ENDPOINT to the CRM web form submit URL. */
