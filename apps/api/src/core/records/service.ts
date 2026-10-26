@@ -234,7 +234,12 @@ export async function updateRecord<Dto>(
   });
   await notifyAssignment(def, user, updated.after, updated.existing);
   const [dto] = await def.toDtos([updated.after], { user, conn: db });
-  const changes = maskEncrypted(diffRecords(updated.existing, updated.after));
+  // Same visibility as the record snapshot the event carries: no hidden fields, no sensitive values.
+  const changes = maskEncrypted(
+    redactDiff(diffRecords(updated.existing, updated.after), fc.fieldLevels) as ReturnType<
+      typeof diffRecords
+    >,
+  );
   if (Object.keys(changes).length) {
     await emitRecordEvent(def, 'updated', dto as Record<string, unknown>, user, changes);
     if (def.entity === 'deal' && changes.stage_id)
