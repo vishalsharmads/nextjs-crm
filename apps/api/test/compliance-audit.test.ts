@@ -49,6 +49,18 @@ describe('access logging', () => {
   });
 });
 
+describe('module reads', () => {
+  it('logs a module record view like a core one', async () => {
+    await setSettingsGroup('compliance', { accessLogging: true });
+    const { client, user } = await clientWithRoles(['admin']);
+    await client.post('/modules/tickets/enable').expect(200);
+    const t = await client.post('/m/tickets/tickets', { subject: 'Logged read' }).expect(201);
+    await client.get(`/m/tickets/tickets/${t.body.uuid}`).expect(200);
+    const row = await db('access_logs').where({ actor_id: user.id, entity: 'tickets.tickets' }).first();
+    expect(row).toMatchObject({ action: 'view', entity_uuid: t.body.uuid });
+  });
+});
+
 describe('audit viewer', () => {
   it('filters, shows one entry and exports only with the export permission', async () => {
     const { client: admin, user } = await clientWithRoles(['admin']);
