@@ -70,7 +70,8 @@ export function CommandPaletteProvider({
     staleTime: 10_000,
   });
 
-  const all = [...baseCommands, ...extra.flat()];
+  // Pages may re-register a base command (same id) with page-specific behaviour; the page wins.
+  const all = [...new Map([...baseCommands, ...extra.flat()].map((c) => [c.id, c])).values()];
   const groups = [...new Set(all.map((c) => c.group))];
   const run = (fn: () => void) => {
     setOpen(false);

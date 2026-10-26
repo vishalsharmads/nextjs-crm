@@ -21,6 +21,7 @@ export const contactsDef: ResourceDef<Row, ContactDto> = {
   entity: 'contact',
   table: 'contacts',
   resource: 'core.contacts',
+  mergeable: true,
   ownerColumns: ['contacts.owner_id'],
   fulltext: ['contacts.full_name', 'contacts.email'],
   likeColumns: ['contacts.full_name', 'contacts.email', 'contacts.phone_e164'],

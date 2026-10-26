@@ -161,17 +161,14 @@ export interface CreateTarget {
 }
 
 /** "New <entity>" targets for the command palette, limited to what the user may create and has enabled. */
-export function buildCreateTargets(boot: BootstrapDto): CreateTarget[] {
+export function buildCreateTargets(boot: BootstrapDto, t: (k: string) => string): CreateTarget[] {
   const can = (p: string) => boot.access.isAdmin || hasPermission(boot.access.permissions, p);
-  const v = labelVars(boot.labels);
   const targets: CreateTarget[] = [];
-  const add = (key: string, singular: string | undefined, route: string, permission: string) => {
-    if (can(permission)) {
-      targets.push({ key, label: `New ${singular ?? key}`, to: `${route}?new=1`, icon: Plus });
-    }
+  const add = (key: string, route: string, permission: string) => {
+    if (can(permission)) targets.push({ key, label: t(`create.${key}`), to: `${route}?new=1`, icon: Plus });
   };
-  add('contact', v.contact, '/contacts', 'core.contacts.create');
-  add('organization', v.organization, '/organizations', 'core.organizations.create');
-  if (boot.settings.features.leads) add('lead', v.lead, '/leads', 'core.leads.create');
+  add('contact', '/contacts', 'core.contacts.create');
+  add('organization', '/organizations', 'core.organizations.create');
+  if (boot.settings.features.leads) add('lead', '/leads', 'core.leads.create');
   return targets;
 }

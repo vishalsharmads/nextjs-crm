@@ -24,6 +24,8 @@ export interface ResourceDef<Row extends Record<string, unknown> = Record<string
   table: string;
   /** Permission resource, e.g. `core.contacts`. */
   resource: string;
+  /** Table has `merged_into_id`: merged-away rows are soft-deleted but are not in the trash. */
+  mergeable?: boolean;
   /** Columns OR-ed for own/team scope. */
   ownerColumns: string[];
   /** Columns in the FULLTEXT index (MATCH ... AGAINST must list exactly these). */

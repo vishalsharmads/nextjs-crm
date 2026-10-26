@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { BootstrapDto } from '@app/shared';
 import { buildCreateTargets } from './nav';
 
+const tr = (k: string) =>
+  ({ 'create.contact': 'New Member', 'create.organization': 'New Company', 'create.lead': 'New Enquiry' })[
+    k
+  ] ?? k;
+
 function boot(opts: { isAdmin?: boolean; permissions?: string[]; leads?: boolean }): BootstrapDto {
   return {
     access: { isAdmin: opts.isAdmin ?? false, permissions: opts.permissions ?? [] },
@@ -16,7 +21,7 @@ function boot(opts: { isAdmin?: boolean; permissions?: string[]; leads?: boolean
 
 describe('buildCreateTargets', () => {
   it('uses vocabulary labels and the list route with ?new=1', () => {
-    const t = buildCreateTargets(boot({ isAdmin: true }));
+    const t = buildCreateTargets(boot({ isAdmin: true }), tr);
     expect(t.map((x) => [x.label, x.to])).toEqual([
       ['New Member', '/contacts?new=1'],
       ['New Company', '/organizations?new=1'],
@@ -25,16 +30,16 @@ describe('buildCreateTargets', () => {
   });
 
   it('only offers what the user may create', () => {
-    const t = buildCreateTargets(boot({ permissions: ['core.contacts.create'] }));
+    const t = buildCreateTargets(boot({ permissions: ['core.contacts.create'] }), tr);
     expect(t.map((x) => x.key)).toEqual(['contact']);
   });
 
   it('hides leads when the feature is off', () => {
-    const t = buildCreateTargets(boot({ isAdmin: true, leads: false }));
+    const t = buildCreateTargets(boot({ isAdmin: true, leads: false }), tr);
     expect(t.map((x) => x.key)).toEqual(['contact', 'organization']);
   });
 
   it('offers nothing without permission', () => {
-    expect(buildCreateTargets(boot({}))).toEqual([]);
+    expect(buildCreateTargets(boot({}), tr)).toEqual([]);
   });
 });

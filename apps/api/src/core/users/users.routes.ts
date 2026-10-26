@@ -15,6 +15,7 @@ import { assertCanAssignRoles, assertCanGrant, assertCanManageUser } from '../rb
 import { escapeLike } from '../records/filters';
 import { sendTemplatedEmail } from '../mail/templates';
 import { recordDefs } from '../records/registry';
+import { emitRecordEvent } from '../records/service';
 
 const uuidParam = z.object({ uuid: z.uuid() });
 
@@ -278,14 +279,19 @@ export const usersRoutes = defineRoutes('/users', ['users'])
       if (to.status !== 'active') throw new AppError('VALIDATION_FAILED', 'The new owner must be active');
       await assertCanManageUser(user, from.id);
       const moved: Record<string, number> = {};
+      const changed: { def: (typeof recordDefs)[keyof typeof recordDefs]; uuid: string; column: string }[] =
+        [];
       await db.transaction(async (trx) => {
         for (const def of Object.values(recordDefs)) {
           let count = 0;
           for (const col of def.ownerColumns) {
             const column = col.split('.')[1]!;
+            const rows = (await trx(def.table).where(column, from.id).select('uuid')) as { uuid: string }[];
+            if (!rows.length) continue;
             count += await trx(def.table)
               .where(column, from.id)
-              .update({ [column]: to.id });
+              .update({ [column]: to.id, updated_at: new Date() });
+            for (const r of rows) changed.push({ def, uuid: r.uuid, column });
           }
           if (count) moved[def.entity] = count;
         }
@@ -297,6 +303,11 @@ export const usersRoutes = defineRoutes('/users', ['users'])
           diff: { to: to.uuid, moved },
         });
       });
+      // After commit, so webhooks and automations see the new owner like any other update.
+      for (const c of changed)
+        await emitRecordEvent(c.def, 'updated', { uuid: c.uuid }, user, {
+          [c.column]: { from: from.uuid, to: to.uuid },
+        });
       return { moved };
     },
   })

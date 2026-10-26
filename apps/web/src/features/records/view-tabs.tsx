@@ -56,12 +56,10 @@ export function ViewTabs({
   const sortSpec = useMemo(
     () =>
       sort
-        ? sort
-            .split(',')
-            .map((s) => ({
-              field: s.replace(/^-/, ''),
-              dir: s.startsWith('-') ? ('desc' as const) : ('asc' as const),
-            }))
+        ? sort.split(',').map((s) => ({
+            field: s.replace(/^-/, ''),
+            dir: s.startsWith('-') ? ('desc' as const) : ('asc' as const),
+          }))
         : null,
     [sort],
   );

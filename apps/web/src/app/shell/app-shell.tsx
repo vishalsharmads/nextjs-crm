@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/menu';
 import { DialogContent, Dialog } from '@/components/ui/dialog';
 import { buildCreateTargets, buildNav, type NavItem } from './nav';
+import { useTrashEntities } from '@/features/records/trash-page';
 import { CommandPaletteProvider, usePalette, type PaletteCommand } from './command-palette';
 import { useHotkeys } from './hotkeys';
 import { IdleTimeout } from './idle-timeout';
@@ -65,29 +66,33 @@ export function AppShell() {
       })),
     [nav, navigate],
   );
+  const trashEntities = useTrashEntities();
   const trashCommand = useMemo<PaletteCommand[]>(
-    () => [
-      {
-        id: 'go:trash',
-        label: 'Trash',
-        group: 'Go to',
-        icon: Trash2,
-        keywords: ['deleted', 'restore'],
-        run: () => navigate('/trash'),
-      },
-    ],
-    [navigate],
+    () =>
+      trashEntities.length === 0
+        ? []
+        : [
+            {
+              id: 'go:trash',
+              label: 'Trash',
+              group: 'Go to',
+              icon: Trash2,
+              keywords: ['deleted', 'restore'],
+              run: () => navigate('/trash'),
+            },
+          ],
+    [navigate, trashEntities.length],
   );
   const createCommands = useMemo<PaletteCommand[]>(
     () =>
-      buildCreateTargets(boot).map((c) => ({
+      buildCreateTargets(boot, t).map((c) => ({
         id: `create:${c.key}`,
         label: c.label,
         group: 'Create',
         icon: c.icon,
         run: () => navigate(c.to),
       })),
-    [boot, navigate],
+    [boot, navigate, t],
   );
 
   return (

@@ -196,6 +196,7 @@ export function TransferDialog({
   onClose: () => void;
 }) {
   const [toUuid, setToUuid] = useState('');
+  const qc = useQueryClient();
   const candidates = users.filter((u) => u.uuid !== from.uuid && u.status === 'active');
   const name = (u: UserDto) => `${u.firstName} ${u.lastName}`.trim() || u.email;
   const transfer = useMutation({
@@ -204,6 +205,8 @@ export function TransferDialog({
     onSuccess: ({ moved }) => {
       const total = Object.values(moved).reduce((a, b) => a + b, 0);
       toast.success(`Transferred ${total} ${total === 1 ? 'record' : 'records'}`);
+      void qc.invalidateQueries({ queryKey: ['records'] });
+      void qc.invalidateQueries({ queryKey: ['activities'] });
       onClose();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not transfer records'),

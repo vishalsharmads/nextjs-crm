@@ -139,5 +139,12 @@
     "body": "You'll be signed out in {{seconds}} seconds to protect this workspace.",
     "stay": "Stay signed in",
     "signOut": "Sign out now"
+  },
+  "create": {
+    "contact": "New {{contact}}",
+    "organization": "New {{organization}}",
+    "lead": "New {{lead}}",
+    "deal": "New {{deal}}",
+    "activity": "New {{activity}}"
   }
 }
