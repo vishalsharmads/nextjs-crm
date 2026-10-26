@@ -232,3 +232,15 @@ describe('review fixes: encryption edge cases', () => {
     expect(ok.headers['cache-control']).toBe('no-store');
   });
 });
+
+describe('blueprints and sensitivity', () => {
+  it('exports sensitivity and refuses sensitive fields that could leak', async () => {
+    const { parseBlueprint } = await import('@app/blueprints');
+    const exported = await admin.get('/blueprints/export').expect(200);
+    const fields = exported.body.custom_fields.contact as { key: string; sensitivity?: string }[];
+    expect(fields.find((f) => f.key === 'diagnosis')?.sensitivity).toBe('special');
+    const bad = structuredClone(exported.body);
+    bad.custom_fields.contact.push({ key: 'bad_one', label: 'Bad', type: 'select', sensitivity: 'special' });
+    expect(() => parseBlueprint(bad)).toThrow();
+  });
+});

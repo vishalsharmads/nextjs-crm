@@ -46,6 +46,7 @@ describe('blueprint engine', () => {
       b.custom_fields.contact!.push({
         key: 'nickname',
         label: 'Nickname',
+        sensitivity: 'normal',
         type: 'text',
         required: false,
         filterable: false,

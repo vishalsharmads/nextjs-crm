@@ -47,6 +47,7 @@ export async function exportBlueprint(knex: Knex, opts: { key?: string; version?
         visibility: d.visibility,
         filterable: d.filterable,
         show_in_list: d.showInList,
+        ...(d.sensitivity !== 'normal' ? { sensitivity: d.sensitivity } : {}),
       }));
     }
   }

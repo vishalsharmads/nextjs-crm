@@ -1,7 +1,7 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import { env } from '../config/env';
 import { logger } from './logger';
-import { sha256 } from './crypto';
+import { hmac } from './crypto';
 
 let transporter: Transporter | null = null;
 
@@ -48,8 +48,12 @@ export async function sendMail(mail: OutgoingMail) {
       headers: mail.headers,
     });
   } catch (err) {
-    // The address is personal data: log a short hash to correlate failures, not the address.
-    logger.error({ err, to: sha256(mail.to.toLowerCase()).slice(0, 12) }, 'Failed to send mail');
+    // The address is personal data: log a keyed hash to correlate failures, not the address
+    // (keyed, so nobody can confirm a guessed address by hashing it).
+    logger.error(
+      { err, to: hmac(env.CSRF_SECRET, `mail-log:${mail.to.toLowerCase()}`).slice(0, 16) },
+      'Failed to send mail',
+    );
     throw err;
   }
 }

@@ -13,8 +13,6 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 
 ## Future
 
-- Access logging (record views) inside modules (bookings, tickets, documents); they already take part in export and erasure.
-- Sensitivity for blueprint-defined custom fields (`sensitivity` in `blueprint.json`), so an industry blueprint can ship sensitive fields.
 - WebAuthn / passkeys as a second factor.
 - Breached-password check (k-anonymity range API) when setting a password.
 - Keep encryption keys in an external key manager (KMS or HSM) instead of the environment.

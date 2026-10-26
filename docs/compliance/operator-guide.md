@@ -16,7 +16,7 @@ For the people who run an instance for a client who holds personal or health dat
 4. **Mark sensitive data.** Create health or other special-category custom fields with Data protection: **Sensitive**. It cannot change later. Mark other personal custom fields **Personal** so they show in the data map.
 5. **Consent purposes.** Settings → Compliance → Consent purposes. Write the exact wording people will tick, choose the lawful basis, and tick Marketing for marketing purposes. Add them to every web form that collects personal data.
 6. **Retention.** Agree retention periods with the client and add rules (Settings → Compliance → Data retention). Check them under Settings → Privacy → Retention before relying on them.
-7. **Roles.** Give each role only what it needs. Only roles that need it get `core.privacy.manage` (privacy requests, export, erasure), `core.audit.view` / `core.audit.export`, and `core.fields.reveal` (sensitive values).
+7. **Roles.** Give each role only what it needs. Only roles that need it get `core.privacy.manage` (privacy requests, restriction, erasure), `core.privacy.export` (data exports, limited to what the role can see), `core.audit.view` / `core.audit.export`, and `core.fields.reveal` (sensitive values).
 8. **Emergency access.** Keep one admin account for emergencies: strong password and 2FA, its recovery codes sealed offline (for example in a safe), used only when normal admins cannot sign in. Every use shows in the audit log; review it afterwards.
 9. **Logs off the server.** Ship the application log (journald) to separate storage. It carries the daily audit digests, so an attacker who alters the database cannot also alter the evidence.
 10. **Record of processing.** Settings → Data map lists what the workspace holds, how long it keeps it and who receives it. Add hosting and backup providers, and give it to the client for their record of processing activities (GDPR Art. 30, LGPD Art. 37).
@@ -61,13 +61,10 @@ For the people who run an instance for a client who holds personal or health dat
 ## 5. What the product does not do
 
 - It does not make the client compliant on its own, and it is not certified under any scheme.
+- A data export holds only what the person exporting can see (their record scope, field visibility, the reveal permission for sensitive values, and the modules they can view). For a complete answer to an access request, export as someone who can see everything, usually an admin.
 - It does not sign agreements, run your servers, encrypt your disks or database tablespaces, or send breach notifications.
-- Modules other than the core record types do not log record views yet (they do take part in export and erasure).
 - Sensitive fields cannot be filtered, sorted or searched: they are encrypted.
 - Sensitivity is fixed when a field is created. To change it, create a new field and move the values.
-- Holders of `core.privacy.manage` see everything about a person in a data export, including fields hidden from their role: give that permission only to the people who answer privacy requests.
-- The audit and access logs are not limited by record scope: `core.audit.view` shows every record's history. Give it only to people who may see all records.
 - Audit entries a former staff member made keep their IP address and user agent after the staff member is erased, as evidence of who did what.
 - Staff can record consent manually (phone, paper) even after someone unsubscribed: only do so when the person asked, and write how in the note.
-- A web form submission is saved before its consent; if recording the consent fails, the record exists without it (the error is logged). Check the record's Privacy tab if a submission reports an error.
 - nginx's own access log is outside the app: use the `crm_minimal` log format from `deploy/nginx.conf.example`, which leaves out query strings (search terms and filters).

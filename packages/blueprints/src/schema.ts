@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  SENSITIVITY_LEVELS,
+  SENSITIVE_TYPES,
   CUSTOMIZABLE_ENTITIES,
   FIELD_TYPES,
   PERMISSION_PATTERN_RE,
@@ -13,22 +15,35 @@ import {
 const itemKey = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
 const semver = z.string().regex(/^\d+\.\d+\.\d+$/, 'Use semantic versioning, e.g. 1.2.0');
 
-export const blueprintFieldSchema = z.object({
-  key: fieldKeySchema,
-  label: z.string().min(1).max(100),
-  type: z.enum(FIELD_TYPES),
-  group: z.string().max(64).optional(),
-  options: z.array(fieldOptionSchema).optional(),
-  currency: z.string().length(3).optional(),
-  placeholder: z.string().max(200).optional(),
-  help_text: z.string().max(500).optional(),
-  required: z.boolean().default(false),
-  default: z.unknown().optional(),
-  validation: fieldValidationSchema.optional(),
-  visibility: visibilitySchema.optional(),
-  filterable: z.boolean().default(false),
-  show_in_list: z.boolean().default(false),
-});
+export const blueprintFieldSchema = z
+  .object({
+    key: fieldKeySchema,
+    label: z.string().min(1).max(100),
+    type: z.enum(FIELD_TYPES),
+    group: z.string().max(64).optional(),
+    options: z.array(fieldOptionSchema).optional(),
+    currency: z.string().length(3).optional(),
+    placeholder: z.string().max(200).optional(),
+    help_text: z.string().max(500).optional(),
+    required: z.boolean().default(false),
+    default: z.unknown().optional(),
+    validation: fieldValidationSchema.optional(),
+    visibility: visibilitySchema.optional(),
+    filterable: z.boolean().default(false),
+    show_in_list: z.boolean().default(false),
+    /** Set when the field is first created; later blueprint versions cannot change it. */
+    sensitivity: z.enum(SENSITIVITY_LEVELS).default('normal'),
+  })
+  .refine(
+    (f) =>
+      f.sensitivity !== 'special' ||
+      (SENSITIVE_TYPES.includes(f.type) && !f.filterable && f.default === undefined),
+    {
+      message:
+        'Sensitive fields must be text, textarea, email, phone or URL, not filterable, with no default',
+      path: ['sensitivity'],
+    },
+  );
 
 export const blueprintGroupSchema = z.object({
   key: itemKey,
