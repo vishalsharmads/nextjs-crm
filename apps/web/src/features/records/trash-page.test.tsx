@@ -20,6 +20,7 @@ vi.mock('@/app/session', () => ({
   }),
   useCan: () => (p: string) => permissions.includes(p),
 }));
+vi.mock('@/app/branding', () => ({ useBranding: () => ({ branding: { appName: 'Test' } }) }));
 vi.mock('./entities', () => ({
   useEntityConfig: (entity: string) => ({
     entity,

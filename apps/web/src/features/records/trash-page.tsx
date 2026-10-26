@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ArchiveRestore, Trash2 } from 'lucide-react';
+import { useBranding } from '@/app/branding';
 import { useBoot, useCan } from '@/app/session';
+import { setDocumentTitle } from '@/theme/apply';
 import { Button } from '@/components/ui/button';
 import {
   EmptyState,
@@ -99,6 +101,8 @@ export function TrashPage() {
   const entities = useTrashEntities();
   const boot = useBoot();
   const labels = useMemo(() => boot.labels, [boot.labels]);
+  const { branding } = useBranding();
+  useEffect(() => setDocumentTitle('Trash', branding.appName), [branding.appName]);
   const [tab, setTab] = useState<TrashEntity | null>(null);
   const active = tab && entities.includes(tab) ? tab : entities[0];
 
