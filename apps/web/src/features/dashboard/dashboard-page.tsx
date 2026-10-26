@@ -9,9 +9,11 @@ import { formatDate, formatMoney, formatRelative } from '@/lib/format';
 import { useBranding } from '@/app/branding';
 import { useBoot, useT } from '@/app/session';
 import { setDocumentTitle } from '@/theme/apply';
+import { Button } from '@/components/ui/button';
 import { PageHeader, Skeleton } from '@/components/ui/misc';
 import { labelVars } from '@/lib/labels';
 import { ModuleWidget } from '@/modules/loader';
+import { orderWidgets } from './dashboard-layout';
 
 interface Widget {
   key: string;
@@ -53,14 +55,16 @@ export function DashboardPage() {
           month: 'long',
         }).format(new Date())}
       />
+      {/* Rows are as tall as their content needs (no fixed minimum), so short widgets stop leaving dead space. */}
       <div className="grid grid-flow-row-dense gap-4 p-4 md:p-6 lg:grid-cols-3">
         {dashboards.isPending
-          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-56 lg:col-span-1" />)
-          : dash?.widgets.map((w) => (
+          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 lg:col-span-1" />)
+          : orderWidgets(dash?.widgets ?? []).map((w) => (
               <section
                 key={w.key}
                 className={cn(
-                  'flex min-h-56 flex-col rounded-md border border-line bg-surface p-4',
+                  'flex min-h-32 flex-col rounded-md border border-line bg-surface p-4',
+                  w.type === 'pipeline_value' && 'shadow-raised',
                   SPAN[w.size],
                 )}
               >
@@ -86,8 +90,16 @@ function useWidget<T>(w: Widget) {
 
 function WidgetBody({ widget }: { widget: Widget }) {
   const q = useWidget<Record<string, unknown>>(widget);
-  if (q.isPending) return <Skeleton className="flex-1" />;
-  if (q.isError) return <Muted icon={<AlertCircle />}>This could not be loaded.</Muted>;
+  if (q.isPending) return <Skeleton className="h-24 flex-1" />;
+  if (q.isError)
+    return (
+      <Muted icon={<AlertCircle />}>
+        Could not load this widget.
+        <Button size="sm" onClick={() => void q.refetch()}>
+          Try again
+        </Button>
+      </Muted>
+    );
   if (q.data.unavailable) {
     return (
       <Muted icon={<Blocks />}>
@@ -165,7 +177,7 @@ function PipelineValue({
         <Stat label="Weighted by probability" value={money(data.weighted)} />
         <Stat label="Open" value={data.count} />
       </dl>
-      <div className="h-44 min-h-0 flex-1" aria-label="Value by stage">
+      <div className="h-44 shrink-0 grow" aria-label="Value by stage">
         <ResponsiveContainer width="100%" height="100%" onResize={(w) => setChartWidth(w)}>
           <BarChart data={data.stages} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
             <XAxis
@@ -268,7 +280,7 @@ function Conversion({
 function ActivityByUser({ data }: { data: { days: number; users: { name: string; total: number }[] } }) {
   if (!data.users.length) return <Muted>No completed activities in the last {data.days} days.</Muted>;
   return (
-    <div className="h-48 flex-1" aria-label="Completed activities by person">
+    <div className="h-48 shrink-0 grow" aria-label="Completed activities by person">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data.users} layout="vertical" margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
           <XAxis type="number" hide allowDecimals={false} />
