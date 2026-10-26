@@ -32,18 +32,20 @@ const NOISE = new Set([
 /**
  * Records whose activities also belong on this record's timeline: a contact's deals, an organization's
  * contacts and deals. Limited to records the user may view, so notes on out-of-scope deals never leak.
+ * Returns id subqueries (wrapped: an async function must never return a Knex builder).
  */
-async function rolledUpIds(entity: CoreEntity, id: number, user: AuthUser) {
+async function rolledUp(entity: CoreEntity, id: number, user: AuthUser) {
   const visible = async (def: ResourceDef, link: (qb: Knex.QueryBuilder) => void) => {
-    if (!can(user, `${def.resource}.view`)) return [];
+    if (!can(user, `${def.resource}.view`)) return null;
     const { qb } = await scopedQuery(def, user);
     link(qb);
-    return (await qb.pluck(`${def.table}.id`)) as number[];
+    qb.select(`${def.table}.id`);
+    return { qb };
   };
   const deals = dealsDef as unknown as ResourceDef;
   const contacts = contactsDef as unknown as ResourceDef;
   if (entity === 'contact') {
-    return { deal: await visible(deals, (qb) => qb.where('deals.contact_id', id)), contact: [] };
+    return { deal: await visible(deals, (qb) => qb.where('deals.contact_id', id)), contact: null };
   }
   if (entity === 'organization') {
     return {
@@ -56,7 +58,7 @@ async function rolledUpIds(entity: CoreEntity, id: number, user: AuthUser) {
       ),
     };
   }
-  return { deal: [], contact: [] };
+  return { deal: null, contact: null };
 }
 
 export async function recordTimeline(
@@ -74,14 +76,14 @@ export async function recordTimeline(
 
   // Activities on this record are visible to anyone who can see the record (decision D9).
   if (want('activity') && entity !== 'activity') {
-    const related = await rolledUpIds(entity, id, user);
+    const related = await rolledUp(entity, id, user);
     const acts = await db('activities')
       .where((w) => {
         w.where({ related_type: entity, related_id: id });
-        if (related.deal.length)
-          w.orWhere((o) => o.where('related_type', 'deal').whereIn('related_id', related.deal));
-        if (related.contact.length)
-          w.orWhere((o) => o.where('related_type', 'contact').whereIn('related_id', related.contact));
+        if (related.deal)
+          w.orWhere((o) => o.where('related_type', 'deal').whereIn('related_id', related.deal!.qb));
+        if (related.contact)
+          w.orWhere((o) => o.where('related_type', 'contact').whereIn('related_id', related.contact!.qb));
       })
       .whereNull('deleted_at')
       .where('created_at', '<', before)

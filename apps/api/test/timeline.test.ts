@@ -87,4 +87,34 @@ describe('timeline roll-up', () => {
     const seen = notes((await client.get(`/contacts/${contact}/timeline`).expect(200)).body);
     expect(seen).toEqual(['<p>On the contact</p>']);
   });
+
+  it("never shows notes from contacts outside the viewer's scope on an organization", async () => {
+    const role = await createRole(['core.contacts.view', 'core.organizations.view'], {
+      'core.contacts': 'own',
+      'core.organizations': 'all',
+    });
+    const viewer = await createUser({ roleKeys: [role] });
+    const mine = (
+      await admin
+        .post('/contacts', {
+          firstName: 'Own',
+          lastName: 'Contact',
+          organizationUuid: org,
+          ownerUuid: viewer.uuid,
+        })
+        .expect(201)
+    ).body.uuid;
+    await admin
+      .post('/activities', {
+        type: 'note',
+        body: '<p>On my contact</p>',
+        related: { type: 'contact', uuid: mine },
+      })
+      .expect(201);
+    const client = await loginAs(viewer);
+    const seen = notes((await client.get(`/organizations/${org}/timeline`).expect(200)).body);
+    expect(seen).toContain('<p>On my contact</p>');
+    expect(seen).not.toContain('<p>On the contact</p>');
+    expect(seen).not.toContain('<p>On the admin deal</p>');
+  });
 });
