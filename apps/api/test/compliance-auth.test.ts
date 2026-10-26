@@ -180,9 +180,10 @@ describe('automatic logoff', () => {
     const current = () => db('sessions').where({ user_id: user.id }).whereNull('revoked_at').first();
 
     await c.get('/me').expect(200); // no header: not activity
-    expect(new Date((await current()).last_used_at).getTime()).toBe(
-      Math.floor(fourMinutesAgo.getTime() / 1000) * 1000,
-    );
+    // DATETIME stores whole seconds (MySQL rounds), so compare to the second.
+    expect(
+      Math.abs(new Date((await current()).last_used_at).getTime() - fourMinutesAgo.getTime()),
+    ).toBeLessThanOrEqual(1000);
     await c.post('/me/activity').set('x-idle-ms', '1000').expect(204);
     expect(Date.now() - new Date((await current()).last_used_at).getTime()).toBeLessThan(60_000);
   });
