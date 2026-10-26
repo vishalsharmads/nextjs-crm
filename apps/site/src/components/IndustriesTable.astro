@@ -8,7 +8,7 @@ interface Props {
 const { heading = 'Templates for nine industries', id = 'industries' } = Astro.props;
 ---
 
-<section class="section" id={id} aria-labelledby={`${id}-title`}>
+<section class="section on-dark" id={id} aria-labelledby={`${id}-title`}>
   <div class="wrap">
     <div class="head">
       <h2 class="h2" id={`${id}-title`}>{heading}</h2>
@@ -115,7 +115,7 @@ const { heading = 'Templates for nine industries', id = 'industries' } = Astro.p
     width: 14px;
     height: 0;
     margin: 0 6px 4px;
-    border-top: 2px dashed rgb(238 242 236 / 0.3);
+    border-top: 2px dashed var(--border-strong);
     vertical-align: middle;
   }
 </style>

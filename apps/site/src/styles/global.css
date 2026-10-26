@@ -125,6 +125,21 @@ p {
 .section + .section {
   border-top: 1px solid var(--border);
 }
+/* Paper: warm light sections for reading, so the dark ones read as moments. Opt out with .on-dark. */
+.section:not(.on-mat):not(.on-dark) {
+  --bg: #f5f3ee;
+  --surface: #ffffff;
+  --surface-2: #ece9e1;
+  --text: #14201b;
+  --muted: rgb(20 32 27 / 0.66);
+  --border: rgb(20 32 27 / 0.12);
+  --border-strong: rgb(20 32 27 / 0.26);
+  --tape: #8f6a17;
+  --tape-ink: #ffffff;
+  --tape-hover: #a67c1c;
+  background: var(--bg);
+  color: var(--text);
+}
 .on-mat {
   background-color: var(--mat);
   color: var(--text);
