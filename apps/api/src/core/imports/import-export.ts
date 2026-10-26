@@ -6,9 +6,9 @@ import { filterSchema, normalizePhone, type CoreEntity, type CustomFieldDef } fr
 import { db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
 import { enqueue, registerJob } from '../../lib/jobs';
-import { storage } from '../../lib/storage';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { logAccess } from '../audit/access-log';
+import { readStoredFile } from '../files/files.service';
 import { audit } from '../audit/audit.service';
 import { assertCan, loadAccess } from '../rbac/access';
 import { customContext } from '../records/common';
@@ -389,7 +389,7 @@ registerJob('import', async (job, progress) => {
   const ctx: RequestContext = { requestId: `job:${job.uuid}`, ip: null, userAgent: null, user };
   const def = recordDefs[input.entity];
   const file = await db('files').where({ uuid: input.fileUuid }).first();
-  const { headers, rows } = parseCsv(await storage.get(file.storage_key));
+  const { headers, rows } = parseCsv(await readStoredFile(file));
   const { defs } = await customContext(input.entity, user);
   const { dateFormat } = await getGroup('general');
   const users = new Map(

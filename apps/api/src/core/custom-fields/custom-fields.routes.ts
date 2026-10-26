@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import {
   CUSTOMIZABLE_ENTITIES,
+  fieldKeySchema,
   FILTERABLE_TYPES,
+  SENSITIVE_TYPES,
   customFieldInputSchema,
   fieldOptionSchema,
   valueSchemaFor,
@@ -14,6 +16,7 @@ import { db } from '../../db/knex';
 import { AppError, conflict, notFound } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
 import { audit } from '../audit/audit.service';
+import { revealField } from './reveal';
 import { ENTITY_TABLE, bumpDefinitionsVersion, getDefinitions, rowToDef } from './definitions';
 import { dropCustomFieldIndex, ensureCustomFieldIndexes, MAX_INDEXED_FIELDS } from './ddl.service';
 
@@ -59,6 +62,14 @@ const patchSchema = toPatch(customFieldInputSchema.omit({ entity: true, key: tru
 export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields'])
   .add({
     method: 'get',
+    path: '/reveal',
+    permission: 'core.fields.reveal',
+    query: z.object({ entity: z.enum(CUSTOMIZABLE_ENTITIES), uuid: z.uuid(), key: fieldKeySchema }),
+    summary: 'Show one sensitive field value (always written to the access log)',
+    handler: ({ ctx, user, query }) => revealField(ctx, user, query.entity, query.uuid, query.key),
+  })
+  .add({
+    method: 'get',
     path: '/',
     permission: 'core.fields.manage',
     query: entityQuery,
@@ -85,8 +96,25 @@ export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields
           { path: 'options', message: 'Add at least one option' },
         ]);
       }
+      const special = body.sensitivity === 'special';
+      if (special && !SENSITIVE_TYPES.includes(body.type))
+        throw new AppError(
+          'VALIDATION_FAILED',
+          'Sensitive fields must be text, long text, email, phone or URL',
+          [{ path: 'sensitivity', message: 'Choose a text-like type for sensitive data' }],
+        );
+      if (
+        special &&
+        body.defaultValue !== undefined &&
+        body.defaultValue !== null &&
+        body.defaultValue !== ''
+      )
+        throw new AppError('VALIDATION_FAILED', 'Sensitive fields cannot have a default value', [
+          { path: 'defaultValue', message: 'Leave empty for sensitive fields' },
+        ]);
+      // Encrypted values cannot be indexed, filtered or sorted.
       const filterable =
-        (body.filterable ?? defaultFilterable(body.type)) && FILTERABLE_TYPES.includes(body.type);
+        !special && (body.filterable ?? defaultFilterable(body.type)) && FILTERABLE_TYPES.includes(body.type);
       if (filterable) await assertIndexCapacity(body.entity);
       const defaultValue =
         body.defaultValue === undefined || body.defaultValue === null || body.defaultValue === ''
@@ -125,6 +153,7 @@ export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields
           help_text: body.helpText ?? null,
           filterable,
           show_in_list: body.showInList ?? false,
+          sensitivity: body.sensitivity,
           sort_order: body.sortOrder ?? Number((max as { m: number | null })?.m ?? 0) + 10,
           customized: true,
         });
@@ -152,6 +181,15 @@ export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields
       const row = await db('custom_field_definitions').where({ uuid: params.uuid }).first();
       if (!row) throw notFound('Field');
       const def = rowToDef(row);
+      if (body.sensitivity !== undefined && body.sensitivity !== def.sensitivity)
+        throw new AppError('VALIDATION_FAILED', 'Sensitivity is fixed when a field is created', [
+          { path: 'sensitivity', message: 'Create a new field with the sensitivity you need' },
+        ]);
+      if (def.sensitivity === 'special' && (body.filterable || (body.defaultValue ?? '') !== ''))
+        throw new AppError(
+          'VALIDATION_FAILED',
+          'Sensitive fields cannot be filterable or have a default value',
+        );
       const filterable =
         body.filterable === undefined
           ? def.filterable

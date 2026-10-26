@@ -24,6 +24,7 @@ const def = (p: Partial<CustomFieldDef>): CustomFieldDef => ({
   sortOrder: 0,
   active: true,
   sourceBlueprint: null,
+  sensitivity: 'normal',
   customized: false,
   ...p,
 });

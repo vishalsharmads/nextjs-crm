@@ -11,6 +11,7 @@ import { newUuid } from '../lib/ids';
 import { clearSettingsCache } from '../core/settings/settings.service';
 import { sealPendingDays, verifyIntegrity } from '../core/audit/integrity';
 import { anonymizeUser } from '../core/privacy/staff';
+import { encryptExistingFiles, rotateKeys } from '../core/security/rotation';
 import { systemContext } from '../http/context';
 
 type Command = (args: string[]) => Promise<void>;
@@ -338,6 +339,18 @@ const commands: Record<string, Command> = {
     if (!u) throw new Error('No user with that email');
     await anonymizeUser(systemContext('cli'), u.uuid as string);
     out('User erased. Their audit entries remain under an anonymous name.');
+  },
+
+  async 'crypto:rotate'() {
+    const counts = await rotateKeys();
+    for (const [k, n] of Object.entries(counts)) out(`${k}: ${n} re-encrypted`);
+    out(
+      'Done. Remove the old keys from ENCRYPTION_KEYS only after backups older than this run have expired.',
+    );
+  },
+
+  async 'files:encrypt-existing'() {
+    out(`Encrypted ${await encryptExistingFiles()} file(s).`);
   },
 
   async 'audit:seal'() {

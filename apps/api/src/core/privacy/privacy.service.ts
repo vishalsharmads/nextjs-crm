@@ -12,7 +12,9 @@ import { daysOf, resealDays } from '../audit/integrity';
 import { getRow } from '../records/service';
 import { recordDefs } from '../records/registry';
 import { escapeLike } from '../records/filters';
+import { decryptCustom } from '../records/custom';
 import { consentSummary } from './consent.service';
+import { readStoredFile } from '../files/files.service';
 import { privacyHandlers, type DataSubject } from './handlers';
 
 /** Personal columns blanked by anonymization (structure and history stay for reporting). */
@@ -220,7 +222,7 @@ export async function exportSubject(
   const { id } = subject;
   const activities = await db('activities').where({ related_type: entity, related_id: id }).orderBy('id');
   const sections: Record<string, unknown> = {
-    record: plain([row])[0],
+    record: plain([{ ...row, custom: decryptCustom(row.custom) }])[0],
     activities: plain(activities),
     emails: plain(
       activities.length
@@ -300,7 +302,7 @@ export async function exportSubject(
     while (used.has(name)) name = name.replace(/(\.[^.]*)?$/, (ext) => `-${used.size}${ext}`);
     used.add(name);
     try {
-      zip.addBuffer(await storage.get(f.storage_key as string), name);
+      zip.addBuffer(await readStoredFile(f as { storage_key: string; enc_kid: string | null }), name);
     } catch (err) {
       logger.error({ err, file: f.uuid }, 'file missing from storage during data export');
     }

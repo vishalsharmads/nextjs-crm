@@ -9,7 +9,7 @@ import { logAccess } from '../audit/access-log';
 import { applyScope, assertCan, scopeAllows } from '../rbac/access';
 import { fieldAccessMap, getDefinitions } from '../custom-fields/definitions';
 import { applySearch, applySort, compileFilter, type FilterContext } from './filters';
-import { prepareCustom, redactDiff } from './custom';
+import { maskEncrypted, prepareCustom, redactDiff } from './custom';
 import { notify } from '../notifications/notifications.service';
 import { emit, type EventType } from '../events/events';
 import { ENTITY_ROUTE } from '@app/shared';
@@ -174,7 +174,7 @@ export async function createRecord<Dto>(
       entity: def.entity,
       entityId: id,
       entityUuid: values.uuid as string,
-      diff: redactDiff({ ...row, custom }, fc.fieldLevels),
+      diff: maskEncrypted(redactDiff({ ...row, custom }, fc.fieldLevels)),
     });
     return trx(def.table).where({ id }).first();
   };
@@ -220,7 +220,7 @@ export async function updateRecord<Dto>(
     await trx(def.table).where({ id: existing.id }).update(values);
     await def.afterWrite?.(existing.id as number, core, wctx, 'update');
     const after = await trx(def.table).where({ id: existing.id }).first();
-    const diff = diffRecords(existing, after);
+    const diff = maskEncrypted(diffRecords(existing, after));
     if (Object.keys(diff).length) {
       await audit(trx, ctx, {
         action: `${def.entity}.updated`,
@@ -234,7 +234,7 @@ export async function updateRecord<Dto>(
   });
   await notifyAssignment(def, user, updated.after, updated.existing);
   const [dto] = await def.toDtos([updated.after], { user, conn: db });
-  const changes = diffRecords(updated.existing, updated.after);
+  const changes = maskEncrypted(diffRecords(updated.existing, updated.after));
   if (Object.keys(changes).length) {
     await emitRecordEvent(def, 'updated', dto as Record<string, unknown>, user, changes);
     if (def.entity === 'deal' && changes.stage_id)

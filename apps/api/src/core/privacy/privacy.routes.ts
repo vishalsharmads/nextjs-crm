@@ -22,6 +22,7 @@ import { createRequest, getRequest, listRequests, updateRequest } from './reques
 import { addDays } from '../commerce/documents';
 import { parseUnsubscribeToken } from './unsubscribe';
 import { previewRetention, runRetention } from './retention.service';
+import { dataMap } from './data-map';
 
 const params = z.object({ entity: z.enum(DATA_SUBJECT_ENTITIES), uuid: z.uuid() });
 
@@ -30,6 +31,13 @@ const confirmToken = (entity: string, uuid: string) =>
   hmac(env.CSRF_SECRET, `hard-delete:${entity}:${uuid}`).slice(0, 16);
 
 export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
+  .add({
+    method: 'get',
+    path: '/data-map',
+    permission: 'core.privacy.manage',
+    summary: 'What personal data is held, where, for how long and who receives it',
+    handler: () => dataMap(),
+  })
   .add({
     method: 'get',
     path: '/retention/preview',

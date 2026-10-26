@@ -22,20 +22,112 @@ export function safeEqual(a: string, b: string): boolean {
   return ab.length === bb.length && timingSafeEqual(ab, bb);
 }
 
-const key = () => Buffer.from(env.ENCRYPTION_KEY, 'hex');
+interface Key {
+  kid: string;
+  key: Buffer;
+}
 
-/** AES-256-GCM. Output: iv.tag.ciphertext (base64url). */
+let ring: Key[] | null = null;
+
+/** The key ring: the first key encrypts, every key decrypts. */
+export function keyRing(): Key[] {
+  ring ??= env.ENCRYPTION_KEYS
+    ? env.ENCRYPTION_KEYS.split(',').map((entry) => {
+        const [kid, hex] = entry.split(':');
+        return { kid: kid!, key: Buffer.from(hex!, 'hex') };
+      })
+    : [{ kid: 'k0', key: Buffer.from(env.ENCRYPTION_KEY, 'hex') }];
+  return ring;
+}
+
+/** Tests only: forget the cached ring after changing env. */
+export function resetKeyRing() {
+  ring = null;
+}
+
+export const activeKid = () => keyRing()[0]!.kid;
+
+function keyFor(kid: string): Buffer {
+  const k = keyRing().find((r) => r.kid === kid);
+  if (!k) throw new Error(`Encryption key "${kid}" is not in the key ring`);
+  return k.key;
+}
+
+/** Ciphertext written before the key ring had no key id; it was always ENCRYPTION_KEY. */
+function legacyKeys(): Buffer[] {
+  const legacy = Buffer.from(env.ENCRYPTION_KEY, 'hex');
+  return [
+    legacy,
+    ...keyRing()
+      .map((k) => k.key)
+      .filter((k) => !k.equals(legacy)),
+  ];
+}
+
+/** AES-256-GCM. Output: `v1.<kid>.<iv>.<tag>.<ciphertext>` (base64url parts). */
 export function encrypt(plain: string): string {
+  const { kid, key } = keyRing()[0]!;
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key(), iv);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
   const data = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
-  return [iv, cipher.getAuthTag(), data].map((b) => b.toString('base64url')).join('.');
+  return ['v1', kid, ...[iv, cipher.getAuthTag(), data].map((b) => b.toString('base64url'))].join('.');
+}
+
+function open(key: Buffer, iv: Buffer, tag: Buffer, data: Buffer): Buffer {
+  const decipher = createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(data), decipher.final()]);
 }
 
 export function decrypt(payload: string): string {
-  const [iv, tag, data] = payload.split('.').map((p) => Buffer.from(p, 'base64url'));
-  if (!iv || !tag || !data) throw new Error('Malformed ciphertext');
-  const decipher = createDecipheriv('aes-256-gcm', key(), iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
+  const parts = payload.split('.');
+  if (parts[0] === 'v1' && parts.length === 5) {
+    const [, kid, iv, tag, data] = parts as [string, string, string, string, string];
+    const b = (s: string) => Buffer.from(s, 'base64url');
+    return open(keyFor(kid), b(iv), b(tag), b(data)).toString('utf8');
+  }
+  const [iv, tag, data] = parts.map((p) => Buffer.from(p, 'base64url'));
+  if (!iv || !tag || !data || parts.length !== 3) throw new Error('Malformed ciphertext');
+  for (const key of legacyKeys()) {
+    try {
+      return open(key, iv, tag, data).toString('utf8');
+    } catch {
+      // try the next key
+    }
+  }
+  throw new Error('Cannot decrypt: no key in the ring matches');
+}
+
+/** Whether a ciphertext uses the active key (rotation re-encrypts the rest). */
+export function isCurrent(payload: string): boolean {
+  const parts = payload.split('.');
+  return parts[0] === 'v1' && parts[1] === activeKid();
+}
+
+const MAGIC = Buffer.from('ENC1');
+
+/** Encrypt bytes (files). Layout: ENC1 | kid length | kid | iv(12) | tag(16) | ciphertext. */
+export function encryptBuffer(plain: Buffer): { data: Buffer; kid: string } {
+  const { kid, key } = keyRing()[0]!;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const body = Buffer.concat([cipher.update(plain), cipher.final()]);
+  const kidBuf = Buffer.from(kid);
+  return {
+    data: Buffer.concat([MAGIC, Buffer.from([kidBuf.length]), kidBuf, iv, cipher.getAuthTag(), body]),
+    kid,
+  };
+}
+
+export function decryptBuffer(data: Buffer): Buffer {
+  if (!data.subarray(0, 4).equals(MAGIC)) throw new Error('Not an encrypted file');
+  const len = data[4]!;
+  const kid = data.subarray(5, 5 + len).toString();
+  const at = 5 + len;
+  return open(
+    keyFor(kid),
+    data.subarray(at, at + 12),
+    data.subarray(at + 12, at + 28),
+    data.subarray(at + 28),
+  );
 }

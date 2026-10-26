@@ -61,6 +61,8 @@ export async function runDoctor(out: Out): Promise<boolean> {
   });
   check(smtpOk, `SMTP reachable at ${env.SMTP_HOST}:${env.SMTP_PORT}`, 'Check SMTP_HOST / SMTP_PORT');
 
+  await complianceChecks(out);
+
   if (env.NODE_ENV === 'production') {
     check(env.APP_URL.startsWith('https://'), 'APP_URL uses https', 'Serve the app over HTTPS in production');
     check(
@@ -70,4 +72,56 @@ export async function runDoctor(out: Out): Promise<boolean> {
     );
   }
   return ok;
+}
+
+/**
+ * Hosting safeguards the app cannot enforce itself. Advisory (they do not fail the doctor) and
+ * only shown when a compliance profile is active.
+ */
+async function complianceChecks(out: Out) {
+  const advise = (pass: boolean, label: string, hint: string) =>
+    out(`${pass ? '✔' : '!'} ${label}${pass ? '' : `\n    → ${hint}`}`);
+  let profile = 'standard';
+  try {
+    const row = await db('settings').where({ key: 'compliance' }).first('value');
+    profile = ((row?.value as { profile?: string } | undefined)?.profile ?? 'standard') as string;
+  } catch {
+    return; // not installed yet
+  }
+  if (profile === 'standard') return;
+  out(`Compliance profile: ${profile}`);
+  try {
+    const [[v]] = (await db.raw(
+      'SELECT @@default_table_encryption AS tde, @@log_bin AS bin, @@binlog_encryption AS binenc, @@require_secure_transport AS tls',
+    )) as [{ tde: number | string; bin: number; binenc: number; tls: number }[]];
+    advise(
+      v!.tde === 1 || v!.tde === 'ON',
+      'MySQL encrypts new tables at rest (default_table_encryption)',
+      "Set up a MySQL keyring component, then SET PERSIST default_table_encryption=ON and ALTER TABLE … ENCRYPTION='Y' (or use full-disk encryption)",
+    );
+    if (v!.bin === 1)
+      advise(
+        v!.binenc === 1,
+        'MySQL encrypts binary logs',
+        'SET PERSIST binlog_encryption=ON (needs a keyring)',
+      );
+    const local = /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(env.DATABASE_URL);
+    advise(
+      local || v!.tls === 1 || /ssl/i.test(env.DATABASE_URL),
+      'Database connection is local or uses TLS',
+      'Add TLS to DATABASE_URL (or require_secure_transport=ON) when MySQL runs on another host',
+    );
+  } catch (err) {
+    advise(false, 'Read MySQL encryption settings', (err as Error).message);
+  }
+  advise(
+    !!process.env.BACKUP_ENCRYPTION_KEY_FILE,
+    'Backups are encrypted (BACKUP_ENCRYPTION_KEY_FILE)',
+    'Create a key file (openssl rand -hex 32 > /etc/crm/backup.key; chmod 600) and set BACKUP_ENCRYPTION_KEY_FILE for deploy/backup.sh',
+  );
+  advise(
+    env.NODE_ENV !== 'production' || env.APP_URL.startsWith('https://'),
+    'Traffic is encrypted (HTTPS)',
+    'Serve the app over HTTPS',
+  );
 }

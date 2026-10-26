@@ -1,5 +1,21 @@
-import { buildCustomSchema, type CustomFieldDef, type VisibilityLevel } from '@app/shared';
+import { SENSITIVE_MASK, buildCustomSchema, type CustomFieldDef, type VisibilityLevel } from '@app/shared';
 import { AppError } from '../../lib/errors';
+import { decrypt, encrypt } from '../../lib/crypto';
+
+/** Stored form of a special (sensitive) value: an encrypted string with a recognizable prefix. */
+const ENC_PREFIX = 'enc:';
+export const isEncryptedValue = (v: unknown): v is string =>
+  typeof v === 'string' && v.startsWith(ENC_PREFIX);
+export const encryptValue = (v: unknown) => `${ENC_PREFIX}${encrypt(JSON.stringify(v))}`;
+export const decryptValue = (v: string): unknown => JSON.parse(decrypt(v.slice(ENC_PREFIX.length)));
+
+/** Plain values for privileged paths (data subject export, reveal). */
+export function decryptCustom(custom: unknown): Custom {
+  const src = (custom && typeof custom === 'object' ? custom : {}) as Custom;
+  return Object.fromEntries(
+    Object.entries(src).map(([k, v]) => [k, isEncryptedValue(v) ? decryptValue(v) : v]),
+  );
+}
 
 type Custom = Record<string, unknown>;
 
@@ -16,7 +32,11 @@ export function prepareCustom(
   mode: 'create' | 'patch',
   existing: Custom = {},
 ): Custom {
-  const patch = { ...(input ?? {}) };
+  const special = new Set(defs.filter((d) => d.sensitivity === 'special').map((d) => d.key));
+  // The mask comes back from forms that loaded a masked value: it means "unchanged".
+  const patch = Object.fromEntries(
+    Object.entries(input ?? {}).filter(([k, v]) => !(special.has(k) && v === SENSITIVE_MASK)),
+  );
   for (const key of Object.keys(patch)) {
     const def = defs.find((d) => d.key === key);
     if (def && levels[key] !== 'write') {
@@ -69,7 +89,8 @@ export function prepareCustom(
   for (const [k, v] of Object.entries(changes)) {
     if (cleared.has(k)) continue;
     const def = defs.find((d) => d.key === k);
-    merged[k] = def?.type === 'datetime' ? new Date(String(v)).toISOString() : v;
+    const value = def?.type === 'datetime' ? new Date(String(v)).toISOString() : v;
+    merged[k] = special.has(k) ? encryptValue(value) : value;
   }
   return merged;
 }
@@ -84,7 +105,9 @@ export function serializeCustom(
   const out: Custom = {};
   for (const def of defs) {
     if (levels[def.key] === 'hidden') continue;
-    if (src[def.key] !== undefined && src[def.key] !== null) out[def.key] = src[def.key];
+    if (src[def.key] === undefined || src[def.key] === null) continue;
+    // Sensitive values never leave in normal responses; reveal is a separate, logged request.
+    out[def.key] = def.sensitivity === 'special' ? SENSITIVE_MASK : src[def.key];
   }
   return out;
 }
@@ -101,4 +124,13 @@ export function redactDiff(diff: Record<string, unknown>, levels: Record<string,
     out[k] = v;
   }
   return out;
+}
+
+/** Replace encrypted values in a diff or record with the mask (audit log, webhooks, timeline). */
+export function maskEncrypted<T>(value: T): T {
+  if (isEncryptedValue(value)) return SENSITIVE_MASK as T;
+  if (Array.isArray(value)) return value.map(maskEncrypted) as T;
+  if (value && typeof value === 'object' && !(value instanceof Date))
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, maskEncrypted(v)])) as T;
+  return value;
 }

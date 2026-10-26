@@ -473,6 +473,7 @@ function FieldEditor({
                   showInList: false,
                   sortOrder: 0,
                   active: true,
+                  sensitivity: 'normal',
                   sourceBlueprint: null,
                   customized: false,
                 }}
