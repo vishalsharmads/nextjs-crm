@@ -73,6 +73,7 @@ function useListState() {
     page: Number(params.get('page') ?? 1),
     view: params.get('view'),
     peek: params.get('peek'),
+    create: params.get('new') === '1',
     conditions,
     set,
     setConditions: (c: FilterCondition[]) => set({ filter: c.length ? JSON.stringify({ and: c }) : null }),
@@ -102,6 +103,12 @@ export function RecordListPage({
   );
   const [search, setSearch] = useState(state.q);
 
+  useEffect(() => {
+    if (state.create) {
+      setCreating(true);
+      state.set({ new: null });
+    }
+  }, [state]);
   useEffect(() => setDocumentTitle(config.plural, branding.appName), [config.plural, branding.appName]);
   useEffect(() => {
     const t = setTimeout(() => {

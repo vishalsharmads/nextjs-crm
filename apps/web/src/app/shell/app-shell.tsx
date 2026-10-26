@@ -30,7 +30,7 @@ import {
   Tooltip,
 } from '@/components/ui/menu';
 import { DialogContent, Dialog } from '@/components/ui/dialog';
-import { buildNav, type NavItem } from './nav';
+import { buildCreateTargets, buildNav, type NavItem } from './nav';
 import { CommandPaletteProvider, usePalette, type PaletteCommand } from './command-palette';
 import { useHotkeys } from './hotkeys';
 import { IdleTimeout } from './idle-timeout';
@@ -64,9 +64,20 @@ export function AppShell() {
       })),
     [nav, navigate],
   );
+  const createCommands = useMemo<PaletteCommand[]>(
+    () =>
+      buildCreateTargets(boot).map((c) => ({
+        id: `create:${c.key}`,
+        label: c.label,
+        group: 'Create',
+        icon: c.icon,
+        run: () => navigate(c.to),
+      })),
+    [boot, navigate],
+  );
 
   return (
-    <CommandPaletteProvider baseCommands={commands}>
+    <CommandPaletteProvider baseCommands={[...commands, ...createCommands]}>
       <ShellLayout nav={nav} />
     </CommandPaletteProvider>
   );
