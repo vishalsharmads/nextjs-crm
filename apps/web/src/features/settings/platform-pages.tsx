@@ -2,16 +2,13 @@ import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Download, Upload } from 'lucide-react';
-import { ApiError, apiDelete, apiGet, apiPost, buildUrl } from '@/lib/api';
+import { ApiError, apiGet, apiPost, buildUrl } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { bootstrapKey, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Badge, Pane, Skeleton } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/checkbox';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { RecordPicker } from '@/components/fields/pickers';
-import { useEntityConfig } from '@/features/records/entities';
 import { SettingsPage } from './layout';
 
 // ---------------- Modules ----------------
@@ -253,127 +250,5 @@ function ReportView({ report }: { report: Report }) {
         <p className="text-muted">Everything is up to date.</p>
       ) : null}
     </div>
-  );
-}
-
-// ---------------- Privacy ----------------
-
-export function PrivacyPage() {
-  const t = useT();
-  const contact = useEntityConfig('contact');
-  const lead = useEntityConfig('lead');
-  const [entity, setEntity] = useState<'contact' | 'lead'>('contact');
-  const [uuid, setUuid] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<'anonymize' | 'delete' | null>(null);
-  const [code, setCode] = useState<string | null>(null);
-  const [typed, setTyped] = useState('');
-  const config = entity === 'contact' ? contact : lead;
-  const anonymize = useMutation({
-    mutationFn: () => apiPost(`/privacy/${entity}/${uuid}/anonymize`),
-    onSuccess: () => {
-      toast.success('Personal data erased');
-      setConfirm(null);
-      setUuid(null);
-    },
-  });
-  const hardDelete = useMutation({
-    mutationFn: (confirmCode?: string) =>
-      apiDelete(`/privacy/${entity}/${uuid}${confirmCode ? `?confirm=${confirmCode}` : ''}`),
-    onSuccess: () => {
-      toast.success('Deleted permanently');
-      setConfirm(null);
-      setUuid(null);
-      setCode(null);
-    },
-    onError: (err) => {
-      if (err instanceof ApiError && err.code === 'VALIDATION_FAILED')
-        setCode(err.fieldErrors().confirm ?? null);
-    },
-  });
-  return (
-    <SettingsPage
-      title={t('settings.privacy')}
-      description="Handle requests to erase someone's personal data. Both actions are recorded in the audit log."
-    >
-      <Pane title="Find the person">
-        <div className="flex flex-wrap gap-2">
-          <div className="flex rounded-sm border border-line p-0.5">
-            {(['contact', 'lead'] as const).map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => (setEntity(e), setUuid(null))}
-                className={`rounded-[3px] px-2.5 py-1 text-xs ${entity === e ? 'bg-primary-soft font-medium' : 'text-muted'}`}
-              >
-                {e === 'contact' ? contact.plural : lead.plural}
-              </button>
-            ))}
-          </div>
-          <div className="min-w-64 flex-1">
-            <RecordPicker
-              route={config.route}
-              value={uuid}
-              onChange={(v) => setUuid(v)}
-              placeholder={`Search ${config.plural.toLowerCase()}`}
-            />
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button disabled={!uuid} onClick={() => setConfirm('anonymize')}>
-            Erase personal data
-          </Button>
-          <Button
-            variant="danger"
-            disabled={!uuid}
-            onClick={() => (setConfirm('delete'), setCode(null), hardDelete.mutate(undefined))}
-          >
-            Delete permanently
-          </Button>
-        </div>
-        <p className="mt-3 text-xs text-muted">
-          Erasing keeps the record (and its history for reports) but removes names, contact details, notes and
-          custom values. Deleting removes the record, its activities and files for good.
-        </p>
-      </Pane>
-      {confirm ? (
-        <Dialog open onOpenChange={(o) => !o && setConfirm(null)}>
-          <DialogContent
-            title={confirm === 'anonymize' ? 'Erase personal data?' : 'Delete permanently?'}
-            description="This cannot be undone."
-            footer={
-              <>
-                <Button onClick={() => setConfirm(null)}>Cancel</Button>
-                {confirm === 'anonymize' ? (
-                  <Button variant="danger" loading={anonymize.isPending} onClick={() => anonymize.mutate()}>
-                    Erase
-                  </Button>
-                ) : (
-                  <Button
-                    variant="danger"
-                    disabled={!code || typed !== code}
-                    loading={hardDelete.isPending}
-                    onClick={() => hardDelete.mutate(code!)}
-                  >
-                    Delete permanently
-                  </Button>
-                )}
-              </>
-            }
-          >
-            {confirm === 'delete' && code ? (
-              <label className="flex flex-col gap-1.5 text-sm">
-                Type <code className="rounded-sm bg-subtle px-1 font-mono">{code}</code> to confirm
-                <Input
-                  value={typed}
-                  onChange={(e) => setTyped(e.target.value)}
-                  className="font-mono"
-                  autoFocus
-                />
-              </label>
-            ) : null}
-          </DialogContent>
-        </Dialog>
-      ) : null}
-    </SettingsPage>
   );
 }

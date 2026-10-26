@@ -38,7 +38,7 @@ const DashboardPage = lazyPage(() => import('@/features/dashboard/dashboard-page
 const AuditPage = lazyPage(() => import('@/features/audit/audit-page'), 'AuditPage');
 const ModulesPage = lazyPage(() => import('@/features/settings/platform-pages'), 'ModulesPage');
 const BlueprintPage = lazyPage(() => import('@/features/settings/platform-pages'), 'BlueprintPage');
-const PrivacyPage = lazyPage(() => import('@/features/settings/platform-pages'), 'PrivacyPage');
+const PrivacyPage = lazyPage(() => import('@/features/privacy/privacy-page'), 'PrivacyPage');
 const ApiKeysPage = lazyPage(() => import('@/features/settings/integration-pages'), 'ApiKeysPage');
 const WebhooksPage = lazyPage(() => import('@/features/settings/integration-pages'), 'WebhooksPage');
 const TemplatesPage = lazyPage(() => import('@/features/settings/integration-pages'), 'TemplatesPage');
@@ -50,6 +50,7 @@ const AutomationsPage = lazyPage(() => import('@/features/settings/workflow-page
 const FormsPage = lazyPage(() => import('@/features/settings/workflow-pages'), 'FormsPage');
 const LayoutBuilderPage = lazyPage(() => import('@/features/settings/layout-builder'), 'LayoutBuilderPage');
 const PublicFormPage = lazyPage(() => import('@/features/forms/public-form-page'), 'PublicFormPage');
+const UnsubscribePage = lazyPage(() => import('@/features/privacy/unsubscribe-page'), 'UnsubscribePage');
 const CommerceSettingsPage = lazyPage(
   () => import('@/features/settings/commerce-page'),
   'CommerceSettingsPage',
@@ -127,6 +128,7 @@ export const router = createBrowserRouter(
     { path: '/reset-password', element: <ResetPasswordPage /> },
     { path: '/accept-invite', element: <AcceptInvitePage /> },
     { path: '/f/:uuid', element: page(<PublicFormPage />) },
+    { path: '/unsubscribe', element: page(<UnsubscribePage />) },
     { path: '/p/:moduleKey/*', element: <PublicModuleOutlet />, errorElement: <RouteError /> },
     {
       element: <RequireAuth />,

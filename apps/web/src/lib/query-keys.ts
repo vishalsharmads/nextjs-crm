@@ -14,4 +14,7 @@ export const qk = {
   customFields: (entity?: string) => ['custom-fields', entity ?? 'all'] as const,
   pipelines: () => ['pipelines'] as const,
   views: (entity: string) => ['saved-views', entity] as const,
+  consents: (entity: string, uuid: string) => ['privacy', 'consents', entity, uuid] as const,
+  privacyRequests: (params?: unknown) =>
+    params === undefined ? (['privacy', 'requests'] as const) : (['privacy', 'requests', params] as const),
 };

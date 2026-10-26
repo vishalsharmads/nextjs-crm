@@ -552,6 +552,7 @@ interface FormRow {
     notifyOwner?: boolean;
     source?: string;
     consentText?: string;
+    consentPurposes?: { key: string; required: boolean }[];
     submitLabel?: string;
   };
   active: boolean;
@@ -868,6 +869,55 @@ function FormEditor({
               />
             )}
           </Field>
+          {boot.settings.consentPurposes.length ? (
+            <fieldset className="flex flex-col gap-2 text-sm sm:col-span-2">
+              <legend className="mb-1 font-medium">Ask for consent</legend>
+              <p className="text-xs text-muted">
+                Each purpose shows as an unticked checkbox with its wording. Required ones must be ticked to
+                submit.
+              </p>
+              {boot.settings.consentPurposes.map((p) => {
+                const chosen = settings.consentPurposes?.find((c) => c.key === p.key);
+                const others = (settings.consentPurposes ?? []).filter((c) => c.key !== p.key);
+                return (
+                  <div key={p.key} className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-[var(--primary)]"
+                        checked={!!chosen}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            consentPurposes: e.target.checked
+                              ? [...others, { key: p.key, required: false }]
+                              : others,
+                          })
+                        }
+                      />
+                      {p.label}
+                    </label>
+                    {chosen ? (
+                      <label className="flex items-center gap-2 text-xs text-muted">
+                        <input
+                          type="checkbox"
+                          className="size-3.5 accent-[var(--primary)]"
+                          checked={chosen.required}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              consentPurposes: [...others, { key: p.key, required: e.target.checked }],
+                            })
+                          }
+                        />
+                        Required
+                      </label>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </fieldset>
+          ) : null}
           <label className="flex items-center justify-between gap-3 text-sm sm:col-span-2">
             Notify the assignee{' '}
             <Switch

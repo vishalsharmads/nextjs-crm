@@ -33,6 +33,7 @@ import { FieldsPanel } from './fields-panel';
 import { RecordFormSheet } from './record-form';
 import { Timeline } from './timeline';
 import { FilesPanel } from './files-panel';
+import { ConsentPanel } from '@/features/privacy/consent-panel';
 
 type Rec = Record<string, unknown> & {
   uuid: string;
@@ -154,6 +155,9 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
               {entity === 'contact' || entity === 'organization' ? (
                 <TabsTrigger value="related">Related</TabsTrigger>
               ) : null}
+              {entity === 'contact' || entity === 'lead' ? (
+                <TabsTrigger value="privacy">Privacy</TabsTrigger>
+              ) : null}
             </TabsList>
             <TabsContent value="timeline" className="pt-3">
               <Timeline config={config} uuid={rec.uuid} />
@@ -167,6 +171,11 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
             <TabsContent value="related" className="pt-3">
               <RelatedRecords entity={entity} rec={rec} />
             </TabsContent>
+            {entity === 'contact' || entity === 'lead' ? (
+              <TabsContent value="privacy" className="pt-3">
+                <ConsentPanel entity={entity} uuid={rec.uuid} resource={config.resource} />
+              </TabsContent>
+            ) : null}
           </Tabs>
         </main>
       </div>

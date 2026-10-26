@@ -17,6 +17,7 @@ interface PublicForm {
   intro: string;
   submitLabel: string;
   consentText: string;
+  consents: { key: string; text: string; required: boolean }[];
   fields: {
     name: string;
     label: string;
@@ -40,6 +41,7 @@ export function PublicFormPage() {
     retry: false,
   });
   const [values, setValues] = useState<Record<string, unknown>>({});
+  const [consents, setConsents] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [done, setDone] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -56,7 +58,7 @@ export function PublicFormPage() {
       const res = await fetch(`/api/v1/public/forms/${uuid}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, consents }),
       });
       const body = (await res.json()) as {
         message?: string;
@@ -193,6 +195,29 @@ export function PublicFormPage() {
                 />
               </label>
             </div>
+            {form.data.consents.map((c) => (
+              <div key={c.key} className="flex flex-col gap-1">
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+                    checked={consents[c.key] === true}
+                    onChange={(e) => setConsents((v) => ({ ...v, [c.key]: e.target.checked }))}
+                    aria-invalid={errors[`consents.${c.key}`] ? true : undefined}
+                    aria-describedby={errors[`consents.${c.key}`] ? `consent-${c.key}-error` : undefined}
+                  />
+                  <span className="whitespace-pre-line">
+                    {c.text}
+                    {c.required ? <span className="text-accent"> *</span> : null}
+                  </span>
+                </label>
+                {errors[`consents.${c.key}`] ? (
+                  <p id={`consent-${c.key}-error`} className="text-xs text-accent">
+                    {errors[`consents.${c.key}`]}
+                  </p>
+                ) : null}
+              </div>
+            ))}
             {form.data.consentText ? (
               <p className="text-xs whitespace-pre-line text-muted">{form.data.consentText}</p>
             ) : null}

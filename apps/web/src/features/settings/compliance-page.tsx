@@ -1,7 +1,13 @@
 import { useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, type Control, type UseFormRegister } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
-import { COMPLIANCE_PROFILES, type ComplianceProfile, type ComplianceSettings } from '@app/shared';
+import {
+  COMPLIANCE_PROFILES,
+  LAWFUL_BASES,
+  type ComplianceProfile,
+  type ComplianceSettings,
+  type LawfulBasis,
+} from '@app/shared';
 import { apiGet } from '@/lib/api';
 import { useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
@@ -91,6 +97,29 @@ function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
               <Input {...p} type="number" min={0} max={720} {...form.register('sessionMaxHours', num)} />
             )}
           </Field>
+        </div>
+      </Pane>
+      <Pane title="Privacy requests and consent">
+        <div className="flex flex-col gap-4">
+          <Field
+            label="Days to answer a privacy request"
+            help={
+              hint('dsarDueDays') ??
+              'GDPR allows one month; CCPA 45 days. Requests show as overdue after this.'
+            }
+          >
+            {(p) => (
+              <Input
+                {...p}
+                type="number"
+                min={1}
+                max={90}
+                className="sm:max-w-48"
+                {...form.register('dsarDueDays', num)}
+              />
+            )}
+          </Field>
+          <ConsentPurposes control={form.control} register={form.register} />
         </div>
       </Pane>
       <Pane title="Audit and access logs">
@@ -232,5 +261,91 @@ function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
         />
       </Dialog>
     </form>
+  );
+}
+
+const BASIS_LABEL: Record<LawfulBasis, string> = {
+  consent: 'Consent',
+  contract: 'Contract',
+  legal_obligation: 'Legal obligation',
+  vital_interests: 'Vital interests',
+  public_task: 'Public task',
+  legitimate_interests: 'Legitimate interests',
+};
+
+/** What people can consent to. Keys are permanent: they link consent records to the purpose. */
+function ConsentPurposes({
+  control,
+  register,
+}: {
+  control: Control<ComplianceSettings>;
+  register: UseFormRegister<ComplianceSettings>;
+}) {
+  const { fields, append, remove } = useFieldArray({ control, name: 'consentPurposes' });
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="mb-1 text-sm font-medium">Consent purposes</legend>
+      <p className="text-xs text-muted">
+        Web forms can show a checkbox for each purpose. The exact wording is stored with every consent, so
+        edit the wording by adding a new purpose rather than changing one people have already agreed to.
+      </p>
+      {fields.map((f, i) => (
+        <div key={f.id} className="grid gap-3 rounded-md border border-line p-3 sm:grid-cols-2">
+          <Field label="Key" help="Lowercase letters, digits and underscores.">
+            {(p) => <Input {...p} {...register(`consentPurposes.${i}.key`)} placeholder="newsletter" />}
+          </Field>
+          <Field label="Name">
+            {(p) => <Input {...p} {...register(`consentPurposes.${i}.label`)} placeholder="Newsletter" />}
+          </Field>
+          <Field label="Checkbox wording" className="sm:col-span-2">
+            {(p) => <Textarea {...p} rows={2} {...register(`consentPurposes.${i}.text`)} />}
+          </Field>
+          <Field label="Lawful basis">
+            {(p) => (
+              <NativeSelect {...p} {...register(`consentPurposes.${i}.lawfulBasis`)}>
+                {LAWFUL_BASES.map((b) => (
+                  <option key={b} value={b}>
+                    {BASIS_LABEL[b]}
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
+          </Field>
+          <div className="flex flex-col justify-end gap-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-[var(--primary)]"
+                {...register(`consentPurposes.${i}.marketing`)}
+              />
+              Marketing (withdrawing it also stops marketing email)
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-[var(--primary)]"
+                {...register(`consentPurposes.${i}.active`)}
+              />
+              In use
+            </label>
+          </div>
+          <div className="sm:col-span-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => remove(i)}>
+              Remove
+            </Button>
+          </div>
+        </div>
+      ))}
+      <div>
+        <Button
+          type="button"
+          onClick={() =>
+            append({ key: '', label: '', text: '', lawfulBasis: 'consent', marketing: false, active: true })
+          }
+        >
+          Add purpose
+        </Button>
+      </div>
+    </fieldset>
   );
 }
