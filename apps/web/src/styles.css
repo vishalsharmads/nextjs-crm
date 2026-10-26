@@ -91,6 +91,10 @@ html.dark {
   --text-2xs--line-height: 1rem;
   --text-table: 0.8125rem;
   --text-table--line-height: 1.25rem;
+  /* Page titles: 28 / 20 / 14 / 13 / 12 is the scale; titles are tightened a little. */
+  --text-title: 1.75rem;
+  --text-title--line-height: 2rem;
+  --text-title--letter-spacing: -0.02em;
 }
 
 @layer base {

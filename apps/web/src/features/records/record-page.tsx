@@ -93,7 +93,7 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold tracking-tight">{title}</h1>
+            <h1 className="truncate text-xl font-semibold tracking-tight md:text-title">{title}</h1>
             <RecordSubheader entity={entity} rec={rec} config={config} />
           </div>
           <div className="flex flex-wrap items-center gap-2">

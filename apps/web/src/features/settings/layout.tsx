@@ -129,7 +129,7 @@ export function SettingsPage({
     <div className="mx-auto max-w-4xl px-4 py-6 md:px-8">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+          <h1 className="text-xl font-semibold tracking-tight md:text-title">{title}</h1>
           {description ? <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p> : null}
         </div>
         {actions ? <div className="flex gap-2">{actions}</div> : null}
