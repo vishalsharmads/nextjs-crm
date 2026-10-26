@@ -6,7 +6,7 @@ import { isInstalled } from './core/settings/settings.service';
 import { logger } from './lib/logger';
 import { every, startJobWorker, stopJobWorker, stopSchedules } from './lib/jobs';
 import { sendDueReminders } from './core/notifications/notifications.service';
-import { isTest } from './config/env';
+import { env, isTest } from './config/env';
 import './core/imports/import-export';
 import { startWebhookRetries } from './core/webhooks/webhooks';
 import { startMailSync } from './core/email/email';
@@ -21,7 +21,10 @@ export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promi
   } else {
     logger.warn('This instance is not installed yet. Run: npm run install:instance -- --blueprint=<key>');
   }
-  const app = createApp({ extraGroups: moduleRouteGroups() });
+  const app = createApp({
+    extraGroups: moduleRouteGroups(),
+    static: { webDir: env.WEB_DIR, siteDir: env.SITE_DIR, appPath: new URL(env.APP_URL).pathname },
+  });
   if (!isTest) {
     startJobWorker();
     every(60_000, 'activity-reminders', () => sendDueReminders());

@@ -3,7 +3,11 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 
+/** Serve the app under a sub-path (e.g. '/app') when it shares a domain with another site. */
+const base = `/${(process.env.APP_BASE_PATH ?? '').replace(/^\/+|\/+$/g, '')}/`.replace('//', '/');
+
 export default defineConfig({
+  base,
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   server: {

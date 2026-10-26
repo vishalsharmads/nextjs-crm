@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import type { CommerceSettings } from '@app/shared';
 import type { WebModule } from '@app/module-sdk';
 import { ApiError, api, apiGet, apiPatch, apiPost, type RequestOptions } from '@/lib/api';
+import { appUrl } from '@/lib/app-url';
 import { formatDate, formatDateTime, formatMoney } from '@/lib/format';
 import { labelVars } from '@/lib/labels';
 import { useBranding } from '@/app/branding';
@@ -156,8 +157,7 @@ function AccountsPage() {
         title="Client portal"
         description={
           <>
-            Customers sign in at{' '}
-            <span className="font-mono text-xs">{`${window.location.origin}/p/portal`}</span> to see their
+            Customers sign in at <span className="font-mono text-xs">{appUrl('/p/portal')}</span> to see their
             quotes, invoices and contracts.
           </>
         }

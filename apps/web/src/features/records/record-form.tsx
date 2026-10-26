@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
 import type { DuplicateCandidate, LayoutSection } from '@app/shared';
 import { ApiError, apiPost } from '@/lib/api';
+import { basePath } from '@/lib/app-url';
 import { useBoot } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/input';
@@ -424,7 +425,7 @@ function DuplicateWarning({ route, dupes }: { route: string; dupes: DuplicateCan
         {dupes.slice(0, 3).map((d) => (
           <li key={d.uuid} className="flex flex-wrap items-center gap-2">
             <a
-              href={`/${route}/${d.uuid}`}
+              href={`${basePath}/${route}/${d.uuid}`}
               target="_blank"
               rel="noreferrer"
               className="font-medium text-ink underline-offset-2 hover:underline"

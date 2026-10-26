@@ -93,12 +93,15 @@ export const publicRoutes = defineRoutes('/public', ['public'])
     permission: 'public',
     handler: async ({ res }) => {
       const b = await publicBranding();
+      // The app may live under a sub-path (APP_URL=https://example.com/app).
+      const appPath = `${new URL(env.APP_URL).pathname.replace(/\/$/, '')}/`;
       res.type('application/manifest+json');
       res.send(
         JSON.stringify({
           name: b.appName,
           short_name: b.appName.slice(0, 12),
-          start_url: '/',
+          start_url: appPath,
+          scope: appPath,
           display: 'standalone',
           background_color: b.colors.light.canvas,
           theme_color: b.colors.light.primary,
