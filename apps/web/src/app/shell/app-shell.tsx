@@ -205,7 +205,7 @@ function Sidebar({
         onClick={onNavigate}
         className={({ isActive }) =>
           cn(
-            'flex h-8 items-center gap-2.5 rounded-sm px-2 text-sm text-muted transition-colors hover:bg-hover hover:text-ink',
+            'flex h-8 items-center gap-2.5 rounded-sm px-2 text-sm text-muted transition-[color,background-color,transform] duration-150 ease-out hover:bg-hover hover:text-ink active:scale-[0.98] pointer-coarse:h-10',
             isActive && 'bg-primary-soft font-medium text-ink hover:bg-primary-soft',
             collapsed && 'justify-center px-0',
           )
@@ -272,7 +272,7 @@ function Sidebar({
             type="button"
             onClick={onToggle}
             className={cn(
-              'flex h-8 items-center gap-2.5 rounded-sm px-2 text-sm text-muted hover:bg-hover hover:text-ink',
+              'flex h-8 items-center gap-2.5 rounded-sm px-2 text-sm text-muted transition-[color,background-color,transform] duration-150 ease-out hover:bg-hover hover:text-ink active:scale-[0.98] pointer-coarse:h-10',
               collapsed && 'justify-center px-0',
             )}
             aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
