@@ -189,6 +189,7 @@ Severity: **B** blocker · **I** important · **N** nice-to-have. Effort: **S / 
 | Branch | Content | Why this order |
 |---|---|---|
 | `phase-6a-quick-wins` | Trash screen; record transfer on disable; ⌘K create commands. **Done.** Table virtualization dropped (see §1: pages are capped at 100 rows) | Cheap, visible fixes |
+| `phase-6a2-ui-polish` | Premium UI refresh: motion, elevation and type tokens, text contrast, linked list rows, touch targets, pipeline-first dashboard, stage track on the deal page, settle motion on the board. **Done.** | Later milestones (custom objects, the assistant panel) build on the refreshed components instead of restyling them |
 | `phase-6b-records-engine` | ResourceDef for modules; module scaffolding CLI; search provider registry | Prerequisite for 6c and for good MCP coverage |
 | `phase-6c-custom-objects` | Admin-defined entities (#5 amended) | Builds on 6b |
 | `phase-6d-tool-layer-mcp` | `defineTool` registry; personal access tokens; MCP endpoint and stdio wrapper | Shared foundation for AI |
@@ -207,3 +208,4 @@ Each milestone ships with tests, docs and a `phase-report`, per CLAUDE.md.
 | 2 | AI provider | **Multiple providers from day one.** A provider interface with Anthropic, OpenAI-compatible (which also covers self-hosted endpoints) and Azure/Bedrock-style adapters. Provider choice and model are admin settings, and no provider names appear in the UI. 6e grows from M to L. |
 | 3 | Milestone order | **As proposed** (6a → 6g). |
 | 4 | Assistant packaging | **Tool layer and MCP in core; assistant ships as module `assistant`.** Reasons: it can be sold and priced as a separate add-on, deployments that don't want AI (for example under the `hipaa` profile) leave it out entirely, and it proves the module SDK is strong enough for a large feature. Under the `hipaa` profile the module needs an explicit admin acknowledgement before it can be enabled, and `special` (encrypted) field values are never sent to a model. |
+| 5 | UI refresh before 6b | **Yes, as `phase-6a2-ui-polish`**, scoped to foundations plus three signature changes. The palette stays client-owned branding, so the refresh works through tokens every instance inherits (type scale, elevation, motion, contrast) and through hierarchy on the home screen and the deal page. No new color scheme, no layout redesign of lists, navigation or modules. |

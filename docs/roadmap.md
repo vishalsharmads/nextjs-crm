@@ -28,7 +28,9 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - Deal velocity and forecast reports built on `deal_stage_history`.
 - Extract remaining literal English UI copy into `apps/web/src/i18n/en.json` (entity names already go through vocabulary).
 - Dashboard editing in the UI (add, remove, resize widgets). Phase 1 ships blueprint-defined dashboards and the API to save personal copies.
-- Mouse-friendly "Move to stage" menu on Kanban cards (keyboard drag works today).
+- Mouse-friendly "Move to stage" menu on Kanban cards (keyboard drag works today; the deal page has a stage track).
+- A display font in branding, used for page titles only (body and tables keep the readable families).
+- Exit animation for the record peek (it closes instantly today, which suits something opened often).
 - Per-user notification preferences UI (the `preferences.emailNotifications` flag exists).
 - OAuth mailbox connection (Google, Microsoft) instead of app passwords.
 - Threaded email view and reply-from-CRM using `In-Reply-To`.
