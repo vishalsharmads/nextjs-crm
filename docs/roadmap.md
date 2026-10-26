@@ -9,9 +9,15 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 | 2     | Configuration and communication: layout builder UI, workflow automation, templates manager, email integration, web forms, webhooks, API keys, BullMQ jobs                                 | Done                           |
 | 3     | Commercial: products, quotes, invoices, payments, contracts and renewals, client portal                                                                                                   | Done                           |
 | 4     | Operational and industry modules: bookings, tickets, documents, inventory/assets, vertical modules                                                                                        | Done                           |
-| 5     | Compliance readiness: profiles with enforced floors, access logging, data subject rights and consent, retention, encryption of sensitive data ([overview](compliance/overview.md))        | In progress (5a–5d done)       |
+| 5     | Compliance readiness: profiles with enforced floors, access logging, data subject rights and consent, retention, encryption of sensitive data ([overview](compliance/overview.md))        | Done                           |
 
 ## Future
+
+- Access logging (record views) inside modules (bookings, tickets, documents); they already take part in export and erasure.
+- Sensitivity for blueprint-defined custom fields (`sensitivity` in `blueprint.json`), so an industry blueprint can ship sensitive fields.
+- WebAuthn / passkeys as a second factor.
+- Breached-password check (k-anonymity range API) when setting a password.
+- Upload `ENCRYPTION_KEYS` to an external key manager (KMS/HSM) instead of the environment.
 
 - Field-level visibility for **core** columns (e.g. hide deal value from a role). Phase 1 covers custom fields only.
 - Activity participants (multiple contacts and users on a meeting).
