@@ -55,7 +55,7 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 | astro, @astrojs/sitemap, @astrojs/check                                                         | Static marketing site (`apps/site`), sitemap, type checks                       |
 | gsap                                                                                            | Marketing-site animation (hero intro, industry re-tailoring)                    |
 | @fontsource-variable/*                                                                          | Self-hosted marketing-site fonts                                                |
-| vitest, supertest, @testing-library/*, jsdom, @playwright/test                                  | Tests                                                                           |
+| vitest 5, supertest, @testing-library/*, jsdom, @playwright/test                                | Tests                                                                           |
 | eslint, typescript-eslint, prettier, husky, lint-staged, commitlint, concurrently               | Tooling                                                                         |
 
 ## Repo layout

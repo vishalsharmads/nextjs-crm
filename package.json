@@ -57,5 +57,8 @@
       "prettier --write"
     ],
     "*.{json,md,css,yml,yaml}": "prettier --write"
+  },
+  "overrides": {
+    "esbuild": "0.28.2"
   }
 }

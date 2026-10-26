@@ -8,7 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "schema": "tsx src/write-json-schema.ts"
   },
   "dependencies": {
@@ -17,6 +17,6 @@
   },
   "devDependencies": {
     "tsx": "4.23.15",
-    "vitest": "3.2.7"
+    "vitest": "5.0.5"
   }
 }
