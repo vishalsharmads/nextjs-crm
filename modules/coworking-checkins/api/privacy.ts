@@ -3,6 +3,7 @@ import type { PrivacyHandler } from '@app/api/module-api';
 export const checkinsPrivacy: PrivacyHandler = {
   key: 'coworking-checkins',
   tables: ['m_coworking_checkins_visits'],
+  viewPermission: 'coworking-checkins.checkins.view',
   async export(subject, conn) {
     if (subject.entity !== 'contact') return {};
     const visits = await conn('m_coworking_checkins_visits')

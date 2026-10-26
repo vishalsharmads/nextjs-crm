@@ -59,7 +59,11 @@ export const CORE_PERMISSIONS: PermissionDef[] = [
   { key: 'core.fields.reveal', description: 'Reveal sensitive (health or special-category) field values' },
   { key: 'core.blueprints.manage', description: 'Apply and export blueprints' },
   { key: 'core.modules.manage', description: 'Enable and disable modules' },
-  { key: 'core.privacy.manage', description: 'Anonymize and hard-delete records' },
+  {
+    key: 'core.privacy.manage',
+    description: 'Track privacy requests, restrict, anonymize and hard-delete records',
+  },
+  { key: 'core.privacy.export', description: "Download a person's data (only what you can see yourself)" },
   { key: 'core.templates.manage', description: 'Manage templates' },
   { key: 'core.automations.manage', description: 'Manage workflow automations' },
   { key: 'core.webhooks.manage', description: 'Manage webhooks' },

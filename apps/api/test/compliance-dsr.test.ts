@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import { inflateRawSync } from 'node:zlib';
 import {
   anonymousClient,
   clientWithRoles,
@@ -444,7 +445,9 @@ describe('review fixes: merged duplicates, scope and staff audit', () => {
     const owner = await createUser({ roleKeys: ['admin'] });
     const ownerClient = await loginAs(owner);
     const c = await ownerClient.post('/contacts', { firstName: 'Scoped' }).expect(201);
-    const role = await createRole(['core.privacy.manage', 'core.contacts.view'], { 'core.contacts': 'own' });
+    const role = await createRole(['core.privacy.manage', 'core.privacy.export', 'core.contacts.view'], {
+      'core.contacts': 'own',
+    });
     const { client } = await clientWithRoles([role]);
     expect((await client.post(`/privacy/contact/${c.body.uuid}/anonymize`)).status).toBe(404);
     expect((await client.get(`/privacy/contact/${c.body.uuid}/export`)).status).toBe(404);
@@ -502,5 +505,68 @@ describe('review fixes: restriction reaches every channel', () => {
     );
     expect(deliveries).toHaveLength(0);
     await admin.delete(`/webhooks/${hook.body.uuid}`).expect(204);
+  });
+});
+
+describe('data export is limited to what the exporter can see', () => {
+  /** Read personal-data.json, the first entry of the ZIP. */
+  function exportedJson(zip: Buffer) {
+    const method = zip.readUInt16LE(8);
+    const size = zip.readUInt32LE(18);
+    const start = 30 + zip.readUInt16LE(26) + zip.readUInt16LE(28);
+    const body = zip.subarray(start, start + size);
+    return JSON.parse((method === 8 ? inflateRawSync(body) : body).toString('utf8'));
+  }
+  const download = (client: Client, uuid: string) =>
+    client.agent
+      .get(`/api/v1/privacy/contact/${uuid}/export`)
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks: Buffer[] = [];
+        r.on('data', (d: Buffer) => chunks.push(d));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+
+  it('leaves out hidden fields, keeps sensitive values masked without reveal, and skips modules', async () => {
+    const exporter = await createRole(['core.privacy.export', 'core.contacts.view'], {
+      'core.contacts': 'all',
+    });
+    const hidden = await admin
+      .post('/custom-fields', {
+        entity: 'contact',
+        key: 'internal_rating',
+        label: 'Internal rating',
+        type: 'text',
+        visibility: { default: 'write', roles: { [exporter]: 'hidden' } },
+      })
+      .expect(201);
+    const special = await admin
+      .post('/custom-fields', {
+        entity: 'contact',
+        key: 'condition_x',
+        label: 'Condition',
+        type: 'text',
+        sensitivity: 'special',
+      })
+      .expect(201);
+    const c = await admin
+      .post('/contacts', { firstName: 'Exported', custom: { internal_rating: 'B-', condition_x: 'Asthma' } })
+      .expect(201);
+    await admin.post('/m/tickets/tickets', { subject: 'Help me', contactUuid: c.body.uuid }).expect(201);
+
+    const { client } = await clientWithRoles([exporter]);
+    const limited = exportedJson((await download(client, c.body.uuid).expect(200)).body as Buffer);
+    expect(limited.record.custom.internal_rating).toBeUndefined();
+    expect(limited.record.custom.condition_x).toBe('••••••');
+    expect(limited.modules.tickets).toBeUndefined();
+    expect(JSON.stringify(limited)).not.toMatch(/"id":/);
+
+    const full = exportedJson((await download(admin, c.body.uuid).expect(200)).body as Buffer);
+    expect(full.record.custom).toMatchObject({ internal_rating: 'B-', condition_x: 'Asthma' });
+    expect(full.modules.tickets.tickets[0].subject).toBe('Help me');
+
+    const { client: manager } = await clientWithRoles([await createRole(['core.privacy.manage'])]);
+    expect((await manager.get(`/privacy/contact/${c.body.uuid}/export`)).status).toBe(403);
+    for (const f of [hidden, special]) await admin.post(`/custom-fields/${f.body.uuid}/archive`).expect(200);
   });
 });

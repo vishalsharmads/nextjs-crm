@@ -91,9 +91,10 @@ export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
   .add({
     method: 'get',
     path: '/:entity/:uuid/export',
-    permission: 'core.privacy.manage',
+    permission: 'core.privacy.export',
     params,
-    summary: 'Everything held about the person (access and portability), as a ZIP of JSON and files',
+    summary:
+      'What is held about the person that you can see (access and portability), as a ZIP of JSON and files',
     handler: ({ ctx, user, params: p, res }) => exportSubject(ctx, user, p.entity, p.uuid, res),
   })
   .add({

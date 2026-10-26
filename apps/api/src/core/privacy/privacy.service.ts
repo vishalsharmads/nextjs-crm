@@ -1,6 +1,12 @@
 import type { Response } from 'express';
 import { ZipFile } from 'yazl';
-import type { DataSubjectEntity, ErasureReportDto } from '@app/shared';
+import {
+  SENSITIVE_MASK,
+  type CustomFieldDef,
+  type DataSubjectEntity,
+  type ErasureReportDto,
+  type VisibilityLevel,
+} from '@app/shared';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { db, type Db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
@@ -9,10 +15,15 @@ import { storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
 import { logAccess } from '../audit/access-log';
 import { brokenSealedDays, daysOf, resealDays } from '../audit/integrity';
-import { getRow } from '../records/service';
 import { recordDefs } from '../records/registry';
 import { escapeLike } from '../records/filters';
-import { decryptCustom } from '../records/custom';
+import { decryptCustom, isEncryptedValue, redactDiff } from '../records/custom';
+import { customContext } from '../records/common';
+import { getRow, scopedQuery } from '../records/service';
+import { can } from '../rbac/access';
+import { activitiesDef } from '../activities/activities.def';
+import { dealsDef } from '../deals/deals.def';
+import { organizationsDef } from '../organizations/organizations.def';
 import { consentSummary } from './consent.service';
 import { readStoredFile } from '../files/files.service';
 import { privacyHandlers, type DataSubject } from './handlers';
@@ -280,8 +291,31 @@ const plain = (rows: Record<string, unknown>[]) =>
   );
 
 /**
- * Right of access and portability: one ZIP with everything held about the person, as JSON
- * (machine-readable), plus their files. Privileged: includes custom fields hidden from staff.
+ * Custom values as this user may see them: hidden fields left out, sensitive values in plain text
+ * only for people who may reveal them (masked otherwise).
+ */
+function visibleCustom(
+  custom: unknown,
+  defs: CustomFieldDef[],
+  levels: Record<string, VisibilityLevel>,
+  canReveal: boolean,
+): Record<string, unknown> {
+  const src = (custom && typeof custom === 'object' ? custom : {}) as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const d of defs) {
+    const v = src[d.key];
+    if (v === undefined || v === null || levels[d.key] === 'hidden') continue;
+    if (!isEncryptedValue(v)) out[d.key] = v;
+    else out[d.key] = canReveal ? decryptCustom({ v }).v : SENSITIVE_MASK;
+  }
+  return out;
+}
+
+/**
+ * Right of access and portability: one ZIP with what is held about the person, as JSON
+ * (machine-readable), plus their files. It contains only what the exporting user may see
+ * themselves: their record scope, field visibility, the reveal permission for sensitive values,
+ * and module data only for modules they can view.
  */
 export async function exportSubject(
   ctx: RequestContext,
@@ -294,21 +328,34 @@ export async function exportSubject(
   const { id } = subject;
   const rows = await subjectRows(db, entity, row);
   const ids = rows.map((r) => r.id);
-  const activities = await db('activities')
-    .where({ related_type: entity })
-    .whereIn('related_id', ids)
-    .orderBy('id');
+  const canReveal = can(user, 'core.fields.reveal');
+  const own = await customContext(entity, user);
+  const recordOut = (r: Row) => ({ ...r, custom: visibleCustom(r.custom, own.defs, own.levels, canReveal) });
+
+  // Activities and deals: only those inside the user's own scope.
+  const actCtx = await customContext('activity', user);
+  const { qb: actQb } = await scopedQuery(activitiesDef, user, db, 'with');
+  const activities = can(user, `${activitiesDef.resource}.view`)
+    ? ((await actQb
+        .where('activities.related_type', entity)
+        .whereIn('activities.related_id', ids)
+        .orderBy('activities.id')
+        .select('activities.*')) as Row[])
+    : [];
   const sections: Record<string, unknown> = {
-    record: plain([{ ...row, custom: decryptCustom(row.custom) }])[0],
-    ...(rows.length > 1
-      ? { mergedRecords: plain(rows.slice(1).map((r) => ({ ...r, custom: decryptCustom(r.custom) }))) }
-      : {}),
-    activities: plain(activities),
+    record: plain([recordOut(row)])[0],
+    ...(rows.length > 1 ? { mergedRecords: plain(rows.slice(1).map(recordOut)) } : {}),
+    activities: plain(
+      activities.map((a) => ({
+        ...a,
+        custom: visibleCustom(a.custom, actCtx.defs, actCtx.levels, canReveal),
+      })),
+    ),
     emails: plain(
       activities.length
         ? await db('email_messages').whereIn(
             'activity_id',
-            activities.map((a) => a.id as number),
+            activities.map((a) => a.id),
           )
         : [],
     ),
@@ -328,18 +375,30 @@ export async function exportSubject(
         .select('type', 'status', 'channel', 'received_at', 'due_at', 'resolution', 'completed_at'),
     ),
     history: plain(
-      await db('audit_logs')
-        .where({ entity })
-        .whereIn('entity_id', ids)
-        .orderBy('id')
-        .select('action', 'diff', 'created_at'),
+      (
+        await db('audit_logs')
+          .where({ entity })
+          .whereIn('entity_id', ids)
+          .orderBy('id')
+          .select('action', 'diff', 'created_at')
+      ).map((h) => ({
+        ...h,
+        diff:
+          h.diff && typeof h.diff === 'object'
+            ? redactDiff(h.diff as Record<string, unknown>, own.levels)
+            : h.diff,
+      })),
     ),
   };
   if (entity === 'contact') {
+    const { qb: orgQb } = await scopedQuery(organizationsDef, user, db);
+    const canOrgs = can(user, `${organizationsDef.resource}.view`);
+    orgQb.select('organizations.id');
     sections.organizations = plain(
       await db('contact_organization as co')
         .join('organizations as o', 'o.id', 'co.organization_id')
         .whereIn('co.contact_id', ids)
+        .whereIn('co.organization_id', canOrgs ? orgQb : [0])
         .select(
           'o.name',
           'co.relationship_type',
@@ -349,15 +408,25 @@ export async function exportSubject(
           'co.ended_at',
         ),
     );
-    sections.deals = plain(
-      await db('deals')
-        .whereIn('contact_id', ids)
-        .whereNull('deleted_at')
-        .select('uuid', 'title', 'value', 'currency', 'status', 'created_at'),
-    );
+    const { qb: dealQb } = await scopedQuery(dealsDef, user, db);
+    sections.deals = can(user, `${dealsDef.resource}.view`)
+      ? plain(
+          await dealQb
+            .whereIn('deals.contact_id', ids)
+            .select(
+              'deals.uuid',
+              'deals.title',
+              'deals.value',
+              'deals.currency',
+              'deals.status',
+              'deals.created_at',
+            ),
+        )
+      : [];
   }
   const modules: Record<string, Record<string, unknown[]>> = {};
   for (const h of await privacyHandlers(db)) {
+    if (!can(user, h.viewPermission)) continue;
     for (const r of rows) {
       for (const [area, list] of Object.entries(await h.export(asSubject(entity, r), db))) {
         modules[h.key] ??= {};
@@ -369,7 +438,9 @@ export async function exportSubject(
     }
   }
   sections.modules = modules;
-  const files = await db('files').where({ entity }).whereIn('entity_id', ids).whereNull('deleted_at');
+  const files = can(user, 'core.files.view')
+    ? await db('files').where({ entity }).whereIn('entity_id', ids).whereNull('deleted_at')
+    : [];
   sections.files = files.map((f) => ({
     name: f.original_name,
     mime: f.mime,
@@ -409,7 +480,13 @@ export async function exportSubject(
       logger.error({ err, file: f.uuid }, 'file missing from storage during data export');
     }
   }
-  zip.end();
+  // Resolve only once the whole file is sent: the router answers 204 to a handler that returns first.
+  await new Promise<void>((resolve, reject) => {
+    res.once('finish', resolve);
+    res.once('close', resolve);
+    zip.outputStream.once('error', reject);
+    zip.end();
+  });
 }
 
 /** Turn processing restriction (GDPR Art. 18) on or off. */

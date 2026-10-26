@@ -3,6 +3,7 @@ import type { PrivacyHandler } from '@app/api/module-api';
 export const ticketsPrivacy: PrivacyHandler = {
   key: 'tickets',
   tables: ['m_tickets_tickets', 'm_tickets_comments'],
+  viewPermission: 'tickets.tickets.view',
   async export(subject, conn) {
     if (subject.entity !== 'contact') return {};
     const tickets = await conn('m_tickets_tickets')

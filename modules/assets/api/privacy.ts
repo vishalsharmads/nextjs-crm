@@ -4,6 +4,7 @@ import type { PrivacyHandler } from '@app/api/module-api';
 export const assetsPrivacy: PrivacyHandler = {
   key: 'assets',
   tables: ['m_assets_assets', 'm_assets_events'],
+  viewPermission: 'assets.assets.view',
   async export(subject, conn) {
     if (subject.entity !== 'contact') return {};
     const assets = await conn('m_assets_assets')
