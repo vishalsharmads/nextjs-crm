@@ -1,6 +1,6 @@
 import type { Knex } from 'knex';
 import { SCOPED_RESOURCES, type Housekeeping, type RetentionRule } from '@app/shared';
-import { systemContext, type AuthUser } from '../../http/context';
+import { systemContext, type AuthUser, type RequestContext } from '../../http/context';
 import { db } from '../../db/knex';
 import { logger } from '../../lib/logger';
 import { storage } from '../../lib/storage';
@@ -41,17 +41,26 @@ function ruleQuery(rule: RetentionRule, now: Date) {
     qb.whereNull(`${t}.deleted_at`).where(`${t}.updated_at`, '<', cutoff);
     if (rule.condition === 'lead_closed') qb.whereIn(`${t}.status`, ['converted', 'unqualified']);
     if (rule.condition === 'inactive') {
+      // Recent activity, or any open task, means the relationship is still live.
       qb.whereNotExists(
         db('activities')
           .whereRaw('activities.related_type = ?', [rule.entity])
           .whereRaw(`activities.related_id = ${t}.id`)
+          .whereNull('activities.deleted_at')
           .where((w) =>
-            w.where('activities.created_at', '>=', cutoff).orWhere('activities.completed_at', '>=', cutoff),
+            w
+              .where('activities.created_at', '>=', cutoff)
+              .orWhere('activities.completed_at', '>=', cutoff)
+              .orWhere((o) => o.where('activities.type', 'task').whereNull('activities.completed_at')),
           ),
       );
+      // So does an open deal, however long since it changed.
       if (rule.entity === 'contact')
         qb.whereNotExists(
-          db('deals').whereRaw('deals.contact_id = contacts.id').where('deals.updated_at', '>=', cutoff),
+          db('deals')
+            .whereRaw('deals.contact_id = contacts.id')
+            .whereNull('deals.deleted_at')
+            .where((w) => w.where('deals.updated_at', '>=', cutoff).orWhere('deals.status', 'open')),
         );
     }
   }
@@ -110,24 +119,37 @@ export async function previewRetention(now = new Date()): Promise<RetentionPrevi
 }
 
 /** Apply retention rules and housekeeping. Each record is erased in its own transaction. */
-export async function runRetention(now = new Date()) {
+/** Candidates examined per rule per run, so records that keep failing cannot block the rest. */
+const MAX_ATTEMPTS = 2000;
+
+/** `ctx` names who started a manual run; scheduled runs are the system. */
+export async function runRetention(now = new Date(), ctx: RequestContext = systemContext('retention')) {
   const { retentionRules, housekeeping } = await effectiveCompliance();
-  const ctx = systemContext('retention');
   const erased: { rule: RetentionRule; done: number; failed: number }[] = [];
   for (const rule of retentionRules) {
-    const { qb } = ruleQuery(rule, now);
-    const uuids = (await qb.limit(BATCH).pluck(`${recordDefs[rule.entity].table}.uuid`)) as string[];
+    const t = recordDefs[rule.entity].table;
     let done = 0;
     let failed = 0;
-    for (const uuid of uuids) {
-      try {
-        await eraseSubject(ctx, SYSTEM, rule.entity, uuid, rule.action);
-        done++;
-      } catch (err) {
-        // For example a legal hold (signed documents) refusing a delete: leave it, report it.
-        failed++;
-        logger.warn({ err, entity: rule.entity, uuid }, 'retention could not erase a record');
+    // Page by id so records that fail (for example a legal hold refusing a delete) are passed over.
+    for (let afterId = 0; done < BATCH && done + failed < MAX_ATTEMPTS;) {
+      const { qb } = ruleQuery(rule, now);
+      const page = (await qb
+        .where(`${t}.id`, '>', afterId)
+        .orderBy(`${t}.id`)
+        .limit(BATCH)
+        .select(`${t}.id`, `${t}.uuid`)) as { id: number; uuid: string }[];
+      if (!page.length) break;
+      for (const r of page) {
+        if (done >= BATCH) break;
+        try {
+          await eraseSubject(ctx, SYSTEM, rule.entity, r.uuid, rule.action);
+          done++;
+        } catch (err) {
+          failed++;
+          logger.warn({ err, entity: rule.entity, uuid: r.uuid }, 'retention could not erase a record');
+        }
       }
+      afterId = page[page.length - 1]!.id;
     }
     erased.push({ rule, done, failed });
   }

@@ -293,10 +293,12 @@ export function documentPrivacyHandler(
   key: string,
   table: string,
   columns = ['number', 'title', 'currency', 'total', 'notes', 'created_at'],
+  viewPermission = `${key}.${key}.view`,
 ): PrivacyHandler {
   return {
     key,
     tables: [table],
+    viewPermission,
     async export(subject, conn) {
       if (subject.entity !== 'contact') return {};
       const rows = await conn(table)

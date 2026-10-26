@@ -13,7 +13,7 @@ import { assertCan, can } from '../rbac/access';
 import { getRow } from '../records/service';
 import { recordDefs } from '../records/registry';
 import { userRefs } from '../records/hydrate';
-import { fileDto, signFileUrl, storeFile, verifyFileToken } from './files.service';
+import { fileDto, readStoredFile, signFileUrl, storeFile, verifyFileToken } from './files.service';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -114,7 +114,8 @@ export const filesRoutes = defineRoutes('/files', ['files'])
         'Content-Disposition',
         `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.original_name)}`,
       );
-      await pipeline(storage.stream(file.storage_key), res);
+      if (file.enc_kid) res.send(await readStoredFile(file));
+      else await pipeline(storage.stream(file.storage_key), res);
     },
   })
   .add({

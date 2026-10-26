@@ -4,6 +4,7 @@ import type { PrivacyHandler } from '@app/api/module-api';
 export const portalPrivacy: PrivacyHandler = {
   key: 'portal',
   tables: ['m_portal_accounts', 'm_portal_sessions', 'm_portal_tokens'],
+  viewPermission: 'portal.accounts.manage',
   async export(subject, conn) {
     if (subject.entity !== 'contact') return {};
     const accounts = await conn('m_portal_accounts')

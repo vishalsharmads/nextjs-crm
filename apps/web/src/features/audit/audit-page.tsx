@@ -111,14 +111,7 @@ export function AuditPage() {
           )}
         </Field>
         <Field label="Record type">
-          {(p) => (
-            <Input
-              {...p}
-              value={filters.entity}
-              onChange={(e) => set('entity', e.target.value)}
-              placeholder="contact"
-            />
-          )}
+          {(p) => <Input {...p} value={filters.entity} onChange={(e) => set('entity', e.target.value)} />}
         </Field>
         <Field label="From">
           {(p) => (

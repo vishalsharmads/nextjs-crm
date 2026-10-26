@@ -7,7 +7,8 @@ Use this before the first client goes live, and for each new client instance. De
 - Passwords hashed with argon2id; optional or required 2FA; account lockout; idle session expiry.
 - Sessions in httpOnly cookies only, with CSRF protection on every change. API keys are scoped to a role.
 - Role permissions and own/team/all record access, enforced on every list, record, export, search, widget and linked record name.
-- Append-only audit log, protected by database triggers.
+- Append-only audit log, protected by database triggers and sealed daily with chained digests; optional access log.
+- Compliance profiles (Privacy, Health data) with enforced minimums; privacy requests, consent, retention, minimal sharing, and encryption of sensitive fields and uploads (see [compliance/overview.md](compliance/overview.md)).
 - Uploads checked by content (not file name), stored under random names, and only parsed after access checks.
 - Rate limits on sign-in, public forms, the client portal and the whole API (`API_RATE_LIMIT_PER_MIN`).
 - Customer portal sessions kept separate from staff sessions. Sign-in links are single-use, expire, and are cleaned up every 6 hours.
@@ -37,6 +38,7 @@ Use this before the first client goes live, and for each new client instance. De
 - [ ] Admin account has 2FA turned on, and **Settings → Security** has "Require 2FA for admins" on.
 - [ ] **Settings → Compliance** has the right profile for the data you hold (Privacy for personal data under GDPR-style laws, Health data for HIPAA). See [compliance/overview.md](compliance/overview.md).
 - [ ] The application log (which carries the daily audit digests) is shipped off the server, and someone runs **Audit log → Check integrity** (or `audit:verify`) on a schedule.
+- [ ] For personal or health data: the steps in [compliance/operator-guide.md](compliance/operator-guide.md) section 1 (agreements with every provider, encrypted disks, database and backups via `BACKUP_ENCRYPTION_KEY_FILE`, sensitive fields marked, consent purposes, retention rules, emergency admin). `npm run doctor` shows what is missing.
 - [ ] Every admin has saved their 2FA recovery codes somewhere other than the device that runs the authenticator app.
 - [ ] Branding, business details (**Settings → Sales documents**) and vocabulary checked with the client.
 

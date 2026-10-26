@@ -20,6 +20,7 @@ import { labelVars } from '@/lib/labels';
 import { formatDate, formatMoney, formatRelative } from '@/lib/format';
 import { Avatar, Badge } from '@/components/ui/misc';
 import { CustomFieldDisplay } from '@/components/fields/custom-field';
+import { SensitiveValue } from '@/components/fields/sensitive-value';
 
 export type FieldKind =
   | 'text'
@@ -103,7 +104,7 @@ const link = (to: string, label: string) => (
   </Link>
 );
 
-function customFieldConfigs<T extends { custom: Record<string, unknown> }>(
+function customFieldConfigs<T extends { uuid: string; custom: Record<string, unknown> }>(
   defs: (CustomFieldDef & { level: VisibilityLevel })[],
 ): FieldConfig<T>[] {
   return defs.map((def) => ({
@@ -111,7 +112,12 @@ function customFieldConfigs<T extends { custom: Record<string, unknown> }>(
     label: def.label,
     kind: 'custom',
     get: (r) => r.custom[def.key],
-    render: (r) => <CustomFieldDisplay def={def} value={r.custom[def.key]} />,
+    render: (r) =>
+      def.sensitivity === 'special' ? (
+        <SensitiveValue def={def} uuid={r.uuid} value={r.custom[def.key]} />
+      ) : (
+        <CustomFieldDisplay def={def} value={r.custom[def.key]} />
+      ),
     sortable: def.filterable && def.type !== 'multi_select',
     filterable: def.filterable,
     options: def.options.map((o) => ({ value: o.key, label: o.label })),

@@ -159,11 +159,41 @@ export async function verifyIntegrity(
   return { daysChecked, problems, sealedThrough };
 }
 
+/** Sealed (not purged) days among `days` whose rows no longer match their digest. */
+export async function brokenSealedDays(conn: Db, source: LogSource, days: string[]): Promise<string[]> {
+  if (!days.length) return [];
+  const sealed = await conn('audit_digests')
+    .where({ source })
+    .whereIn('day', days)
+    .whereNull('purged_at')
+    .select('day', 'digest', 'row_count');
+  const broken: string[] = [];
+  for (const r of sealed) {
+    const day = typeof r.day === 'string' ? r.day : dayKey(new Date(r.day as Date));
+    const d = await digestDay(source, day, conn);
+    if (d.digest !== r.digest || d.count !== r.row_count) broken.push(day);
+  }
+  return broken;
+}
+
+/** Record that sealed days no longer matched their digest before a privileged change. */
+async function reportBroken(conn: Db, source: LogSource, days: string[], during: string) {
+  logger.error({ source, days, during }, 'audit log integrity check failed');
+  await audit(conn, systemContext('integrity'), {
+    action: 'audit.integrity_failed',
+    entity: 'audit_log',
+    diff: { source, days, during },
+  });
+}
+
 /**
  * After a privileged redaction (privacy erasure) rewrote rows on sealed days, recompute those
- * days and every later link of the chain, and audit the old and new digests.
+ * days and every later link of the chain, and audit the old and new digests. Pass the days that
+ * were already broken before the redaction (`brokenSealedDays`), so resealing never hides
+ * earlier tampering: they are recorded as an integrity failure first.
  */
-export async function resealDays(trx: Db, source: LogSource, days: string[]) {
+export async function resealDays(trx: Db, source: LogSource, days: string[], brokenBefore: string[] = []) {
+  if (brokenBefore.length) await reportBroken(trx, source, brokenBefore, 'redaction');
   const sealed = await trx('audit_digests')
     .where({ source })
     .whereIn('day', days)
@@ -210,6 +240,21 @@ export async function purgeExpiredLogs(now = new Date()): Promise<Record<LogSour
   const cutoffDay = dayKey(new Date(now.getTime() - auditRetentionDays * DAY_MS));
   for (const source of Object.keys(LOG_SOURCES) as LogSource[]) {
     const lastSealed = await db('audit_digests').where({ source }).max({ day: 'day' }).first();
+    // Never delete evidence of tampering: check the days about to go first.
+    const due = (await db('audit_digests')
+      .where({ source })
+      .where('day', '<', cutoffDay)
+      .whereNull('purged_at')
+      .pluck('day')) as (string | Date)[];
+    const broken = await brokenSealedDays(
+      db,
+      source,
+      due.map((d) => (typeof d === 'string' ? d : dayKey(new Date(d)))),
+    );
+    if (broken.length) {
+      await reportBroken(db, source, broken, 'retention purge');
+      continue;
+    }
     if (!lastSealed?.day) continue;
     const sealedDay = typeof lastSealed.day === 'string' ? lastSealed.day : dayKey(new Date(lastSealed.day));
     const before = startOf(cutoffDay <= addDays(sealedDay, 1) ? cutoffDay : addDays(sealedDay, 1));

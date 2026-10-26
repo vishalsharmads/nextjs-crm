@@ -5,9 +5,10 @@ import {
   consentChangeSchema,
   privacyRequestCreateSchema,
   privacyRequestUpdateSchema,
+  type DataSubjectEntity,
 } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
-import { db } from '../../db/knex';
+import { db, type Db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
 import { hmac } from '../../lib/crypto';
 import { env } from '../../config/env';
@@ -22,6 +23,7 @@ import { createRequest, getRequest, listRequests, updateRequest } from './reques
 import { addDays } from '../commerce/documents';
 import { parseUnsubscribeToken } from './unsubscribe';
 import { previewRetention, runRetention } from './retention.service';
+import { dataMap } from './data-map';
 
 const params = z.object({ entity: z.enum(DATA_SUBJECT_ENTITIES), uuid: z.uuid() });
 
@@ -30,6 +32,13 @@ const confirmToken = (entity: string, uuid: string) =>
   hmac(env.CSRF_SECRET, `hard-delete:${entity}:${uuid}`).slice(0, 16);
 
 export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
+  .add({
+    method: 'get',
+    path: '/data-map',
+    permission: 'core.privacy.manage',
+    summary: 'What personal data is held, where, for how long and who receives it',
+    handler: () => dataMap(),
+  })
   .add({
     method: 'get',
     path: '/retention/preview',
@@ -42,7 +51,7 @@ export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
     path: '/retention/run',
     permission: 'core.privacy.manage',
     summary: 'Apply retention now instead of waiting for the next scheduled run',
-    handler: () => runRetention(),
+    handler: ({ ctx }) => runRetention(new Date(), ctx),
   })
   .add({
     method: 'get',
@@ -82,9 +91,10 @@ export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
   .add({
     method: 'get',
     path: '/:entity/:uuid/export',
-    permission: 'core.privacy.manage',
+    permission: 'core.privacy.export',
     params,
-    summary: 'Everything held about the person (access and portability), as a ZIP of JSON and files',
+    summary:
+      'What is held about the person that you can see (access and portability), as a ZIP of JSON and files',
     handler: ({ ctx, user, params: p, res }) => exportSubject(ctx, user, p.entity, p.uuid, res),
   })
   .add({
@@ -92,7 +102,7 @@ export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
     path: '/:entity/:uuid/anonymize',
     permission: 'core.privacy.manage',
     params,
-    summary: 'Erase personal data everywhere but keep the record (and its deals/activities) for reporting',
+    summary: 'Erase personal data everywhere but keep the record and its linked records for reporting',
     handler: ({ ctx, user, params: p }) => eraseSubject(ctx, user, p.entity, p.uuid, 'anonymize'),
   })
   .add({
@@ -162,6 +172,21 @@ export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
     },
   });
 
+/**
+ * The record an unsubscribe link applies to now: links in old emails may name a contact that was
+ * since merged into another, and the opt-out must reach the surviving record.
+ */
+async function survivingRecord(conn: Db, entity: DataSubjectEntity, uuid: string) {
+  let row = await conn(recordDefs[entity].table)
+    .where({ uuid })
+    .first('id', 'uuid', 'marketing_opt_out', ...(entity === 'contact' ? ['merged_into_id'] : []));
+  for (let hops = 0; row?.merged_into_id && hops < 10; hops++)
+    row = await conn('contacts')
+      .where({ id: row.merged_into_id })
+      .first('id', 'uuid', 'marketing_opt_out', 'merged_into_id');
+  return row as { id: number; uuid: string; marketing_opt_out: number } | undefined;
+}
+
 const unsubscribeBody = z.object({
   token: z.string().max(200).optional(),
   /** CCPA/CPRA "Do not sell or share my personal information". */
@@ -179,7 +204,7 @@ export const publicPrivacyRoutes = defineRoutes('/public/privacy', ['public'])
     handler: async ({ query }) => {
       const t = parseUnsubscribeToken(query.token);
       if (!t) throw new AppError('NOT_FOUND', 'This link is not valid');
-      const row = await db(recordDefs[t.entity].table).where({ uuid: t.uuid }).first('marketing_opt_out');
+      const row = await survivingRecord(db, t.entity, t.uuid);
       return { valid: !!row, optedOut: !!row?.marketing_opt_out };
     },
   })
@@ -193,11 +218,21 @@ export const publicPrivacyRoutes = defineRoutes('/public/privacy', ['public'])
       const t = parseUnsubscribeToken(body.token ?? query.token ?? '');
       if (!t) throw new AppError('NOT_FOUND', 'This link is not valid');
       await db.transaction(async (trx) => {
-        const row = await trx(recordDefs[t.entity].table).where({ uuid: t.uuid }).forUpdate().first('id');
+        const row = await survivingRecord(trx, t.entity, t.uuid);
         if (!row) return;
-        const subject = { entity: t.entity, id: row.id as number, uuid: t.uuid };
+        const subject = { entity: t.entity, id: row.id as number, uuid: row.uuid as string };
         await withdrawMarketing(trx, ctx, subject, 'unsubscribe');
-        if (body.doNotSell) {
+        const already =
+          body.doNotSell &&
+          (await trx('privacy_requests')
+            .where({
+              subject_type: t.entity,
+              subject_id: row.id,
+              type: 'opt_out_sale_share',
+              status: 'completed',
+            })
+            .first('id'));
+        if (body.doNotSell && !already) {
           // Recorded as a completed request: there is nothing more to do than stop.
           const uuid = newUuid();
           const today = new Date().toISOString().slice(0, 10);

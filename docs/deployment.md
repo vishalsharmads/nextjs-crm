@@ -46,13 +46,15 @@ This checks out the release, builds, runs `doctor` and migrations, re-applies th
 
 - `mysqldump --single-transaction --routines --triggers <db>`: the triggers keep the audit log append-only after a restore.
 - `STORAGE_DIR` (uploaded files). Files are stored under random keys and are only reachable through signed links.
+- Set `BACKUP_ENCRYPTION_KEY_FILE` to encrypt both (required in practice for personal or health data). Keep the key away from the server: a backup without its key cannot be restored.
 
 ## Security checklist
 
 - Production refuses to start with default or short secrets.
 - Cookies are `Secure` in production; serve over HTTPS only.
 - Keep `CORS_ORIGINS` empty (same-origin deployment).
-- Admins can require two-factor authentication for all admins (Settings → Security).
-- Privacy requests: Settings → Privacy (anonymize, or permanently delete with a confirmation code).
+- Settings → Compliance sets the profile (Standard, Privacy, Health data) and its enforced minimums: 2FA, session limits, logging, retention and encryption.
+- Privacy requests: Settings → Privacy (track requests, export a person's data, restrict, erase or permanently delete).
+- For personal or health data, follow [compliance/operator-guide.md](compliance/operator-guide.md).
 
 Before going live, work through the [production checklist](production-checklist.md).

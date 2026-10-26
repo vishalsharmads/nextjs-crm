@@ -19,6 +19,7 @@ import { getRow } from '../records/service';
 import { recordDefs } from '../records/registry';
 import { sanitizeBody } from '../activities/activities.def';
 import { getBranding } from '../settings/settings.service';
+import { restrictedRecipients } from '../privacy/privacy.service';
 
 const server = z.object({
   host: z.string().min(1).max(255),
@@ -62,7 +63,7 @@ function transportFor(a: AccountRow) {
     host: a.smtp.host,
     port: a.smtp.port,
     secure: a.smtp.secure,
-    auth: { user: a.email, pass: decrypt(a.password_enc) },
+    auth: { user: a.email, pass: decrypt(a.password_enc, 'mail_accounts.password_enc') },
   });
 }
 
@@ -109,16 +110,17 @@ export async function sendEmail(ctx: RequestContext, user: AuthUser, input: z.in
         AccountRow | undefined);
   if (input.accountUuid && !account) throw notFound('Mail account');
   const related = await resolveRelated(user, input.related, [...input.to, ...input.cc]);
-  if (related && (related.type === 'contact' || related.type === 'lead')) {
-    const row = await db(recordDefs[related.type].table)
-      .where({ id: related.id })
-      .first('processing_restricted');
-    if (row?.processing_restricted)
-      throw new AppError(
-        'FORBIDDEN',
-        'Processing of this record is restricted. Lift the restriction before emailing.',
-      );
-  }
+  if (
+    (await restrictedRecipients([...input.to, ...input.cc])) ||
+    (related &&
+      (related.type === 'contact' || related.type === 'lead') &&
+      (await isRestrictedId(related.type, related.id)))
+  )
+    throw new AppError(
+      'FORBIDDEN',
+      'Processing is restricted for a recipient or the linked record. Lift the restriction before emailing.',
+    );
+
   const html = sanitizeBody(input.body) ?? '';
   const text = html
     .replace(/<br\s*\/?>/g, '\n')
@@ -203,7 +205,7 @@ export async function syncAccount(account: AccountRow): Promise<number> {
     host: account.imap.host,
     port: account.imap.port,
     secure: account.imap.secure,
-    auth: { user: account.email, pass: decrypt(account.password_enc) },
+    auth: { user: account.email, pass: decrypt(account.password_enc, 'mail_accounts.password_enc') },
     logger: false,
   });
   let logged = 0;
@@ -324,7 +326,7 @@ export const emailRoutes = defineRoutes('/email', ['email'])
             display_name: body.displayName,
             smtp: JSON.stringify(body.smtp),
             imap: body.imap ? JSON.stringify(body.imap) : null,
-            password_enc: encrypt(body.password),
+            password_enc: encrypt(body.password, 'mail_accounts.password_enc'),
           })
           .onConflict(['user_id', 'email'])
           .merge(['display_name', 'smtp', 'imap', 'password_enc']);
@@ -376,3 +378,8 @@ export const emailRoutes = defineRoutes('/email', ['email'])
     status: 201,
     handler: ({ ctx, user, body }) => sendEmail(ctx, user, body),
   });
+
+async function isRestrictedId(type: 'contact' | 'lead', id: number) {
+  const row = await db(recordDefs[type].table).where({ id }).first('processing_restricted');
+  return !!row?.processing_restricted;
+}

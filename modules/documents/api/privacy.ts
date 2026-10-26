@@ -3,6 +3,7 @@ import { AppError, type ErasureResult, type PrivacyHandler } from '@app/api/modu
 export const documentsPrivacy: PrivacyHandler = {
   key: 'documents',
   tables: ['m_documents_documents', 'm_documents_requests'],
+  viewPermission: 'documents.documents.view',
   async export(subject, conn) {
     if (subject.entity !== 'contact') return {};
     const documents = await conn('m_documents_documents')

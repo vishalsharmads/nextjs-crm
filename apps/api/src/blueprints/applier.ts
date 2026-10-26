@@ -63,6 +63,8 @@ interface UpsertSpec {
   hashExtra?: unknown;
   /** Hash only this instead of values + extra (settings: the blueprint's own values). */
   hashOf?: unknown;
+  /** Written on creation only (custom field sensitivity: changing it later would strand data). */
+  insertOnly?: Record<string, unknown>;
 }
 
 class Applier {
@@ -123,7 +125,13 @@ class Applier {
         spec.table === 'dashboards'
           ? { uuid: newUuid(), ...spec.values }
           : spec.values;
-      const [id] = await trx(spec.table).insert({ ...spec.natural, ...values, ...bpCols, customized: false });
+      const [id] = await trx(spec.table).insert({
+        ...spec.natural,
+        ...values,
+        ...spec.insertOnly,
+        ...bpCols,
+        customized: false,
+      });
       this.report.created.push(spec.sourceKey);
       return { id: id!, action: 'created' };
     }
@@ -293,6 +301,7 @@ class Applier {
         sort_order: index * 10,
         active: true,
       },
+      insertOnly: { sensitivity: f.sensitivity },
     });
   }
 

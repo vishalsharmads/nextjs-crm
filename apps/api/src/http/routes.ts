@@ -152,6 +152,7 @@ function toHandler(def: RouteDef): RequestHandler {
         query,
         body,
       });
+      await logModuleRead(def, req, params);
       if (res.headersSent) return;
       if (result === undefined) {
         res.status(def.status ?? 204).end();
@@ -185,4 +186,21 @@ export function mountGroups(router: Router, groups: RouteGroup[]) {
 
 export function createApiRouter() {
   return Router();
+}
+
+/**
+ * Module records are read through module routes, which core services never see. A successful
+ * GET of one record (`/:uuid`, guarded by a `.view` permission) goes to the access log, named by
+ * the permission's resource (for example `tickets.tickets`). Core record reads log in their services.
+ */
+async function logModuleRead(def: RouteDef, req: Request, params: unknown) {
+  const uuid = (params as { uuid?: unknown } | null)?.uuid;
+  if (!def.moduleKey || def.method !== 'get' || typeof uuid !== 'string') return;
+  if (typeof def.permission !== 'string' || !def.permission.endsWith('.view')) return;
+  const { logAccess } = await import('../core/audit/access-log');
+  await logAccess(req.ctx, {
+    action: 'view',
+    entity: def.permission.slice(0, -'.view'.length),
+    entityUuid: uuid,
+  });
 }

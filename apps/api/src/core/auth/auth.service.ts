@@ -31,6 +31,9 @@ const getDummyHash = () => (dummyHash ??= hash('placeholder-password-for-timing'
 
 export const hashPassword = (password: string) => hash(password);
 
+/** Binds a 2FA secret to its user: copied onto another account it no longer decrypts. */
+export const totpAad = (userId: number) => `users.totp_secret_enc:${userId}`;
+
 export async function validatePassword(password: string) {
   const policy = await effectiveSecurity();
   const result = passwordPolicySchema(policy).safeParse(password);
@@ -128,7 +131,9 @@ export async function verifyMfa(
   if (input.recoveryCode) {
     recoveryId = await matchRecoveryCode(user.id, input.recoveryCode);
   } else if (input.code) {
-    step = user.totp_secret_enc ? matchTotpStep(decrypt(user.totp_secret_enc), input.code) : null;
+    step = user.totp_secret_enc
+      ? matchTotpStep(decrypt(user.totp_secret_enc, totpAad(user.id)), input.code)
+      : null;
     // A step that was already used cannot be replayed.
     if (step !== null && user.totp_last_step !== null && step <= Number(user.totp_last_step)) step = null;
   }
@@ -382,7 +387,7 @@ export async function setupTotp(ctx: RequestContext, userId: number, email: stri
   await db.transaction(async (trx) => {
     const n = await trx('users')
       .where({ id: userId, totp_enabled: false })
-      .update({ totp_secret_enc: encrypt(secret), totp_last_step: null });
+      .update({ totp_secret_enc: encrypt(secret, totpAad(userId)), totp_last_step: null });
     if (!n) throw new AppError('CONFLICT', 'Two-factor authentication is already on');
     await audit(trx, ctx, { action: 'auth.mfa_setup_started', entity: 'user', entityId: userId });
   });
@@ -395,7 +400,7 @@ export async function enableTotp(ctx: RequestContext, userId: number, code: stri
   if (!user?.totp_secret_enc) throw new AppError('VALIDATION_FAILED', 'Start two-factor setup first');
   // Re-enabling would replace the recovery codes without the password check that regeneration needs.
   if (user.totp_enabled) throw new AppError('CONFLICT', 'Two-factor authentication is already on');
-  const step = matchTotpStep(decrypt(user.totp_secret_enc), code);
+  const step = matchTotpStep(decrypt(user.totp_secret_enc, totpAad(userId)), code);
   if (step === null || (user.totp_last_step !== null && step <= Number(user.totp_last_step)))
     throw new AppError('MFA_INVALID', 'That code is not valid');
   return db.transaction(async (trx) => {

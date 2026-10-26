@@ -58,6 +58,7 @@ export function useSettingsSections() {
         { to: 'blueprint', label: t('settings.blueprint'), permission: 'core.blueprints.manage' },
         { to: 'audit', label: t('settings.audit'), permission: 'core.audit.view' },
         { to: 'privacy', label: t('settings.privacy'), permission: 'core.privacy.manage' },
+        { to: 'data-map', label: t('settings.dataMap'), permission: 'core.privacy.manage' },
       ],
     },
   ];

@@ -16,7 +16,7 @@ import {
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost, buildUrl } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { formatDate } from '@/lib/format';
-import { useT } from '@/app/session';
+import { useCan, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
 import {
@@ -421,6 +421,7 @@ function PersonActions({
   onErased?: () => void;
 }) {
   const qc = useQueryClient();
+  const can = useCan();
   const [confirm, setConfirm] = useState<'anonymize' | 'delete' | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
@@ -471,11 +472,13 @@ function PersonActions({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
-        <Button asChild variant={primary(['access', 'portability'])}>
-          <a href={buildUrl(`/privacy/${entity}/${uuid}/export`)} download>
-            <Download /> Download their data
-          </a>
-        </Button>
+        {can('core.privacy.export') ? (
+          <Button asChild variant={primary(['access', 'portability'])}>
+            <a href={buildUrl(`/privacy/${entity}/${uuid}/export`)} download>
+              <Download /> Download their data
+            </a>
+          </Button>
+        ) : null}
         <Button
           variant={primary(['restriction', 'objection'])}
           loading={restrict.isPending}
@@ -499,9 +502,9 @@ function PersonActions({
         </Button>
       </div>
       <p className="text-xs text-muted">
-        Erasing keeps the record for reports but removes personal details everywhere, including emails, files,
-        webhook copies and module data. Records the law requires you to keep, such as invoices, are listed in
-        the report.
+        The download holds only what you can see yourself. Erasing keeps the record for reports but removes
+        personal details everywhere, including emails, files, webhook copies and module data. Records the law
+        requires you to keep, such as invoices, are listed in the report.
       </p>
       {confirm ? (
         <Dialog open onOpenChange={(o) => !o && setConfirm(null)}>

@@ -49,6 +49,18 @@ describe('access logging', () => {
   });
 });
 
+describe('module reads', () => {
+  it('logs a module record view like a core one', async () => {
+    await setSettingsGroup('compliance', { accessLogging: true });
+    const { client, user } = await clientWithRoles(['admin']);
+    await client.post('/modules/tickets/enable').expect(200);
+    const t = await client.post('/m/tickets/tickets', { subject: 'Logged read' }).expect(201);
+    await client.get(`/m/tickets/tickets/${t.body.uuid}`).expect(200);
+    const row = await db('access_logs').where({ actor_id: user.id, entity: 'tickets.tickets' }).first();
+    expect(row).toMatchObject({ action: 'view', entity_uuid: t.body.uuid });
+  });
+});
+
 describe('audit viewer', () => {
   it('filters, shows one entry and exports only with the export permission', async () => {
     const { client: admin, user } = await clientWithRoles(['admin']);
@@ -70,6 +82,22 @@ describe('audit viewer', () => {
     await client.get('/audit-logs').expect(200);
     await client.get('/audit-logs/export').expect(403);
     await client.get('/access-logs/export').expect(403);
+  });
+
+  it('shows record history only inside the viewer’s record scope', async () => {
+    const { client: admin } = await clientWithRoles(['admin']);
+    const theirs = await admin.post('/contacts', { firstName: 'Not yours' }).expect(201);
+    const role = await createRole(['core.audit.view', 'core.contacts.view', 'core.contacts.create'], {
+      'core.contacts': 'own',
+    });
+    const { client } = await clientWithRoles([role]);
+    const mine = await client.post('/contacts', { firstName: 'Mine' }).expect(201);
+    expect((await client.get(`/audit-logs?entityUuid=${theirs.body.uuid}`)).body.data).toHaveLength(0);
+    expect((await client.get(`/audit-logs?entityUuid=${mine.body.uuid}`)).body.data).toHaveLength(1);
+    const theirEntry = (await admin.get(`/audit-logs?entityUuid=${theirs.body.uuid}`)).body.data[0];
+    expect((await client.get(`/audit-logs/${theirEntry.id}`)).status).toBe(404);
+    // Workspace entries are not record data.
+    expect((await client.get('/audit-logs?action=auth.login')).body.meta.total).toBeGreaterThan(0);
   });
 
   it('hides custom fields the viewer cannot see from diffs', async () => {
@@ -186,8 +214,23 @@ describe('integrity digests and retention', () => {
   });
 
   it('reseals days that a privacy erasure redacted, and audits it', async () => {
+    // Tamper with a sealed row first: the erasure must record it, not silently reseal it.
+    const target = await db('audit_logs')
+      .where({ entity_uuid: contactUuid, action: 'contact.updated' })
+      .where('created_at', '<', daysAgo(2))
+      .first();
+    await db.transaction(async (trx) => {
+      await trx.raw('SET @audit_redaction = 1');
+      await trx('audit_logs').where({ id: target.id }).update({ action: 'contact.tampered' });
+      await trx.raw('SET @audit_redaction = 0');
+    });
     const { client } = await clientWithRoles(['admin']);
     await client.post(`/privacy/contact/${contactUuid}/anonymize`).expect(200);
+    const failure = await db('audit_logs')
+      .where({ action: 'audit.integrity_failed' })
+      .orderBy('id', 'desc')
+      .first();
+    expect(failure.diff.days).toContain(dayKey(new Date(target.created_at)));
     expect((await verifyIntegrity()).problems).toEqual([]);
     const resealed = await db('audit_logs').where({ action: 'audit.resealed' }).orderBy('id', 'desc').first();
     expect(resealed.diff.changes.length).toBeGreaterThan(0);

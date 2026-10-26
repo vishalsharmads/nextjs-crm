@@ -2,13 +2,20 @@ import type { Response } from 'express';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify';
 import { z } from 'zod';
-import { filterSchema, normalizePhone, type CoreEntity, type CustomFieldDef } from '@app/shared';
+import {
+  SENSITIVE_MASK,
+  filterSchema,
+  normalizePhone,
+  type CoreEntity,
+  type CustomFieldDef,
+} from '@app/shared';
 import { db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
 import { enqueue, registerJob } from '../../lib/jobs';
-import { storage } from '../../lib/storage';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { logAccess } from '../audit/access-log';
+import { readStoredFile } from '../files/files.service';
+import { csvSafe } from '../../lib/csv';
 import { audit } from '../audit/audit.service';
 import { assertCan, loadAccess } from '../rbac/access';
 import { customContext } from '../records/common';
@@ -168,10 +175,11 @@ export async function exportCsv(
     if (!rows.length) break;
     const dtos = (await def.toDtos(rows, { user, conn: db })) as Dto[];
     for (const d of dtos) {
-      csv.write([
-        ...columns.map((c) => c.get(d) ?? ''),
-        ...visible.map((f) => exportValue(f, d.custom[f.key])),
-      ]);
+      csv.write(
+        [...columns.map((c) => c.get(d) ?? ''), ...visible.map((f) => exportValue(f, d.custom[f.key]))].map(
+          csvSafe,
+        ),
+      );
       count++;
     }
     if (rows.length < batch) break;
@@ -389,7 +397,7 @@ registerJob('import', async (job, progress) => {
   const ctx: RequestContext = { requestId: `job:${job.uuid}`, ip: null, userAgent: null, user };
   const def = recordDefs[input.entity];
   const file = await db('files').where({ uuid: input.fileUuid }).first();
-  const { headers, rows } = parseCsv(await storage.get(file.storage_key));
+  const { headers, rows } = parseCsv(await readStoredFile(file));
   const { defs } = await customContext(input.entity, user);
   const { dateFormat } = await getGroup('general');
   const users = new Map(
@@ -405,6 +413,17 @@ registerJob('import', async (job, progress) => {
     failed: 0,
     errors: [] as { row: number; message: string; values: string[] }[],
   };
+
+  // Columns mapped to sensitive fields: never echo their values back in error reports.
+  const sensitiveCols = new Set(
+    headers.flatMap((h, col) => {
+      const target = input.mapping[h];
+      return target?.startsWith('custom.') &&
+        defs.some((d) => d.key === target.slice(7) && d.sensitivity === 'special')
+        ? [col]
+        : [];
+    }),
+  );
 
   for (const [i, cells] of rows.entries()) {
     const core: Record<string, unknown> = {};
@@ -489,7 +508,7 @@ registerJob('import', async (job, progress) => {
           message: details?.length
             ? details.map((d) => `${d.path}: ${d.message}`).join('; ')
             : (err as Error).message,
-          values: cells,
+          values: cells.map((c, col) => (sensitiveCols.has(col) && c ? SENSITIVE_MASK : c)),
         });
       }
     }

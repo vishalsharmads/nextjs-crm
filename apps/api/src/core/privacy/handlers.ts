@@ -24,6 +24,8 @@ export interface PrivacyHandler {
   key: string;
   /** The module's tables; the handler is skipped while the first one does not exist. */
   tables: string[];
+  /** Exports include this module's data only for people who hold this permission. */
+  viewPermission: string;
   /** Everything the module holds about the person, as JSON-serializable rows per area. */
   export(subject: DataSubject, conn: Db): Promise<Record<string, unknown[] | undefined>>;
   /**

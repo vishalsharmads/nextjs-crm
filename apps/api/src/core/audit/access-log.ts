@@ -19,9 +19,15 @@ export interface AccessEntry {
  * workspace turns access logging on. Reads must not fail because logging failed, so errors are
  * logged instead of thrown.
  */
-export async function logAccess(ctx: RequestContext, entry: AccessEntry) {
+export async function logAccess(
+  ctx: RequestContext,
+  entry: AccessEntry,
+  /** always: log whatever the setting; required: the read must not happen unless the log is written. */
+  opts: { always?: boolean; required?: boolean } = {},
+) {
   try {
-    if (!(await effectiveCompliance()).accessLogging) return;
+    // Some reads (revealing a sensitive value) are logged whatever the setting.
+    if (!opts.always && !(await effectiveCompliance()).accessLogging) return;
     await db('access_logs').insert({
       ...actorColumns(ctx),
       action: entry.action,
@@ -35,5 +41,6 @@ export async function logAccess(ctx: RequestContext, entry: AccessEntry) {
     });
   } catch (err) {
     logger.error({ err, action: entry.action, entity: entry.entity }, 'access log write failed');
+    if (opts.required) throw err;
   }
 }

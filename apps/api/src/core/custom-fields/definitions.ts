@@ -5,6 +5,7 @@ import {
   type CustomFieldDef,
   type CustomizableEntity,
   type FieldType,
+  type Sensitivity,
   type VisibilityLevel,
 } from '@app/shared';
 import { db, type Db } from '../../db/knex';
@@ -45,6 +46,7 @@ export function rowToDef(r: Row): CustomFieldDef {
     showInList: !!r.show_in_list,
     sortOrder: Number(r.sort_order ?? 0),
     active: !!r.active,
+    sensitivity: ((r.sensitivity as string | undefined) ?? 'normal') as Sensitivity,
     sourceBlueprint: (r.source_blueprint as string | null) ?? null,
     customized: !!r.customized,
   };

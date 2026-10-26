@@ -11,7 +11,7 @@ import { newUuid } from '../../lib/ids';
 import { logger } from '../../lib/logger';
 import { enqueue, every, registerJob } from '../../lib/jobs';
 import { audit } from '../audit/audit.service';
-import { isRestricted } from '../privacy/privacy.service';
+import { eventTouchesRestricted } from '../privacy/privacy.service';
 import { effectiveCompliance } from '../settings/settings.service';
 import { EVENT_TYPES, onEvent, type DomainEvent } from '../events/events';
 
@@ -95,7 +95,7 @@ async function deliver(deliveryId: number) {
         'X-Webhook-Id': d.uuid,
         'X-Webhook-Event': d.event,
         'X-Webhook-Timestamp': timestamp,
-        'X-Webhook-Signature': sign(decrypt(d.secret_enc), timestamp, body),
+        'X-Webhook-Signature': sign(decrypt(d.secret_enc, 'webhooks.secret_enc'), timestamp, body),
       },
       body,
       redirect: 'manual',
@@ -141,7 +141,7 @@ registerJob('webhook.deliver', async (job) => {
 /** Fan out every domain event to subscribed, active webhooks. */
 onEvent(async (e: DomainEvent) => {
   // GDPR Art. 18: do not pass a restricted record on to other systems.
-  if (await isRestricted(e.entity, e.uuid)) return;
+  if (await eventTouchesRestricted(e)) return;
   const hooks = await db('webhooks').where({ active: true });
   const minimal = hooks.length ? (await effectiveCompliance()).webhookMinimal : false;
   for (const h of hooks) {
@@ -150,7 +150,13 @@ onEvent(async (e: DomainEvent) => {
     const uuid = newUuid();
     // Minimal mode (forced by the health data profile): no personal data leaves in webhooks.
     const data = minimal
-      ? { entity: e.entity, uuid: e.uuid, changedFields: Object.keys(e.changes ?? {}) }
+      ? {
+          entity: e.entity,
+          uuid: e.uuid, // Custom field names can themselves be telling (a "diagnosis" changed): report "custom" only.
+          changedFields: [
+            ...new Set(Object.keys(e.changes ?? {}).map((k) => (k.startsWith('custom.') ? 'custom' : k))),
+          ],
+        }
       : { entity: e.entity, uuid: e.uuid, record: e.record, changes: e.changes ?? null };
     const payload = { id: uuid, type: e.type, createdAt: e.at, data };
     const [id] = await db('webhook_deliveries').insert({
@@ -222,7 +228,7 @@ export const webhooksRoutes = defineRoutes('/webhooks', ['webhooks'])
           name: b.name,
           url: b.url,
           events: JSON.stringify(b.events),
-          secret_enc: encrypt(secret),
+          secret_enc: encrypt(secret, 'webhooks.secret_enc'),
           active: b.active,
           created_by: user.id,
         });

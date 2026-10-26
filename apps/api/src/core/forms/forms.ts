@@ -12,7 +12,7 @@ import { loadAccess } from '../rbac/access';
 import { emit } from '../events/events';
 import { notify } from '../notifications/notifications.service';
 import { recordDefs } from '../records/registry';
-import { createRecord } from '../records/service';
+import { createRecord, emitRecordEvent } from '../records/service';
 import { getDefinitions } from '../custom-fields/definitions';
 import { effectiveCompliance, getBranding } from '../settings/settings.service';
 import { recordConsent } from '../privacy/consent.service';
@@ -205,25 +205,21 @@ export const publicFormsRoutes = defineRoutes('/public/forms', ['forms'])
       input.ownerUuid = owner.uuid;
       const def = recordDefs[f.entity as 'contact' | 'lead'];
       let record: { uuid: string; fullName?: string };
+      const entity = f.entity as 'contact' | 'lead';
+      const actorCtx = { ...ctx, user: actor };
       try {
-        record = (await createRecord(def, { ...ctx, user: actor }, actor, input)) as {
-          uuid: string;
-          fullName?: string;
-        };
-      } catch (err) {
-        // Field-level messages are safe to show; anything else stays generic.
-        if (err instanceof AppError && err.code === 'VALIDATION_FAILED') throw err;
-        throw new AppError('INTERNAL', 'The form could not be submitted. Try again.');
-      }
-      if (granted.length) {
-        const entity = f.entity as 'contact' | 'lead';
-        await db.transaction(async (trx) => {
-          const row = await trx(def.table).where({ uuid: record.uuid }).first('id');
+        // The record and the consent it was given with are saved together, or not at all.
+        record = await db.transaction(async (trx) => {
+          const created = (await createRecord(def, actorCtx, actor, input, trx)) as {
+            uuid: string;
+            fullName?: string;
+          };
+          const row = await trx(def.table).where({ uuid: created.uuid }).first('id');
           for (const p of granted)
             await recordConsent(
               trx,
               ctx,
-              { entity, id: row.id as number, uuid: record.uuid },
+              { entity, id: row.id as number, uuid: created.uuid },
               {
                 purposeKey: p.key,
                 status: 'granted',
@@ -232,8 +228,15 @@ export const publicFormsRoutes = defineRoutes('/public/forms', ['forms'])
                 note: `Form: ${f.name as string}`,
               },
             );
+          return created;
         });
+      } catch (err) {
+        // Field-level messages are safe to show; anything else stays generic.
+        if (err instanceof AppError && err.code === 'VALIDATION_FAILED') throw err;
+        throw new AppError('INTERNAL', 'The form could not be submitted. Try again.');
       }
+      // createRecord leaves the event to its caller inside a transaction: emit after commit.
+      await emitRecordEvent(def, 'created', record as unknown as Record<string, unknown>, actor);
       await db('web_forms').where({ id: f.id }).increment('submission_count', 1);
       await audit(db, ctx, {
         action: 'form.submitted',

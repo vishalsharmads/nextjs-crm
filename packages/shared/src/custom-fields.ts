@@ -41,6 +41,17 @@ export const FILTERABLE_TYPES: readonly FieldType[] = [
   'user',
 ];
 
+/**
+ * Data protection class. `personal` is personal data (listed in the data map); `special` is
+ * special-category or health data: encrypted at rest, masked in every response, never filterable.
+ */
+export const SENSITIVITY_LEVELS = ['normal', 'personal', 'special'] as const;
+export type Sensitivity = (typeof SENSITIVITY_LEVELS)[number];
+/** Types a special field can have (stored as encrypted text). */
+export const SENSITIVE_TYPES: readonly FieldType[] = ['text', 'textarea', 'email', 'phone', 'url'];
+/** What responses show instead of a special field's value. Sending it back leaves the value unchanged. */
+export const SENSITIVE_MASK = '••••••';
+
 export const VISIBILITY_LEVELS = ['write', 'read', 'hidden'] as const;
 export type VisibilityLevel = (typeof VISIBILITY_LEVELS)[number];
 export const VISIBILITY_RANK: Record<VisibilityLevel, number> = { hidden: 0, read: 1, write: 2 };
@@ -97,6 +108,8 @@ export const customFieldInputSchema = z.object({
   filterable: z.boolean().optional(),
   showInList: z.boolean().default(false),
   sortOrder: z.number().int().optional(),
+  /** Fixed at creation: changing it would leave values encrypted (or not) inconsistently. */
+  sensitivity: z.enum(SENSITIVITY_LEVELS).default('normal'),
 });
 export type CustomFieldInput = z.input<typeof customFieldInputSchema>;
 
@@ -120,6 +133,7 @@ export interface CustomFieldDef {
   showInList: boolean;
   sortOrder: number;
   active: boolean;
+  sensitivity: Sensitivity;
   sourceBlueprint: string | null;
   customized: boolean;
 }

@@ -26,7 +26,20 @@ const schema = z.object({
     .string()
     .regex(/^[0-9a-f]{64}$/i, 'ENCRYPTION_KEY must be 64 hex chars (32 bytes)')
     .default('0'.repeat(64)),
+  /**
+   * Key ring for rotation: `kid:hex64,kid:hex64`. The first key encrypts; all of them decrypt.
+   * When unset, ENCRYPTION_KEY is the only key (kid `k0`).
+   */
+  ENCRYPTION_KEYS: z
+    .string()
+    .regex(
+      /^[a-z0-9_-]{1,16}:[0-9a-f]{64}(,[a-z0-9_-]{1,16}:[0-9a-f]{64})*$/i,
+      'ENCRYPTION_KEYS must look like kid:<64 hex>,kid:<64 hex>',
+    )
+    .optional(),
   FILE_URL_SECRET: z.string().min(16).default('dev-only-file-url-secret'),
+  /** Signs unsubscribe links. They never expire, so keep this stable (falls back to CSRF_SECRET). */
+  UNSUBSCRIBE_SECRET: z.string().min(16).optional(),
   COOKIE_SECURE: bool.optional(),
   ACCESS_TOKEN_TTL_MIN: z.coerce.number().int().min(1).default(15),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).default(14),
@@ -69,7 +82,11 @@ function load(): Env {
     const weak = (['JWT_SECRET', 'CSRF_SECRET', 'FILE_URL_SECRET'] as const).filter(
       (k) => env[k].startsWith('dev-only') || env[k].length < 32,
     );
-    if (env.ENCRYPTION_KEY === '0'.repeat(64)) weak.push('ENCRYPTION_KEY' as never);
+    const active = env.ENCRYPTION_KEYS
+      ? env.ENCRYPTION_KEYS.split(',')[0]!.split(':')[1]
+      : env.ENCRYPTION_KEY;
+    if (active === '0'.repeat(64))
+      weak.push((env.ENCRYPTION_KEYS ? 'ENCRYPTION_KEYS' : 'ENCRYPTION_KEY') as never);
     if (weak.length) throw new Error(`Weak or default secrets in production: ${weak.join(', ')}`);
   }
   return env;

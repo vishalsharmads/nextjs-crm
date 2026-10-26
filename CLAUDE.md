@@ -7,7 +7,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 ## Current status
 
 - Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
-- **Phases 1–4 complete** (all planned phases). New work goes through the roadmap's Future list.
+- **Phases 1–4 complete.** Phase 5 (compliance readiness, see `docs/compliance/`) is built on branches `phase-5a`…`phase-5e` and awaits the user's review before merging. New work goes through the roadmap's Future list.
 
 ## Non-negotiables
 
@@ -117,8 +117,11 @@ Run test suites one workspace at a time on this machine; running all three in pa
 - **Validation:** Zod on every body, query, and param. Custom fields use the runtime schema from `SchemaBuilder`.
 - **SQL:** parameterized only. Identifiers from user input (custom field keys) must match `^[a-z][a-z0-9_]{0,48}$` **and** be resolved through `custom_field_definitions`. Never interpolate request values into `knex.raw`.
 - **Audit:** every mutation writes an `audit_logs` row in the same transaction. Audit is append-only (DB triggers). The only exceptions are the privileged privacy anonymize path (`@audit_redaction`, then `resealDays()` for sealed days) and the retention job (`@audit_purge`, only on sealed days).
+- **Encryption:** use `encrypt`/`decrypt`/`encryptBuffer` from `lib/crypto.ts` (key ring, `ENCRYPTION_KEYS`); never use `ENCRYPTION_KEY` directly. Read stored files through `readStoredFile()` (decrypts when `files.enc_kid` is set), never `storage.get` on its own. Sensitive (`special`) custom field values are stored as `enc:` strings and leave the API only as `SENSITIVE_MASK`; a new place that reads raw `custom` must mask (`maskEncrypted`) or, on privileged paths, `decryptCustom`. A new table with encrypted columns must be added to `crypto:rotate` (`core/security/rotation.ts`).
 - **Personal data in modules:** a module that stores data about contacts or leads returns `privacy: PrivacyHandler` from its `ApiModule` (export + erase); core erasure (`core/privacy/privacy.service.ts`) also clears email copies, webhook payloads, jobs, automation logs and notifications. A new core table that copies personal data must be added there.
-- **Restriction and opt-out:** automations, webhooks and CRM email skip records with `processing_restricted`; automated email to a contact/lead checks `marketing_opt_out` and adds the unsubscribe link. New outbound channels must do the same.
+- **Restriction and opt-out:** automations, webhooks and CRM email skip events that touch a restricted person (`eventTouchesRestricted`, `restrictedRecipients` in `core/privacy/privacy.service.ts`); automated email to a contact/lead checks `marketing_opt_out` and adds the unsubscribe link. New outbound channels must do the same.
+- **CSV exports** pass every cell through `csvSafe()` (`lib/csv.ts`) so spreadsheet formulas never run.
+- **Merged contacts** keep their soft-deleted rows (`merged_into_id`). Anything that acts on a person (erasure, export, unsubscribe) must follow them (`subjectRows()`).
 - **Access log:** reads of personal data call `logAccess(ctx, …)` (`core/audit/access-log.ts`); it is a no-op unless `accessLogging` is on and never throws. New record detail, download or export paths must call it.
 - **Errors:** throw `AppError(code, message, details?)`. Response shape is `{ error: { code, message, details? } }`. Codes are in `packages/shared/src/errors.ts` and are stable once released.
 - **Lists:** `{ data, meta: { page, pageSize, total } }`. `pageSize` max is 100. Filters use the shared filter AST with a per-resource field whitelist.
