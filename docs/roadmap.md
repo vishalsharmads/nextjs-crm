@@ -9,7 +9,7 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 | 2     | Configuration and communication: layout builder UI, workflow automation, templates manager, email integration, web forms, webhooks, API keys, BullMQ jobs                                 | Done                           |
 | 3     | Commercial: products, quotes, invoices, payments, contracts and renewals, client portal                                                                                                   | Done                           |
 | 4     | Operational and industry modules: bookings, tickets, documents, inventory/assets, vertical modules                                                                                        | Done                           |
-| 5     | Compliance readiness: profiles with enforced floors, access logging, data subject rights and consent, retention, encryption of sensitive data ([overview](compliance/overview.md))        | Done                           |
+| 5     | Compliance readiness: profiles with enforced floors, access logging, data subject rights and consent, retention, encryption of sensitive data ([overview](compliance/overview.md))        | Built, in review               |
 
 ## Future
 

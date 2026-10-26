@@ -7,7 +7,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 ## Current status
 
 - Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
-- **Phases 1–5 complete** (Phase 5: compliance readiness, see `docs/compliance/`). New work goes through the roadmap's Future list.
+- **Phases 1–4 complete.** Phase 5 (compliance readiness, see `docs/compliance/`) is built on branches `phase-5a`…`phase-5e` and awaits the user's review before merging. New work goes through the roadmap's Future list.
 
 ## Non-negotiables
 
