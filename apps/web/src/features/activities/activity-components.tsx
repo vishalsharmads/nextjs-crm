@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -11,12 +12,12 @@ import {
   Mail,
   Flag,
 } from 'lucide-react';
-import type { ActivityDto, ActivityType, RelatedType } from '@app/shared';
+import { ENTITY_ROUTE, type ActivityDto, type ActivityType, type RelatedType } from '@app/shared';
 import { apiGet, apiPost } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative, fromLocalInput, toLocalInput } from '@/lib/format';
-import { useBoot, useCan } from '@/app/session';
+import { useBoot, useCan, useLabel } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -82,6 +83,19 @@ export function useToggleActivity() {
   });
 }
 
+/** "· Membership: Mei – hot desk", linking to the record the activity was logged on. */
+function RelatedLink({ related }: { related: NonNullable<ActivityDto['related']> }) {
+  const label = useLabel(related.type);
+  return (
+    <span className="truncate text-xs text-muted">
+      · {label.singular}:{' '}
+      <Link to={`/${ENTITY_ROUTE[related.type]}/${related.uuid}`} className="text-ink hover:underline">
+        {related.title}
+      </Link>
+    </span>
+  );
+}
+
 export function ActivityItem({ a, showRelated }: { a: ActivityDto; showRelated?: boolean }) {
   const toggle = useToggleActivity();
   const can = useCan();
@@ -120,9 +134,7 @@ export function ActivityItem({ a, showRelated }: { a: ActivityDto; showRelated?:
               <Flag className="size-3" /> High
             </Badge>
           ) : null}
-          {showRelated && a.related ? (
-            <span className="truncate text-xs text-muted">· {a.related.title}</span>
-          ) : null}
+          {showRelated && a.related ? <RelatedLink related={a.related} /> : null}
         </div>
         {a.body ? (
           <div
