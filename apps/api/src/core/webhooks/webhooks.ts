@@ -12,6 +12,7 @@ import { logger } from '../../lib/logger';
 import { enqueue, every, registerJob } from '../../lib/jobs';
 import { audit } from '../audit/audit.service';
 import { isRestricted } from '../privacy/privacy.service';
+import { effectiveCompliance } from '../settings/settings.service';
 import { EVENT_TYPES, onEvent, type DomainEvent } from '../events/events';
 
 const MAX_ATTEMPTS = 6;
@@ -142,16 +143,16 @@ onEvent(async (e: DomainEvent) => {
   // GDPR Art. 18: do not pass a restricted record on to other systems.
   if (await isRestricted(e.entity, e.uuid)) return;
   const hooks = await db('webhooks').where({ active: true });
+  const minimal = hooks.length ? (await effectiveCompliance()).webhookMinimal : false;
   for (const h of hooks) {
     const events = h.events as string[];
     if (!events.includes('*') && !events.includes(e.type)) continue;
     const uuid = newUuid();
-    const payload = {
-      id: uuid,
-      type: e.type,
-      createdAt: e.at,
-      data: { entity: e.entity, uuid: e.uuid, record: e.record, changes: e.changes ?? null },
-    };
+    // Minimal mode (forced by the health data profile): no personal data leaves in webhooks.
+    const data = minimal
+      ? { entity: e.entity, uuid: e.uuid, changedFields: Object.keys(e.changes ?? {}) }
+      : { entity: e.entity, uuid: e.uuid, record: e.record, changes: e.changes ?? null };
+    const payload = { id: uuid, type: e.type, createdAt: e.at, data };
     const [id] = await db('webhook_deliveries').insert({
       uuid,
       webhook_id: h.id,

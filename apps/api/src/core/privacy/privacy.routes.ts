@@ -21,6 +21,7 @@ import { eraseSubject, exportSubject, setRestriction } from './privacy.service';
 import { createRequest, getRequest, listRequests, updateRequest } from './requests.service';
 import { addDays } from '../commerce/documents';
 import { parseUnsubscribeToken } from './unsubscribe';
+import { previewRetention, runRetention } from './retention.service';
 
 const params = z.object({ entity: z.enum(DATA_SUBJECT_ENTITIES), uuid: z.uuid() });
 
@@ -29,6 +30,20 @@ const confirmToken = (entity: string, uuid: string) =>
   hmac(env.CSRF_SECRET, `hard-delete:${entity}:${uuid}`).slice(0, 16);
 
 export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
+  .add({
+    method: 'get',
+    path: '/retention/preview',
+    permission: 'core.privacy.manage',
+    summary: 'How many records each retention rule and housekeeping task would remove now',
+    handler: () => previewRetention(),
+  })
+  .add({
+    method: 'post',
+    path: '/retention/run',
+    permission: 'core.privacy.manage',
+    summary: 'Apply retention now instead of waiting for the next scheduled run',
+    handler: () => runRetention(),
+  })
   .add({
     method: 'get',
     path: '/requests',

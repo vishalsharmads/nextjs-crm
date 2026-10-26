@@ -51,7 +51,7 @@ export function createApp(opts: AppOptions = {}): Express {
           req: (req: { id: string; method: string; url: string }) => ({
             id: req.id,
             method: req.method,
-            url: req.url,
+            url: redactQuery(req.url),
           }),
           res: (res: { statusCode: number }) => ({ status: res.statusCode }),
         },
@@ -84,4 +84,26 @@ export function createApp(opts: AppOptions = {}): Express {
   if (opts.static) mountStatic(app, opts.static);
   app.use(errorHandler);
   return app;
+}
+
+/** Query values that are safe to log. Everything else (search terms, filters, tokens) is masked. */
+const LOGGABLE_QUERY = new Set([
+  'page',
+  'pageSize',
+  'sort',
+  'view',
+  'limit',
+  'kinds',
+  'inline',
+  'status',
+  'entity',
+]);
+
+/** Search terms and filters often contain names and emails: keep the keys, mask the values. */
+export function redactQuery(url: string): string {
+  const i = url.indexOf('?');
+  if (i < 0) return url;
+  const params = new URLSearchParams(url.slice(i + 1));
+  const out = [...params].map(([k, v]) => `${k}=${LOGGABLE_QUERY.has(k) ? v : '*'}`);
+  return `${url.slice(0, i)}?${out.join('&')}`;
 }

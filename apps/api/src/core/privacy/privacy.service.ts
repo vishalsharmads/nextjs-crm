@@ -172,7 +172,7 @@ export async function eraseSubject(
     if (mode === 'anonymize') {
       await trx(def.table)
         .where({ id: subject.id })
-        .update({ ...PII[entity], custom: JSON.stringify({}), updated_by: user.id });
+        .update({ ...PII[entity], custom: JSON.stringify({}), updated_by: user.id || null });
     } else {
       await trx('record_follows').where({ entity, entity_id: subject.id }).delete();
       if (entity === 'contact') {

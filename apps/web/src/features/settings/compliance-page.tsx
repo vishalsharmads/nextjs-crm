@@ -4,6 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import {
   COMPLIANCE_PROFILES,
   LAWFUL_BASES,
+  RETENTION_CONDITIONS,
+  type Housekeeping,
+  type RetentionCondition,
   type ComplianceProfile,
   type ComplianceSettings,
   type LawfulBasis,
@@ -17,6 +20,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { SettingsPage } from './layout';
 import { useSaveGroup, useSettings } from './general-page';
 import { floorHint } from './compliance-floors';
+import { useEntityConfig } from '@/features/records/entities';
 
 const PROFILE_COPY: Record<ComplianceProfile, { label: string; help: string }> = {
   standard: {
@@ -120,6 +124,55 @@ function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
             )}
           </Field>
           <ConsentPurposes control={form.control} register={form.register} />
+        </div>
+      </Pane>
+      <Pane title="Data retention">
+        <RetentionRules control={form.control} register={form.register} />
+      </Pane>
+      <Pane title="Housekeeping">
+        <p className="mb-3 text-xs text-muted">
+          Operational records copy personal data. They are deleted after these many days.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {HOUSEKEEPING.map(([key, label]) => (
+            <Field key={key} label={label}>
+              {(p) => (
+                <Input
+                  {...p}
+                  type="number"
+                  min={1}
+                  max={3650}
+                  {...form.register(`housekeeping.${key}`, num)}
+                />
+              )}
+            </Field>
+          ))}
+        </div>
+      </Pane>
+      <Pane title="Sharing less">
+        <div className="flex flex-col gap-3 text-sm">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              className="size-4 accent-[var(--primary)]"
+              {...form.register('webhookMinimal')}
+            />
+            Webhooks send only record ids and the names of changed fields
+            {hint('webhookMinimal') ? (
+              <span className="text-xs text-muted">({hint('webhookMinimal')})</span>
+            ) : null}
+          </label>
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              className="size-4 accent-[var(--primary)]"
+              {...form.register('notificationEmailMinimal')}
+            />
+            Notification emails leave out names and details
+            {hint('notificationEmailMinimal') ? (
+              <span className="text-xs text-muted">({hint('notificationEmailMinimal')})</span>
+            ) : null}
+          </label>
         </div>
       </Pane>
       <Pane title="Audit and access logs">
@@ -347,5 +400,88 @@ function ConsentPurposes({
         </Button>
       </div>
     </fieldset>
+  );
+}
+
+const HOUSEKEEPING: [keyof Housekeeping, string][] = [
+  ['sessionsDays', 'Ended sessions and sign-in links'],
+  ['jobsDays', 'Finished background jobs'],
+  ['webhookDeliveriesDays', 'Webhook deliveries'],
+  ['notificationsDays', 'Read notifications'],
+  ['automationRunsDays', 'Automation run logs'],
+  ['deletedFilesDays', 'Deleted files'],
+];
+
+const CONDITION_LABEL: Record<RetentionCondition, string> = {
+  deleted: 'deleted (in the bin) for',
+  inactive: 'with no updates or activity for',
+  lead_closed: 'converted or unqualified for',
+};
+
+/** Storage limitation: erase people automatically once there is no reason to keep them. */
+function RetentionRules({
+  control,
+  register,
+}: {
+  control: Control<ComplianceSettings>;
+  register: UseFormRegister<ComplianceSettings>;
+}) {
+  const contact = useEntityConfig('contact');
+  const lead = useEntityConfig('lead');
+  const { fields, append, remove } = useFieldArray({ control, name: 'retentionRules' });
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-muted">
+        Checked every six hours. People with an open privacy request are skipped. Check what a rule would do
+        under Privacy → Retention before saving it.
+      </p>
+      {fields.map((f, i) => (
+        <div key={f.id} className="flex flex-wrap items-center gap-2 text-sm">
+          <NativeSelect aria-label="Action" className="w-auto" {...register(`retentionRules.${i}.action`)}>
+            <option value="anonymize">Erase personal data of</option>
+            <option value="delete">Delete</option>
+          </NativeSelect>
+          <NativeSelect
+            aria-label="Record type"
+            className="w-auto"
+            {...register(`retentionRules.${i}.entity`)}
+          >
+            <option value="contact">{contact.plural}</option>
+            <option value="lead">{lead.plural}</option>
+          </NativeSelect>
+          <NativeSelect
+            aria-label="Condition"
+            className="w-auto"
+            {...register(`retentionRules.${i}.condition`)}
+          >
+            {RETENTION_CONDITIONS.map((c) => (
+              <option key={c} value={c}>
+                {CONDITION_LABEL[c]}
+              </option>
+            ))}
+          </NativeSelect>
+          <Input
+            aria-label="Days"
+            type="number"
+            min={1}
+            max={36500}
+            className="w-24"
+            {...register(`retentionRules.${i}.days`, { valueAsNumber: true })}
+          />
+          <span>days</span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => remove(i)}>
+            Remove
+          </Button>
+        </div>
+      ))}
+      <div>
+        <Button
+          type="button"
+          onClick={() => append({ entity: 'contact', condition: 'deleted', days: 30, action: 'delete' })}
+        >
+          Add rule
+        </Button>
+      </div>
+    </div>
   );
 }
