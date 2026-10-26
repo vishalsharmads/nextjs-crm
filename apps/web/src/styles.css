@@ -23,8 +23,9 @@
   --font-family: 'IBM Plex Sans', system-ui, sans-serif;
 
   /* Derived tokens: computed from the brand tokens so every palette stays coherent. */
-  --muted: color-mix(in oklch, var(--ink) 64%, var(--surface));
-  --faint: color-mix(in oklch, var(--ink) 45%, var(--surface));
+  /* Both clear 4.5:1 on surface and canvas for the factory palettes; faint is for placeholders and meta text. */
+  --muted: color-mix(in oklch, var(--ink) 70%, var(--surface));
+  --faint: color-mix(in oklch, var(--ink) 60%, var(--surface));
   --subtle: color-mix(in oklch, var(--ink) 5%, var(--surface));
   --hover: color-mix(in oklch, var(--ink) 7%, var(--surface));
   --line-strong: color-mix(in oklch, var(--ink) 22%, var(--surface));

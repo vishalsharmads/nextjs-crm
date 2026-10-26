@@ -79,8 +79,13 @@ export function Sheet({
       <D.Portal>
         <D.Overlay className="anim-fade fixed inset-0 z-40 bg-overlay md:bg-transparent" />
         <D.Content
+          // Focus the panel, not its first button: a header action would open its tooltip on load.
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).focus();
+          }}
           className={cn(
-            'anim-sheet fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-line bg-surface shadow-2xl',
+            'anim-sheet fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-line bg-surface shadow-2xl outline-none',
             width,
           )}
         >

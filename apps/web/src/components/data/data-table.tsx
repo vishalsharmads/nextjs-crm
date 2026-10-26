@@ -53,6 +53,8 @@ export function DataTable<T>({
   empty,
 }: DataTableProps<T>) {
   const [cursor, setCursor] = useState(0);
+  // The keyboard cursor stays hidden until the first key press or row click, so no row looks selected on load.
+  const [cursorActive, setCursorActive] = useState(false);
   const bodyRef = useRef<HTMLTableSectionElement>(null);
   const rowH = density === 'compact' ? 'h-8' : 'h-10';
   const sortField = sort?.replace(/^-/, '').split(',')[0];
@@ -75,14 +77,19 @@ export function DataTable<T>({
       if (e.metaKey || e.ctrlKey || e.altKey || !rows?.length) return;
       if (e.key === 'j' || e.key === 'ArrowDown') {
         e.preventDefault();
-        setCursor((c) => Math.min(c + 1, rows.length - 1));
+        // The first press reveals the cursor on the first row instead of skipping past it.
+        setCursor((c) => (cursorActive ? Math.min(c + 1, rows.length - 1) : 0));
+        setCursorActive(true);
       } else if (e.key === 'k' || e.key === 'ArrowUp') {
         e.preventDefault();
-        setCursor((c) => Math.max(c - 1, 0));
-      } else if (e.key === 'Enter' && onRowOpen) {
+        setCursor((c) => (cursorActive ? Math.max(c - 1, 0) : 0));
+        setCursorActive(true);
+      } else if (e.key === 'Enter' && onRowOpen && cursorActive) {
+        // Enter on a focused link or button keeps its own meaning.
+        if (el.closest('a, button')) return;
         e.preventDefault();
         onRowOpen(rows[cursor]!);
-      } else if (e.key === 'x' && selectable) {
+      } else if (e.key === 'x' && selectable && cursorActive) {
         e.preventDefault();
         const k = keys[cursor]!;
         const next = new Set(selected);
@@ -93,11 +100,11 @@ export function DataTable<T>({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [rows, cursor, keys, onRowOpen, selectable, selected, onSelectedChange]);
+  }, [rows, cursor, cursorActive, keys, onRowOpen, selectable, selected, onSelectedChange]);
 
   useEffect(() => {
-    bodyRef.current?.querySelectorAll('tr')[cursor]?.scrollIntoView({ block: 'nearest' });
-  }, [cursor]);
+    if (cursorActive) bodyRef.current?.querySelectorAll('tr')[cursor]?.scrollIntoView({ block: 'nearest' });
+  }, [cursor, cursorActive]);
 
   const toggleSort = (id: string) => {
     if (!onSortChange) return;
@@ -184,12 +191,13 @@ export function DataTable<T>({
               : rows?.map((row, i) => {
                   const k = keys[i]!;
                   const isActive = activeKey === k;
-                  const isCursor = cursor === i;
+                  const isCursor = cursorActive && cursor === i;
                   return (
                     <tr
                       key={k}
                       onClick={() => {
                         setCursor(i);
+                        setCursorActive(true);
                         onRowOpen?.(row);
                       }}
                       className={cn(
