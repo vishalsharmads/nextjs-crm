@@ -36,11 +36,18 @@ const year = new Date().getFullYear();
         <li><a href="/contact">Contact</a></li>
         <li><a href="/privacy">Privacy</a></li>
         <li><a href="/terms">Terms</a></li>
+        <li><a href={site.company.url} target="_blank" rel="noopener">{site.company.name}</a></li>
       </ul>
     </nav>
   </div>
   <div class="wrap base">
     <p>© {year} Bespoq. All rights reserved.</p>
+    <p class="credit">
+      Bespoq is a product of
+      <a href={site.company.url} target="_blank" rel="noopener">
+        <img src={site.company.logo} alt={site.company.name} width="110" height="17" />
+      </a>
+    </p>
   </div>
 </footer>
 
@@ -55,7 +62,7 @@ const year = new Date().getFullYear();
     position: absolute;
     inset: 0 0 auto;
     height: 2px;
-    background-image: linear-gradient(90deg, rgb(242 194 48 / 0.7) 60%, transparent 0);
+    background-image: linear-gradient(90deg, rgb(217 178 90 / 0.7) 60%, transparent 0);
     background-size: 14px 2px;
   }
   .grid {
@@ -86,21 +93,45 @@ const year = new Date().getFullYear();
   }
   ul a {
     text-decoration: none;
-    color: rgb(243 246 241 / 0.82);
+    color: rgb(238 242 236 / 0.82);
     font-size: 15.5px;
     transition: color 160ms ease;
   }
   @media (hover: hover) and (pointer: fine) {
     ul a:hover {
-      color: var(--chalk);
+      color: var(--text);
     }
   }
   .base {
     margin-top: 64px;
     padding-top: 24px;
-    border-top: 1px solid var(--line-on-mat);
+    border-top: 1px solid var(--border);
     font-size: 14px;
-    color: rgb(243 246 241 / 0.6);
+    color: rgb(238 242 236 / 0.6);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 24px;
+  }
+  .credit {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .credit img {
+    display: block;
+    height: 17px;
+    width: auto;
+  }
+  .base a {
+    color: rgb(238 242 236 / 0.82);
+    text-underline-offset: 3px;
+    transition: color 160ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .base a:hover {
+      color: var(--text);
+    }
   }
   @media (max-width: 860px) {
     .grid {

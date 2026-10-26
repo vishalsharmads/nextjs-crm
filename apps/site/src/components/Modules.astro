@@ -41,20 +41,20 @@ const { heading = 'Everything a service business runs on, in one place' } = Astr
     padding: 0;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    border-top: 1px solid var(--line);
-    border-inline-start: 1px solid var(--line);
+    border-top: 1px solid var(--border);
+    border-inline-start: 1px solid var(--border);
   }
   .item {
     display: grid;
     gap: 12px;
     align-content: start;
     padding: 28px 24px 32px;
-    border-inline-end: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
+    border-inline-end: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
   }
   .item.wide {
     grid-column: span 2;
-    background: var(--chalk-2);
+    background: var(--surface-2);
   }
   .item .link {
     margin-top: 6px;

@@ -120,11 +120,11 @@ const detail: Record<string, string[]> = {
   .points li {
     position: relative;
     padding: 16px 0 16px 34px;
-    border-top: 2px dashed rgb(18 32 27 / 0.2);
+    border-top: 2px dashed var(--border-strong);
     font-size: 18px;
   }
   .points li:last-child {
-    border-bottom: 2px dashed rgb(18 32 27 / 0.2);
+    border-bottom: 2px dashed var(--border-strong);
   }
   /* a tailor's tick: a short stitched check */
   .points li::before {
@@ -134,8 +134,8 @@ const detail: Record<string, string[]> = {
     top: 24px;
     width: 14px;
     height: 7px;
-    border-inline-start: 2.5px solid var(--mat);
-    border-bottom: 2.5px solid var(--mat);
+    border-inline-start: 2px solid var(--tape);
+    border-bottom: 2px solid var(--tape);
     transform: rotate(-45deg);
   }
   @media (max-width: 900px) {

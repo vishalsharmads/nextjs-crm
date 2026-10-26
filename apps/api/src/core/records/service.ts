@@ -36,8 +36,10 @@ export async function scopedQuery(
   trashed?: 'only' | 'with',
 ) {
   const qb = conn(def.table);
-  if (trashed === 'only') qb.whereNotNull(`${def.table}.deleted_at`);
-  else if (!trashed) qb.whereNull(`${def.table}.deleted_at`);
+  if (trashed === 'only') {
+    qb.whereNotNull(`${def.table}.deleted_at`);
+    if (def.mergeable) qb.whereNull(`${def.table}.merged_into_id`);
+  } else if (!trashed) qb.whereNull(`${def.table}.deleted_at`);
   await applyScope(qb, user, def.resource, def.ownerColumns, conn);
   return { qb };
 }

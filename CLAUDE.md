@@ -12,7 +12,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 ## Non-negotiables
 
 1. **Not SaaS, not multi-tenant.** No `tenant_id`/`org_id`, no tenant scoping, no subdomain routing, billing, or super-admin. The top role is the org's Admin. The `organizations` table holds the client's _customers_, not tenants.
-2. **White-label.** No vendor, product, or company names anywhere user-visible in the product (the marketing site in `apps/site` is the one place the vendor name "Bespoq" appears; it is on the brand deny list for the product) (UI, titles, emails, PDFs, errors, API responses, docs). Everything comes from `settings`. Workspace packages are named `@app/*`. The fallback app name is "CRM".
+2. **White-label.** No vendor, product, or company names anywhere user-visible in the product (the marketing site in `apps/site` is the one place the vendor name "Bespoq" and its parent company "Dotsquares" appear; both are on the brand deny list for the product) (UI, titles, emails, PDFs, errors, API responses, docs). Everything comes from `settings`. Workspace packages are named `@app/*`. The fallback app name is "CRM".
 3. **No hardcoded colors** in `apps/web/src`: no hex/rgb literals and no Tailwind palette classes (`bg-blue-500`). Use theme tokens (`bg-primary`, `text-ink`, `border-line`). The only exception is `theme/defaults.ts`.
 4. **Vocabulary everywhere.** All user-facing copy goes through i18n keys that interpolate entity labels (`"New {{entity.deal.singular}}"`). Never put an article before an entity name ("a/an Member").
 5. **Fixed core entities + custom fields.** No dynamic "define any entity" engine. Industry tables ship as modules (`m_<key>_*` tables).

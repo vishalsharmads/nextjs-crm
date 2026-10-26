@@ -8,6 +8,7 @@ import { AcceptInvitePage, ForgotPasswordPage, LoginPage, ResetPasswordPage } fr
 import { SettingsLayout } from '@/features/settings/layout';
 import { RecordListPage } from '@/features/records/list-page';
 import { RecordPage } from '@/features/records/record-page';
+import { TrashPage } from '@/features/records/trash-page';
 import { ModuleOutlet, PublicModuleOutlet } from '@/modules/loader';
 import { basePath } from '@/lib/app-url';
 
@@ -150,6 +151,7 @@ export const router = createBrowserRouter(
             { path: 'leads/:uuid', element: <RecordPage entity="lead" /> },
             { path: 'deals', element: page(<DealsPage />) },
             { path: 'deals/:uuid', element: <RecordPage entity="deal" /> },
+            { path: 'trash', element: page(<TrashPage />) },
             { path: 'tasks', element: page(<TasksPage />) },
             { path: 'calendar', element: page(<CalendarPage />) },
             {

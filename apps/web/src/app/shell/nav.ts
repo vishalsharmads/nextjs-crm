@@ -15,6 +15,7 @@ import {
   MapPin,
   Notebook,
   Package,
+  Plus,
   Receipt,
   Settings,
   Target,
@@ -150,4 +151,24 @@ export function buildNav(boot: BootstrapDto, t: (k: string) => string): NavItem[
       section: 'footer',
     });
   return items;
+}
+
+export interface CreateTarget {
+  key: string;
+  label: string;
+  to: string;
+  icon: LucideIcon;
+}
+
+/** "New <entity>" targets for the command palette, limited to what the user may create and has enabled. */
+export function buildCreateTargets(boot: BootstrapDto, t: (k: string) => string): CreateTarget[] {
+  const can = (p: string) => boot.access.isAdmin || hasPermission(boot.access.permissions, p);
+  const targets: CreateTarget[] = [];
+  const add = (key: string, route: string, permission: string) => {
+    if (can(permission)) targets.push({ key, label: t(`create.${key}`), to: `${route}?new=1`, icon: Plus });
+  };
+  add('contact', '/contacts', 'core.contacts.create');
+  add('organization', '/organizations', 'core.organizations.create');
+  if (boot.settings.features.leads) add('lead', '/leads', 'core.leads.create');
+  return targets;
 }

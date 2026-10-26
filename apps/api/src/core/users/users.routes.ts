@@ -14,6 +14,8 @@ import { burnUserTokens, createOneTimeToken } from '../auth/tokens';
 import { assertCanAssignRoles, assertCanGrant, assertCanManageUser } from '../rbac/grants';
 import { escapeLike } from '../records/filters';
 import { sendTemplatedEmail } from '../mail/templates';
+import { recordDefs } from '../records/registry';
+import { emitRecordEvent } from '../records/service';
 
 const uuidParam = z.object({ uuid: z.uuid() });
 
@@ -259,6 +261,54 @@ export const usersRoutes = defineRoutes('/users', ['users'])
         });
       });
       return userDto(u.id);
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/:uuid/transfer-records',
+    permission: 'core.users.manage',
+    summary: "Hand a user's records (owner and assignee columns) to another active user",
+    params: uuidParam,
+    body: z.object({ toUuid: z.uuid() }),
+    handler: async ({ ctx, user, params, body }) => {
+      const from = await db('users').where({ uuid: params.uuid }).whereNull('deleted_at').first();
+      if (!from) throw notFound('User');
+      const to = await db('users').where({ uuid: body.toUuid }).whereNull('deleted_at').first();
+      if (!to) throw notFound('User');
+      if (from.id === to.id) throw new AppError('VALIDATION_FAILED', 'Choose a different user');
+      if (to.status !== 'active') throw new AppError('VALIDATION_FAILED', 'The new owner must be active');
+      await assertCanManageUser(user, from.id);
+      const moved: Record<string, number> = {};
+      const changed: { def: (typeof recordDefs)[keyof typeof recordDefs]; uuid: string; column: string }[] =
+        [];
+      await db.transaction(async (trx) => {
+        for (const def of Object.values(recordDefs)) {
+          let count = 0;
+          for (const col of def.ownerColumns) {
+            const column = col.split('.')[1]!;
+            const rows = (await trx(def.table).where(column, from.id).select('uuid')) as { uuid: string }[];
+            if (!rows.length) continue;
+            count += await trx(def.table)
+              .where(column, from.id)
+              .update({ [column]: to.id, updated_at: new Date() });
+            for (const r of rows) changed.push({ def, uuid: r.uuid, column });
+          }
+          if (count) moved[def.entity] = count;
+        }
+        await audit(trx, ctx, {
+          action: 'user.records_transferred',
+          entity: 'user',
+          entityId: from.id,
+          entityUuid: from.uuid,
+          diff: { to: to.uuid, moved },
+        });
+      });
+      // After commit, so webhooks and automations see the new owner like any other update.
+      for (const c of changed)
+        await emitRecordEvent(c.def, 'updated', { uuid: c.uuid }, user, {
+          [c.column]: { from: from.uuid, to: to.uuid },
+        });
+      return { moved };
     },
   })
   .add({

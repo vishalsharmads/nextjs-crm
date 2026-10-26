@@ -4,7 +4,7 @@ import { Columns3, Download, Plus, Rows3, Rows4, Search, Inbox, Upload } from 'l
 import { buildUrl } from '@/lib/api';
 import type { CoreEntity, FilterCondition } from '@app/shared';
 import { useBranding } from '@/app/branding';
-import { useBoot, useCan } from '@/app/session';
+import { useBoot, useCan, useT } from '@/app/session';
 import { setDocumentTitle } from '@/theme/apply';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,6 +73,7 @@ function useListState() {
     page: Number(params.get('page') ?? 1),
     view: params.get('view'),
     peek: params.get('peek'),
+    create: params.get('new') === '1',
     conditions,
     set,
     setConditions: (c: FilterCondition[]) => set({ filter: c.length ? JSON.stringify({ and: c }) : null }),
@@ -91,6 +92,7 @@ export function RecordListPage({
   const config = useEntityConfig(entity);
   const boot = useBoot();
   const can = useCan();
+  const tr = useT();
   const navigate = useNavigate();
   const { branding } = useBranding();
   const state = useListState();
@@ -102,6 +104,13 @@ export function RecordListPage({
   );
   const [search, setSearch] = useState(state.q);
 
+  const canCreate = can(`${config.resource}.create`);
+  useEffect(() => {
+    if (state.create) {
+      if (canCreate) setCreating(true);
+      state.set({ new: null });
+    }
+  }, [state, canCreate]);
   useEffect(() => setDocumentTitle(config.plural, branding.appName), [config.plural, branding.appName]);
   useEffect(() => {
     const t = setTimeout(() => {
@@ -149,7 +158,6 @@ export function RecordListPage({
     [columnIds, byKey],
   );
 
-  const canCreate = can(`${config.resource}.create`);
   const openCreate = useCallback(() => canCreate && setCreating(true), [canCreate]);
   useHotkeys({ c: openCreate });
   usePaletteCommands(
@@ -159,7 +167,7 @@ export function RecordListPage({
           ? [
               {
                 id: `create:${entity}`,
-                label: `New ${config.singular}`,
+                label: tr(`create.${entity}`),
                 group: 'Create',
                 icon: Plus,
                 shortcut: 'c',
@@ -167,7 +175,7 @@ export function RecordListPage({
               },
             ]
           : [],
-      [canCreate, entity, config.singular],
+      [canCreate, entity, tr],
     ),
   );
 
@@ -183,7 +191,7 @@ export function RecordListPage({
             {canCreate ? (
               <Tooltip content="Shortcut: c">
                 <Button variant="primary" onClick={openCreate}>
-                  <Plus /> New {config.singular}
+                  <Plus /> {tr(`create.${entity}`)}
                 </Button>
               </Tooltip>
             ) : null}
@@ -305,7 +313,7 @@ export function RecordListPage({
                 action={
                   canCreate ? (
                     <Button variant="primary" onClick={openCreate}>
-                      <Plus /> New {config.singular}
+                      <Plus /> {tr(`create.${entity}`)}
                     </Button>
                   ) : undefined
                 }

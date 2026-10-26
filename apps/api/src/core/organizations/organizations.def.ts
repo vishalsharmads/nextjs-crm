@@ -27,6 +27,7 @@ export const organizationsDef: ResourceDef<Row, OrganizationDto> = {
   entity: 'organization',
   table: 'organizations',
   resource: 'core.organizations',
+  mergeable: true,
   ownerColumns: ['organizations.owner_id'],
   fulltext: ['organizations.name', 'organizations.domain'],
   likeColumns: ['organizations.name', 'organizations.domain'],
