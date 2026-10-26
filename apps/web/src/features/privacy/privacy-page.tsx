@@ -132,6 +132,7 @@ export function PrivacyPage() {
         )}
       </Pane>
       <FindPersonPane />
+      <RetentionPane />
       {creating ? (
         <NewRequestDialog onClose={() => setCreating(false)} onCreated={(uuid) => open(uuid)} />
       ) : null}
@@ -614,5 +615,85 @@ export function ErasureReport({ report }: { report: ErasureReportDto }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+const HOUSEKEEPING_LABEL: Record<string, string> = {
+  sessionsDays: 'Ended sessions',
+  jobsDays: 'Finished jobs',
+  webhookDeliveriesDays: 'Webhook deliveries',
+  notificationsDays: 'Read notifications',
+  automationRunsDays: 'Automation logs',
+  deletedFilesDays: 'Deleted files',
+};
+
+interface RetentionPreview {
+  rules: {
+    rule: { entity: DataSubjectEntity; condition: string; days: number; action: string };
+    matches: number;
+  }[];
+  housekeeping: Record<string, number>;
+}
+
+function RetentionPane() {
+  const qc = useQueryClient();
+  const contact = useEntityConfig('contact');
+  const lead = useEntityConfig('lead');
+  const q = useQuery({
+    queryKey: ['privacy', 'retention'],
+    queryFn: () => apiGet<RetentionPreview>('/privacy/retention/preview'),
+  });
+  const run = useMutation({
+    mutationFn: () => apiPost('/privacy/retention/run'),
+    onSuccess: () => {
+      toast.success('Retention applied');
+      void qc.invalidateQueries({ queryKey: ['privacy', 'retention'] });
+      void qc.invalidateQueries({ queryKey: ['records'] });
+    },
+  });
+  const pending = q.data
+    ? q.data.rules.reduce((n, r) => n + r.matches, 0) +
+      Object.values(q.data.housekeeping).reduce((n, v) => n + v, 0)
+    : 0;
+  return (
+    <Pane
+      title="Retention"
+      actions={
+        <Button disabled={!pending} loading={run.isPending} onClick={() => run.mutate()}>
+          Run now
+        </Button>
+      }
+    >
+      {q.isPending ? (
+        <Skeleton className="h-20" />
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => q.refetch()} />
+      ) : (
+        <div className="flex flex-col gap-3 text-sm">
+          {q.data.rules.length ? (
+            <ul className="flex flex-col gap-1">
+              {q.data.rules.map(({ rule, matches }, i) => (
+                <li key={i} className="flex justify-between gap-3">
+                  <span>
+                    {rule.action === 'delete' ? 'Delete' : 'Erase'}{' '}
+                    {(rule.entity === 'contact' ? contact : lead).plural.toLowerCase()} (
+                    {rule.condition.replace('_', ' ')}, {rule.days} days)
+                  </span>
+                  <span className="tabular">{matches} now</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted">No retention rules yet. Add them under Settings → Compliance.</p>
+          )}
+          <p className="text-xs text-muted">
+            Housekeeping due now:{' '}
+            {Object.entries(q.data.housekeeping)
+              .map(([k, n]) => `${HOUSEKEEPING_LABEL[k] ?? k} ${n}`)
+              .join(' · ')}
+          </p>
+        </div>
+      )}
+    </Pane>
   );
 }
