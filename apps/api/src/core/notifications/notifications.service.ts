@@ -3,6 +3,7 @@ import { env } from '../../config/env';
 import { logger } from '../../lib/logger';
 import { newUuid } from '../../lib/ids';
 import { sendTemplatedEmail } from '../mail/templates';
+import { effectiveCompliance } from '../settings/settings.service';
 
 export interface NotifyInput {
   type: string;
@@ -44,10 +45,13 @@ export async function notify(
   const prefs = (user.preferences ?? {}) as Prefs;
   if (input.email && prefs.emailNotifications !== false) {
     // Email after commit, best-effort: a mail outage must not roll back the business change.
+    // Minimal mode (forced by the health data profile): email leaves the system, so it carries no
+    // names or details; the in-app notification, behind sign-in, keeps them.
+    const minimal = (await effectiveCompliance()).notificationEmailMinimal;
     setImmediate(() => {
       sendTemplatedEmail('notification.generic', user.email, {
-        title: input.title,
-        body: input.body ?? '',
+        title: minimal ? 'You have a new notification' : input.title,
+        body: minimal ? 'Sign in to see the details.' : (input.body ?? ''),
         link: input.link ? `${env.APP_URL}${input.link}` : '',
       })
         .then(() => db('notifications').where({ uuid }).update({ emailed_at: new Date() }))

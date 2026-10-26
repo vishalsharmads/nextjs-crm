@@ -1,6 +1,7 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import { env } from '../config/env';
 import { logger } from './logger';
+import { sha256 } from './crypto';
 
 let transporter: Transporter | null = null;
 
@@ -47,7 +48,8 @@ export async function sendMail(mail: OutgoingMail) {
       headers: mail.headers,
     });
   } catch (err) {
-    logger.error({ err, to: mail.to }, 'Failed to send mail');
+    // The address is personal data: log a short hash to correlate failures, not the address.
+    logger.error({ err, to: sha256(mail.to.toLowerCase()).slice(0, 12) }, 'Failed to send mail');
     throw err;
   }
 }

@@ -10,6 +10,34 @@ import { consentPurposeSchema } from './privacy';
 export const COMPLIANCE_PROFILES = ['standard', 'privacy', 'hipaa'] as const;
 export type ComplianceProfile = (typeof COMPLIANCE_PROFILES)[number];
 
+export const RETENTION_CONDITIONS = ['deleted', 'inactive', 'lead_closed'] as const;
+export type RetentionCondition = (typeof RETENTION_CONDITIONS)[number];
+
+export const retentionRuleSchema = z
+  .object({
+    entity: z.enum(['contact', 'lead']),
+    /** deleted: in the bin; inactive: not updated and no activity; lead_closed: converted or unqualified. */
+    condition: z.enum(RETENTION_CONDITIONS),
+    days: z.number().int().min(1).max(36500),
+    action: z.enum(['anonymize', 'delete']),
+  })
+  .refine((r) => r.condition !== 'lead_closed' || r.entity === 'lead', {
+    message: 'Only leads can be closed',
+    path: ['condition'],
+  });
+export type RetentionRule = z.infer<typeof retentionRuleSchema>;
+
+/** How long operational records that copy personal data are kept. */
+export const housekeepingSchema = z.object({
+  sessionsDays: z.number().int().min(1).max(3650).default(30),
+  jobsDays: z.number().int().min(1).max(3650).default(30),
+  webhookDeliveriesDays: z.number().int().min(1).max(3650).default(90),
+  notificationsDays: z.number().int().min(1).max(3650).default(90),
+  automationRunsDays: z.number().int().min(1).max(3650).default(180),
+  deletedFilesDays: z.number().int().min(1).max(3650).default(30),
+});
+export type Housekeeping = z.infer<typeof housekeepingSchema>;
+
 export const complianceSettingsSchema = z.object({
   profile: z.enum(COMPLIANCE_PROFILES).default('standard'),
   /** Sign out after this many minutes without activity. 0 = off (the security idle days still apply). */
@@ -36,6 +64,13 @@ export const complianceSettingsSchema = z.object({
     .max(30)
     .default([])
     .refine((list) => new Set(list.map((p) => p.key)).size === list.length, 'Purpose keys must be unique'),
+  /** Records erased automatically once they meet a rule (storage limitation). */
+  retentionRules: z.array(retentionRuleSchema).max(20).default([]),
+  housekeeping: housekeepingSchema.default(housekeepingSchema.parse({})),
+  /** Webhooks send ids and changed field names only; receivers fetch the record through the API. */
+  webhookMinimal: z.boolean().default(false),
+  /** Notification emails say only that something needs attention, with a link: no names or details. */
+  notificationEmailMinimal: z.boolean().default(false),
   /** Shown on the sign-in screen (for example an authorized-use warning). */
   loginNotice: z.string().trim().max(2000).default(''),
 });
@@ -76,6 +111,8 @@ export const PROFILE_FLOORS: Record<ComplianceProfile, ProfileFloors> = {
       sessionMaxHours: { kind: 'atMost', value: 12 },
       apiKeyMaxDays: { kind: 'atMost', value: 365 },
       accessLogging: { kind: 'on' },
+      webhookMinimal: { kind: 'on' },
+      notificationEmailMinimal: { kind: 'on' },
       // HIPAA keeps required documentation for six years.
       auditRetentionDays: { kind: 'keepAtLeast', value: 2190 },
       dsarDueDays: { kind: 'atMost', value: 30 },
