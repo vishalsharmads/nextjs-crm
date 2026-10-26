@@ -6,6 +6,7 @@ import type { DealDto } from '@app/shared';
 vi.mock('@/app/session', () => ({
   useBoot: () => ({ settings: { deals: { lostReasons: [] } } }),
   useCan: () => () => true,
+  useT: () => (key: string) => key,
 }));
 vi.mock('@/lib/api', () => ({ apiGet: vi.fn(), apiPatch: vi.fn() }));
 

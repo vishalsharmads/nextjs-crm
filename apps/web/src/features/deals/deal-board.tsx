@@ -26,7 +26,7 @@ import { apiGet } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { cn } from '@/lib/cn';
 import { formatDate, formatMoney } from '@/lib/format';
-import { useBoot, useCan } from '@/app/session';
+import { useBoot, useCan, useT } from '@/app/session';
 import { Avatar, ErrorState, Skeleton } from '@/components/ui/misc';
 import { LostReasonDialog } from './lost-reason-dialog';
 import { patchDealStage } from './stage-move';
@@ -64,6 +64,7 @@ export function DealBoard({
 }) {
   const qc = useQueryClient();
   const can = useCan();
+  const t = useT();
   const boot = useBoot();
   const params = {
     pipeline: pipelineUuid,
@@ -205,7 +206,7 @@ export function DealBoard({
       <div
         className="flex h-full min-h-0 gap-3 overflow-x-auto p-4 md:px-6"
         role="list"
-        aria-label="Pipeline stages"
+        aria-label={t('common.pipelineStages')}
       >
         {board.data.columns.map((c) => (
           <BoardColumn

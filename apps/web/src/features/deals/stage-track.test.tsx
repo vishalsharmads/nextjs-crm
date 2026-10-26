@@ -52,6 +52,7 @@ vi.mock('@/app/session', () => ({
     settings: { deals: { lostReasons } },
   }),
   useCan: () => (p: string) => permissions.includes(p),
+  useT: () => (key: string) => (key === 'common.pipelineStages' ? 'Pipeline stages' : key),
 }));
 vi.mock('@/lib/api', () => ({ apiPatch: (...a: unknown[]) => patch(...a) }));
 vi.mock('sonner', () => ({

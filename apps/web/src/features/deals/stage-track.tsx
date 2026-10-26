@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import type { DealDto, StageDto } from '@app/shared';
 import { qk } from '@/lib/query-keys';
 import { cn } from '@/lib/cn';
-import { useBoot, useCan } from '@/app/session';
+import { useBoot, useCan, useT } from '@/app/session';
 import { Badge } from '@/components/ui/misc';
 import { LostReasonDialog } from './lost-reason-dialog';
 import { patchDealStage } from './stage-move';
@@ -16,6 +16,7 @@ import { patchDealStage } from './stage-move';
 export function StageTrack({ deal }: { deal: DealDto }) {
   const qc = useQueryClient();
   const can = useCan();
+  const t = useT();
   const { pipelines, settings } = useBoot();
   const [lostFor, setLostFor] = useState<StageDto | null>(null);
   const canMove = can('core.deals.update');
@@ -89,7 +90,7 @@ export function StageTrack({ deal }: { deal: DealDto }) {
 
   return (
     <>
-      <ol aria-label="Pipeline stages" className="-mx-1 flex gap-1 overflow-x-auto px-1 py-1">
+      <ol aria-label={t('common.pipelineStages')} className="-mx-1 flex gap-1 overflow-x-auto px-1 py-1">
         {stages.map((s, i) => {
           const current = s.uuid === deal.stage.uuid;
           const done = !deal.stage.isLost && currentIndex >= 0 && i < currentIndex;

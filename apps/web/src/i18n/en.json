@@ -41,7 +41,8 @@
     "showing": "{{from}}–{{to}} of {{total}}",
     "showEmptyFields_one": "Show {{count}} empty field",
     "showEmptyFields_other": "Show {{count}} empty fields",
-    "hideEmptyFields": "Hide empty fields"
+    "hideEmptyFields": "Hide empty fields",
+    "pipelineStages": "{{pipeline}} {{stagePluralLower}}"
   },
   "nav": {
     "home": "Home",
