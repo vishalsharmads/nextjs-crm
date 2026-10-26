@@ -43,8 +43,10 @@ test('creates a custom field and uses it on a new contact', async ({ page }) => 
   await page.getByRole('button', { name: 'Preferred language' }).click();
   await page.getByRole('option', { name: 'Spanish' }).click();
   await page.getByRole('button', { name: 'Create Contact' }).click();
-  await expect(page.getByRole('dialog')).toContainText('Spanish');
-  await expect(page.getByRole('dialog').getByRole('heading', { name: 'Lucia Playwright' })).toBeVisible();
+  // By name: the form and the combobox are still fading out for a moment, and are dialogs too.
+  const peek = page.getByRole('dialog', { name: 'Lucia Playwright' });
+  await expect(peek).toContainText('Spanish');
+  await expect(peek.getByRole('heading', { name: 'Lucia Playwright' })).toBeVisible();
 });
 
 test('moves a deal across stages on the board', async ({ page }) => {

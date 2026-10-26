@@ -212,6 +212,12 @@ html.dark {
 .anim-fade[data-state='closed'] {
   animation: fade-out 120ms var(--ease-out) forwards;
 }
+/* A closing overlay is on its way out: it must not catch clicks meant for what is behind it. */
+.anim-sheet[data-state='closed'],
+.anim-pop[data-state='closed'],
+.anim-fade[data-state='closed'] {
+  pointer-events: none;
+}
 /* A card that was just moved on the board: a ring and tint that fade out, so the eye can follow it. */
 @keyframes card-settle {
   from {
