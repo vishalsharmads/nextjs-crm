@@ -9,11 +9,18 @@ export const isEncryptedValue = (v: unknown): v is string =>
 export const encryptValue = (v: unknown) => `${ENC_PREFIX}${encrypt(JSON.stringify(v))}`;
 export const decryptValue = (v: string): unknown => JSON.parse(decrypt(v.slice(ENC_PREFIX.length)));
 
-/** Plain values for privileged paths (data subject export, reveal). */
+/** Plain values for privileged paths (data subject export, lead conversion). */
 export function decryptCustom(custom: unknown): Custom {
   const src = (custom && typeof custom === 'object' ? custom : {}) as Custom;
   return Object.fromEntries(
-    Object.entries(src).map(([k, v]) => [k, isEncryptedValue(v) ? decryptValue(v) : v]),
+    Object.entries(src).map(([k, v]) => {
+      if (!isEncryptedValue(v)) return [k, v];
+      try {
+        return [k, decryptValue(v)];
+      } catch {
+        return [k, '[unreadable]'];
+      }
+    }),
   );
 }
 
@@ -55,6 +62,12 @@ export function prepareCustom(
   for (const [k, v] of Object.entries(patch)) {
     if (v === '' || (Array.isArray(v) && v.length === 0)) patch[k] = null;
   }
+  // The `enc:` prefix marks stored ciphertext, so people cannot type it into ordinary fields.
+  for (const [k, v] of Object.entries(patch))
+    if (!special.has(k) && isEncryptedValue(v))
+      throw new AppError('VALIDATION_FAILED', 'This value cannot start with "enc:"', [
+        { path: `custom.${k}`, message: 'Values cannot start with "enc:"' },
+      ]);
   const writable = defs.filter((d) => levels[d.key] === 'write');
   // Required fields are only enforced for people who can actually fill them in.
   const schema = buildCustomSchema(

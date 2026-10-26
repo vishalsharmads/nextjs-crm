@@ -2,7 +2,13 @@ import type { Response } from 'express';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify';
 import { z } from 'zod';
-import { filterSchema, normalizePhone, type CoreEntity, type CustomFieldDef } from '@app/shared';
+import {
+  SENSITIVE_MASK,
+  filterSchema,
+  normalizePhone,
+  type CoreEntity,
+  type CustomFieldDef,
+} from '@app/shared';
 import { db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
 import { enqueue, registerJob } from '../../lib/jobs';
@@ -406,6 +412,17 @@ registerJob('import', async (job, progress) => {
     errors: [] as { row: number; message: string; values: string[] }[],
   };
 
+  // Columns mapped to sensitive fields: never echo their values back in error reports.
+  const sensitiveCols = new Set(
+    headers.flatMap((h, col) => {
+      const target = input.mapping[h];
+      return target?.startsWith('custom.') &&
+        defs.some((d) => d.key === target.slice(7) && d.sensitivity === 'special')
+        ? [col]
+        : [];
+    }),
+  );
+
   for (const [i, cells] of rows.entries()) {
     const core: Record<string, unknown> = {};
     const custom: Record<string, unknown> = {};
@@ -489,7 +506,7 @@ registerJob('import', async (job, progress) => {
           message: details?.length
             ? details.map((d) => `${d.path}: ${d.message}`).join('; ')
             : (err as Error).message,
-          values: cells,
+          values: cells.map((c, col) => (sensitiveCols.has(col) && c ? SENSITIVE_MASK : c)),
         });
       }
     }

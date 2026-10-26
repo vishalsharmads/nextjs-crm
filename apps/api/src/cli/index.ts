@@ -342,15 +342,20 @@ const commands: Record<string, Command> = {
   },
 
   async 'crypto:rotate'() {
-    const counts = await rotateKeys();
-    for (const [k, n] of Object.entries(counts)) out(`${k}: ${n} re-encrypted`);
-    out(
-      'Done. Remove the old keys from ENCRYPTION_KEYS only after backups older than this run have expired.',
-    );
+    const r = await rotateKeys();
+    for (const [k, n] of Object.entries(r.done)) out(`${k}: ${n} re-encrypted`);
+    for (const [k, n] of Object.entries(r.failed)) out(`FAILED ${k}: ${n} (left as they were; see the log)`);
+    for (const key of r.leftovers) out(`Remove the old copy by hand: ${key}`);
+    if (Object.keys(r.failed).length) process.exitCode = 2;
+    else out('Done. Remove old keys from ENCRYPTION_KEYS only after backups that need them have expired.');
   },
 
   async 'files:encrypt-existing'() {
-    out(`Encrypted ${await encryptExistingFiles()} file(s).`);
+    const r = await encryptExistingFiles();
+    out(`Encrypted ${r.done.files ?? 0} file(s).`);
+    if (r.failed.files) out(`FAILED: ${r.failed.files} file(s) could not be read (see the log).`);
+    for (const key of r.leftovers) out(`Remove the unencrypted original by hand: ${key}`);
+    if (r.failed.files || r.leftovers.length) process.exitCode = 2;
   },
 
   async 'audit:seal'() {

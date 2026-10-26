@@ -130,7 +130,7 @@ describe('upload encryption and key rotation', () => {
     const { body: link } = await admin.get(`/files/${sealedUuid}/url`).expect(200);
     expect((await admin.agent.get(link.url).expect(200)).text).toBe('sealed text');
 
-    expect(await encryptExistingFiles()).toBeGreaterThanOrEqual(1);
+    expect((await encryptExistingFiles()).done.files).toBeGreaterThanOrEqual(1);
     expect((await db('files').where({ uuid: plainUuid }).first()).enc_kid).toBe('k0');
 
     const previous = env.ENCRYPTION_KEYS;
@@ -138,8 +138,9 @@ describe('upload encryption and key rotation', () => {
     resetKeyRing();
     try {
       const counts = await rotateKeys();
-      expect(counts.files).toBeGreaterThanOrEqual(2);
-      expect(counts['contacts.custom']).toBeGreaterThanOrEqual(1);
+      expect(counts.done.files).toBeGreaterThanOrEqual(2);
+      expect(counts.done['contacts.custom']).toBeGreaterThanOrEqual(1);
+      expect(counts.failed).toEqual({});
       expect((await db('files').where({ uuid: plainUuid }).first()).enc_kid).toBe('k1');
       const row = await db('contacts').where({ uuid: c.body.uuid }).first('custom');
       expect(String(row.custom.diagnosis)).toMatch(/^enc:v1\.k1\./);
@@ -171,5 +172,53 @@ describe('data map', () => {
     });
     expect(map.body.recipients[0].name).toMatch(/SMTP/);
     expect(map.body.system.map((s: { area: string }) => s.area)).toContain('Audit log');
+  });
+});
+
+describe('review fixes: encryption edge cases', () => {
+  it('refuses the ciphertext prefix in ordinary fields', async () => {
+    const f = await admin
+      .post('/custom-fields', { entity: 'contact', key: 'nickname_x', label: 'Nickname', type: 'text' })
+      .expect(201);
+    const res = await admin.post('/contacts', { firstName: 'Tricky', custom: { nickname_x: 'enc:hello' } });
+    expect(res.status).toBe(422);
+    await admin.post(`/custom-fields/${f.body.uuid}/archive`).expect(200);
+  });
+
+  it('carries the plain sensitive value through lead conversion', async () => {
+    const lf = await admin
+      .post('/custom-fields', {
+        entity: 'lead',
+        key: 'diagnosis',
+        label: 'Diagnosis',
+        type: 'textarea',
+        sensitivity: 'special',
+      })
+      .expect(201);
+    const lead = await admin
+      .post('/leads', { firstName: 'Convert', custom: { diagnosis: 'Migraine' } })
+      .expect(201);
+    const converted = await admin.post(`/leads/${lead.body.uuid}/convert`, {}).expect(200);
+    const contactUuid = converted.body.contactUuid as string;
+    const shown = await admin
+      .get(`/custom-fields/reveal?entity=contact&uuid=${contactUuid}&key=diagnosis`)
+      .expect(200);
+    expect(shown.body.value).toBe('Migraine');
+    await admin.post(`/custom-fields/${lf.body.uuid}/archive`).expect(200);
+  });
+
+  it('reveals only inside the caller’s record scope, and never caches', async () => {
+    const c = await admin
+      .post('/contacts', { firstName: 'Out of scope', custom: { diagnosis: 'Private' } })
+      .expect(201);
+    const role = await createRole(['core.contacts.view', 'core.fields.reveal'], { 'core.contacts': 'own' });
+    const { client } = await clientWithRoles([role]);
+    expect(
+      (await client.get(`/custom-fields/reveal?entity=contact&uuid=${c.body.uuid}&key=diagnosis`)).status,
+    ).toBe(404);
+    const ok = await admin
+      .get(`/custom-fields/reveal?entity=contact&uuid=${c.body.uuid}&key=diagnosis`)
+      .expect(200);
+    expect(ok.headers['cache-control']).toBe('no-store');
   });
 });

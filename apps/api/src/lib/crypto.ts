@@ -53,15 +53,17 @@ function keyFor(kid: string): Buffer {
   return k.key;
 }
 
-/** Ciphertext written before the key ring had no key id; it was always ENCRYPTION_KEY. */
+const ZERO_KEY = '0'.repeat(64);
+
+/**
+ * Ciphertext written before the key ring had no key id; it was always ENCRYPTION_KEY. The all-zero
+ * development default is never accepted once a real key ring exists (anyone could forge it).
+ */
 function legacyKeys(): Buffer[] {
+  const keys = keyRing().map((k) => k.key);
+  if (env.ENCRYPTION_KEY === ZERO_KEY && env.ENCRYPTION_KEYS) return keys;
   const legacy = Buffer.from(env.ENCRYPTION_KEY, 'hex');
-  return [
-    legacy,
-    ...keyRing()
-      .map((k) => k.key)
-      .filter((k) => !k.equals(legacy)),
-  ];
+  return [legacy, ...keys.filter((k) => !k.equals(legacy))];
 }
 
 /** AES-256-GCM. Output: `v1.<kid>.<iv>.<tag>.<ciphertext>` (base64url parts). */
@@ -74,7 +76,9 @@ export function encrypt(plain: string): string {
 }
 
 function open(key: Buffer, iv: Buffer, tag: Buffer, data: Buffer): Buffer {
-  const decipher = createDecipheriv('aes-256-gcm', key, iv);
+  // Full-length tags only: a truncated tag would weaken forgery resistance.
+  if (tag.length !== 16) throw new Error('Malformed ciphertext');
+  const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(data), decipher.final()]);
 }

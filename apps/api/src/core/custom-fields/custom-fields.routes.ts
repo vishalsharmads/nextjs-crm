@@ -66,7 +66,11 @@ export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields
     permission: 'core.fields.reveal',
     query: z.object({ entity: z.enum(CUSTOMIZABLE_ENTITIES), uuid: z.uuid(), key: fieldKeySchema }),
     summary: 'Show one sensitive field value (always written to the access log)',
-    handler: ({ ctx, user, query }) => revealField(ctx, user, query.entity, query.uuid, query.key),
+    handler: ({ ctx, user, query, res }) => {
+      // A decrypted value must not be kept by browsers or proxies.
+      res.set('Cache-Control', 'no-store');
+      return revealField(ctx, user, query.entity, query.uuid, query.key);
+    },
   })
   .add({
     method: 'get',

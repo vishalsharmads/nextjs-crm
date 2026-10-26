@@ -105,7 +105,7 @@ export async function dataMap(): Promise<DataMapDto> {
   const hooks = await db('webhooks').where({ active: true }).select('name', 'url');
   const recipients = [
     { name: 'Email delivery (SMTP)', detail: env.SMTP_HOST },
-    ...hooks.map((w) => ({ name: `Webhook: ${w.name as string}`, detail: new URL(w.url as string).host })),
+    ...hooks.map((w) => ({ name: `Webhook: ${w.name as string}`, detail: hostOf(w.url as string) })),
   ];
   const mailboxes = Number(
     ((await db('mail_accounts').where({ active: true }).count({ n: '*' }).first()) as { n: number }).n,
@@ -120,4 +120,12 @@ export async function dataMap(): Promise<DataMapDto> {
     recipients,
     retentionRules: c.retentionRules.length,
   };
+}
+
+function hostOf(url: string) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }

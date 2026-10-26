@@ -25,11 +25,11 @@ export async function revealField(
   const field = (await getDefinitions(entity)).find((d) => d.key === key && d.sensitivity === 'special');
   if (!field || fieldLevel(field, user) === 'hidden') throw notFound('Field');
   const raw = (row.custom as Record<string, unknown> | null)?.[key];
-  const value = isEncryptedValue(raw) ? decryptValue(raw) : (raw ?? null);
+  // Log first, and fail closed: no record of the reveal, no value.
   await logAccess(
     ctx,
     { action: 'reveal', entity, entityId: row.id as number, entityUuid: uuid, detail: { field: key } },
-    { always: true },
+    { always: true, required: true },
   );
-  return { value };
+  return { value: isEncryptedValue(raw) ? decryptValue(raw) : (raw ?? null) };
 }

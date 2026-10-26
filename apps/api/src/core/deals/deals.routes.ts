@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { dealMoveSchema, leadConvertSchema, type DealDto } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
+import { decryptCustom } from '../records/custom';
 import { AppError, notFound } from '../../lib/errors';
 import { audit } from '../audit/audit.service';
 import { applyScope, assertCan } from '../rbac/access';
@@ -184,7 +185,9 @@ export const leadsRoutes = [
         .transaction(async (trx) => {
           const lead = await getRow(leadsDef, user, params.uuid, trx, { forUpdate: true });
           if (lead.converted_at) throw new AppError('CONFLICT', 'This lead was already converted');
-          const leadCustom = (lead.custom as Record<string, unknown>) ?? {};
+          // Sensitive values are stored encrypted: carry the plain value; the target encrypts it again
+          // if it is sensitive too.
+          const leadCustom = decryptCustom(lead.custom);
           // Custom values carry over to fields with the same key on the new records.
           const carry = async (entity: 'contact' | 'organization' | 'deal') => {
             const keys = (await trx('custom_field_definitions')

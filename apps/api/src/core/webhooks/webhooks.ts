@@ -150,7 +150,13 @@ onEvent(async (e: DomainEvent) => {
     const uuid = newUuid();
     // Minimal mode (forced by the health data profile): no personal data leaves in webhooks.
     const data = minimal
-      ? { entity: e.entity, uuid: e.uuid, changedFields: Object.keys(e.changes ?? {}) }
+      ? {
+          entity: e.entity,
+          uuid: e.uuid, // Custom field names can themselves be telling (a "diagnosis" changed): report "custom" only.
+          changedFields: [
+            ...new Set(Object.keys(e.changes ?? {}).map((k) => (k.startsWith('custom.') ? 'custom' : k))),
+          ],
+        }
       : { entity: e.entity, uuid: e.uuid, record: e.record, changes: e.changes ?? null };
     const payload = { id: uuid, type: e.type, createdAt: e.at, data };
     const [id] = await db('webhook_deliveries').insert({
