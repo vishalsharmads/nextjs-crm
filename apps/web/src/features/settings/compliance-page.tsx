@@ -19,11 +19,11 @@ const PROFILE_COPY: Record<ComplianceProfile, { label: string; help: string }> =
   },
   privacy: {
     label: 'Privacy (GDPR, UK GDPR, DPDP, CCPA/CPRA, PIPEDA, LGPD)',
-    help: 'For workspaces holding personal data under privacy laws.',
+    help: 'For workspaces holding personal data under privacy laws. Keeps audit and access logs for at least a year.',
   },
   hipaa: {
     label: 'Health data (HIPAA)',
-    help: 'Everything in Privacy, plus two-factor authentication for everyone, sign-out after 15 minutes idle, sessions of at most 12 hours and a stronger password policy.',
+    help: 'Everything in Privacy, plus two-factor authentication for everyone, sign-out after 15 minutes idle, sessions of at most 12 hours, a stronger password policy, access logging and six years of log retention.',
   },
 };
 
@@ -89,6 +89,39 @@ function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
           <Field label="Maximum session length (hours)" help={hint('sessionMaxHours') ?? '0 turns this off.'}>
             {(p) => (
               <Input {...p} type="number" min={0} max={720} {...form.register('sessionMaxHours', num)} />
+            )}
+          </Field>
+        </div>
+      </Pane>
+      <Pane title="Audit and access logs">
+        <div className="flex flex-col gap-4">
+          <label className="flex items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 accent-[var(--primary)]"
+              {...form.register('accessLogging')}
+            />
+            Record who views records, downloads files and exports data
+            {hint('accessLogging') ? (
+              <span className="text-xs text-muted">({hint('accessLogging')})</span>
+            ) : null}
+          </label>
+          <Field
+            label="Keep log entries for (days)"
+            help={
+              hint('auditRetentionDays') ??
+              'Older entries are deleted after their day is sealed. 0 keeps them forever.'
+            }
+          >
+            {(p) => (
+              <Input
+                {...p}
+                type="number"
+                min={0}
+                max={36500}
+                className="sm:max-w-48"
+                {...form.register('auditRetentionDays', num)}
+              />
             )}
           </Field>
         </div>

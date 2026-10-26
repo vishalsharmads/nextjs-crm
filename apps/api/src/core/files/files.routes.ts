@@ -8,6 +8,7 @@ import { env } from '../../config/env';
 import { AppError, notFound } from '../../lib/errors';
 import { storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
+import { logAccess } from '../audit/access-log';
 import { assertCan, can } from '../rbac/access';
 import { getRow } from '../records/service';
 import { recordDefs } from '../records/registry';
@@ -93,9 +94,15 @@ export const filesRoutes = defineRoutes('/files', ['files'])
     permission: 'authenticated',
     query: z.object({ token: z.string().max(500), inline: z.coerce.boolean().optional() }),
     summary: 'Download via a short-lived signed link',
-    handler: async ({ res, user, query }) => {
+    handler: async ({ ctx, res, user, query }) => {
       const uuid = verifyFileToken(query.token);
       const file = await fileWithAccess(user, uuid);
+      await logAccess(ctx, {
+        action: 'download',
+        entity: file.entity,
+        entityId: file.entity_id,
+        detail: { file: file.uuid },
+      });
       const inline = query.inline && (file.mime.startsWith('image/') || file.mime === 'application/pdf');
       res.set('Content-Type', file.mime);
       res.set('X-Content-Type-Options', 'nosniff');

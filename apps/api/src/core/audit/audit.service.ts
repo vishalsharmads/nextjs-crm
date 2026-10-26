@@ -9,9 +9,9 @@ export interface AuditEntry {
   diff?: unknown;
 }
 
-/** Append an audit row. Call inside the same transaction as the change it records. */
-export async function audit(conn: Db, ctx: RequestContext, entry: AuditEntry) {
-  await conn('audit_logs').insert({
+/** Who did it, as stored on audit and access log rows. */
+export function actorColumns(ctx: RequestContext) {
+  return {
     actor_id: ctx.user?.id ?? null,
     actor_type: ctx.user?.apiKeyId
       ? 'api_key'
@@ -20,6 +20,13 @@ export async function audit(conn: Db, ctx: RequestContext, entry: AuditEntry) {
         : ctx.requestId.startsWith('cli')
           ? 'cli'
           : 'system',
+  };
+}
+
+/** Append an audit row. Call inside the same transaction as the change it records. */
+export async function audit(conn: Db, ctx: RequestContext, entry: AuditEntry) {
+  await conn('audit_logs').insert({
+    ...actorColumns(ctx),
     action: entry.action,
     entity: entry.entity,
     entity_id: entry.entityId ?? null,

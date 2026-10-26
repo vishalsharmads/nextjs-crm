@@ -42,7 +42,7 @@ export function recordRoutes(def: ResourceDef, tag: string): RouteGroup {
       path: '/:uuid',
       permission: p('view'),
       params: uuidParam,
-      handler: ({ user, params }) => getRecord(def, user, params.uuid),
+      handler: ({ ctx, user, params }) => getRecord(def, user, params.uuid, ctx),
     })
     .add({
       method: 'patch',

@@ -1,31 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { anonymousClient, clientWithRoles, createRole, createUser, loginAs, type TestUser } from './helpers';
+import { describe, expect, it } from 'vitest';
+import {
+  anonymousClient,
+  clientWithRoles,
+  createRole,
+  createUser,
+  loginAs,
+  restoreSettingsAfterEach,
+  setSettingsGroup,
+  type TestUser,
+} from './helpers';
 import { db } from '../src/db/knex';
 import { totpAt } from '../src/lib/totp';
 import { clearSettingsCache } from '../src/core/settings/settings.service';
 
-// Settings are shared by every test file, so each test restores the groups it touches.
-const GROUPS = ['security', 'compliance'];
-let saved: { key: string; value: unknown }[] = [];
+restoreSettingsAfterEach(['security', 'compliance']);
 
-beforeEach(async () => {
-  saved = await db('settings').whereIn('key', GROUPS).select('key', 'value');
-});
-
-afterEach(async () => {
-  await db('settings').whereIn('key', GROUPS).delete();
-  for (const row of saved)
-    await db('settings').insert({ key: row.key, group: row.key, value: JSON.stringify(row.value) });
-  clearSettingsCache();
-});
-
-async function setCompliance(value: object) {
-  await db('settings')
-    .insert({ key: 'compliance', group: 'compliance', value: JSON.stringify(value) })
-    .onConflict('key')
-    .merge();
-  clearSettingsCache();
-}
+const setCompliance = (value: object) => setSettingsGroup('compliance', value);
 
 async function enrol(user: TestUser) {
   const c = await loginAs(user);

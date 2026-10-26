@@ -8,6 +8,7 @@ import { AppError } from '../../lib/errors';
 import { enqueue, registerJob } from '../../lib/jobs';
 import { storage } from '../../lib/storage';
 import type { AuthUser, RequestContext } from '../../http/context';
+import { logAccess } from '../audit/access-log';
 import { audit } from '../audit/audit.service';
 import { assertCan, loadAccess } from '../rbac/access';
 import { customContext } from '../records/common';
@@ -181,6 +182,7 @@ export async function exportCsv(
     entity,
     diff: { count, filter: query.filter ?? null, q: query.q ?? null },
   });
+  await logAccess(ctx, { action: 'export', entity, detail: { count } });
 }
 
 // ---------------- Import ----------------
