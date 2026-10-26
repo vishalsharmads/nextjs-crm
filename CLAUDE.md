@@ -86,6 +86,7 @@ npm run check:brand              # white-label grep over build output, templates
 npm run doctor                   # Node/MySQL versions, sql_mode, TRIGGER privilege, binlog, SMTP
 npm run cli -w @app/api -- user:reset-password --email=<email>
 npm run cli -w @app/api -- demo:seed [--password=..]   # one demo user per role; shown on sign-in only with DEMO_MODE=true
+npm run demo:reset -- --industry=<slug> [--yes]        # wipe the demo DB and install one industry with sample data (demo instances only)
 ```
 
 API tests drop and recreate `crm_test` on every run (`apps/api/test/global-setup.ts`). E2E (`npm run test:e2e`) drops and reinstalls `crm_e2e` and starts its own API (:4300) and web (:5300).
@@ -100,6 +101,7 @@ Run test suites one workspace at a time on this machine; running all three in pa
 - **Route order:** static paths (`/deals/board`, `/contacts/export`) must be registered before `/:uuid` routes. A test fails on shadowed routes.
 - **Domain events** (`core/events/events.ts`) are emitted by services after commit; webhooks and automations subscribe and enqueue jobs. New record types must emit created/updated/deleted.
 - **Jobs:** `enqueue`/`registerJob` in `lib/jobs.ts` (in-process, or BullMQ with `REDIS_URL`); recurring work uses `every()`, which takes a Redis lock per tick.
+- **`demo:reset` is guarded to demo instances** (`apps/api/src/cli/demo.ts`): `DEMO_MODE=true`, a database name containing `demo`, a `STORAGE_DIR` whose own folder name contains `demo` and which holds neither the app nor a home folder, and a database that is empty or carries the `demo_reset_marker` table (written right after emptying, so failed resets can be retried). `resetDemo` re-checks all of them itself. Keep every guard; it drops tables. Its test runs the CLI in a child process against `crm_test_demo`.
 - **Captured test mail is shared across test files:** filter by recipient (`takeMail().filter(m => m.to === …)`), never assert on the whole mailbox.
 - **Tests share one database:** a test that creates a _required_ custom field must archive it before it ends, or other files' creates fail.
 - **Modules** import only from `@app/api/module-api`; tables are `m_<key>_*`; list new modules in `apps/api/src/modules/installed.ts`.

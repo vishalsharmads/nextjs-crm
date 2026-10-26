@@ -77,6 +77,13 @@ export interface DemoAccount {
   password: string;
 }
 
+/** The industry a demo instance shows (set by `demo:reset`), only while DEMO_MODE=true. */
+export async function getDemoIndustry(conn: Db = db): Promise<string | null> {
+  if (!env.DEMO_MODE) return null;
+  const v = (await getRaw('demo', conn)) as { industry?: string } | undefined;
+  return v?.industry ?? null;
+}
+
 /**
  * Demo accounts for the sign-in screen. Two switches must both be on:
  * `DEMO_MODE=true` in the environment, and accounts stored by `npm run cli -- demo:seed` (or `demo:enable`).

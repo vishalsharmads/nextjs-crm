@@ -7,7 +7,7 @@ import { clearSettingsCache } from '../src/core/settings/settings.service';
 describe('demo accounts on the sign-in screen', () => {
   afterAll(async () => {
     env.DEMO_MODE = false;
-    await db('settings').where({ key: 'demo_login' }).delete();
+    await db('settings').whereIn('key', ['demo_login', 'demo']).delete();
     clearSettingsCache();
   });
 
@@ -40,5 +40,23 @@ describe('demo accounts on the sign-in screen', () => {
     expect((await client.get('/public/branding')).body.demoAccounts).toEqual([
       { label: 'Admin', email: 'old@demo.test', password: 'x' },
     ]);
+  });
+
+  it('tells the website which industry the demo shows, only in demo mode', async () => {
+    await db('settings')
+      .insert({
+        key: 'demo',
+        group: 'system',
+        value: JSON.stringify({ industry: 'law-firms' }),
+        is_public: false,
+      })
+      .onConflict('key')
+      .merge();
+    clearSettingsCache();
+    const client = await anonymousClient();
+    env.DEMO_MODE = false;
+    await client.get('/public/demo').expect(404);
+    env.DEMO_MODE = true;
+    expect((await client.get('/public/demo').expect(200)).body).toEqual({ industry: 'law-firms' });
   });
 });

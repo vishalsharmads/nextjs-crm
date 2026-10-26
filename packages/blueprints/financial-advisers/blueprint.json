@@ -1,0 +1,1631 @@
+{
+  "$schema": "../schema.json",
+  "key": "financial-advisers",
+  "name": "Financial advisers and mortgage brokers",
+  "version": "1.0.0",
+  "description": "Clients, lenders and applications for financial advisers and mortgage brokers, from discovery and fact find to settlement and annual review.",
+  "settings": {
+    "features": {
+      "leads": true
+    },
+    "general": {
+      "currency": "AUD"
+    },
+    "contacts": {
+      "sources": [
+        "Referral",
+        "Website",
+        "Real estate agent",
+        "Accountant",
+        "Existing client",
+        "Seminar",
+        "Social",
+        "Other"
+      ],
+      "lifecycleStatuses": [
+        "Prospect",
+        "Active client",
+        "Settled client",
+        "Former client",
+        "Lender representative"
+      ]
+    },
+    "deals": {
+      "lostReasons": [
+        "Went direct to lender",
+        "Chose another broker",
+        "Not approved",
+        "Rate not competitive",
+        "Deferred purchase",
+        "No response"
+      ]
+    }
+  },
+  "vocabulary": {
+    "contact": {
+      "singular": "Client",
+      "plural": "Clients"
+    },
+    "organization": {
+      "singular": "Lender",
+      "plural": "Lenders"
+    },
+    "deal": {
+      "singular": "Application",
+      "plural": "Applications"
+    }
+  },
+  "modules": ["documents", "portal", "quotes", "invoices", "contracts"],
+  "custom_field_groups": {
+    "contact": [
+      {
+        "key": "client_profile",
+        "label": "Client profile"
+      }
+    ],
+    "deal": [
+      {
+        "key": "loan",
+        "label": "Loan details"
+      }
+    ]
+  },
+  "custom_fields": {
+    "contact": [
+      {
+        "key": "client_type",
+        "label": "Client type",
+        "type": "select",
+        "group": "client_profile",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "first_home_buyer",
+            "label": "First home buyer"
+          },
+          {
+            "key": "upgrader",
+            "label": "Upgrader"
+          },
+          {
+            "key": "refinancer",
+            "label": "Refinancer"
+          },
+          {
+            "key": "investor",
+            "label": "Investor"
+          },
+          {
+            "key": "smsf_trustee",
+            "label": "SMSF trustee"
+          },
+          {
+            "key": "retiree",
+            "label": "Pre-retiree or retiree"
+          }
+        ]
+      },
+      {
+        "key": "fact_find_complete",
+        "label": "Fact find complete",
+        "type": "boolean",
+        "group": "client_profile",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "review_due",
+        "label": "Annual review due",
+        "type": "date",
+        "group": "client_profile",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ],
+    "deal": [
+      {
+        "key": "application_type",
+        "label": "Application type",
+        "type": "select",
+        "group": "loan",
+        "required": true,
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "purchase",
+            "label": "Home purchase"
+          },
+          {
+            "key": "refinance",
+            "label": "Refinance"
+          },
+          {
+            "key": "investment",
+            "label": "Investment loan"
+          },
+          {
+            "key": "construction",
+            "label": "Construction loan"
+          },
+          {
+            "key": "smsf",
+            "label": "SMSF loan"
+          },
+          {
+            "key": "advice",
+            "label": "Financial advice"
+          }
+        ]
+      },
+      {
+        "key": "lvr",
+        "label": "LVR (%)",
+        "type": "decimal",
+        "group": "loan",
+        "filterable": true,
+        "validation": {
+          "min": 0,
+          "max": 100,
+          "scale": 1
+        }
+      },
+      {
+        "key": "interest_rate",
+        "label": "Interest rate (%)",
+        "type": "decimal",
+        "group": "loan",
+        "validation": {
+          "min": 0,
+          "max": 25,
+          "scale": 2
+        }
+      },
+      {
+        "key": "lodged_on",
+        "label": "Lodged on",
+        "type": "date",
+        "group": "loan",
+        "filterable": true
+      },
+      {
+        "key": "expected_settlement",
+        "label": "Expected settlement",
+        "type": "date",
+        "group": "loan",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "applications",
+      "name": "Applications",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        {
+          "key": "discovery",
+          "name": "Discovery",
+          "probability": 10,
+          "rotting_days": 7
+        },
+        {
+          "key": "fact_find",
+          "name": "Fact find",
+          "probability": 30,
+          "rotting_days": 14
+        },
+        {
+          "key": "recommendation",
+          "name": "Recommendation",
+          "probability": 50,
+          "rotting_days": 10
+        },
+        {
+          "key": "lodged",
+          "name": "Lodged",
+          "probability": 80,
+          "rotting_days": 21
+        },
+        {
+          "key": "settled",
+          "name": "Settled",
+          "probability": 100,
+          "is_won": true
+        },
+        {
+          "key": "lost",
+          "name": "Lost",
+          "probability": 0,
+          "is_lost": true
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "adviser",
+      "name": "Adviser",
+      "description": "Runs their own clients and applications from discovery to settlement and review",
+      "permissions": [
+        "core.contacts.view",
+        "core.contacts.create",
+        "core.contacts.update",
+        "core.organizations.view",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.view",
+        "core.files.*",
+        "core.dashboard.view",
+        "documents.documents.*",
+        "quotes.quotes.*",
+        "contracts.contracts.view",
+        "contracts.contracts.create",
+        "contracts.contracts.update",
+        "invoices.invoices.view"
+      ],
+      "scopes": {
+        "core.contacts": "own",
+        "core.leads": "own",
+        "core.deals": "own",
+        "core.activities": "own",
+        "core.organizations": "all"
+      }
+    },
+    {
+      "key": "client_services",
+      "name": "Client services",
+      "description": "Chases fact-find documents, books reviews, prepares files for lodgement and handles billing",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.leads.*",
+        "core.deals.view",
+        "core.deals.update",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.view",
+        "core.saved_views.share",
+        "core.audit.view",
+        "documents.*",
+        "quotes.quotes.view",
+        "invoices.*",
+        "contracts.contracts.view",
+        "portal.accounts.manage"
+      ],
+      "scopes": {
+        "*": "all"
+      }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": [
+        "full_name",
+        "email",
+        "phone",
+        "lifecycle_status",
+        "cf.client_type",
+        "cf.fact_find_complete",
+        "cf.review_due",
+        "owner"
+      ]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": [
+        "title",
+        "contact",
+        "organization",
+        "stage",
+        "value",
+        "cf.application_type",
+        "cf.expected_settlement",
+        "owner"
+      ]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "pipeline_value",
+        "type": "pipeline_value",
+        "title": "Applications by stage",
+        "size": "lg",
+        "params": {
+          "pipeline": "applications"
+        }
+      },
+      {
+        "key": "documents",
+        "type": "module:documents.awaiting",
+        "title": "Fact-find documents awaiting action",
+        "size": "md"
+      },
+      {
+        "key": "settlements",
+        "type": "date_window",
+        "title": "Settlements in the next 30 days",
+        "size": "md",
+        "params": {
+          "entity": "deal",
+          "field": "cf.expected_settlement",
+          "days": 30,
+          "status": "open"
+        }
+      },
+      {
+        "key": "reviews",
+        "type": "date_window",
+        "title": "Annual reviews due in the next 60 days",
+        "size": "md",
+        "params": {
+          "entity": "contact",
+          "field": "cf.review_due",
+          "days": 60
+        }
+      },
+      {
+        "key": "renewals",
+        "type": "module:contracts.renewals",
+        "title": "Ongoing advice renewals",
+        "size": "sm"
+      },
+      {
+        "key": "receivables",
+        "type": "module:invoices.receivables",
+        "title": "Outstanding fees",
+        "size": "sm"
+      },
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      }
+    ]
+  },
+  "templates": [
+    {
+      "key": "adviser.fact_find_reminder",
+      "channel": "email",
+      "name": "Fact-find reminder",
+      "subject": "A couple of documents still to come",
+      "body": "<p>Hi {{contact.firstName}},</p><p>Thanks for starting your fact find. We are still waiting on a few documents before we can compare options for you. You can upload them securely from your client portal, and the checklist shows exactly what is outstanding.</p><p>If anything is hard to find, reply to this email and we will help.</p>"
+    },
+    {
+      "key": "adviser.annual_review",
+      "channel": "email",
+      "name": "Annual review invitation",
+      "subject": "Time for your annual review",
+      "body": "<p>Hi {{contact.firstName}},</p><p>It has been a year since we last reviewed your loan and goals. Rates and circumstances change, so it is worth a short check-in to make sure everything still fits.</p><p>Reply to this email to book a time that suits you.</p>"
+    }
+  ],
+  "sample_data": {
+    "organizations": [
+      {
+        "ref": "harbourline",
+        "name": "Harbourline Bank",
+        "website": "https://harbourline-bank.test",
+        "industry": "Bank",
+        "days": -270,
+        "owner": "admin"
+      },
+      {
+        "ref": "wattle",
+        "name": "Wattle Mutual",
+        "website": "https://wattlemutual.test",
+        "industry": "Mutual bank",
+        "days": -250
+      },
+      {
+        "ref": "kestrel",
+        "name": "Kestrel Home Loans",
+        "website": "https://kestrelhomeloans.test",
+        "industry": "Non-bank lender",
+        "days": -180,
+        "owner": "adviser"
+      },
+      {
+        "ref": "bluegum",
+        "name": "Bluegum Credit Union",
+        "website": "https://bluegumcu.test",
+        "industry": "Credit union",
+        "days": -220,
+        "owner": "client_services"
+      },
+      {
+        "ref": "ironbark",
+        "name": "Ironbark Lending",
+        "website": "https://ironbarklending.test",
+        "industry": "Specialist lender (SMSF)",
+        "days": -140,
+        "owner": "adviser"
+      },
+      {
+        "ref": "tidewater",
+        "name": "Tidewater Finance",
+        "website": "https://tidewaterfinance.test",
+        "industry": "Construction lender",
+        "days": -90
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "rossi",
+        "first_name": "Marco",
+        "last_name": "Rossi",
+        "email": "marco.rossi@example.test",
+        "phone": "+61 2 5550 0100",
+        "lifecycle_status": "Prospect",
+        "source": "Real estate agent",
+        "custom": {
+          "client_type": "first_home_buyer",
+          "fact_find_complete": false
+        },
+        "days": -4,
+        "owner": "adviser"
+      },
+      {
+        "ref": "nguyen",
+        "first_name": "Linh",
+        "last_name": "Nguyen",
+        "email": "linh.nguyen@example.test",
+        "phone": "+61 2 5550 0101",
+        "lifecycle_status": "Prospect",
+        "source": "Website",
+        "custom": {
+          "client_type": "first_home_buyer",
+          "fact_find_complete": false
+        },
+        "days": -2,
+        "owner": "client_services"
+      },
+      {
+        "ref": "kim",
+        "first_name": "Jiwoo",
+        "last_name": "Kim",
+        "email": "jiwoo.kim@example.test",
+        "phone": "+61 2 5550 0102",
+        "lifecycle_status": "Active client",
+        "source": "Referral",
+        "custom": {
+          "client_type": "upgrader",
+          "fact_find_complete": false
+        },
+        "days": -16,
+        "owner": "adviser"
+      },
+      {
+        "ref": "walsh",
+        "first_name": "Connor",
+        "last_name": "Walsh",
+        "email": "connor.walsh@example.test",
+        "phone": "+61 2 5550 0103",
+        "lifecycle_status": "Active client",
+        "source": "Existing client",
+        "custom": {
+          "client_type": "refinancer",
+          "fact_find_complete": false,
+          "review_due": "{{date:-20}}"
+        },
+        "days": -380
+      },
+      {
+        "ref": "novak",
+        "first_name": "Petra",
+        "last_name": "Novak",
+        "email": "petra.novak@example.test",
+        "phone": "+61 2 5550 0104",
+        "lifecycle_status": "Active client",
+        "source": "Website",
+        "custom": {
+          "client_type": "refinancer",
+          "fact_find_complete": true
+        },
+        "days": -35,
+        "owner": "adviser"
+      },
+      {
+        "ref": "singh",
+        "first_name": "Harpreet",
+        "last_name": "Singh",
+        "email": "harpreet.singh@example.test",
+        "phone": "+61 2 5550 0105",
+        "lifecycle_status": "Active client",
+        "source": "Accountant",
+        "custom": {
+          "client_type": "investor",
+          "fact_find_complete": true
+        },
+        "days": -28,
+        "owner": "adviser"
+      },
+      {
+        "ref": "papadopoulos",
+        "first_name": "Eleni",
+        "last_name": "Papadopoulos",
+        "email": "eleni.p@example.test",
+        "phone": "+61 2 5550 0106",
+        "lifecycle_status": "Active client",
+        "source": "Seminar",
+        "custom": {
+          "client_type": "retiree",
+          "fact_find_complete": true
+        },
+        "days": -42,
+        "owner": "admin"
+      },
+      {
+        "ref": "haddad",
+        "first_name": "Sami",
+        "last_name": "Haddad",
+        "email": "sami.haddad@example.test",
+        "phone": "+61 2 5550 0107",
+        "lifecycle_status": "Active client",
+        "source": "Accountant",
+        "custom": {
+          "client_type": "smsf_trustee",
+          "fact_find_complete": true
+        },
+        "days": -70,
+        "owner": "adviser"
+      },
+      {
+        "ref": "taylor",
+        "first_name": "Emma",
+        "last_name": "Taylor",
+        "email": "emma.taylor@example.test",
+        "phone": "+61 2 5550 0108",
+        "lifecycle_status": "Active client",
+        "source": "Referral",
+        "custom": {
+          "client_type": "upgrader",
+          "fact_find_complete": true
+        },
+        "days": -64
+      },
+      {
+        "ref": "obrien",
+        "first_name": "Liam",
+        "last_name": "O’Brien",
+        "email": "liam.obrien@example.test",
+        "phone": "+61 2 5550 0109",
+        "lifecycle_status": "Active client",
+        "source": "Real estate agent",
+        "custom": {
+          "client_type": "first_home_buyer",
+          "fact_find_complete": true
+        },
+        "days": -48,
+        "owner": "adviser"
+      },
+      {
+        "ref": "brown",
+        "first_name": "Olivia",
+        "last_name": "Brown",
+        "email": "olivia.brown@example.test",
+        "phone": "+61 2 5550 0110",
+        "lifecycle_status": "Settled client",
+        "source": "Existing client",
+        "custom": {
+          "client_type": "investor",
+          "fact_find_complete": true,
+          "review_due": "{{date:+140}}"
+        },
+        "days": -260,
+        "owner": "adviser"
+      },
+      {
+        "ref": "costa",
+        "first_name": "Isabel",
+        "last_name": "Costa",
+        "email": "isabel.costa@example.test",
+        "phone": "+61 2 5550 0111",
+        "lifecycle_status": "Settled client",
+        "source": "Website",
+        "custom": {
+          "client_type": "refinancer",
+          "fact_find_complete": true,
+          "review_due": "{{date:+270}}"
+        },
+        "days": -150,
+        "owner": "client_services"
+      },
+      {
+        "ref": "murray",
+        "first_name": "Jack",
+        "last_name": "Murray",
+        "email": "jack.murray@example.test",
+        "phone": "+61 2 5550 0112",
+        "lifecycle_status": "Settled client",
+        "source": "Referral",
+        "custom": {
+          "client_type": "retiree",
+          "fact_find_complete": true,
+          "review_due": "{{date:+215}}"
+        },
+        "days": -200,
+        "owner": "admin"
+      },
+      {
+        "ref": "white",
+        "first_name": "Noah",
+        "last_name": "White",
+        "email": "noah.white@example.test",
+        "phone": "+61 2 5550 0113",
+        "lifecycle_status": "Settled client",
+        "source": "Referral",
+        "custom": {
+          "client_type": "upgrader",
+          "fact_find_complete": true,
+          "review_due": "{{date:+18}}"
+        },
+        "days": -350,
+        "owner": "adviser"
+      },
+      {
+        "ref": "fraser",
+        "first_name": "Ruby",
+        "last_name": "Fraser",
+        "email": "ruby.fraser@example.test",
+        "lifecycle_status": "Former client",
+        "source": "Social",
+        "custom": {
+          "client_type": "first_home_buyer",
+          "fact_find_complete": true
+        },
+        "days": -120,
+        "owner": "client_services"
+      },
+      {
+        "ref": "chandra",
+        "first_name": "Arjun",
+        "last_name": "Chandra",
+        "email": "arjun.chandra@example.test",
+        "phone": "+61 2 5550 0114",
+        "lifecycle_status": "Former client",
+        "source": "Website",
+        "custom": {
+          "client_type": "investor",
+          "fact_find_complete": false
+        },
+        "days": -95
+      },
+      {
+        "ref": "tessa",
+        "first_name": "Tessa",
+        "last_name": "Kiely",
+        "email": "tessa.kiely@harbourline-bank.test",
+        "phone": "+61 2 5550 0115",
+        "job_title": "Business development manager",
+        "organization": "harbourline",
+        "lifecycle_status": "Lender representative",
+        "source": "Other",
+        "days": -270,
+        "owner": "admin"
+      },
+      {
+        "ref": "raj",
+        "first_name": "Raj",
+        "last_name": "Mehta",
+        "email": "raj.mehta@kestrelhomeloans.test",
+        "phone": "+61 2 5550 0116",
+        "job_title": "Broker relationship manager",
+        "organization": "kestrel",
+        "lifecycle_status": "Lender representative",
+        "source": "Other",
+        "days": -180,
+        "owner": "adviser"
+      },
+      {
+        "ref": "sophie",
+        "first_name": "Sophie",
+        "last_name": "Lachlan",
+        "email": "sophie.l@ironbarklending.test",
+        "phone": "+61 2 5550 0117",
+        "job_title": "SMSF lending specialist",
+        "organization": "ironbark",
+        "lifecycle_status": "Lender representative",
+        "source": "Other",
+        "days": -140,
+        "owner": "adviser"
+      },
+      {
+        "ref": "dylan",
+        "first_name": "Dylan",
+        "last_name": "Webb",
+        "email": "dylan.webb@bluegumcu.test",
+        "phone": "+61 2 5550 0118",
+        "job_title": "Credit assessor",
+        "organization": "bluegum",
+        "lifecycle_status": "Lender representative",
+        "source": "Other",
+        "days": -210,
+        "owner": "client_services"
+      }
+    ],
+    "leads": [
+      {
+        "ref": "chloe",
+        "first_name": "Chloe",
+        "last_name": "Bennett",
+        "email": "chloe.bennett@example.test",
+        "phone": "+61 2 5550 0119",
+        "source": "Website",
+        "status": "new",
+        "days": 0,
+        "owner": "client_services"
+      },
+      {
+        "ref": "tim",
+        "first_name": "Tim",
+        "last_name": "Archer",
+        "email": "tim.archer@example.test",
+        "phone": "+61 2 5550 0120",
+        "source": "Seminar",
+        "status": "contacted",
+        "days": -6,
+        "owner": "adviser"
+      },
+      {
+        "ref": "mia",
+        "first_name": "Mia",
+        "last_name": "Russo",
+        "email": "mia.russo@example.test",
+        "phone": "+61 2 5550 0121",
+        "source": "Real estate agent",
+        "status": "qualified",
+        "days": -3,
+        "owner": "adviser"
+      },
+      {
+        "ref": "zara",
+        "first_name": "Zara",
+        "last_name": "Hussain",
+        "email": "zara.h@example.test",
+        "source": "Social",
+        "status": "new",
+        "days": -1
+      },
+      {
+        "ref": "greg",
+        "first_name": "Greg",
+        "last_name": "Doyle",
+        "email": "greg.doyle@example.test",
+        "company_name": "Doyle Plumbing",
+        "job_title": "Owner",
+        "source": "Website",
+        "status": "unqualified",
+        "days": -12,
+        "owner": "client_services"
+      }
+    ],
+    "deals": [
+      {
+        "ref": "rossi",
+        "title": "Rossi family – first home",
+        "contact": "rossi",
+        "stage": "discovery",
+        "value": 780000,
+        "days": -4,
+        "owner": "adviser",
+        "custom": {
+          "application_type": "purchase",
+          "lvr": 90
+        }
+      },
+      {
+        "ref": "nguyen",
+        "title": "Linh Nguyen – first home",
+        "contact": "nguyen",
+        "stage": "discovery",
+        "value": 620000,
+        "days": -2,
+        "owner": "client_services",
+        "custom": {
+          "application_type": "purchase"
+        }
+      },
+      {
+        "ref": "kim",
+        "title": "Jiwoo Kim – upgrade purchase",
+        "contact": "kim",
+        "stage": "fact_find",
+        "value": 1150000,
+        "days": -16,
+        "stage_days": -9,
+        "owner": "adviser",
+        "custom": {
+          "application_type": "purchase",
+          "lvr": 75
+        }
+      },
+      {
+        "ref": "walsh",
+        "title": "Connor Walsh – refinance",
+        "contact": "walsh",
+        "stage": "fact_find",
+        "value": 540000,
+        "days": -25,
+        "stage_days": -18,
+        "custom": {
+          "application_type": "refinance",
+          "lvr": 62
+        }
+      },
+      {
+        "ref": "novak",
+        "title": "Novak refinance",
+        "contact": "novak",
+        "organization": "wattle",
+        "stage": "recommendation",
+        "value": 685000,
+        "days": -35,
+        "stage_days": -6,
+        "expected_close": "{{date:+10}}",
+        "owner": "adviser",
+        "custom": {
+          "application_type": "refinance",
+          "lvr": 68,
+          "interest_rate": 5.89
+        }
+      },
+      {
+        "ref": "singh",
+        "title": "Singh investment property",
+        "contact": "singh",
+        "organization": "kestrel",
+        "stage": "recommendation",
+        "value": 590000,
+        "days": -28,
+        "stage_days": -12,
+        "expected_close": "{{date:+14}}",
+        "owner": "adviser",
+        "custom": {
+          "application_type": "investment",
+          "lvr": 80,
+          "interest_rate": 6.24
+        }
+      },
+      {
+        "ref": "papadopoulos",
+        "title": "Eleni Papadopoulos – retirement advice",
+        "contact": "papadopoulos",
+        "stage": "recommendation",
+        "value": 3300,
+        "days": -42,
+        "stage_days": -8,
+        "expected_close": "{{date:+7}}",
+        "owner": "admin",
+        "custom": {
+          "application_type": "advice"
+        }
+      },
+      {
+        "ref": "haddad",
+        "title": "Haddad SMSF",
+        "contact": "haddad",
+        "organization": "ironbark",
+        "stage": "lodged",
+        "value": 720000,
+        "days": -70,
+        "stage_days": -5,
+        "expected_close": "{{date:+30}}",
+        "owner": "adviser",
+        "custom": {
+          "application_type": "smsf",
+          "lvr": 70,
+          "interest_rate": 6.49,
+          "lodged_on": "{{date:-5}}",
+          "expected_settlement": "{{date:+30}}"
+        }
+      },
+      {
+        "ref": "taylor",
+        "title": "Emma Taylor – construction loan",
+        "contact": "taylor",
+        "organization": "tidewater",
+        "stage": "lodged",
+        "value": 860000,
+        "days": -64,
+        "stage_days": -15,
+        "expected_close": "{{date:+21}}",
+        "custom": {
+          "application_type": "construction",
+          "lvr": 80,
+          "interest_rate": 6.35,
+          "lodged_on": "{{date:-15}}",
+          "expected_settlement": "{{date:+21}}"
+        }
+      },
+      {
+        "ref": "obrien",
+        "title": "Liam O’Brien – first home",
+        "contact": "obrien",
+        "organization": "harbourline",
+        "stage": "lodged",
+        "value": 655000,
+        "days": -48,
+        "stage_days": -11,
+        "expected_close": "{{date:+12}}",
+        "owner": "adviser",
+        "custom": {
+          "application_type": "purchase",
+          "lvr": 85,
+          "interest_rate": 5.99,
+          "lodged_on": "{{date:-11}}",
+          "expected_settlement": "{{date:+12}}"
+        }
+      },
+      {
+        "ref": "brown",
+        "title": "Brown investment",
+        "contact": "brown",
+        "organization": "bluegum",
+        "stage": "settled",
+        "value": 510000,
+        "days": -260,
+        "stage_days": -225,
+        "owner": "adviser",
+        "custom": {
+          "application_type": "investment",
+          "lvr": 78,
+          "interest_rate": 6.09,
+          "lodged_on": "{{date:-250}}",
+          "expected_settlement": "{{date:-225}}"
+        }
+      },
+      {
+        "ref": "costa",
+        "title": "Isabel Costa – refinance",
+        "contact": "costa",
+        "organization": "wattle",
+        "stage": "settled",
+        "value": 470000,
+        "days": -150,
+        "stage_days": -95,
+        "owner": "client_services",
+        "custom": {
+          "application_type": "refinance",
+          "lvr": 58,
+          "interest_rate": 5.79,
+          "lodged_on": "{{date:-120}}",
+          "expected_settlement": "{{date:-95}}"
+        }
+      },
+      {
+        "ref": "murray",
+        "title": "Jack Murray – retirement plan",
+        "contact": "murray",
+        "stage": "settled",
+        "value": 3300,
+        "days": -200,
+        "stage_days": -150,
+        "owner": "admin",
+        "custom": {
+          "application_type": "advice"
+        }
+      },
+      {
+        "ref": "fraser",
+        "title": "Ruby Fraser – first home",
+        "contact": "fraser",
+        "stage": "lost",
+        "value": 560000,
+        "days": -120,
+        "stage_days": -80,
+        "lost_reason": "Went direct to lender",
+        "owner": "client_services",
+        "custom": {
+          "application_type": "purchase",
+          "lvr": 90
+        }
+      },
+      {
+        "ref": "chandra",
+        "title": "Arjun Chandra – investment loan",
+        "contact": "chandra",
+        "organization": "kestrel",
+        "stage": "lost",
+        "value": 640000,
+        "days": -95,
+        "stage_days": -40,
+        "lost_reason": "Deferred purchase",
+        "custom": {
+          "application_type": "investment",
+          "lvr": 80
+        }
+      }
+    ],
+    "activities": [
+      {
+        "type": "meeting",
+        "related": "deal:rossi",
+        "subject": "Discovery meeting: Rossi family",
+        "due_days": 2,
+        "hour": 17,
+        "days": -3,
+        "owner": "adviser"
+      },
+      {
+        "type": "note",
+        "related": "contact:rossi",
+        "body": "<p>Referred by the selling agent. Pre-approval needed within three weeks; they have a 10% deposit and are asking about first home buyer concessions.</p>",
+        "days": -4,
+        "owner": "adviser"
+      },
+      {
+        "type": "call",
+        "related": "deal:nguyen",
+        "subject": "Intro call with Linh to book discovery",
+        "due_days": 0,
+        "priority": "high",
+        "days": -2,
+        "owner": "client_services"
+      },
+      {
+        "type": "note",
+        "related": "deal:kim",
+        "body": "<p>Online fact find done. Still missing the last two payslips and a recent savings statement. Checklist sent through the portal.</p>",
+        "days": -9,
+        "owner": "adviser"
+      },
+      {
+        "type": "task",
+        "related": "deal:kim",
+        "subject": "Chase Jiwoo’s payslips and savings statement",
+        "due_days": -1,
+        "priority": "high",
+        "days": -6,
+        "owner": "client_services"
+      },
+      {
+        "type": "task",
+        "related": "deal:walsh",
+        "subject": "Request Connor’s current loan statements",
+        "due_days": -4,
+        "days": -18,
+        "owner": "client_services"
+      },
+      {
+        "type": "note",
+        "related": "deal:walsh",
+        "body": "<p>Annual review turned into a refinance. Current rate is well above market; fixed term rolled off last month.</p>",
+        "days": -25
+      },
+      {
+        "type": "note",
+        "related": "deal:novak",
+        "body": "<p>Comparison done across five lenders. Recommending Wattle Mutual at 5.89% with an offset account. Monthly saving of about $310.</p>",
+        "days": -6,
+        "owner": "adviser"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:novak",
+        "subject": "Walk Petra through the recommendation",
+        "due_days": 3,
+        "hour": 10,
+        "days": -5,
+        "owner": "adviser"
+      },
+      {
+        "type": "call",
+        "related": "deal:singh",
+        "subject": "Confirm rental income figures with Harpreet’s accountant",
+        "due_days": -8,
+        "done": true,
+        "outcome": "Figures confirmed, tax returns to follow",
+        "days": -10,
+        "owner": "adviser"
+      },
+      {
+        "type": "task",
+        "related": "deal:singh",
+        "subject": "Prepare credit proposal for Singh investment",
+        "due_days": 2,
+        "days": -3,
+        "owner": "adviser"
+      },
+      {
+        "type": "note",
+        "related": "deal:papadopoulos",
+        "body": "<p>Statement of Advice drafted. Fee quote sent; Eleni wants her daughter at the presentation meeting.</p>",
+        "days": -8,
+        "owner": "admin"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:papadopoulos",
+        "subject": "Present Statement of Advice to Eleni",
+        "due_days": 5,
+        "hour": 14,
+        "days": -6,
+        "owner": "admin"
+      },
+      {
+        "type": "note",
+        "related": "deal:haddad",
+        "body": "<p>Lodged with Ironbark. Trust deed and bare trust documents checked by the SMSF accountant before submission.</p>",
+        "days": -5,
+        "owner": "adviser"
+      },
+      {
+        "type": "task",
+        "related": "deal:haddad",
+        "subject": "Chase overdue SMSF structuring fee",
+        "due_days": 1,
+        "priority": "high",
+        "days": -2,
+        "owner": "client_services"
+      },
+      {
+        "type": "call",
+        "related": "deal:taylor",
+        "subject": "Check valuation status with Tidewater",
+        "due_days": -2,
+        "done": true,
+        "outcome": "Valuer booked for Friday",
+        "days": -4
+      },
+      {
+        "type": "task",
+        "related": "deal:obrien",
+        "subject": "Send Liam’s formal approval to his conveyancer",
+        "due_days": 4,
+        "days": -1,
+        "owner": "adviser"
+      },
+      {
+        "type": "call",
+        "related": "contact:tessa",
+        "subject": "Ask Tessa for an update on O’Brien assessment",
+        "due_days": -3,
+        "done": true,
+        "outcome": "Conditional approval issued",
+        "days": -5,
+        "owner": "adviser"
+      },
+      {
+        "type": "note",
+        "related": "deal:brown",
+        "body": "<p>Settled. Fixed for two years; set a reminder before the fixed period ends.</p>",
+        "days": -225,
+        "owner": "adviser"
+      },
+      {
+        "type": "task",
+        "related": "contact:brown",
+        "subject": "Rate check before Olivia’s fixed term ends",
+        "due_days": 30,
+        "days": -10,
+        "owner": "adviser"
+      },
+      {
+        "type": "note",
+        "related": "deal:costa",
+        "body": "<p>Refinance settled. Isabel saved about $240 a month; she has referred her brother.</p>",
+        "days": -95,
+        "owner": "client_services"
+      },
+      {
+        "type": "meeting",
+        "related": "contact:white",
+        "subject": "Annual review: Noah White",
+        "due_days": 18,
+        "hour": 11,
+        "days": -2,
+        "owner": "adviser"
+      },
+      {
+        "type": "task",
+        "related": "contact:walsh",
+        "subject": "Overdue annual review for Connor",
+        "due_days": -20,
+        "days": -40
+      },
+      {
+        "type": "note",
+        "related": "deal:fraser",
+        "body": "<p>Ruby took a direct offer from her own bank's branch. Left on good terms; may come back for the next property.</p>",
+        "days": -80,
+        "owner": "client_services"
+      },
+      {
+        "type": "note",
+        "related": "deal:chandra",
+        "body": "<p>Arjun has paused his purchase until next year. Keep him on the quarterly market update list.</p>",
+        "days": -40
+      },
+      {
+        "type": "meeting",
+        "related": "organization:kestrel",
+        "subject": "Quarterly catch-up with Kestrel BDM",
+        "due_days": 7,
+        "hour": 9,
+        "days": -6,
+        "owner": "adviser"
+      },
+      {
+        "type": "note",
+        "related": "organization:ironbark",
+        "body": "<p>Ironbark updated SMSF policy: maximum LVR now 70% for residential.</p>",
+        "days": -30,
+        "owner": "adviser"
+      },
+      {
+        "type": "call",
+        "related": "lead:mia",
+        "subject": "Call Mia about pre-approval timing",
+        "due_days": 0,
+        "priority": "high",
+        "days": -3,
+        "owner": "adviser"
+      },
+      {
+        "type": "task",
+        "related": "lead:tim",
+        "subject": "Send seminar slides and booking link to Tim",
+        "due_days": -2,
+        "days": -6,
+        "owner": "adviser"
+      },
+      {
+        "type": "task",
+        "subject": "Prepare monthly compliance file check",
+        "due_days": 3,
+        "days": -2,
+        "owner": "client_services"
+      },
+      {
+        "type": "task",
+        "subject": "Update lender rate sheet for this week",
+        "due_days": 0,
+        "days": -1,
+        "owner": "admin"
+      }
+    ],
+    "requests": [
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "SOA",
+          "name": "Statement of Advice",
+          "unit": "plan",
+          "unitPrice": 3000,
+          "taxRate": 10
+        },
+        "ref": "p_soa"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "OAS-Y",
+          "name": "Ongoing advice service (annual)",
+          "unit": "year",
+          "unitPrice": 2500,
+          "taxRate": 10,
+          "recurring": true
+        },
+        "ref": "p_ongoing"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "SMSF-STR",
+          "name": "SMSF loan structuring",
+          "unit": "loan",
+          "unitPrice": 1500,
+          "taxRate": 10
+        },
+        "ref": "p_smsf"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "REV",
+          "name": "Review meeting (casual clients)",
+          "unit": "meeting",
+          "unitPrice": 600,
+          "taxRate": 10
+        },
+        "ref": "p_review"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Eleni Papadopoulos – Statement of Advice",
+          "contactUuid": "{{contact:papadopoulos}}",
+          "dealUuid": "{{deal:papadopoulos}}",
+          "issueDate": "{{date:-8}}",
+          "validUntil": "{{date:+22}}",
+          "notes": "Covers superannuation, retirement income and estate planning considerations.",
+          "lines": [
+            {
+              "productUuid": "{{req:p_soa}}",
+              "name": "Statement of Advice",
+              "quantity": 1,
+              "unitPrice": 3000,
+              "taxRate": 10
+            }
+          ]
+        },
+        "ref": "q_papa"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_papa}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Haddad SMSF – structuring fee",
+          "contactUuid": "{{contact:haddad}}",
+          "organizationUuid": "{{organization:ironbark}}",
+          "dealUuid": "{{deal:haddad}}",
+          "issueDate": "{{date:-40}}",
+          "validUntil": "{{date:-10}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_smsf}}",
+              "name": "SMSF loan structuring",
+              "quantity": 1,
+              "unitPrice": 1500,
+              "taxRate": 10
+            }
+          ]
+        },
+        "ref": "q_haddad"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_haddad}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_haddad}}/accept",
+        "body": {
+          "acceptedByName": "Sami Haddad"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Jack Murray – Statement of Advice",
+          "contactUuid": "{{contact:murray}}",
+          "dealUuid": "{{deal:murray}}",
+          "issueDate": "{{date:-150}}",
+          "dueDate": "{{date:-136}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_soa}}",
+              "name": "Statement of Advice",
+              "quantity": 1,
+              "unitPrice": 3000,
+              "taxRate": 10
+            }
+          ]
+        },
+        "ref": "inv_murray"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_murray}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_murray}}/payments",
+        "body": {
+          "amount": 3300,
+          "paidOn": "{{date:-140}}",
+          "method": "bank_transfer",
+          "reference": "MURRAY-SOA"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Haddad SMSF – structuring fee",
+          "contactUuid": "{{contact:haddad}}",
+          "organizationUuid": "{{organization:ironbark}}",
+          "dealUuid": "{{deal:haddad}}",
+          "issueDate": "{{date:-24}}",
+          "dueDate": "{{date:-10}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_smsf}}",
+              "name": "SMSF loan structuring",
+              "quantity": 1,
+              "unitPrice": 1500,
+              "taxRate": 10
+            }
+          ]
+        },
+        "ref": "inv_haddad"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_haddad}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Noah White – ongoing advice, next year",
+          "contactUuid": "{{contact:white}}",
+          "issueDate": "{{date:0}}",
+          "dueDate": "{{date:+30}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_ongoing}}",
+              "name": "Ongoing advice service (annual)",
+              "quantity": 1,
+              "unitPrice": 2500,
+              "taxRate": 10
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts",
+        "body": {
+          "title": "Jack Murray – ongoing advice agreement",
+          "contactUuid": "{{contact:murray}}",
+          "dealUuid": "{{deal:murray}}",
+          "startDate": "{{date:-150}}",
+          "endDate": "{{date:+215}}",
+          "signedOn": "{{date:-152}}",
+          "value": 2750,
+          "billingCycle": "yearly",
+          "autoRenew": true,
+          "renewalTermMonths": 12,
+          "noticeDays": 30,
+          "description": "Annual review, quarterly portfolio updates and unlimited phone and email access."
+        },
+        "ref": "c_murray"
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts/{{req:c_murray}}/activate",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts",
+        "body": {
+          "title": "Noah White – ongoing advice agreement",
+          "contactUuid": "{{contact:white}}",
+          "startDate": "{{date:-345}}",
+          "endDate": "{{date:+20}}",
+          "signedOn": "{{date:-347}}",
+          "value": 2750,
+          "billingCycle": "yearly",
+          "autoRenew": true,
+          "renewalTermMonths": 12,
+          "noticeDays": 30
+        },
+        "ref": "c_white"
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts/{{req:c_white}}/activate",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts",
+        "body": {
+          "title": "Eleni Papadopoulos – ongoing advice agreement",
+          "contactUuid": "{{contact:papadopoulos}}",
+          "dealUuid": "{{deal:papadopoulos}}",
+          "startDate": "{{date:+14}}",
+          "endDate": "{{date:+379}}",
+          "value": 2750,
+          "billingCycle": "yearly",
+          "noticeDays": 30
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/templates",
+        "body": {
+          "name": "Credit guide and privacy consent",
+          "description": "Given to every new client before any credit assistance.",
+          "requiresSignature": true,
+          "body": "<h2>Credit guide and privacy consent</h2><p>Client: {{contact.fullName}}</p><p>I confirm I have received the credit guide from {{business.name}}, which explains the services offered, how fees and commissions are paid and how to make a complaint.</p><p>I consent to my personal information being collected and shared with lenders for the purpose of arranging credit.</p><p>Adviser: {{user.name}}</p><p>Date: {{today}}</p>"
+        },
+        "ref": "tpl_credit"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/templates",
+        "body": {
+          "name": "Fact find summary",
+          "description": "A summary of the client’s goals and circumstances for them to confirm.",
+          "requiresSignature": true,
+          "body": "<h2>Fact find summary</h2><p>Client: {{contact.fullName}}</p><p>Application: {{deal.title}}</p><p>Please check that your goals, income, expenses, assets and liabilities are recorded correctly. Tell us about any changes before we make a recommendation.</p><p>Date: {{today}}</p>"
+        },
+        "ref": "tpl_fact"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:tpl_credit}}",
+          "contactUuid": "{{contact:kim}}",
+          "dealUuid": "{{deal:kim}}",
+          "title": "Credit guide and privacy consent – Jiwoo Kim"
+        },
+        "ref": "doc_kim"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents/{{req:doc_kim}}/share",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:kim}}",
+          "dealUuid": "{{deal:kim}}",
+          "items": [
+            {
+              "name": "Last two payslips",
+              "description": "Your two most recent payslips from your employer.",
+              "dueDate": "{{date:+3}}"
+            },
+            {
+              "name": "Savings account statement",
+              "description": "The last three months, showing your deposit savings.",
+              "dueDate": "{{date:+3}}"
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:walsh}}",
+          "dealUuid": "{{deal:walsh}}",
+          "items": [
+            {
+              "name": "Current home loan statements",
+              "description": "The last six months from your current lender.",
+              "dueDate": "{{date:+5}}"
+            },
+            {
+              "name": "Council rates notice",
+              "description": "The most recent notice for the property.",
+              "dueDate": "{{date:+5}}"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

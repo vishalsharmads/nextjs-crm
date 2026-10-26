@@ -46,20 +46,40 @@ WEB_DIR=../web/dist                   # relative to apps/api
 SITE_DIR=../site/dist
 DATABASE_URL=mysql://user:pass@host:3306/dbname
 DEMO_MODE=true                        # demo server only, never a client instance
+STORAGE_DIR=./storage-demo            # demo:reset empties it, so its own name must contain "demo"
 # plus the secrets from env-reference.md
 ```
 
 `npm run start:single` sets `WEB_DIR` and `SITE_DIR` for you. On Passenger, set the application root to
 `apps/api`, the startup file to `dist/server.js`, and the variables above in the panel.
 
-## Install the demo
+## Install or switch the demo industry
+
+One demo database shows one industry at a time. Switch it before a sales call:
 
 ```
-DATABASE_URL=... deploy/setup-demo.sh coworking
+npm run demo:reset -- --industry=law-firms          # asks you to type the industry to confirm
+npm run demo:reset -- --industry=law-firms --yes --restart-file=apps/api/tmp/restart.txt
 ```
 
-This installs the industry template with sample data and one demo user per role (password
-`DemoAccess2026!` unless `ADMIN_PASSWORD` is set). With `DEMO_MODE=true` the sign-in screen lists them.
+Industries: `real-estate`, `healthcare-clinics`, `law-firms`, `financial-advisers`, `construction-trades`,
+`education-training`, `recruitment-staffing`, `immigration-visa`, `coworking` (the website's slugs).
+
+It empties the demo database and its upload folder, installs that industry's template, creates one demo
+user per role (password `DemoAccess2026!`, or `--password`), then adds sample data dated around today:
+companies, contacts, deals in every stage, notes, tasks, meetings, and module records (quotes, invoices,
+bookings, tickets, contracts) created through the app itself. Then restart the app (on Passenger,
+`--restart-file` touches `tmp/restart.txt` for you). The website marks that industry's demo as live.
+
+**It only ever runs on a demo.** It refuses, and changes nothing, unless all of these hold:
+
+- `DEMO_MODE=true`;
+- the database name contains `demo` (e.g. `crm_demo`), and so does the upload folder's own name
+  (`STORAGE_DIR=./storage-demo`), which must not contain the app or a home folder;
+- the database is empty, or was created by an earlier `demo:reset` (it carries a marker table, written
+  first, so a reset that fails halfway can simply be run again).
+
+It drops tables rather than the database, so the hosting account needs no `CREATE DATABASE` right.
 
 ## Start and check
 
@@ -69,6 +89,7 @@ npm run start:single
 
 - `https://yourdomain.com/` shows the website; "Sign in" opens `/app`.
 - `https://yourdomain.com/app` shows the sign-in screen with the demo accounts.
+- `https://yourdomain.com/demo#live` marks the installed industry as "Live now".
 - `https://yourdomain.com/api/v1/health/ready` answers `{"status":"ok","database":"ok"}`.
 
 Lead forms on the site can post to a web form on this same app

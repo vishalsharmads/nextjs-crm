@@ -124,6 +124,30 @@ export const blueprintSchema = z.object({
       organizations: z.array(z.record(z.string(), z.unknown())).default([]),
       contacts: z.array(z.record(z.string(), z.unknown())).default([]),
       deals: z.array(z.record(z.string(), z.unknown())).default([]),
+      leads: z.array(z.record(z.string(), z.unknown())).default([]),
+      /** Notes, tasks, calls and meetings, backdated by `days` and linked by `related: "deal:<ref>"`. */
+      activities: z.array(z.record(z.string(), z.unknown())).default([]),
+      /**
+       * Module records created through the app's own API as the demo admin, in order, so numbering,
+       * totals and status rules apply. `{{contact:<ref>}}`-style placeholders become record uuids,
+       * `{{date:+7}}` a date relative to today. Runs only for demo resets.
+       */
+      requests: z
+        .array(
+          z.object({
+            ref: z
+              .string()
+              .regex(/^[a-z][a-z0-9_]*$/)
+              .optional(),
+            method: z.enum(['post', 'patch', 'put']),
+            path: z
+              .string()
+              .regex(/^\/[A-Za-z0-9/_{}:+.-]+$/)
+              .refine((p) => !p.split('/').some((seg) => seg === '.' || seg === '..'), 'No . or .. segments'),
+            body: z.record(z.string(), z.unknown()).default({}),
+          }),
+        )
+        .default([]),
     })
     .optional(),
 });

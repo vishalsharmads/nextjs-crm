@@ -1,0 +1,1788 @@
+{
+  "$schema": "../schema.json",
+  "key": "recruitment-staffing",
+  "name": "Recruitment and staffing",
+  "version": "1.0.0",
+  "description": "Candidates, client companies and placements from sourcing to start date, with right-to-work file requests, placement-fee quotes and invoices, and temp and contract assignments.",
+  "settings": {
+    "features": {
+      "leads": true
+    },
+    "general": {
+      "currency": "USD"
+    },
+    "contacts": {
+      "sources": [
+        "Job board",
+        "Professional network",
+        "Referral",
+        "Website",
+        "Database search",
+        "Headhunted",
+        "Event",
+        "Other"
+      ],
+      "lifecycleStatuses": [
+        "New candidate",
+        "Active candidate",
+        "Placed",
+        "Not looking",
+        "Client representative"
+      ]
+    },
+    "deals": {
+      "lostReasons": [
+        "Rejected by client",
+        "Candidate withdrew",
+        "Counter-offer accepted",
+        "Salary mismatch",
+        "Role filled elsewhere",
+        "Role on hold"
+      ]
+    }
+  },
+  "vocabulary": {
+    "contact": {
+      "singular": "Candidate",
+      "plural": "Candidates"
+    },
+    "organization": {
+      "singular": "Client",
+      "plural": "Clients"
+    },
+    "deal": {
+      "singular": "Placement",
+      "plural": "Placements"
+    },
+    "lead": {
+      "singular": "Enquiry",
+      "plural": "Enquiries"
+    }
+  },
+  "modules": ["documents", "portal", "quotes", "invoices", "contracts"],
+  "custom_field_groups": {
+    "contact": [
+      {
+        "key": "candidate",
+        "label": "Candidate profile"
+      }
+    ],
+    "organization": [
+      {
+        "key": "terms",
+        "label": "Terms of business"
+      }
+    ],
+    "deal": [
+      {
+        "key": "placement",
+        "label": "Placement"
+      }
+    ]
+  },
+  "custom_fields": {
+    "contact": [
+      {
+        "key": "work_authorization",
+        "label": "Work authorization",
+        "type": "select",
+        "group": "candidate",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "citizen",
+            "label": "Citizen"
+          },
+          {
+            "key": "permanent_resident",
+            "label": "Permanent resident"
+          },
+          {
+            "key": "work_visa",
+            "label": "Work visa holder"
+          },
+          {
+            "key": "needs_sponsorship",
+            "label": "Needs sponsorship"
+          }
+        ]
+      },
+      {
+        "key": "right_to_work_checked",
+        "label": "Right to work checked",
+        "type": "boolean",
+        "group": "candidate",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "desired_salary",
+        "label": "Desired salary",
+        "type": "currency",
+        "group": "candidate",
+        "filterable": true
+      },
+      {
+        "key": "notice_period",
+        "label": "Notice period",
+        "type": "select",
+        "group": "candidate",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "immediate",
+            "label": "Available now"
+          },
+          {
+            "key": "two_weeks",
+            "label": "Two weeks"
+          },
+          {
+            "key": "one_month",
+            "label": "One month"
+          },
+          {
+            "key": "two_months",
+            "label": "Two months or more"
+          }
+        ]
+      }
+    ],
+    "organization": [
+      {
+        "key": "terms_signed",
+        "label": "Terms of business signed",
+        "type": "boolean",
+        "group": "terms",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "agreed_fee_pct",
+        "label": "Agreed fee %",
+        "type": "decimal",
+        "group": "terms",
+        "validation": {
+          "min": 0,
+          "max": 100
+        }
+      }
+    ],
+    "deal": [
+      {
+        "key": "placement_type",
+        "label": "Placement type",
+        "type": "select",
+        "group": "placement",
+        "required": true,
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "permanent",
+            "label": "Permanent"
+          },
+          {
+            "key": "contract",
+            "label": "Contract"
+          },
+          {
+            "key": "temp",
+            "label": "Temp"
+          }
+        ]
+      },
+      {
+        "key": "base_salary",
+        "label": "Base salary",
+        "type": "currency",
+        "group": "placement",
+        "filterable": true
+      },
+      {
+        "key": "fee_pct",
+        "label": "Fee %",
+        "type": "decimal",
+        "group": "placement",
+        "validation": {
+          "min": 0,
+          "max": 100
+        }
+      },
+      {
+        "key": "start_date",
+        "label": "Start date",
+        "type": "date",
+        "group": "placement",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "placements",
+      "name": "Placements",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        {
+          "key": "sourced",
+          "name": "Sourced",
+          "probability": 10,
+          "rotting_days": 7
+        },
+        {
+          "key": "screened",
+          "name": "Screened",
+          "probability": 25,
+          "rotting_days": 5
+        },
+        {
+          "key": "submitted",
+          "name": "Submitted",
+          "probability": 45,
+          "rotting_days": 5
+        },
+        {
+          "key": "interview",
+          "name": "Interview",
+          "probability": 70,
+          "rotting_days": 7
+        },
+        {
+          "key": "placed",
+          "name": "Placed",
+          "probability": 100,
+          "is_won": true
+        },
+        {
+          "key": "not_placed",
+          "name": "Not placed",
+          "probability": 0,
+          "is_lost": true
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "recruiter",
+      "name": "Recruiter",
+      "description": "Sources and screens candidates and runs their own placements through to start",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.view",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.*",
+        "documents.documents.*",
+        "quotes.quotes.view",
+        "invoices.invoices.view",
+        "contracts.contracts.view"
+      ],
+      "scopes": {
+        "*": "own"
+      }
+    },
+    {
+      "key": "account_manager",
+      "name": "Account manager",
+      "description": "Owns client relationships, fee terms, contracts and billing across the desk",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.*",
+        "core.saved_views.share",
+        "documents.*",
+        "quotes.quotes.*",
+        "invoices.*",
+        "contracts.contracts.*",
+        "portal.accounts.manage"
+      ],
+      "scopes": {
+        "*": "all"
+      }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": [
+        "full_name",
+        "email",
+        "phone",
+        "organization",
+        "cf.work_authorization",
+        "cf.notice_period",
+        "cf.right_to_work_checked",
+        "lifecycle_status",
+        "owner"
+      ]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": [
+        "title",
+        "contact",
+        "organization",
+        "stage",
+        "cf.placement_type",
+        "value",
+        "cf.start_date",
+        "owner"
+      ]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "pipeline",
+        "type": "pipeline_value",
+        "title": "Placements by stage",
+        "size": "lg",
+        "params": {
+          "pipeline": "placements"
+        }
+      },
+      {
+        "key": "starts",
+        "type": "date_window",
+        "title": "Starts in the next 30 days",
+        "size": "md",
+        "params": {
+          "entity": "deal",
+          "field": "cf.start_date",
+          "days": 30,
+          "status": "won"
+        }
+      },
+      {
+        "key": "documents",
+        "type": "module:documents.awaiting",
+        "title": "Right-to-work files awaiting action",
+        "size": "md"
+      },
+      {
+        "key": "receivables",
+        "type": "module:invoices.receivables",
+        "title": "Outstanding fees",
+        "size": "sm"
+      },
+      {
+        "key": "renewals",
+        "type": "module:contracts.renewals",
+        "title": "Assignments ending soon",
+        "size": "sm"
+      },
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      }
+    ]
+  },
+  "templates": [],
+  "sample_data": {
+    "organizations": [
+      {
+        "ref": "tidewater",
+        "name": "Tidewater Software",
+        "website": "https://tidewater-software.test",
+        "industry": "Software",
+        "days": -250,
+        "owner": "account_manager",
+        "custom": {
+          "terms_signed": true,
+          "agreed_fee_pct": 20
+        }
+      },
+      {
+        "ref": "harborline",
+        "name": "Harborline Logistics",
+        "website": "https://harborline.test",
+        "industry": "Logistics",
+        "days": -230,
+        "owner": "account_manager",
+        "custom": {
+          "terms_signed": true,
+          "agreed_fee_pct": 22
+        }
+      },
+      {
+        "ref": "brightpath",
+        "name": "Brightpath Health Partners",
+        "website": "https://brightpath-health.test",
+        "industry": "Healthcare",
+        "days": -200,
+        "owner": "account_manager",
+        "custom": {
+          "terms_signed": true,
+          "agreed_fee_pct": 20
+        }
+      },
+      {
+        "ref": "copperleaf",
+        "name": "Copperleaf Financial Group",
+        "website": "https://copperleaf-financial.test",
+        "industry": "Financial services",
+        "days": -160,
+        "owner": "admin",
+        "custom": {
+          "terms_signed": true,
+          "agreed_fee_pct": 22
+        }
+      },
+      {
+        "ref": "summit",
+        "name": "Summit Ridge Manufacturing",
+        "website": "https://summitridge-mfg.test",
+        "industry": "Manufacturing",
+        "days": -140,
+        "owner": "account_manager",
+        "custom": {
+          "terms_signed": true,
+          "agreed_fee_pct": 18
+        }
+      },
+      {
+        "ref": "meridian",
+        "name": "Meridian Home Goods",
+        "website": "https://meridian-homegoods.test",
+        "industry": "Retail",
+        "days": -110,
+        "owner": "recruiter",
+        "custom": {
+          "terms_signed": false,
+          "agreed_fee_pct": 20
+        }
+      },
+      {
+        "ref": "oakhollow",
+        "name": "Oak Hollow Credit Union",
+        "website": "https://oakhollow-cu.test",
+        "industry": "Financial services",
+        "days": -25,
+        "owner": "account_manager",
+        "custom": {
+          "terms_signed": false
+        }
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "rachel",
+        "first_name": "Rachel",
+        "last_name": "Moreno",
+        "email": "rachel.moreno@tidewater-software.test",
+        "phone": "+1 512 555 0101",
+        "job_title": "VP of engineering",
+        "organization": "tidewater",
+        "lifecycle_status": "Client representative",
+        "source": "Referral",
+        "custom": {},
+        "days": -248,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "derek",
+        "first_name": "Derek",
+        "last_name": "Whitfield",
+        "email": "derek.whitfield@harborline.test",
+        "phone": "+1 312 555 0102",
+        "job_title": "Director of operations",
+        "organization": "harborline",
+        "lifecycle_status": "Client representative",
+        "source": "Event",
+        "custom": {},
+        "days": -228,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "nina",
+        "first_name": "Nina",
+        "last_name": "Patel",
+        "email": "nina.patel@brightpath-health.test",
+        "phone": "+1 614 555 0103",
+        "job_title": "Director of nursing",
+        "organization": "brightpath",
+        "lifecycle_status": "Client representative",
+        "source": "Website",
+        "custom": {},
+        "days": -198,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "graham",
+        "first_name": "Graham",
+        "last_name": "Lyle",
+        "email": "graham.lyle@copperleaf-financial.test",
+        "phone": "+1 704 555 0104",
+        "job_title": "Chief financial officer",
+        "organization": "copperleaf",
+        "lifecycle_status": "Client representative",
+        "source": "Referral",
+        "custom": {},
+        "days": -158,
+        "owner": "admin"
+      },
+      {
+        "ref": "teresa",
+        "first_name": "Teresa",
+        "last_name": "Quinn",
+        "email": "teresa.quinn@summitridge-mfg.test",
+        "phone": "+1 414 555 0105",
+        "job_title": "Plant manager",
+        "organization": "summit",
+        "lifecycle_status": "Client representative",
+        "source": "Event",
+        "custom": {},
+        "days": -138,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "jamal",
+        "first_name": "Jamal",
+        "last_name": "Carter",
+        "email": "jamal.carter@meridian-homegoods.test",
+        "phone": "+1 303 555 0106",
+        "job_title": "Head of people",
+        "organization": "meridian",
+        "lifecycle_status": "Client representative",
+        "source": "Website",
+        "custom": {},
+        "days": -108,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "chen",
+        "first_name": "Chen",
+        "last_name": "Wu",
+        "email": "chen.wu@mail.test",
+        "phone": "+1 512 555 0107",
+        "job_title": "Senior developer",
+        "lifecycle_status": "New candidate",
+        "source": "Professional network",
+        "custom": {
+          "work_authorization": "permanent_resident",
+          "right_to_work_checked": false,
+          "desired_salary": 140000,
+          "notice_period": "one_month"
+        },
+        "days": -6,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "dara",
+        "first_name": "Dara",
+        "last_name": "Novak",
+        "email": "dara.novak@mail.test",
+        "phone": "+1 512 555 0108",
+        "job_title": "Senior developer",
+        "lifecycle_status": "Active candidate",
+        "source": "Job board",
+        "custom": {
+          "work_authorization": "citizen",
+          "right_to_work_checked": false,
+          "desired_salary": 130000,
+          "notice_period": "two_weeks"
+        },
+        "days": -19,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "eli",
+        "first_name": "Eli",
+        "last_name": "Brown",
+        "email": "eli.brown@mail.test",
+        "phone": "+1 737 555 0109",
+        "job_title": "Backend engineer",
+        "lifecycle_status": "Active candidate",
+        "source": "Database search",
+        "custom": {
+          "work_authorization": "citizen",
+          "right_to_work_checked": true,
+          "desired_salary": 125000,
+          "notice_period": "two_weeks"
+        },
+        "days": -34,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "hana",
+        "first_name": "Hana",
+        "last_name": "Kim",
+        "email": "hana.kim@mail.test",
+        "phone": "+1 512 555 0110",
+        "job_title": "Product designer",
+        "lifecycle_status": "Active candidate",
+        "source": "Referral",
+        "custom": {
+          "work_authorization": "work_visa",
+          "right_to_work_checked": true,
+          "desired_salary": 120000,
+          "notice_period": "one_month"
+        },
+        "days": -47,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "kofi",
+        "first_name": "Kofi",
+        "last_name": "Mensah",
+        "email": "kofi.mensah@mail.test",
+        "phone": "+1 312 555 0111",
+        "job_title": "Logistics coordinator",
+        "organization": "harborline",
+        "lifecycle_status": "Placed",
+        "source": "Job board",
+        "custom": {
+          "work_authorization": "permanent_resident",
+          "right_to_work_checked": false,
+          "desired_salary": 60000,
+          "notice_period": "two_weeks"
+        },
+        "days": -70,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "aaron",
+        "first_name": "Aaron",
+        "last_name": "Webb",
+        "email": "aaron.webb@mail.test",
+        "phone": "+1 312 555 0112",
+        "job_title": "Warehouse manager",
+        "organization": "harborline",
+        "lifecycle_status": "Placed",
+        "source": "Headhunted",
+        "custom": {
+          "work_authorization": "citizen",
+          "right_to_work_checked": true,
+          "desired_salary": 78000,
+          "notice_period": "one_month"
+        },
+        "days": -190,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "maria",
+        "first_name": "Maria",
+        "last_name": "Gonzalez",
+        "email": "maria.gonzalez@mail.test",
+        "phone": "+1 614 555 0113",
+        "job_title": "Registered nurse",
+        "organization": "brightpath",
+        "lifecycle_status": "Placed",
+        "source": "Job board",
+        "custom": {
+          "work_authorization": "citizen",
+          "right_to_work_checked": true,
+          "desired_salary": 92000,
+          "notice_period": "immediate"
+        },
+        "days": -95,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "sofia",
+        "first_name": "Sofia",
+        "last_name": "Russo",
+        "email": "sofia.russo@mail.test",
+        "phone": "+1 614 555 0114",
+        "job_title": "ICU nurse",
+        "lifecycle_status": "Active candidate",
+        "source": "Website",
+        "custom": {
+          "work_authorization": "needs_sponsorship",
+          "right_to_work_checked": false,
+          "desired_salary": 98000,
+          "notice_period": "two_months"
+        },
+        "days": -22,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "owen",
+        "first_name": "Owen",
+        "last_name": "Fitzgerald",
+        "email": "owen.fitzgerald@mail.test",
+        "phone": "+1 704 555 0115",
+        "job_title": "Financial analyst",
+        "lifecycle_status": "Active candidate",
+        "source": "Professional network",
+        "custom": {
+          "work_authorization": "citizen",
+          "right_to_work_checked": true,
+          "desired_salary": 95000,
+          "notice_period": "one_month"
+        },
+        "days": -41,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "priya",
+        "first_name": "Priya",
+        "last_name": "Shah",
+        "email": "priya.shah@mail.test",
+        "phone": "+1 704 555 0116",
+        "job_title": "Senior accountant",
+        "lifecycle_status": "Active candidate",
+        "source": "Referral",
+        "custom": {
+          "work_authorization": "permanent_resident",
+          "right_to_work_checked": true,
+          "desired_salary": 90000,
+          "notice_period": "two_weeks"
+        },
+        "days": -28,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "marcus",
+        "first_name": "Marcus",
+        "last_name": "Bell",
+        "email": "marcus.bell@mail.test",
+        "phone": "+1 414 555 0117",
+        "job_title": "Maintenance technician",
+        "organization": "summit",
+        "lifecycle_status": "Placed",
+        "source": "Job board",
+        "custom": {
+          "work_authorization": "citizen",
+          "right_to_work_checked": true,
+          "desired_salary": 58000,
+          "notice_period": "immediate"
+        },
+        "days": -120,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "tyler",
+        "first_name": "Tyler",
+        "last_name": "Ng",
+        "email": "tyler.ng@mail.test",
+        "phone": "+1 312 555 0118",
+        "job_title": "Warehouse supervisor",
+        "lifecycle_status": "Active candidate",
+        "source": "Job board",
+        "custom": {
+          "work_authorization": "citizen",
+          "notice_period": "two_weeks",
+          "desired_salary": 64000
+        },
+        "days": -15,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "lena",
+        "first_name": "Lena",
+        "last_name": "Fischer",
+        "email": "lena.fischer@mail.test",
+        "phone": "+1 303 555 0119",
+        "job_title": "Store manager",
+        "lifecycle_status": "Not looking",
+        "source": "Headhunted",
+        "custom": {
+          "work_authorization": "citizen",
+          "right_to_work_checked": true,
+          "desired_salary": 72000,
+          "notice_period": "one_month"
+        },
+        "days": -88,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "isaac",
+        "first_name": "Isaac",
+        "last_name": "Romero",
+        "email": "isaac.romero@mail.test",
+        "phone": "+1 737 555 0120",
+        "job_title": "Data engineer",
+        "lifecycle_status": "Active candidate",
+        "source": "Professional network",
+        "custom": {
+          "work_authorization": "work_visa",
+          "right_to_work_checked": true,
+          "desired_salary": 135000,
+          "notice_period": "one_month"
+        },
+        "days": -64,
+        "owner": "recruiter"
+      }
+    ],
+    "leads": [
+      {
+        "ref": "lakeshore",
+        "first_name": "Paula",
+        "last_name": "Jensen",
+        "email": "paula.jensen@lakeshore-dental.test",
+        "phone": "+1 608 555 0121",
+        "company_name": "Lakeshore Dental Group",
+        "job_title": "Practice manager",
+        "source": "Website",
+        "status": "new",
+        "days": -2,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "ironbridge",
+        "first_name": "Victor",
+        "last_name": "Huang",
+        "email": "victor.huang@ironbridge-build.test",
+        "phone": "+1 214 555 0122",
+        "company_name": "Ironbridge Construction",
+        "job_title": "Project director",
+        "source": "Referral",
+        "status": "contacted",
+        "days": -9,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "bluewater",
+        "first_name": "Elise",
+        "last_name": "Durand",
+        "email": "elise.durand@bluewater-hotels.test",
+        "phone": "+1 305 555 0123",
+        "company_name": "Bluewater Hotels",
+        "job_title": "HR manager",
+        "source": "Event",
+        "status": "qualified",
+        "days": -16,
+        "owner": "admin"
+      },
+      {
+        "ref": "pinecrest",
+        "first_name": "Sam",
+        "last_name": "Okoro",
+        "email": "sam.okoro@pinecrest-living.test",
+        "phone": "+1 614 555 0124",
+        "company_name": "Pinecrest Senior Living",
+        "job_title": "Director of nursing",
+        "source": "Website",
+        "status": "new",
+        "days": -1,
+        "owner": "recruiter"
+      },
+      {
+        "ref": "redline",
+        "first_name": "Ben",
+        "last_name": "Archer",
+        "email": "ben.archer@redline-couriers.test",
+        "company_name": "Redline Couriers",
+        "job_title": "Founder",
+        "source": "Other",
+        "status": "unqualified",
+        "days": -40,
+        "owner": "recruiter"
+      }
+    ],
+    "deals": [
+      {
+        "ref": "chen_tw",
+        "title": "Senior developer, Tidewater: Chen Wu",
+        "contact": "chen",
+        "organization": "tidewater",
+        "stage": "sourced",
+        "value": 28000,
+        "days": -5,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 140000,
+          "fee_pct": 20
+        },
+        "expected_close": "{{date:+45}}"
+      },
+      {
+        "ref": "dara_tw",
+        "title": "Senior developer, Tidewater: Dara Novak",
+        "contact": "dara",
+        "organization": "tidewater",
+        "stage": "screened",
+        "value": 26000,
+        "days": -18,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 130000,
+          "fee_pct": 20
+        },
+        "stage_days": -3,
+        "expected_close": "{{date:+35}}"
+      },
+      {
+        "ref": "tyler_hl",
+        "title": "Warehouse supervisor, Harborline: Tyler Ng",
+        "contact": "tyler",
+        "organization": "harborline",
+        "stage": "screened",
+        "value": 14080,
+        "days": -14,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 64000,
+          "fee_pct": 22
+        },
+        "stage_days": -4,
+        "expected_close": "{{date:+30}}"
+      },
+      {
+        "ref": "eli_tw",
+        "title": "Backend engineer, Tidewater: Eli Brown",
+        "contact": "eli",
+        "organization": "tidewater",
+        "stage": "submitted",
+        "value": 25000,
+        "days": -32,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 125000,
+          "fee_pct": 20
+        },
+        "stage_days": -6,
+        "expected_close": "{{date:+21}}"
+      },
+      {
+        "ref": "priya_cl",
+        "title": "Senior accountant, Copperleaf: Priya Shah",
+        "contact": "priya",
+        "organization": "copperleaf",
+        "stage": "submitted",
+        "value": 19800,
+        "days": -26,
+        "owner": "account_manager",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 90000,
+          "fee_pct": 22
+        },
+        "stage_days": -2,
+        "expected_close": "{{date:+28}}"
+      },
+      {
+        "ref": "sofia_bp",
+        "title": "ICU nurse (13-week contract), Brightpath: Sofia Russo",
+        "contact": "sofia",
+        "organization": "brightpath",
+        "stage": "submitted",
+        "value": 15600,
+        "days": -20,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "contract",
+          "base_salary": 98000
+        },
+        "stage_days": -8,
+        "expected_close": "{{date:+20}}"
+      },
+      {
+        "ref": "hana_tw",
+        "title": "Product designer, Tidewater: Hana Kim",
+        "contact": "hana",
+        "organization": "tidewater",
+        "stage": "interview",
+        "value": 24000,
+        "days": -45,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 120000,
+          "fee_pct": 20
+        },
+        "stage_days": -5,
+        "expected_close": "{{date:+10}}"
+      },
+      {
+        "ref": "owen_cl",
+        "title": "Financial analyst, Copperleaf: Owen Fitzgerald",
+        "contact": "owen",
+        "organization": "copperleaf",
+        "stage": "interview",
+        "value": 20900,
+        "days": -39,
+        "owner": "account_manager",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 95000,
+          "fee_pct": 22
+        },
+        "stage_days": -9,
+        "expected_close": "{{date:+14}}"
+      },
+      {
+        "ref": "kofi_hl",
+        "title": "Logistics coordinator, Harborline: Kofi Mensah",
+        "contact": "kofi",
+        "organization": "harborline",
+        "stage": "placed",
+        "value": 13200,
+        "days": -68,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 60000,
+          "fee_pct": 22,
+          "start_date": "{{date:+12}}"
+        },
+        "stage_days": -6
+      },
+      {
+        "ref": "aaron_hl",
+        "title": "Warehouse manager, Harborline: Aaron Webb",
+        "contact": "aaron",
+        "organization": "harborline",
+        "stage": "placed",
+        "value": 17160,
+        "days": -188,
+        "owner": "account_manager",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 78000,
+          "fee_pct": 22,
+          "start_date": "{{date:-140}}"
+        },
+        "stage_days": -150
+      },
+      {
+        "ref": "maria_bp",
+        "title": "Registered nurse (contract), Brightpath: Maria Gonzalez",
+        "contact": "maria",
+        "organization": "brightpath",
+        "stage": "placed",
+        "value": 20800,
+        "days": -92,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "contract",
+          "base_salary": 92000,
+          "start_date": "{{date:-40}}"
+        },
+        "stage_days": -50
+      },
+      {
+        "ref": "marcus_sr",
+        "title": "Maintenance technician (temp), Summit Ridge: Marcus Bell",
+        "contact": "marcus",
+        "organization": "summit",
+        "stage": "placed",
+        "value": 9360,
+        "days": -118,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "temp",
+          "base_salary": 58000,
+          "start_date": "{{date:-75}}"
+        },
+        "stage_days": -80
+      },
+      {
+        "ref": "lena_mr",
+        "title": "Store manager, Meridian: Lena Fischer",
+        "contact": "lena",
+        "organization": "meridian",
+        "stage": "not_placed",
+        "value": 14400,
+        "days": -86,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 72000,
+          "fee_pct": 20
+        },
+        "stage_days": -52,
+        "lost_reason": "Counter-offer accepted"
+      },
+      {
+        "ref": "isaac_tw",
+        "title": "Data engineer, Tidewater: Isaac Romero",
+        "contact": "isaac",
+        "organization": "tidewater",
+        "stage": "not_placed",
+        "value": 27000,
+        "days": -62,
+        "owner": "recruiter",
+        "custom": {
+          "placement_type": "permanent",
+          "base_salary": 135000,
+          "fee_pct": 20
+        },
+        "stage_days": -30,
+        "lost_reason": "Rejected by client"
+      }
+    ],
+    "activities": [
+      {
+        "type": "note",
+        "related": "organization:tidewater",
+        "body": "<p>Tidewater is hiring 4 engineers this quarter: 2 senior developers, 1 backend, 1 product designer. Rachel wants shortlists of 3 per role within 10 days.</p>",
+        "days": -40,
+        "owner": "account_manager"
+      },
+      {
+        "type": "note",
+        "related": "deal:chen_tw",
+        "body": "<p>Strong Go and TypeScript background, 9 years. Open to hybrid in Austin. Wants $140k base.</p>",
+        "days": -5,
+        "owner": "recruiter"
+      },
+      {
+        "type": "call",
+        "related": "deal:chen_tw",
+        "subject": "Phone screen with Chen",
+        "due_days": 1,
+        "days": -4,
+        "owner": "recruiter"
+      },
+      {
+        "type": "call",
+        "related": "deal:dara_tw",
+        "subject": "Phone screen with Dara",
+        "due_days": -3,
+        "days": -6,
+        "owner": "recruiter",
+        "done": true,
+        "outcome": "Good fit; send to Rachel after references"
+      },
+      {
+        "type": "task",
+        "related": "deal:dara_tw",
+        "subject": "Collect two references from Dara",
+        "due_days": -1,
+        "days": -3,
+        "owner": "recruiter",
+        "priority": "high"
+      },
+      {
+        "type": "note",
+        "related": "deal:eli_tw",
+        "body": "<p>Profile sent to Rachel with salary expectations. Rachel asked for a code sample before booking interviews.</p>",
+        "days": -6,
+        "owner": "recruiter"
+      },
+      {
+        "type": "task",
+        "related": "deal:eli_tw",
+        "subject": "Chase Tidewater for feedback on Eli",
+        "due_days": -2,
+        "days": -5,
+        "owner": "recruiter",
+        "priority": "high"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:hana_tw",
+        "subject": "Final round: Hana Kim with Tidewater design team",
+        "due_days": 4,
+        "days": -5,
+        "owner": "recruiter",
+        "hour": 15
+      },
+      {
+        "type": "call",
+        "related": "deal:hana_tw",
+        "subject": "Prep call with Hana before the final round",
+        "due_days": 3,
+        "days": -2,
+        "owner": "recruiter"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:owen_cl",
+        "subject": "Second interview: Owen with Graham Lyle",
+        "due_days": 6,
+        "days": -9,
+        "owner": "account_manager",
+        "hour": 11
+      },
+      {
+        "type": "note",
+        "related": "deal:owen_cl",
+        "body": "<p>First interview went well. Graham wants to test Excel modelling in round two.</p>",
+        "days": -9,
+        "owner": "account_manager"
+      },
+      {
+        "type": "task",
+        "related": "deal:priya_cl",
+        "subject": "Confirm Priya's interview availability for next week",
+        "due_days": 1,
+        "days": -2,
+        "owner": "account_manager"
+      },
+      {
+        "type": "note",
+        "related": "deal:sofia_bp",
+        "body": "<p>Sofia needs visa sponsorship. Nina confirmed Brightpath can sponsor for ICU roles; check timelines before submitting more nurses.</p>",
+        "days": -8,
+        "owner": "recruiter"
+      },
+      {
+        "type": "call",
+        "related": "deal:sofia_bp",
+        "subject": "Nina Patel: feedback on Sofia's profile",
+        "due_days": -1,
+        "days": -4,
+        "owner": "recruiter",
+        "done": true,
+        "outcome": "Wants a video call next week"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:sofia_bp",
+        "subject": "Video interview: Sofia and Nina Patel",
+        "due_days": 7,
+        "days": -1,
+        "owner": "recruiter",
+        "hour": 14
+      },
+      {
+        "type": "note",
+        "related": "deal:kofi_hl",
+        "body": "<p>Offer accepted at $60k. Starts in two weeks. Right-to-work documents requested through the portal.</p>",
+        "days": -6,
+        "owner": "recruiter"
+      },
+      {
+        "type": "task",
+        "related": "deal:kofi_hl",
+        "subject": "Check Kofi's right-to-work documents before start",
+        "due_days": 5,
+        "days": -6,
+        "owner": "recruiter",
+        "priority": "high"
+      },
+      {
+        "type": "call",
+        "related": "deal:kofi_hl",
+        "subject": "Start-day check-in with Kofi",
+        "due_days": 13,
+        "days": -6,
+        "owner": "recruiter"
+      },
+      {
+        "type": "call",
+        "related": "deal:aaron_hl",
+        "subject": "90-day check-in with Aaron and Derek",
+        "due_days": -50,
+        "days": -55,
+        "owner": "account_manager",
+        "done": true,
+        "outcome": "Happy on both sides; guarantee period passed"
+      },
+      {
+        "type": "note",
+        "related": "deal:maria_bp",
+        "body": "<p>Contract runs 26 weeks. Brightpath may extend; raise with Nina six weeks before the end date.</p>",
+        "days": -40,
+        "owner": "recruiter"
+      },
+      {
+        "type": "task",
+        "related": "deal:maria_bp",
+        "subject": "Raise contract extension with Nina",
+        "due_days": 10,
+        "days": -3,
+        "owner": "account_manager"
+      },
+      {
+        "type": "call",
+        "related": "deal:marcus_sr",
+        "subject": "Weekly timesheet check with Teresa",
+        "due_days": -2,
+        "days": -9,
+        "owner": "recruiter",
+        "done": true,
+        "outcome": "Hours approved"
+      },
+      {
+        "type": "note",
+        "related": "deal:lena_mr",
+        "body": "<p>Lena accepted a counter-offer from her current employer two days before the start date. Keep warm for next year.</p>",
+        "days": -52,
+        "owner": "recruiter"
+      },
+      {
+        "type": "note",
+        "related": "deal:isaac_tw",
+        "body": "<p>Rachel passed after the system design round: wanted more streaming experience. Isaac open to other roles.</p>",
+        "days": -30,
+        "owner": "recruiter"
+      },
+      {
+        "type": "note",
+        "related": "contact:graham",
+        "body": "<p>Graham prefers fee invoices addressed to ap@copperleaf-financial.test with the PO number on the first line.</p>",
+        "days": -150,
+        "owner": "admin"
+      },
+      {
+        "type": "meeting",
+        "related": "organization:meridian",
+        "subject": "Terms of business meeting with Jamal Carter",
+        "due_days": 5,
+        "days": -3,
+        "owner": "account_manager",
+        "hour": 10
+      },
+      {
+        "type": "task",
+        "related": "organization:oakhollow",
+        "subject": "Send terms of business to Oak Hollow",
+        "due_days": -1,
+        "days": -8,
+        "owner": "account_manager",
+        "priority": "high"
+      },
+      {
+        "type": "call",
+        "related": "contact:tyler",
+        "subject": "Second screen with Tyler",
+        "due_days": 2,
+        "days": -1,
+        "owner": "recruiter"
+      },
+      {
+        "type": "task",
+        "subject": "Refresh the senior developer job ad",
+        "due_days": 0,
+        "days": -1,
+        "owner": "recruiter"
+      },
+      {
+        "type": "task",
+        "subject": "Weekly billing review",
+        "due_days": 3,
+        "days": -2,
+        "owner": "account_manager"
+      }
+    ],
+    "requests": [
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "PERM-FEE",
+          "name": "Permanent placement fee",
+          "description": "Percentage of first-year base salary, per the client's terms of business.",
+          "unit": "placement",
+          "unitPrice": 20000
+        },
+        "ref": "p_perm"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "CONTRACT-WK",
+          "name": "Contract staffing (weekly)",
+          "unit": "week",
+          "unitPrice": 1600,
+          "recurring": true
+        },
+        "ref": "p_contract"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "TEMP-HR",
+          "name": "Temp staffing (hour)",
+          "unit": "hour",
+          "unitPrice": 48
+        },
+        "ref": "p_temp"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "BG-CHECK",
+          "name": "Background and reference check",
+          "unit": "check",
+          "unitPrice": 95
+        },
+        "ref": "p_check"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Tidewater: engineering hiring, 4 roles",
+          "contactUuid": "{{contact:rachel}}",
+          "organizationUuid": "{{organization:tidewater}}",
+          "dealUuid": "{{deal:hana_tw}}",
+          "issueDate": "{{date:-42}}",
+          "validUntil": "{{date:-12}}",
+          "terms": "Fee 20% of first-year base salary, due on start date. 90-day replacement guarantee.",
+          "lines": [
+            {
+              "productUuid": "{{req:p_perm}}",
+              "name": "Permanent placement fee: senior developer",
+              "quantity": 2,
+              "unitPrice": 27000
+            },
+            {
+              "productUuid": "{{req:p_perm}}",
+              "name": "Permanent placement fee: backend engineer",
+              "quantity": 1,
+              "unitPrice": 25000
+            },
+            {
+              "productUuid": "{{req:p_perm}}",
+              "name": "Permanent placement fee: product designer",
+              "quantity": 1,
+              "unitPrice": 24000
+            }
+          ]
+        },
+        "ref": "q_tw"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_tw}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_tw}}/accept",
+        "body": {
+          "acceptedByName": "Rachel Moreno"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Copperleaf: finance team hires",
+          "contactUuid": "{{contact:graham}}",
+          "organizationUuid": "{{organization:copperleaf}}",
+          "dealUuid": "{{deal:owen_cl}}",
+          "issueDate": "{{date:-10}}",
+          "validUntil": "{{date:+20}}",
+          "terms": "Fee 22% of first-year base salary.",
+          "lines": [
+            {
+              "productUuid": "{{req:p_perm}}",
+              "name": "Permanent placement fee: financial analyst",
+              "quantity": 1,
+              "unitPrice": 20900
+            },
+            {
+              "productUuid": "{{req:p_perm}}",
+              "name": "Permanent placement fee: senior accountant",
+              "quantity": 1,
+              "unitPrice": 19800
+            },
+            {
+              "productUuid": "{{req:p_check}}",
+              "name": "Background and reference check",
+              "quantity": 2,
+              "unitPrice": 95
+            }
+          ]
+        },
+        "ref": "q_cl"
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_cl}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Meridian: store manager search",
+          "contactUuid": "{{contact:jamal}}",
+          "organizationUuid": "{{organization:meridian}}",
+          "issueDate": "{{date:-2}}",
+          "validUntil": "{{date:+28}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_perm}}",
+              "name": "Permanent placement fee: store manager (20% of $70,000)",
+              "quantity": 1,
+              "unitPrice": 14000
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Placement fee: Aaron Webb",
+          "contactUuid": "{{contact:derek}}",
+          "organizationUuid": "{{organization:harborline}}",
+          "dealUuid": "{{deal:aaron_hl}}",
+          "issueDate": "{{date:-140}}",
+          "dueDate": "{{date:-110}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_perm}}",
+              "name": "Permanent placement fee: warehouse manager (22% of $78,000)",
+              "quantity": 1,
+              "unitPrice": 17160
+            }
+          ]
+        },
+        "ref": "inv_aaron"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_aaron}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_aaron}}/payments",
+        "body": {
+          "amount": 17160,
+          "paidOn": "{{date:-115}}",
+          "method": "bank_transfer",
+          "reference": "HL-ACH-40213"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Maria Gonzalez: contract, last 4 weeks",
+          "contactUuid": "{{contact:nina}}",
+          "organizationUuid": "{{organization:brightpath}}",
+          "dealUuid": "{{deal:maria_bp}}",
+          "issueDate": "{{date:-35}}",
+          "dueDate": "{{date:-5}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_contract}}",
+              "name": "Contract staffing (weekly): registered nurse",
+              "quantity": 4,
+              "unitPrice": 3200
+            }
+          ]
+        },
+        "ref": "inv_maria"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_maria}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Marcus Bell: temp hours, last two weeks",
+          "contactUuid": "{{contact:teresa}}",
+          "organizationUuid": "{{organization:summit}}",
+          "dealUuid": "{{deal:marcus_sr}}",
+          "issueDate": "{{date:-7}}",
+          "dueDate": "{{date:+7}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_temp}}",
+              "name": "Temp staffing (hour): maintenance technician",
+              "quantity": 80,
+              "unitPrice": 48
+            }
+          ]
+        },
+        "ref": "inv_marcus"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_marcus}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_marcus}}/payments",
+        "body": {
+          "amount": 1920,
+          "paidOn": "{{date:-1}}",
+          "method": "card",
+          "reference": "Part payment"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Placement fee: Kofi Mensah (due on start)",
+          "contactUuid": "{{contact:derek}}",
+          "organizationUuid": "{{organization:harborline}}",
+          "dealUuid": "{{deal:kofi_hl}}",
+          "issueDate": "{{date:+12}}",
+          "dueDate": "{{date:+42}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_perm}}",
+              "name": "Permanent placement fee: logistics coordinator (22% of $60,000)",
+              "quantity": 1,
+              "unitPrice": 13200
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts",
+        "body": {
+          "title": "Brightpath: terms of business",
+          "contactUuid": "{{contact:nina}}",
+          "organizationUuid": "{{organization:brightpath}}",
+          "startDate": "{{date:-195}}",
+          "endDate": "{{date:+170}}",
+          "signedOn": "{{date:-196}}",
+          "billingCycle": "none",
+          "autoRenew": true,
+          "renewalTermMonths": 12,
+          "noticeDays": 60,
+          "description": "Permanent fee 20%. Contract and temp margins per the rate card."
+        },
+        "ref": "c_bp"
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts/{{req:c_bp}}/activate",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts",
+        "body": {
+          "title": "Maria Gonzalez: 26-week nursing assignment",
+          "contactUuid": "{{contact:maria}}",
+          "organizationUuid": "{{organization:brightpath}}",
+          "dealUuid": "{{deal:maria_bp}}",
+          "startDate": "{{date:-40}}",
+          "endDate": "{{date:+142}}",
+          "signedOn": "{{date:-45}}",
+          "value": 83200,
+          "billingCycle": "monthly",
+          "noticeDays": 30
+        },
+        "ref": "c_maria"
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts/{{req:c_maria}}/activate",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts",
+        "body": {
+          "title": "Marcus Bell: temp assignment",
+          "contactUuid": "{{contact:marcus}}",
+          "organizationUuid": "{{organization:summit}}",
+          "dealUuid": "{{deal:marcus_sr}}",
+          "startDate": "{{date:-75}}",
+          "endDate": "{{date:+15}}",
+          "signedOn": "{{date:-77}}",
+          "value": 24960,
+          "billingCycle": "monthly",
+          "noticeDays": 14
+        },
+        "ref": "c_marcus"
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts/{{req:c_marcus}}/activate",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/templates",
+        "body": {
+          "name": "Candidate engagement and consent",
+          "description": "Consent to represent the candidate and share their profile with clients.",
+          "requiresSignature": true,
+          "body": "<h1>Candidate engagement and consent</h1><p>Dear {{contact.firstName}},</p><p>Thank you for registering with {{business.name}}. By signing below you agree that we may represent you and share your profile with prospective employers, and that you will tell us if you apply to the same role elsewhere.</p><p>Signed by {{contact.fullName}} on {{today}}.</p><p>{{user.name}}<br>{{business.name}}</p>"
+        },
+        "ref": "tpl_consent"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:tpl_consent}}",
+          "contactUuid": "{{contact:kofi}}",
+          "dealUuid": "{{deal:kofi_hl}}",
+          "title": "Engagement and consent: Kofi Mensah"
+        },
+        "ref": "doc_kofi"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents/{{req:doc_kofi}}/share",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:kofi}}",
+          "dealUuid": "{{deal:kofi_hl}}",
+          "items": [
+            {
+              "name": "Proof of work authorization",
+              "description": "Permanent resident card, front and back.",
+              "dueDate": "{{date:+5}}"
+            },
+            {
+              "name": "Photo ID",
+              "description": "Driver's license or state ID.",
+              "dueDate": "{{date:+5}}"
+            },
+            {
+              "name": "Signed offer letter",
+              "dueDate": "{{date:+3}}"
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:sofia}}",
+          "dealUuid": "{{deal:sofia_bp}}",
+          "items": [
+            {
+              "name": "Nursing license",
+              "description": "Current state RN license.",
+              "dueDate": "{{date:+10}}"
+            },
+            {
+              "name": "BLS and ACLS certificates",
+              "dueDate": "{{date:+10}}"
+            },
+            {
+              "name": "Passport",
+              "description": "Photo page, for the sponsorship application.",
+              "dueDate": "{{date:+14}}"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -65,3 +65,17 @@ export function compareVersions(a: string, b: string): number {
   }
   return 0;
 }
+
+/** Industry slugs (as on the marketing site) whose blueprint key differs from the slug. */
+const INDUSTRY_ALIASES: Record<string, string> = { 'immigration-visa': 'visa-consultancy' };
+
+/** Blueprint key for an industry slug or a blueprint key. */
+export function blueprintForIndustry(industry: string): string {
+  return INDUSTRY_ALIASES[industry] ?? industry;
+}
+
+/** Industry slug for a blueprint key (the reverse of `blueprintForIndustry`). */
+export function industryForBlueprint(key: string): string {
+  return Object.entries(INDUSTRY_ALIASES).find(([, k]) => k === key)?.[0] ?? key;
+}
+export * from './check-sample';

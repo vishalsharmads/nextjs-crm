@@ -1,0 +1,1604 @@
+{
+  "$schema": "../schema.json",
+  "key": "real-estate",
+  "name": "Real estate agency",
+  "version": "1.0.0",
+  "description": "Buyers, vendors and listings from appraisal to settlement, with open homes, agency agreements, vendor portal access and commission invoices.",
+  "settings": {
+    "features": {
+      "leads": true
+    },
+    "general": {
+      "currency": "AUD"
+    },
+    "contacts": {
+      "sources": [
+        "Open home",
+        "Property portal",
+        "Website",
+        "Signboard",
+        "Referral",
+        "Past client",
+        "Social",
+        "Other"
+      ],
+      "lifecycleStatuses": ["Prospective buyer", "Active buyer", "Vendor", "Past client"]
+    },
+    "deals": {
+      "lostReasons": [
+        "Listed with another agency",
+        "Price expectations",
+        "Vendor withdrew",
+        "Passed in, not sold",
+        "No response"
+      ]
+    }
+  },
+  "vocabulary": {
+    "contact": {
+      "singular": "Buyer",
+      "plural": "Buyers"
+    },
+    "organization": {
+      "singular": "Agency",
+      "plural": "Agencies"
+    },
+    "deal": {
+      "singular": "Listing",
+      "plural": "Listings"
+    }
+  },
+  "modules": ["bookings", "portal", "documents", "invoices"],
+  "custom_field_groups": {
+    "contact": [
+      {
+        "key": "buying",
+        "label": "Buying profile"
+      }
+    ],
+    "deal": [
+      {
+        "key": "property",
+        "label": "Property"
+      },
+      {
+        "key": "campaign",
+        "label": "Campaign"
+      }
+    ]
+  },
+  "custom_fields": {
+    "contact": [
+      {
+        "key": "buyer_type",
+        "label": "Buyer type",
+        "type": "select",
+        "group": "buying",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "first_home",
+            "label": "First home buyer"
+          },
+          {
+            "key": "owner_occupier",
+            "label": "Owner-occupier"
+          },
+          {
+            "key": "investor",
+            "label": "Investor"
+          },
+          {
+            "key": "downsizer",
+            "label": "Downsizer"
+          }
+        ]
+      },
+      {
+        "key": "max_budget",
+        "label": "Max budget",
+        "type": "currency",
+        "group": "buying",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "finance_status",
+        "label": "Finance",
+        "type": "select",
+        "group": "buying",
+        "filterable": true,
+        "options": [
+          {
+            "key": "pre_approved",
+            "label": "Pre-approved"
+          },
+          {
+            "key": "arranging",
+            "label": "Arranging finance"
+          },
+          {
+            "key": "cash",
+            "label": "Cash buyer"
+          },
+          {
+            "key": "not_started",
+            "label": "Not started"
+          }
+        ]
+      }
+    ],
+    "deal": [
+      {
+        "key": "property_type",
+        "label": "Property type",
+        "type": "select",
+        "group": "property",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "house",
+            "label": "House"
+          },
+          {
+            "key": "apartment",
+            "label": "Apartment"
+          },
+          {
+            "key": "townhouse",
+            "label": "Townhouse"
+          },
+          {
+            "key": "land",
+            "label": "Land"
+          }
+        ]
+      },
+      {
+        "key": "bedrooms",
+        "label": "Bedrooms",
+        "type": "number",
+        "group": "property",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "sale_method",
+        "label": "Sale method",
+        "type": "select",
+        "group": "campaign",
+        "filterable": true,
+        "options": [
+          {
+            "key": "private_treaty",
+            "label": "Private treaty"
+          },
+          {
+            "key": "auction",
+            "label": "Auction"
+          },
+          {
+            "key": "eoi",
+            "label": "Expressions of interest"
+          }
+        ]
+      },
+      {
+        "key": "settlement_date",
+        "label": "Settlement date",
+        "type": "date",
+        "group": "campaign",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "commission_rate",
+        "label": "Commission rate (%)",
+        "type": "decimal",
+        "group": "campaign",
+        "visibility": {
+          "default": "write",
+          "roles": {
+            "sales_agent": "read"
+          }
+        }
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "listings",
+      "name": "Listings",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        {
+          "key": "appraisal",
+          "name": "Appraisal",
+          "probability": 20,
+          "rotting_days": 14
+        },
+        {
+          "key": "listed",
+          "name": "Listed",
+          "probability": 40,
+          "rotting_days": 21
+        },
+        {
+          "key": "open_homes",
+          "name": "Open homes",
+          "probability": 60,
+          "rotting_days": 28
+        },
+        {
+          "key": "under_offer",
+          "name": "Under offer",
+          "probability": 85,
+          "rotting_days": 10
+        },
+        {
+          "key": "settled",
+          "name": "Settled",
+          "probability": 100,
+          "is_won": true
+        },
+        {
+          "key": "withdrawn",
+          "name": "Withdrawn",
+          "probability": 0,
+          "is_lost": true
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "sales_agent",
+      "name": "Sales agent",
+      "description": "Runs their own appraisals, listings, open homes and buyer follow-up",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.view",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.*",
+        "bookings.bookings.*",
+        "documents.documents.*",
+        "invoices.invoices.view"
+      ],
+      "scopes": {
+        "*": "own",
+        "core.contacts": "all",
+        "bookings.bookings": "all"
+      }
+    },
+    {
+      "key": "office_admin",
+      "name": "Office administrator",
+      "description": "Manages every listing, open-home schedule, agency agreement and invoice",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.*",
+        "core.saved_views.share",
+        "bookings.*",
+        "documents.*",
+        "invoices.*",
+        "products.products.*",
+        "portal.accounts.manage"
+      ],
+      "scopes": {
+        "*": "all"
+      }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": [
+        "full_name",
+        "email",
+        "phone",
+        "lifecycle_status",
+        "cf.buyer_type",
+        "cf.max_budget",
+        "owner"
+      ]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": [
+        "title",
+        "contact",
+        "stage",
+        "value",
+        "cf.property_type",
+        "cf.bedrooms",
+        "cf.settlement_date",
+        "owner"
+      ]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "pipeline_value",
+        "type": "pipeline_value",
+        "title": "Listings by stage",
+        "size": "lg",
+        "params": {
+          "pipeline": "listings"
+        }
+      },
+      {
+        "key": "settlements",
+        "type": "date_window",
+        "title": "Settlements in the next 45 days",
+        "size": "md",
+        "params": {
+          "entity": "deal",
+          "field": "cf.settlement_date",
+          "days": 45,
+          "status": "open"
+        }
+      },
+      {
+        "key": "documents",
+        "type": "module:documents.awaiting",
+        "title": "Agreements and files awaiting action",
+        "size": "md"
+      },
+      {
+        "key": "receivables",
+        "type": "module:invoices.receivables",
+        "title": "Outstanding invoices",
+        "size": "sm"
+      },
+      {
+        "key": "conversion",
+        "type": "conversion",
+        "title": "Listings sold (180 days)",
+        "size": "sm",
+        "params": {
+          "days": 180
+        }
+      },
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      }
+    ]
+  },
+  "templates": [],
+  "sample_data": {
+    "organizations": [
+      {
+        "ref": "harbourside",
+        "name": "Harbourside Conveyancing",
+        "website": "https://harbourside-conveyancing.test",
+        "industry": "Conveyancing",
+        "days": -250
+      },
+      {
+        "ref": "ironbark",
+        "name": "Ironbark Developments",
+        "website": "https://ironbark-dev.test",
+        "industry": "Property development",
+        "days": -210,
+        "owner": "office_admin"
+      },
+      {
+        "ref": "coastline",
+        "name": "Coastline Buyers Advocates",
+        "website": "https://coastline-advocates.test",
+        "industry": "Buyers agency",
+        "days": -160,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "meridian",
+        "name": "Meridian Relocations",
+        "website": "https://meridian-relocations.test",
+        "industry": "Corporate relocation",
+        "days": -120
+      },
+      {
+        "ref": "bluegum",
+        "name": "Bluegum Home Loans",
+        "website": "https://bluegum-loans.test",
+        "industry": "Mortgage broking",
+        "days": -270,
+        "owner": "admin"
+      },
+      {
+        "ref": "wattlefinch",
+        "name": "Wattle & Finch Property Management",
+        "website": "https://wattlefinch.test",
+        "industry": "Property management",
+        "days": -90,
+        "owner": "office_admin"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "margaret",
+        "first_name": "Margaret",
+        "last_name": "Cole",
+        "email": "margaret.cole@example.test",
+        "phone": "07 5550 0100",
+        "lifecycle_status": "Vendor",
+        "source": "Past client",
+        "custom": {
+          "buyer_type": "downsizer"
+        },
+        "days": -14,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "ben",
+        "first_name": "Ben",
+        "last_name": "Carter",
+        "email": "ben.carter@example.test",
+        "phone": "07 5550 0101",
+        "lifecycle_status": "Vendor",
+        "source": "Signboard",
+        "days": -6,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "daniel",
+        "first_name": "Daniel",
+        "last_name": "Nguyen",
+        "email": "daniel.nguyen@example.test",
+        "phone": "07 5550 0102",
+        "lifecycle_status": "Vendor",
+        "source": "Referral",
+        "custom": {
+          "buyer_type": "investor",
+          "finance_status": "pre_approved"
+        },
+        "days": -48,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "priya",
+        "first_name": "Priya",
+        "last_name": "Raman",
+        "email": "priya.raman@example.test",
+        "phone": "07 5550 0103",
+        "lifecycle_status": "Vendor",
+        "source": "Website",
+        "custom": {
+          "buyer_type": "owner_occupier",
+          "max_budget": 2400000,
+          "finance_status": "arranging"
+        },
+        "days": -75,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "liam",
+        "first_name": "Liam",
+        "last_name": "O'Brien",
+        "email": "liam.obrien@example.test",
+        "phone": "07 5550 0104",
+        "lifecycle_status": "Vendor",
+        "source": "Past client",
+        "custom": {
+          "buyer_type": "owner_occupier"
+        },
+        "days": -110,
+        "owner": "admin"
+      },
+      {
+        "ref": "sophie",
+        "first_name": "Sophie",
+        "last_name": "Walsh",
+        "email": "sophie.walsh@example.test",
+        "phone": "07 5550 0105",
+        "lifecycle_status": "Past client",
+        "source": "Referral",
+        "custom": {
+          "buyer_type": "downsizer",
+          "finance_status": "cash"
+        },
+        "days": -190,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "rhys",
+        "first_name": "Rhys",
+        "last_name": "Morgan",
+        "email": "rhys@ironbark-dev.test",
+        "phone": "07 5550 0106",
+        "job_title": "Development manager",
+        "organization": "ironbark",
+        "lifecycle_status": "Vendor",
+        "source": "Referral",
+        "days": -205,
+        "owner": "office_admin"
+      },
+      {
+        "ref": "helen",
+        "first_name": "Helen",
+        "last_name": "Park",
+        "email": "helen.park@example.test",
+        "phone": "07 5550 0107",
+        "lifecycle_status": "Past client",
+        "source": "Property portal",
+        "days": -140,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "graham",
+        "first_name": "Graham",
+        "last_name": "Holt",
+        "email": "graham.holt@example.test",
+        "phone": "07 5550 0108",
+        "lifecycle_status": "Past client",
+        "source": "Signboard",
+        "days": -170,
+        "owner": "admin"
+      },
+      {
+        "ref": "emily",
+        "first_name": "Emily",
+        "last_name": "Chen",
+        "email": "emily.chen@example.test",
+        "phone": "07 5550 0109",
+        "lifecycle_status": "Vendor",
+        "source": "Open home",
+        "custom": {
+          "buyer_type": "downsizer",
+          "max_budget": 950000,
+          "finance_status": "cash"
+        },
+        "days": -95,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "jack",
+        "first_name": "Jack",
+        "last_name": "Thompson",
+        "email": "jack.thompson@example.test",
+        "phone": "07 5550 0110",
+        "lifecycle_status": "Active buyer",
+        "source": "Open home",
+        "custom": {
+          "buyer_type": "first_home",
+          "max_budget": 780000,
+          "finance_status": "pre_approved"
+        },
+        "days": -21,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "chloe",
+        "first_name": "Chloe",
+        "last_name": "Martin",
+        "email": "chloe.martin@example.test",
+        "phone": "07 5550 0111",
+        "lifecycle_status": "Past client",
+        "source": "Property portal",
+        "custom": {
+          "buyer_type": "investor",
+          "max_budget": 900000,
+          "finance_status": "pre_approved"
+        },
+        "days": -230,
+        "owner": "admin"
+      },
+      {
+        "ref": "aaron",
+        "first_name": "Aaron",
+        "last_name": "Kelly",
+        "email": "aaron.kelly@example.test",
+        "phone": "07 5550 0112",
+        "organization": "coastline",
+        "lifecycle_status": "Active buyer",
+        "source": "Referral",
+        "custom": {
+          "buyer_type": "owner_occupier",
+          "max_budget": 2300000,
+          "finance_status": "pre_approved"
+        },
+        "days": -33,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "mia",
+        "first_name": "Mia",
+        "last_name": "Robinson",
+        "email": "mia@coastline-advocates.test",
+        "phone": "07 5550 0113",
+        "job_title": "Buyers advocate",
+        "organization": "coastline",
+        "lifecycle_status": "Active buyer",
+        "source": "Referral",
+        "days": -150,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "noah",
+        "first_name": "Noah",
+        "last_name": "Singh",
+        "email": "noah.singh@example.test",
+        "phone": "07 5550 0114",
+        "organization": "meridian",
+        "lifecycle_status": "Active buyer",
+        "source": "Website",
+        "custom": {
+          "buyer_type": "owner_occupier",
+          "max_budget": 1300000,
+          "finance_status": "arranging"
+        },
+        "days": -12
+      },
+      {
+        "ref": "tom",
+        "first_name": "Tom",
+        "last_name": "Baker",
+        "email": "tom@harbourside-conveyancing.test",
+        "phone": "07 5550 0115",
+        "job_title": "Senior conveyancer",
+        "organization": "harbourside",
+        "lifecycle_status": "Past client",
+        "source": "Referral",
+        "days": -245,
+        "owner": "office_admin"
+      },
+      {
+        "ref": "grace",
+        "first_name": "Grace",
+        "last_name": "Lee",
+        "email": "grace@bluegum-loans.test",
+        "phone": "07 5550 0116",
+        "job_title": "Mortgage broker",
+        "organization": "bluegum",
+        "lifecycle_status": "Past client",
+        "source": "Event",
+        "days": -265,
+        "owner": "admin"
+      },
+      {
+        "ref": "oliver",
+        "first_name": "Oliver",
+        "last_name": "Wright",
+        "email": "oliver.wright@example.test",
+        "lifecycle_status": "Prospective buyer",
+        "source": "Open home",
+        "custom": {
+          "buyer_type": "first_home",
+          "max_budget": 700000,
+          "finance_status": "not_started"
+        },
+        "days": -4,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "isla",
+        "first_name": "Isla",
+        "last_name": "Brown",
+        "email": "isla.brown@example.test",
+        "phone": "07 5550 0117",
+        "lifecycle_status": "Past client",
+        "source": "Past client",
+        "custom": {
+          "buyer_type": "owner_occupier",
+          "max_budget": 1500000,
+          "finance_status": "pre_approved"
+        },
+        "days": -130,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "zoe",
+        "first_name": "Zoe",
+        "last_name": "Patel",
+        "email": "zoe.patel@example.test",
+        "lifecycle_status": "Prospective buyer",
+        "source": "Property portal",
+        "custom": {
+          "buyer_type": "investor",
+          "max_budget": 650000,
+          "finance_status": "arranging"
+        },
+        "days": -9
+      },
+      {
+        "ref": "hamish",
+        "first_name": "Hamish",
+        "last_name": "Doyle",
+        "email": "hamish@wattlefinch.test",
+        "phone": "07 5550 0118",
+        "job_title": "Leasing manager",
+        "organization": "wattlefinch",
+        "lifecycle_status": "Past client",
+        "source": "Referral",
+        "days": -85,
+        "owner": "office_admin"
+      }
+    ],
+    "leads": [
+      {
+        "ref": "l_kowalski",
+        "first_name": "Anna",
+        "last_name": "Kowalski",
+        "email": "anna.kowalski@example.test",
+        "phone": "07 5550 0119",
+        "source": "Website",
+        "status": "new",
+        "days": -1,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "l_fraser",
+        "first_name": "Callum",
+        "last_name": "Fraser",
+        "email": "callum.fraser@example.test",
+        "source": "Property portal",
+        "status": "contacted",
+        "days": -5,
+        "owner": "sales_agent"
+      },
+      {
+        "ref": "l_ward",
+        "first_name": "Rebecca",
+        "last_name": "Ward",
+        "email": "rebecca.ward@example.test",
+        "phone": "07 5550 0120",
+        "source": "Signboard",
+        "status": "qualified",
+        "days": -11,
+        "owner": "admin"
+      },
+      {
+        "ref": "l_meridian",
+        "first_name": "Sanjay",
+        "last_name": "Iyer",
+        "email": "sanjay@meridian-relocations.test",
+        "company_name": "Meridian Relocations",
+        "job_title": "Relocation consultant",
+        "source": "Referral",
+        "status": "contacted",
+        "days": -8,
+        "owner": "office_admin"
+      },
+      {
+        "ref": "l_stone",
+        "first_name": "Peter",
+        "last_name": "Stone",
+        "email": "peter.stone@example.test",
+        "source": "Social",
+        "status": "unqualified",
+        "days": -26
+      }
+    ],
+    "deals": [
+      {
+        "ref": "wattle",
+        "title": "14 Wattle Cres, Ashgrove",
+        "contact": "margaret",
+        "stage": "appraisal",
+        "value": 1450000,
+        "days": -12,
+        "expected_close": "{{date:+75}}",
+        "owner": "sales_agent",
+        "custom": {
+          "property_type": "house",
+          "bedrooms": 4,
+          "commission_rate": 2.0
+        }
+      },
+      {
+        "ref": "banksia",
+        "title": "22 Banksia St, Kelvin Grove",
+        "contact": "ben",
+        "stage": "appraisal",
+        "value": 980000,
+        "days": -5,
+        "owner": "sales_agent",
+        "custom": {
+          "property_type": "house",
+          "bedrooms": 3
+        }
+      },
+      {
+        "ref": "harbour",
+        "title": "3/88 Harbour Rd, Hamilton",
+        "contact": "daniel",
+        "stage": "listed",
+        "value": 1240000,
+        "days": -45,
+        "stage_days": -9,
+        "expected_close": "{{date:+40}}",
+        "owner": "sales_agent",
+        "custom": {
+          "property_type": "apartment",
+          "bedrooms": 2,
+          "sale_method": "private_treaty",
+          "commission_rate": 2.2
+        }
+      },
+      {
+        "ref": "ridge_lot2",
+        "title": "Lot 2, 9 Ridge Rd, Bardon",
+        "contact": "rhys",
+        "organization": "ironbark",
+        "stage": "listed",
+        "value": 985000,
+        "days": -60,
+        "stage_days": -20,
+        "owner": "office_admin",
+        "custom": {
+          "property_type": "townhouse",
+          "bedrooms": 3,
+          "sale_method": "private_treaty",
+          "commission_rate": 1.8
+        }
+      },
+      {
+        "ref": "elm",
+        "title": "7 Elm Street, Paddington",
+        "contact": "priya",
+        "stage": "open_homes",
+        "value": 1650000,
+        "days": -70,
+        "stage_days": -24,
+        "expected_close": "{{date:+12}}",
+        "owner": "sales_agent",
+        "custom": {
+          "property_type": "house",
+          "bedrooms": 4,
+          "sale_method": "auction",
+          "commission_rate": 2.0
+        }
+      },
+      {
+        "ref": "kurrajong",
+        "title": "41 Kurrajong Ave, Indooroopilly",
+        "contact": "emily",
+        "stage": "open_homes",
+        "value": 1120000,
+        "days": -38,
+        "stage_days": -10,
+        "expected_close": "{{date:+30}}",
+        "owner": "sales_agent",
+        "custom": {
+          "property_type": "house",
+          "bedrooms": 3,
+          "sale_method": "private_treaty",
+          "commission_rate": 2.2
+        }
+      },
+      {
+        "ref": "bay",
+        "title": "201 Bay Pde, Manly",
+        "contact": "liam",
+        "stage": "under_offer",
+        "value": 2150000,
+        "days": -105,
+        "stage_days": -10,
+        "owner": "admin",
+        "custom": {
+          "property_type": "house",
+          "bedrooms": 5,
+          "sale_method": "eoi",
+          "settlement_date": "{{date:+32}}",
+          "commission_rate": 1.9
+        }
+      },
+      {
+        "ref": "ridge_lot1",
+        "title": "Lot 1, 9 Ridge Rd, Bardon",
+        "contact": "rhys",
+        "organization": "ironbark",
+        "stage": "under_offer",
+        "value": 960000,
+        "days": -60,
+        "stage_days": -4,
+        "owner": "office_admin",
+        "custom": {
+          "property_type": "townhouse",
+          "bedrooms": 3,
+          "sale_method": "private_treaty",
+          "settlement_date": "{{date:+44}}",
+          "commission_rate": 1.8
+        }
+      },
+      {
+        "ref": "oak",
+        "title": "5 Oak Lane, Toowong",
+        "contact": "sophie",
+        "stage": "settled",
+        "value": 1380000,
+        "days": -150,
+        "stage_days": -20,
+        "owner": "sales_agent",
+        "custom": {
+          "property_type": "house",
+          "bedrooms": 4,
+          "sale_method": "auction",
+          "settlement_date": "{{date:-20}}",
+          "commission_rate": 2.0
+        }
+      },
+      {
+        "ref": "station",
+        "title": "6/31 Station St, Taringa",
+        "contact": "chloe",
+        "stage": "settled",
+        "value": 640000,
+        "days": -125,
+        "stage_days": -55,
+        "owner": "admin",
+        "custom": {
+          "property_type": "apartment",
+          "bedrooms": 2,
+          "sale_method": "private_treaty",
+          "settlement_date": "{{date:-55}}",
+          "commission_rate": 2.5
+        }
+      },
+      {
+        "ref": "marine",
+        "title": "12/4 Marine Pde, Redcliffe",
+        "contact": "isla",
+        "stage": "settled",
+        "value": 745000,
+        "days": -128,
+        "stage_days": -90,
+        "owner": "sales_agent",
+        "custom": {
+          "property_type": "apartment",
+          "bedrooms": 2,
+          "sale_method": "private_treaty",
+          "settlement_date": "{{date:-90}}",
+          "commission_rate": 2.3
+        }
+      },
+      {
+        "ref": "ridge_lot3",
+        "title": "Lot 3, 9 Ridge Rd, Bardon",
+        "contact": "rhys",
+        "organization": "ironbark",
+        "stage": "settled",
+        "value": 1010000,
+        "days": -200,
+        "stage_days": -35,
+        "owner": "office_admin",
+        "custom": {
+          "property_type": "townhouse",
+          "bedrooms": 3,
+          "sale_method": "private_treaty",
+          "settlement_date": "{{date:-35}}",
+          "commission_rate": 1.8
+        }
+      },
+      {
+        "ref": "figtree",
+        "title": "27 Fig Tree Ct, Chapel Hill",
+        "contact": "helen",
+        "stage": "withdrawn",
+        "value": 1300000,
+        "days": -135,
+        "stage_days": -118,
+        "lost_reason": "Listed with another agency",
+        "owner": "sales_agent",
+        "custom": {
+          "property_type": "house",
+          "bedrooms": 4
+        }
+      },
+      {
+        "ref": "lyrebird",
+        "title": "9 Lyrebird Way, The Gap",
+        "contact": "graham",
+        "stage": "withdrawn",
+        "value": 870000,
+        "days": -165,
+        "stage_days": -70,
+        "lost_reason": "Passed in, not sold",
+        "owner": "admin",
+        "custom": {
+          "property_type": "house",
+          "bedrooms": 3,
+          "sale_method": "auction",
+          "commission_rate": 2.0
+        }
+      }
+    ],
+    "activities": [
+      {
+        "type": "meeting",
+        "related": "deal:wattle",
+        "subject": "Appraisal at 14 Wattle Cres with Margaret",
+        "due_days": 2,
+        "hour": 10,
+        "days": -12,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "note",
+        "related": "deal:wattle",
+        "body": "<p>Margaret is downsizing after 22 years. Wants to sell before Christmas and is weighing auction against private treaty. Comparable sales on Wattle Cres: 1.38M and 1.52M this year.</p>",
+        "days": -11,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "task",
+        "related": "deal:wattle",
+        "subject": "Prepare comparable sales report for Margaret",
+        "due_days": 1,
+        "priority": "high",
+        "days": -3,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "call",
+        "related": "deal:banksia",
+        "subject": "Book appraisal time with Ben Carter",
+        "due_days": 0,
+        "days": -5,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "note",
+        "related": "deal:harbour",
+        "body": "<p>First week on market: 31 online enquiries, 2 private inspections. Daniel happy with the photography; asked for weekly numbers every Monday.</p>",
+        "days": -6,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "task",
+        "related": "deal:harbour",
+        "subject": "Send Daniel the weekly vendor report",
+        "due_days": -2,
+        "priority": "high",
+        "days": -9,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "call",
+        "related": "deal:ridge_lot2",
+        "subject": "Update Rhys on Lot 2 enquiry levels",
+        "due_days": -8,
+        "done": true,
+        "outcome": "Agreed to hold price for 2 more weeks",
+        "days": -10,
+        "owner": "office_admin"
+      },
+      {
+        "type": "note",
+        "related": "deal:elm",
+        "body": "<p>Saturday open home: 22 groups through, 6 contract requests. Strongest interest from Aaron Kelly (via Coastline) and a young family from Bulimba.</p>",
+        "days": -3,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:elm",
+        "subject": "Pre-auction meeting with Priya",
+        "due_days": 6,
+        "hour": 17,
+        "days": -2,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "task",
+        "related": "deal:elm",
+        "subject": "Book auctioneer for 7 Elm Street",
+        "due_days": -1,
+        "priority": "high",
+        "days": -14,
+        "owner": "office_admin"
+      },
+      {
+        "type": "call",
+        "related": "contact:aaron",
+        "subject": "Follow up Aaron after second inspection of 7 Elm St",
+        "due_days": -3,
+        "done": true,
+        "outcome": "Registering to bid; building report ordered",
+        "days": -5,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "note",
+        "related": "deal:kurrajong",
+        "body": "<p>Emily wants a settlement that lines up with her apartment purchase. Ideal is 60 days; she would accept 45 for the right price.</p>",
+        "days": -9,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:kurrajong",
+        "subject": "Private inspection: Noah Singh at 41 Kurrajong Ave",
+        "due_days": 3,
+        "hour": 16,
+        "days": -1,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "call",
+        "related": "deal:bay",
+        "subject": "Chase deposit release with the buyer's conveyancer",
+        "due_days": -1,
+        "priority": "high",
+        "days": -6,
+        "owner": "admin"
+      },
+      {
+        "type": "note",
+        "related": "deal:bay",
+        "body": "<p>Two offers received. Vendor accepted 2.15M with a 30-day finance clause; building and pest passed with minor items. Cooling-off ended Tuesday.</p>",
+        "days": -10,
+        "owner": "admin"
+      },
+      {
+        "type": "task",
+        "related": "deal:ridge_lot1",
+        "subject": "Send contract of sale to Tom at Harbourside",
+        "due_days": 1,
+        "days": -4,
+        "owner": "office_admin"
+      },
+      {
+        "type": "note",
+        "related": "deal:ridge_lot1",
+        "body": "<p>Buyer is a first home buyer using the stamp duty concession; settlement must be after the build certificate is issued.</p>",
+        "days": -4,
+        "owner": "office_admin"
+      },
+      {
+        "type": "task",
+        "related": "deal:oak",
+        "subject": "Send thank-you gift and review request to Sophie",
+        "due_days": -12,
+        "done": true,
+        "days": -20,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "note",
+        "related": "deal:oak",
+        "body": "<p>Sold under the hammer at 1,380,000, 80k over reserve. Five registered bidders.</p>",
+        "days": -50,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "note",
+        "related": "deal:figtree",
+        "body": "<p>Helen went with another agency that quoted a higher price guide. Keep in touch: their campaign has been on market 16 weeks.</p>",
+        "days": -118,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "call",
+        "related": "deal:lyrebird",
+        "subject": "Check in with Graham about relisting in spring",
+        "due_days": 10,
+        "days": -2,
+        "owner": "admin"
+      },
+      {
+        "type": "call",
+        "related": "contact:jack",
+        "subject": "Call Jack about the new two-bedroom listings",
+        "due_days": -2,
+        "done": true,
+        "outcome": "Wants to see Lot 2 on Saturday",
+        "days": -7,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "task",
+        "related": "contact:oliver",
+        "subject": "Send Oliver the first home buyer guide",
+        "due_days": 0,
+        "days": -4,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "note",
+        "related": "contact:noah",
+        "body": "<p>Relocating from Melbourne in February with two kids. Wants walking distance to a primary school; budget includes stamp duty.</p>",
+        "days": -12
+      },
+      {
+        "type": "call",
+        "related": "contact:zoe",
+        "subject": "Return Zoe's enquiry on 3/88 Harbour Rd",
+        "due_days": -1,
+        "priority": "high",
+        "days": -9
+      },
+      {
+        "type": "note",
+        "related": "organization:coastline",
+        "body": "<p>Mia sends us 3–4 buyers a quarter. Always share off-market listings with her first.</p>",
+        "days": -60,
+        "owner": "sales_agent"
+      },
+      {
+        "type": "meeting",
+        "related": "organization:ironbark",
+        "subject": "Stage 2 release planning with Ironbark",
+        "due_days": 5,
+        "hour": 11,
+        "days": -3,
+        "owner": "office_admin"
+      },
+      {
+        "type": "note",
+        "related": "organization:bluegum",
+        "body": "<p>Grace can turn around pre-approvals in 48 hours for our first home buyers.</p>",
+        "days": -100,
+        "owner": "admin"
+      },
+      {
+        "type": "task",
+        "subject": "Order signboards for Wattle Cres and Banksia St",
+        "due_days": 4,
+        "days": -1,
+        "owner": "office_admin"
+      },
+      {
+        "type": "task",
+        "subject": "Monthly sales meeting: review days on market",
+        "due_days": 7,
+        "days": -2,
+        "owner": "admin"
+      }
+    ],
+    "requests": [
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "MKT-PREM",
+          "name": "Premium marketing package",
+          "description": "Portal premiere listing, social campaign, signboard and printed brochures",
+          "unit": "package",
+          "unitPrice": 4950,
+          "taxRate": 10
+        },
+        "ref": "p_premium"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "MKT-STD",
+          "name": "Standard marketing package",
+          "unit": "package",
+          "unitPrice": 2450,
+          "taxRate": 10
+        },
+        "ref": "p_standard"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "PHOTO",
+          "name": "Photography and floor plan",
+          "unit": "shoot",
+          "unitPrice": 870,
+          "taxRate": 10
+        },
+        "ref": "p_photo"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "AUCT",
+          "name": "Auctioneer fee",
+          "unit": "auction",
+          "unitPrice": 1100,
+          "taxRate": 10
+        },
+        "ref": "p_auction"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": {
+          "name": "7 Elm Street, Paddington",
+          "kind": "property",
+          "location": "Paddington",
+          "capacity": 40
+        },
+        "ref": "r_elm"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": {
+          "name": "41 Kurrajong Ave, Indooroopilly",
+          "kind": "property",
+          "location": "Indooroopilly",
+          "capacity": 30
+        },
+        "ref": "r_kurrajong"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": {
+          "name": "3/88 Harbour Rd, Hamilton",
+          "kind": "property",
+          "location": "Hamilton",
+          "capacity": 20
+        },
+        "ref": "r_harbour"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_elm}}",
+          "contactUuid": "{{contact:priya}}",
+          "title": "Open home: 7 Elm Street",
+          "startsAt": "{{datetime:+3@0}}",
+          "endsAt": "{{datetime:+3@0:30}}",
+          "attendees": 25,
+          "notes": "Saturday open home. Contract-of-sale packs at the door."
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_elm}}",
+          "contactUuid": "{{contact:aaron}}",
+          "organizationUuid": "{{organization:coastline}}",
+          "title": "Private inspection: Aaron Kelly",
+          "startsAt": "{{datetime:+1@7}}",
+          "endsAt": "{{datetime:+1@7:30}}",
+          "attendees": 2,
+          "notes": "Building inspector attending."
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_kurrajong}}",
+          "contactUuid": "{{contact:emily}}",
+          "title": "Open home: 41 Kurrajong Ave",
+          "startsAt": "{{datetime:+3@1}}",
+          "endsAt": "{{datetime:+3@1:30}}",
+          "attendees": 18
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_kurrajong}}",
+          "contactUuid": "{{contact:noah}}",
+          "organizationUuid": "{{organization:meridian}}",
+          "title": "Private inspection: Noah Singh",
+          "startsAt": "{{datetime:+3@6}}",
+          "endsAt": "{{datetime:+3@6:30}}",
+          "attendees": 4
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_harbour}}",
+          "contactUuid": "{{contact:jack}}",
+          "title": "Private inspection: Jack Thompson",
+          "startsAt": "{{datetime:+2@8}}",
+          "endsAt": "{{datetime:+2@8:30}}",
+          "attendees": 2
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/templates",
+        "body": {
+          "name": "Exclusive agency agreement",
+          "description": "Appointment of the agency to sell, with commission and marketing terms",
+          "requiresSignature": true,
+          "body": "<h1>Exclusive agency agreement</h1><p>Date: {{today}}</p><p>Between {{business.name}} (the agency) and {{contact.fullName}} (the vendor).</p><h2>Property</h2><p>{{deal.title}}</p><h2>Appointment</h2><p>The vendor appoints the agency as exclusive selling agent for a period of 90 days from the date of this agreement.</p><h2>Commission and marketing</h2><p>Commission is payable on settlement at the rate set out in the listing schedule. Marketing costs are invoiced before the campaign starts and are payable whether or not the property sells.</p><p>Agent: {{user.name}}</p>"
+        },
+        "ref": "t_agency"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:t_agency}}",
+          "contactUuid": "{{contact:daniel}}",
+          "dealUuid": "{{deal:harbour}}",
+          "title": "Agency agreement: 3/88 Harbour Rd"
+        },
+        "ref": "d_harbour"
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents/{{req:d_harbour}}/share",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:t_agency}}",
+          "contactUuid": "{{contact:margaret}}",
+          "dealUuid": "{{deal:wattle}}",
+          "title": "Agency agreement: 14 Wattle Cres"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:margaret}}",
+          "dealUuid": "{{deal:wattle}}",
+          "items": [
+            {
+              "name": "Council rates notice",
+              "description": "The latest notice for 14 Wattle Cres",
+              "dueDate": "{{date:+7}}"
+            },
+            {
+              "name": "Photo ID",
+              "description": "Driver licence or passport for the vendor identity check",
+              "dueDate": "{{date:+7}}"
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Marketing: 3/88 Harbour Rd",
+          "contactUuid": "{{contact:daniel}}",
+          "dealUuid": "{{deal:harbour}}",
+          "issueDate": "{{date:-40}}",
+          "dueDate": "{{date:-26}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_standard}}",
+              "name": "Standard marketing package",
+              "quantity": 1,
+              "unitPrice": 2450,
+              "taxRate": 10
+            },
+            {
+              "productUuid": "{{req:p_photo}}",
+              "name": "Photography and floor plan",
+              "quantity": 1,
+              "unitPrice": 870,
+              "taxRate": 10
+            }
+          ]
+        },
+        "ref": "inv_harbour"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_harbour}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_harbour}}/payments",
+        "body": {
+          "amount": 3652,
+          "paidOn": "{{date:-30}}",
+          "method": "bank_transfer",
+          "reference": "NGUYEN-MKT"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Commission: 5 Oak Lane",
+          "contactUuid": "{{contact:sophie}}",
+          "dealUuid": "{{deal:oak}}",
+          "issueDate": "{{date:-20}}",
+          "dueDate": "{{date:-10}}",
+          "notes": "Deducted from the deposit held in trust at settlement.",
+          "lines": [
+            {
+              "name": "Sales commission, 2.0% of 1,380,000",
+              "quantity": 1,
+              "unitPrice": 27600,
+              "taxRate": 10
+            }
+          ]
+        },
+        "ref": "inv_oak"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_oak}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Marketing: 7 Elm Street",
+          "contactUuid": "{{contact:priya}}",
+          "dealUuid": "{{deal:elm}}",
+          "issueDate": "{{date:-10}}",
+          "dueDate": "{{date:+4}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_premium}}",
+              "name": "Premium marketing package",
+              "quantity": 1,
+              "unitPrice": 4950,
+              "taxRate": 10
+            },
+            {
+              "productUuid": "{{req:p_photo}}",
+              "name": "Photography and floor plan",
+              "quantity": 1,
+              "unitPrice": 870,
+              "taxRate": 10
+            },
+            {
+              "productUuid": "{{req:p_auction}}",
+              "name": "Auctioneer fee",
+              "quantity": 1,
+              "unitPrice": 1100,
+              "taxRate": 10
+            }
+          ]
+        },
+        "ref": "inv_elm"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_elm}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Commission: Lot 1, 9 Ridge Rd",
+          "contactUuid": "{{contact:rhys}}",
+          "organizationUuid": "{{organization:ironbark}}",
+          "dealUuid": "{{deal:ridge_lot1}}",
+          "issueDate": "{{date:0}}",
+          "dueDate": "{{date:+44}}",
+          "lines": [
+            {
+              "name": "Sales commission, 1.8% of 960,000",
+              "quantity": 1,
+              "unitPrice": 17280,
+              "taxRate": 10
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

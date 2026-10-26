@@ -1,0 +1,1788 @@
+{
+  "$schema": "../schema.json",
+  "key": "construction-trades",
+  "name": "Construction and trades",
+  "version": "1.0.0",
+  "description": "Customers, builders and jobs for builders, renovators and trade businesses: enquiry to site visit, quote, schedule and invoice, with crews, equipment and tools.",
+  "settings": {
+    "features": {
+      "leads": true
+    },
+    "general": {
+      "currency": "USD"
+    },
+    "contacts": {
+      "sources": [
+        "Phone",
+        "Website",
+        "Referral",
+        "Builder",
+        "Repeat customer",
+        "Trade directory",
+        "Site signage",
+        "Other"
+      ],
+      "lifecycleStatuses": ["Enquirer", "Quoted", "Customer", "Repeat customer", "Inactive"]
+    },
+    "deals": {
+      "lostReasons": [
+        "Price too high",
+        "Went with another contractor",
+        "Job postponed",
+        "Out of service area",
+        "Scope changed",
+        "No response"
+      ]
+    }
+  },
+  "vocabulary": {
+    "contact": {
+      "singular": "Customer",
+      "plural": "Customers"
+    },
+    "organization": {
+      "singular": "Builder",
+      "plural": "Builders"
+    },
+    "deal": {
+      "singular": "Job",
+      "plural": "Jobs"
+    }
+  },
+  "modules": ["quotes", "invoices", "bookings", "assets", "portal"],
+  "custom_field_groups": {
+    "contact": [
+      {
+        "key": "property",
+        "label": "Property"
+      }
+    ],
+    "organization": [
+      {
+        "key": "compliance",
+        "label": "Compliance"
+      }
+    ],
+    "deal": [
+      {
+        "key": "job_details",
+        "label": "Job details"
+      },
+      {
+        "key": "scheduling",
+        "label": "Scheduling"
+      }
+    ]
+  },
+  "custom_fields": {
+    "contact": [
+      {
+        "key": "property_type",
+        "label": "Property type",
+        "type": "select",
+        "group": "property",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          { "key": "single_family", "label": "Single-family home" },
+          { "key": "townhouse", "label": "Townhouse" },
+          { "key": "condo", "label": "Condo" },
+          { "key": "multi_unit", "label": "Multi-unit building" },
+          { "key": "commercial", "label": "Commercial" }
+        ]
+      }
+    ],
+    "organization": [
+      {
+        "key": "license_no",
+        "label": "Contractor license no.",
+        "type": "text",
+        "group": "compliance",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ],
+    "deal": [
+      {
+        "key": "job_type",
+        "label": "Job type",
+        "type": "select",
+        "group": "job_details",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          { "key": "kitchen", "label": "Kitchen" },
+          { "key": "bathroom", "label": "Bathroom" },
+          { "key": "deck_patio", "label": "Deck or patio" },
+          { "key": "roofing", "label": "Roofing" },
+          { "key": "extension", "label": "Extension or addition" },
+          { "key": "landscaping", "label": "Retaining wall or landscaping" },
+          { "key": "concrete", "label": "Concrete" },
+          { "key": "framing", "label": "Framing" },
+          { "key": "fit_out", "label": "Commercial fit-out" },
+          { "key": "repairs", "label": "Repairs and maintenance" }
+        ]
+      },
+      {
+        "key": "site_address",
+        "label": "Site address",
+        "type": "text",
+        "group": "job_details",
+        "filterable": true
+      },
+      {
+        "key": "permit_required",
+        "label": "Permit required",
+        "type": "boolean",
+        "group": "job_details",
+        "filterable": true
+      },
+      {
+        "key": "start_date",
+        "label": "Start date",
+        "type": "date",
+        "group": "scheduling",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "crew",
+        "label": "Crew",
+        "type": "select",
+        "group": "scheduling",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          { "key": "crew_a", "label": "Crew A" },
+          { "key": "crew_b", "label": "Crew B" },
+          { "key": "subcontractor", "label": "Subcontractor" }
+        ]
+      },
+      {
+        "key": "deposit_received",
+        "label": "Deposit received",
+        "type": "boolean",
+        "group": "scheduling",
+        "filterable": true
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "jobs",
+      "name": "Jobs",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        { "key": "enquiry", "name": "Enquiry", "probability": 10, "rotting_days": 2 },
+        { "key": "site_visit", "name": "Site visit", "probability": 25, "rotting_days": 5 },
+        { "key": "quoted", "name": "Quoted", "probability": 50, "rotting_days": 10 },
+        { "key": "scheduled", "name": "Scheduled", "probability": 85, "rotting_days": 30 },
+        { "key": "invoiced", "name": "Invoiced", "probability": 100, "is_won": true },
+        { "key": "lost", "name": "Lost", "probability": 0, "is_lost": true }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "estimator",
+      "name": "Estimator",
+      "description": "Handles enquiries, site visits and quotes, and follows jobs through to invoice",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.view",
+        "core.saved_views.share",
+        "products.products.view",
+        "quotes.quotes.*",
+        "invoices.invoices.view",
+        "bookings.bookings.view"
+      ],
+      "scopes": {
+        "*": "all"
+      }
+    },
+    {
+      "key": "site_supervisor",
+      "name": "Site supervisor",
+      "description": "Runs crews on site: schedules crews and equipment, lends tools and logs site notes",
+      "permissions": [
+        "core.contacts.view",
+        "core.organizations.view",
+        "core.deals.view",
+        "core.activities.view",
+        "core.activities.create",
+        "core.activities.update",
+        "core.tags.view",
+        "core.files.view",
+        "core.files.create",
+        "core.dashboard.view",
+        "bookings.bookings.*",
+        "assets.assets.*",
+        "assets.stock.manage"
+      ],
+      "scopes": {
+        "core.contacts": "all",
+        "core.organizations": "all",
+        "core.deals": "all",
+        "core.activities": "own"
+      }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": [
+        "full_name",
+        "email",
+        "phone",
+        "organization",
+        "cf.property_type",
+        "lifecycle_status",
+        "owner"
+      ]
+    },
+    {
+      "entity": "organization",
+      "context": "list",
+      "columns": ["name", "industry", "cf.license_no", "contact_count", "owner"]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": ["title", "contact", "stage", "value", "cf.job_type", "cf.start_date", "cf.crew", "owner"]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "crew_load",
+        "type": "module:bookings.occupancy",
+        "title": "Crews and equipment booked",
+        "size": "sm"
+      },
+      {
+        "key": "receivables",
+        "type": "module:invoices.receivables",
+        "title": "Outstanding invoices",
+        "size": "sm"
+      },
+      {
+        "key": "pipeline_value",
+        "type": "pipeline_value",
+        "title": "Job value by stage",
+        "size": "lg",
+        "params": {
+          "pipeline": "jobs"
+        }
+      },
+      {
+        "key": "starting_soon",
+        "type": "date_window",
+        "title": "Jobs starting in the next 14 days",
+        "size": "md",
+        "params": {
+          "entity": "deal",
+          "field": "cf.start_date",
+          "days": 14,
+          "status": "open"
+        }
+      },
+      {
+        "key": "inventory",
+        "type": "module:assets.overview",
+        "title": "Tools and stock",
+        "size": "sm"
+      },
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      }
+    ]
+  },
+  "templates": [],
+  "sample_data": {
+    "organizations": [
+      {
+        "ref": "summit",
+        "name": "Summit Ridge Homes",
+        "website": "https://summitridgehomes.test",
+        "industry": "Residential builder",
+        "custom": { "license_no": "GC-40218" },
+        "days": -250,
+        "owner": "estimator"
+      },
+      {
+        "ref": "cedar",
+        "name": "Cedar & Stone Builders",
+        "website": "https://cedarstone.test",
+        "industry": "General contractor",
+        "custom": { "license_no": "GC-38871" },
+        "days": -190
+      },
+      {
+        "ref": "ironbark",
+        "name": "Ironbark Developments",
+        "website": "https://ironbark-dev.test",
+        "industry": "Developer",
+        "custom": { "license_no": "GC-51102" },
+        "days": -35,
+        "owner": "estimator"
+      },
+      {
+        "ref": "highline",
+        "name": "Highline Property Group",
+        "website": "https://highlineproperty.test",
+        "industry": "Property management",
+        "days": -230
+      },
+      {
+        "ref": "bluebird",
+        "name": "Bluebird Custom Homes",
+        "website": "https://bluebirdhomes.test",
+        "industry": "Custom home builder",
+        "custom": { "license_no": "GC-47390" },
+        "days": -160
+      },
+      {
+        "ref": "mesa",
+        "name": "Mesa Commercial Construction",
+        "website": "https://mesacommercial.test",
+        "industry": "Commercial builder",
+        "custom": { "license_no": "GC-29954" },
+        "days": -28,
+        "owner": "estimator"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "linda",
+        "first_name": "Linda",
+        "last_name": "Carver",
+        "email": "linda.carver@example.test",
+        "phone": "+1 303 555 0111",
+        "lifecycle_status": "Enquirer",
+        "source": "Phone",
+        "custom": { "property_type": "single_family" },
+        "days": -3,
+        "owner": "estimator"
+      },
+      {
+        "ref": "raj",
+        "first_name": "Raj",
+        "last_name": "Patel",
+        "email": "raj.patel@example.test",
+        "phone": "+1 303 555 0112",
+        "lifecycle_status": "Enquirer",
+        "source": "Website",
+        "custom": { "property_type": "single_family" },
+        "days": -12,
+        "owner": "estimator"
+      },
+      {
+        "ref": "megan",
+        "first_name": "Megan",
+        "last_name": "O'Brien",
+        "email": "megan.obrien@example.test",
+        "phone": "+1 303 555 0113",
+        "lifecycle_status": "Quoted",
+        "source": "Referral",
+        "custom": { "property_type": "single_family" },
+        "days": -26,
+        "owner": "estimator"
+      },
+      {
+        "ref": "carlos",
+        "first_name": "Carlos",
+        "last_name": "Mendoza",
+        "email": "carlos.mendoza@example.test",
+        "phone": "+1 303 555 0114",
+        "lifecycle_status": "Customer",
+        "source": "Trade directory",
+        "custom": { "property_type": "townhouse" },
+        "days": -48
+      },
+      {
+        "ref": "diane",
+        "first_name": "Diane",
+        "last_name": "Whitfield",
+        "email": "diane.whitfield@example.test",
+        "phone": "+1 303 555 0115",
+        "lifecycle_status": "Customer",
+        "source": "Site signage",
+        "custom": { "property_type": "single_family" },
+        "days": -95,
+        "owner": "estimator"
+      },
+      {
+        "ref": "greg",
+        "first_name": "Greg",
+        "last_name": "Holloway",
+        "email": "greg@summitridgehomes.test",
+        "phone": "+1 303 555 0116",
+        "job_title": "Site manager",
+        "organization": "summit",
+        "lifecycle_status": "Repeat customer",
+        "source": "Builder",
+        "custom": { "property_type": "single_family" },
+        "days": -250,
+        "owner": "site_supervisor"
+      },
+      {
+        "ref": "owen",
+        "first_name": "Owen",
+        "last_name": "Grant",
+        "email": "owen@summitridgehomes.test",
+        "job_title": "Estimating manager",
+        "organization": "summit",
+        "lifecycle_status": "Repeat customer",
+        "source": "Builder",
+        "days": -240,
+        "owner": "estimator"
+      },
+      {
+        "ref": "tanya",
+        "first_name": "Tanya",
+        "last_name": "Brooks",
+        "email": "tanya@cedarstone.test",
+        "phone": "+1 303 555 0117",
+        "job_title": "Project manager",
+        "organization": "cedar",
+        "lifecycle_status": "Quoted",
+        "source": "Builder",
+        "custom": { "property_type": "single_family" },
+        "days": -190
+      },
+      {
+        "ref": "victor",
+        "first_name": "Victor",
+        "last_name": "Lin",
+        "email": "victor@ironbark-dev.test",
+        "phone": "+1 303 555 0118",
+        "job_title": "Development manager",
+        "organization": "ironbark",
+        "lifecycle_status": "Enquirer",
+        "source": "Referral",
+        "custom": { "property_type": "townhouse" },
+        "days": -35,
+        "owner": "estimator"
+      },
+      {
+        "ref": "aisha",
+        "first_name": "Aisha",
+        "last_name": "Rahman",
+        "email": "aisha@highlineproperty.test",
+        "phone": "+1 303 555 0119",
+        "job_title": "Portfolio manager",
+        "organization": "highline",
+        "lifecycle_status": "Repeat customer",
+        "source": "Referral",
+        "custom": { "property_type": "multi_unit" },
+        "days": -230
+      },
+      {
+        "ref": "nina",
+        "first_name": "Nina",
+        "last_name": "Alvarez",
+        "email": "nina@highlineproperty.test",
+        "job_title": "Maintenance coordinator",
+        "organization": "highline",
+        "lifecycle_status": "Repeat customer",
+        "source": "Referral",
+        "custom": { "property_type": "multi_unit" },
+        "days": -120,
+        "owner": "site_supervisor"
+      },
+      {
+        "ref": "ben",
+        "first_name": "Ben",
+        "last_name": "Foster",
+        "email": "ben@bluebirdhomes.test",
+        "phone": "+1 303 555 0120",
+        "job_title": "Owner",
+        "organization": "bluebird",
+        "lifecycle_status": "Customer",
+        "source": "Builder",
+        "custom": { "property_type": "single_family" },
+        "days": -160
+      },
+      {
+        "ref": "mike",
+        "first_name": "Mike",
+        "last_name": "Delgado",
+        "email": "mike@mesacommercial.test",
+        "phone": "+1 303 555 0121",
+        "job_title": "Construction manager",
+        "organization": "mesa",
+        "lifecycle_status": "Quoted",
+        "source": "Builder",
+        "custom": { "property_type": "commercial" },
+        "days": -28,
+        "owner": "estimator"
+      },
+      {
+        "ref": "sarah",
+        "first_name": "Sarah",
+        "last_name": "Kowalski",
+        "email": "sarah.kowalski@example.test",
+        "phone": "+1 303 555 0122",
+        "lifecycle_status": "Customer",
+        "source": "Referral",
+        "custom": { "property_type": "single_family" },
+        "days": -70
+      },
+      {
+        "ref": "emily",
+        "first_name": "Emily",
+        "last_name": "Shaw",
+        "email": "emily.shaw@example.test",
+        "lifecycle_status": "Enquirer",
+        "source": "Website",
+        "custom": { "property_type": "townhouse" },
+        "days": -1
+      },
+      {
+        "ref": "tom",
+        "first_name": "Tom",
+        "last_name": "Becker",
+        "email": "tom.becker@example.test",
+        "phone": "+1 303 555 0123",
+        "lifecycle_status": "Repeat customer",
+        "source": "Repeat customer",
+        "custom": { "property_type": "single_family" },
+        "days": -210,
+        "owner": "site_supervisor"
+      },
+      {
+        "ref": "kelly",
+        "first_name": "Kelly",
+        "last_name": "Nguyen",
+        "email": "kelly.nguyen@example.test",
+        "phone": "+1 303 555 0124",
+        "lifecycle_status": "Inactive",
+        "source": "Website",
+        "custom": { "property_type": "single_family" },
+        "days": -140,
+        "owner": "estimator"
+      },
+      {
+        "ref": "jordan",
+        "first_name": "Jordan",
+        "last_name": "Price",
+        "email": "jordan.price@example.test",
+        "lifecycle_status": "Inactive",
+        "source": "Phone",
+        "custom": { "property_type": "condo" },
+        "days": -110
+      }
+    ],
+    "leads": [
+      {
+        "ref": "paula",
+        "first_name": "Paula",
+        "last_name": "Jensen",
+        "email": "paula.jensen@example.test",
+        "phone": "+1 303 555 0125",
+        "source": "Website",
+        "status": "new",
+        "days": -1
+      },
+      {
+        "ref": "derek",
+        "first_name": "Derek",
+        "last_name": "Moss",
+        "email": "derek.moss@example.test",
+        "phone": "+1 303 555 0126",
+        "source": "Phone",
+        "status": "contacted",
+        "days": -4,
+        "owner": "estimator"
+      },
+      {
+        "ref": "harmon",
+        "first_name": "Lisa",
+        "last_name": "Harmon",
+        "email": "lisa@harmonhoa.test",
+        "company_name": "Willow Creek HOA",
+        "job_title": "Board treasurer",
+        "source": "Referral",
+        "status": "qualified",
+        "days": -9,
+        "owner": "estimator"
+      },
+      {
+        "ref": "quinn",
+        "first_name": "Ray",
+        "last_name": "Quinn",
+        "email": "ray.quinn@example.test",
+        "source": "Site signage",
+        "status": "new",
+        "days": -2
+      },
+      {
+        "ref": "osei",
+        "first_name": "Kofi",
+        "last_name": "Osei",
+        "email": "kofi@oseicafe.test",
+        "company_name": "Osei Cafe",
+        "job_title": "Owner",
+        "source": "Trade directory",
+        "status": "unqualified",
+        "days": -20
+      }
+    ],
+    "deals": [
+      {
+        "ref": "deck",
+        "title": "Deck rebuild – Carver",
+        "contact": "linda",
+        "stage": "enquiry",
+        "value": 4800,
+        "days": -3,
+        "owner": "estimator",
+        "custom": {
+          "job_type": "deck_patio",
+          "site_address": "1418 Aspen Ct, Lakewood",
+          "permit_required": false
+        }
+      },
+      {
+        "ref": "patio",
+        "title": "Paver patio – Shaw",
+        "contact": "emily",
+        "stage": "enquiry",
+        "value": 6500,
+        "days": -1,
+        "custom": { "job_type": "deck_patio", "site_address": "72 Juniper Ln, Golden" }
+      },
+      {
+        "ref": "kitchen",
+        "title": "Kitchen, Lee St",
+        "contact": "raj",
+        "stage": "site_visit",
+        "value": 32000,
+        "days": -12,
+        "stage_days": -6,
+        "owner": "estimator",
+        "expected_close": "{{date:+21}}",
+        "custom": { "job_type": "kitchen", "site_address": "305 Lee St, Denver", "permit_required": true }
+      },
+      {
+        "ref": "townhouse_decks",
+        "title": "Ironbark – rear decks, 6 townhouses",
+        "contact": "victor",
+        "organization": "ironbark",
+        "stage": "site_visit",
+        "value": 27600,
+        "days": -30,
+        "stage_days": -4,
+        "owner": "estimator",
+        "expected_close": "{{date:+30}}",
+        "custom": {
+          "job_type": "deck_patio",
+          "site_address": "Lots 3–8, Ironbark Row, Arvada",
+          "permit_required": true
+        }
+      },
+      {
+        "ref": "roof",
+        "title": "Roof restoration – O'Brien",
+        "contact": "megan",
+        "stage": "quoted",
+        "value": 18400,
+        "days": -26,
+        "stage_days": -9,
+        "owner": "estimator",
+        "expected_close": "{{date:+7}}",
+        "custom": {
+          "job_type": "roofing",
+          "site_address": "88 Hawthorn Ave, Littleton",
+          "permit_required": true
+        }
+      },
+      {
+        "ref": "driveway",
+        "title": "Cedar & Stone – driveway and footpaths",
+        "contact": "tanya",
+        "organization": "cedar",
+        "stage": "quoted",
+        "value": 14200,
+        "days": -20,
+        "stage_days": -5,
+        "expected_close": "{{date:+12}}",
+        "custom": { "job_type": "concrete", "site_address": "2210 Ridgeview Dr, Highlands Ranch" }
+      },
+      {
+        "ref": "fitout",
+        "title": "Mesa – dental clinic fit-out",
+        "contact": "mike",
+        "organization": "mesa",
+        "stage": "quoted",
+        "value": 58000,
+        "days": -24,
+        "stage_days": -2,
+        "owner": "estimator",
+        "expected_close": "{{date:+18}}",
+        "custom": {
+          "job_type": "fit_out",
+          "site_address": "Suite 4, 900 Market Pl, Denver",
+          "permit_required": true
+        }
+      },
+      {
+        "ref": "bathroom",
+        "title": "Bathroom reno – Mendoza",
+        "contact": "carlos",
+        "stage": "scheduled",
+        "value": 21500,
+        "days": -45,
+        "stage_days": -10,
+        "owner": "site_supervisor",
+        "custom": {
+          "job_type": "bathroom",
+          "site_address": "17 Cypress Way, Aurora",
+          "permit_required": false,
+          "start_date": "{{date:+3}}",
+          "crew": "crew_b",
+          "deposit_received": true
+        }
+      },
+      {
+        "ref": "framing",
+        "title": "Summit Ridge – framing, lot 14",
+        "contact": "greg",
+        "organization": "summit",
+        "stage": "scheduled",
+        "value": 36000,
+        "days": -40,
+        "stage_days": -14,
+        "owner": "site_supervisor",
+        "custom": {
+          "job_type": "framing",
+          "site_address": "Lot 14, Summit Ridge Estate, Parker",
+          "permit_required": true,
+          "start_date": "{{date:+1}}",
+          "crew": "crew_a",
+          "deposit_received": true
+        }
+      },
+      {
+        "ref": "extension",
+        "title": "Two-room addition – Kowalski",
+        "contact": "sarah",
+        "stage": "scheduled",
+        "value": 84000,
+        "days": -68,
+        "stage_days": -6,
+        "owner": "estimator",
+        "custom": {
+          "job_type": "extension",
+          "site_address": "4410 Birch St, Englewood",
+          "permit_required": true,
+          "start_date": "{{date:+12}}",
+          "crew": "crew_a",
+          "deposit_received": false
+        }
+      },
+      {
+        "ref": "wall",
+        "title": "Retaining wall – Whitfield",
+        "contact": "diane",
+        "stage": "invoiced",
+        "value": 13162,
+        "days": -90,
+        "stage_days": -12,
+        "owner": "estimator",
+        "custom": {
+          "job_type": "landscaping",
+          "site_address": "6 Meadowlark Rd, Centennial",
+          "start_date": "{{date:-30}}",
+          "crew": "crew_b",
+          "deposit_received": true
+        }
+      },
+      {
+        "ref": "repairs",
+        "title": "Highline – water damage repairs, unit 12B",
+        "contact": "aisha",
+        "organization": "highline",
+        "stage": "invoiced",
+        "value": 3900,
+        "days": -40,
+        "stage_days": -20,
+        "owner": "site_supervisor",
+        "custom": {
+          "job_type": "repairs",
+          "site_address": "Unit 12B, 1500 Pearl St, Boulder",
+          "start_date": "{{date:-28}}",
+          "crew": "crew_b",
+          "deposit_received": false
+        }
+      },
+      {
+        "ref": "bluebird_walls",
+        "title": "Bluebird – retaining walls, Elk Hollow",
+        "contact": "ben",
+        "organization": "bluebird",
+        "stage": "invoiced",
+        "value": 22400,
+        "days": -120,
+        "stage_days": -45,
+        "custom": {
+          "job_type": "landscaping",
+          "site_address": "Elk Hollow subdivision, Castle Rock",
+          "permit_required": true,
+          "start_date": "{{date:-75}}",
+          "crew": "subcontractor",
+          "deposit_received": true
+        }
+      },
+      {
+        "ref": "gutters",
+        "title": "Gutter and fascia replacement – Becker",
+        "contact": "tom",
+        "stage": "invoiced",
+        "value": 4100,
+        "days": -200,
+        "stage_days": -170,
+        "owner": "site_supervisor",
+        "custom": {
+          "job_type": "roofing",
+          "site_address": "51 Poplar Ave, Westminster",
+          "start_date": "{{date:-175}}",
+          "crew": "crew_a",
+          "deposit_received": true
+        }
+      },
+      {
+        "ref": "basement",
+        "title": "Basement finish – Nguyen",
+        "contact": "kelly",
+        "stage": "lost",
+        "value": 46000,
+        "days": -135,
+        "stage_days": -100,
+        "owner": "estimator",
+        "lost_reason": "Price too high",
+        "custom": {
+          "job_type": "extension",
+          "site_address": "930 Spruce St, Broomfield",
+          "permit_required": true
+        }
+      },
+      {
+        "ref": "fence",
+        "title": "Cedar fence – Price",
+        "contact": "jordan",
+        "stage": "lost",
+        "value": 5200,
+        "days": -105,
+        "stage_days": -90,
+        "lost_reason": "Went with another contractor",
+        "custom": { "job_type": "landscaping", "site_address": "12 Larkspur Ct, Thornton" }
+      }
+    ],
+    "activities": [
+      {
+        "type": "note",
+        "related": "deal:deck",
+        "body": "<p>Linda called: existing deck boards are soft near the back door and two joists are rotten. Roughly 16 x 12 ft, wants composite boards. No permit needed if we keep the same footprint.</p>",
+        "days": -3,
+        "owner": "estimator"
+      },
+      {
+        "type": "task",
+        "related": "deal:deck",
+        "subject": "Book a site visit with Linda Carver",
+        "due_days": 1,
+        "priority": "high",
+        "days": -3,
+        "owner": "estimator"
+      },
+      {
+        "type": "task",
+        "related": "deal:patio",
+        "subject": "Reply to the web enquiry about a paver patio",
+        "due_days": -1,
+        "priority": "high",
+        "days": -1
+      },
+      {
+        "type": "meeting",
+        "related": "deal:kitchen",
+        "subject": "Site visit: kitchen at 305 Lee St",
+        "due_days": -6,
+        "hour": 14,
+        "done": true,
+        "days": -10,
+        "owner": "estimator"
+      },
+      {
+        "type": "note",
+        "related": "deal:kitchen",
+        "body": "<p>Measured up: 14 ft galley, load-bearing wall between kitchen and dining. Needs an engineer's letter and a beam before we can open it up. Raj wants quartz tops and to keep the existing window.</p>",
+        "days": -6,
+        "owner": "estimator"
+      },
+      {
+        "type": "task",
+        "related": "deal:kitchen",
+        "subject": "Get structural engineer's price for the beam",
+        "due_days": 2,
+        "days": -5,
+        "owner": "estimator"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:townhouse_decks",
+        "subject": "Site walk with Victor at Ironbark Row",
+        "due_days": 4,
+        "hour": 8,
+        "days": -4,
+        "owner": "estimator"
+      },
+      {
+        "type": "note",
+        "related": "deal:roof",
+        "body": "<p>Quote sent for a full restoration: replace cracked tiles, re-bed and re-point ridges, new valley flashings. Megan is comparing with one other quote and wants an answer on the 10-year workmanship warranty.</p>",
+        "days": -9,
+        "owner": "estimator"
+      },
+      {
+        "type": "call",
+        "related": "deal:roof",
+        "subject": "Follow up the roof quote with Megan",
+        "due_days": -2,
+        "days": -5,
+        "owner": "estimator"
+      },
+      {
+        "type": "call",
+        "related": "deal:driveway",
+        "subject": "Check Tanya received the driveway quote",
+        "due_days": -3,
+        "done": true,
+        "outcome": "Received; waiting on the homeowner's sign-off",
+        "days": -4
+      },
+      {
+        "type": "meeting",
+        "related": "deal:fitout",
+        "subject": "Walk-through of the clinic plans with Mike",
+        "due_days": 5,
+        "hour": 10,
+        "days": -2,
+        "owner": "estimator"
+      },
+      {
+        "type": "note",
+        "related": "deal:fitout",
+        "body": "<p>Mesa needs the fit-out finished before the tenant's lease start. Plumbing for four operatories is the long-lead item. Quote assumes after-hours work for the slab cuts.</p>",
+        "days": -2,
+        "owner": "estimator"
+      },
+      {
+        "type": "note",
+        "related": "deal:bathroom",
+        "body": "<p>Tiles and vanity delivered to the garage. Carlos is staying with family during the work; lockbox code is in the job folder.</p>",
+        "days": -2,
+        "owner": "site_supervisor"
+      },
+      {
+        "type": "task",
+        "related": "deal:bathroom",
+        "subject": "Order the shower screen (8-day lead time)",
+        "due_days": -1,
+        "priority": "high",
+        "days": -6,
+        "owner": "site_supervisor"
+      },
+      {
+        "type": "task",
+        "related": "deal:framing",
+        "subject": "Confirm lumber drop at lot 14 for 6:30am",
+        "due_days": 0,
+        "priority": "high",
+        "days": -2,
+        "owner": "site_supervisor"
+      },
+      {
+        "type": "call",
+        "related": "deal:framing",
+        "subject": "Pre-start call with Greg Holloway",
+        "due_days": -1,
+        "done": true,
+        "outcome": "Slab inspection passed; site is ready",
+        "days": -3,
+        "owner": "site_supervisor"
+      },
+      {
+        "type": "task",
+        "related": "deal:extension",
+        "subject": "Chase the 20% deposit from Sarah Kowalski",
+        "due_days": 3,
+        "priority": "high",
+        "days": -4
+      },
+      {
+        "type": "note",
+        "related": "deal:extension",
+        "body": "<p>Permit approved by the city. Start locked in for crew A once the deposit clears. Excavator needed on day one for the footings.</p>",
+        "days": -6,
+        "owner": "estimator"
+      },
+      {
+        "type": "note",
+        "related": "deal:wall",
+        "body": "<p>Wall finished: 42 ft of block wall with drainage behind. Diane paid half on completion and the rest is due in 30 days as agreed.</p>",
+        "days": -12,
+        "owner": "estimator"
+      },
+      {
+        "type": "call",
+        "related": "deal:bluebird_walls",
+        "subject": "Call Ben about the overdue Elk Hollow invoice",
+        "due_days": 1,
+        "priority": "high",
+        "days": -1
+      },
+      {
+        "type": "note",
+        "related": "deal:repairs",
+        "body": "<p>Replaced 40 sq ft of drywall and the subfloor under the dishwasher. Insurance assessor signed off the photos.</p>",
+        "days": -22,
+        "owner": "site_supervisor"
+      },
+      {
+        "type": "note",
+        "related": "deal:basement",
+        "body": "<p>Kelly went with a cheaper quote that excluded egress windows. Worth a check-in next spring.</p>",
+        "days": -100,
+        "owner": "estimator"
+      },
+      {
+        "type": "note",
+        "related": "deal:fence",
+        "body": "<p>Jordan chose another contractor who could start a week sooner.</p>",
+        "days": -90
+      },
+      {
+        "type": "note",
+        "related": "organization:summit",
+        "body": "<p>Summit Ridge has 22 more lots in this phase. Owen wants a fixed framing rate per square foot for the next round.</p>",
+        "days": -15,
+        "owner": "estimator"
+      },
+      {
+        "type": "meeting",
+        "related": "organization:summit",
+        "subject": "Rate review with Owen Grant",
+        "due_days": 7,
+        "hour": 15,
+        "days": -5,
+        "owner": "estimator"
+      },
+      {
+        "type": "task",
+        "related": "contact:nina",
+        "subject": "Send Highline the quarterly maintenance schedule",
+        "due_days": 6,
+        "days": -2,
+        "owner": "site_supervisor"
+      },
+      {
+        "type": "call",
+        "related": "contact:tom",
+        "subject": "Check in with Tom about the gutter guards",
+        "due_days": -30,
+        "done": true,
+        "outcome": "Happy with the work; wants a deck quote in spring",
+        "days": -32,
+        "owner": "site_supervisor"
+      },
+      {
+        "type": "task",
+        "subject": "Excavator 250-hour service",
+        "due_days": 9,
+        "days": -3,
+        "owner": "site_supervisor"
+      },
+      {
+        "type": "task",
+        "subject": "Renew general liability certificate for builders",
+        "due_days": 14,
+        "days": -7
+      }
+    ],
+    "requests": [
+      {
+        "ref": "p_carpenter",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "LAB-CARP", "name": "Carpenter (hour)", "unit": "hour", "unitPrice": 85 }
+      },
+      {
+        "ref": "p_labourer",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "LAB-GEN", "name": "Laborer (hour)", "unit": "hour", "unitPrice": 55 }
+      },
+      {
+        "ref": "p_crew_day",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "CREW-DAY", "name": "Two-person crew (day)", "unit": "day", "unitPrice": 1150 }
+      },
+      {
+        "ref": "p_excavator",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "EQ-EXC", "name": "Excavator with operator (day)", "unit": "day", "unitPrice": 1400 }
+      },
+      {
+        "ref": "p_concrete",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "MAT-CONC",
+          "name": "Ready-mix concrete, placed",
+          "unit": "cu yd",
+          "unitPrice": 210,
+          "taxRate": 8
+        }
+      },
+      {
+        "ref": "p_decking",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "MAT-DECK",
+          "name": "Composite decking, supplied and fixed",
+          "unit": "sq ft",
+          "unitPrice": 24,
+          "taxRate": 8
+        }
+      },
+      {
+        "ref": "p_tiles",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "MAT-TILE",
+          "name": "Roof tiles, supplied",
+          "unit": "sq ft",
+          "unitPrice": 6.5,
+          "taxRate": 8
+        }
+      },
+      {
+        "ref": "p_dumpster",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "SITE-BIN", "name": "Dumpster, 20 yd", "unit": "each", "unitPrice": 480 }
+      },
+      {
+        "ref": "p_permit",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "ADM-PERMIT", "name": "Permit lodgement and fees", "unit": "each", "unitPrice": 650 }
+      },
+      {
+        "ref": "q_roof",
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Roof restoration – 88 Hawthorn Ave",
+          "contactUuid": "{{contact:megan}}",
+          "dealUuid": "{{deal:roof}}",
+          "issueDate": "{{date:-9}}",
+          "validUntil": "{{date:+21}}",
+          "terms": "30% deposit to book. Includes a 10-year workmanship warranty.",
+          "lines": [
+            {
+              "productUuid": "{{req:p_crew_day}}",
+              "name": "Two-person crew (day)",
+              "quantity": 8,
+              "unitPrice": 1150
+            },
+            {
+              "productUuid": "{{req:p_tiles}}",
+              "name": "Roof tiles, supplied",
+              "quantity": 900,
+              "unitPrice": 6.5,
+              "taxRate": 8
+            },
+            {
+              "productUuid": "{{req:p_dumpster}}",
+              "name": "Dumpster, 20 yd",
+              "quantity": 1,
+              "unitPrice": 480
+            },
+            { "name": "Valley flashings and ridge re-pointing", "quantity": 1, "unitPrice": 1752 },
+            {
+              "productUuid": "{{req:p_permit}}",
+              "name": "Permit lodgement and fees",
+              "quantity": 1,
+              "unitPrice": 650
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_roof}}/send",
+        "body": {}
+      },
+      {
+        "ref": "q_driveway",
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Driveway and footpaths – 2210 Ridgeview Dr",
+          "contactUuid": "{{contact:tanya}}",
+          "organizationUuid": "{{organization:cedar}}",
+          "dealUuid": "{{deal:driveway}}",
+          "issueDate": "{{date:-5}}",
+          "validUntil": "{{date:+25}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_concrete}}",
+              "name": "Ready-mix concrete, placed",
+              "quantity": 38,
+              "unitPrice": 210,
+              "taxRate": 8
+            },
+            {
+              "productUuid": "{{req:p_excavator}}",
+              "name": "Excavator with operator (day)",
+              "quantity": 1,
+              "unitPrice": 1400
+            },
+            {
+              "productUuid": "{{req:p_crew_day}}",
+              "name": "Two-person crew (day)",
+              "quantity": 4,
+              "unitPrice": 1150
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_driveway}}/send",
+        "body": {}
+      },
+      {
+        "ref": "q_fitout",
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Dental clinic fit-out – Suite 4",
+          "contactUuid": "{{contact:mike}}",
+          "organizationUuid": "{{organization:mesa}}",
+          "dealUuid": "{{deal:fitout}}",
+          "issueDate": "{{date:0}}",
+          "validUntil": "{{date:+30}}",
+          "notes": "Draft: waiting on the plumber's price for four operatories.",
+          "lines": [
+            {
+              "productUuid": "{{req:p_carpenter}}",
+              "name": "Carpenter (hour)",
+              "quantity": 320,
+              "unitPrice": 85
+            },
+            {
+              "productUuid": "{{req:p_labourer}}",
+              "name": "Laborer (hour)",
+              "quantity": 160,
+              "unitPrice": 55
+            },
+            { "name": "Partitions, ceilings and doors, supplied", "quantity": 1, "unitPrice": 21400 },
+            {
+              "productUuid": "{{req:p_permit}}",
+              "name": "Permit lodgement and fees",
+              "quantity": 1,
+              "unitPrice": 650
+            }
+          ]
+        }
+      },
+      {
+        "ref": "q_bathroom",
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Bathroom renovation – 17 Cypress Way",
+          "contactUuid": "{{contact:carlos}}",
+          "dealUuid": "{{deal:bathroom}}",
+          "issueDate": "{{date:-25}}",
+          "validUntil": "{{date:+5}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_crew_day}}",
+              "name": "Two-person crew (day)",
+              "quantity": 9,
+              "unitPrice": 1150
+            },
+            {
+              "name": "Vanity, toilet, shower fixtures and tiles",
+              "quantity": 1,
+              "unitPrice": 9200,
+              "taxRate": 8
+            },
+            {
+              "productUuid": "{{req:p_dumpster}}",
+              "name": "Dumpster, 20 yd",
+              "quantity": 1,
+              "unitPrice": 480
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_bathroom}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_bathroom}}/accept",
+        "body": { "acceptedByName": "Carlos Mendoza" }
+      },
+      {
+        "ref": "q_wall",
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Retaining wall – 6 Meadowlark Rd",
+          "contactUuid": "{{contact:diane}}",
+          "dealUuid": "{{deal:wall}}",
+          "issueDate": "{{date:-60}}",
+          "validUntil": "{{date:-30}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_excavator}}",
+              "name": "Excavator with operator (day)",
+              "quantity": 2,
+              "unitPrice": 1400
+            },
+            {
+              "name": "Segmental block wall with drainage, 42 ft",
+              "quantity": 1,
+              "unitPrice": 6400,
+              "taxRate": 8
+            },
+            {
+              "productUuid": "{{req:p_crew_day}}",
+              "name": "Two-person crew (day)",
+              "quantity": 3,
+              "unitPrice": 1150
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_wall}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_wall}}/accept",
+        "body": { "acceptedByName": "Diane Whitfield" }
+      },
+      {
+        "ref": "inv_wall",
+        "method": "post",
+        "path": "/m/invoices/invoices/from-quote/{{req:q_wall}}",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_wall}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_wall}}/payments",
+        "body": {
+          "amount": 6500,
+          "paidOn": "{{date:-12}}",
+          "method": "card",
+          "reference": "50% on completion"
+        }
+      },
+      {
+        "ref": "q_basement",
+        "method": "post",
+        "path": "/m/quotes/quotes",
+        "body": {
+          "title": "Basement finish – 930 Spruce St",
+          "contactUuid": "{{contact:kelly}}",
+          "dealUuid": "{{deal:basement}}",
+          "issueDate": "{{date:-115}}",
+          "validUntil": "{{date:-85}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_carpenter}}",
+              "name": "Carpenter (hour)",
+              "quantity": 260,
+              "unitPrice": 85
+            },
+            { "name": "Egress windows (2), supplied and installed", "quantity": 2, "unitPrice": 4300 },
+            { "name": "Drywall, insulation and finishes", "quantity": 1, "unitPrice": 15300, "taxRate": 8 }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_basement}}/send",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_basement}}/decline",
+        "body": { "reason": "Found a cheaper quote without egress windows" }
+      },
+      {
+        "ref": "inv_repairs",
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Water damage repairs – unit 12B",
+          "contactUuid": "{{contact:aisha}}",
+          "organizationUuid": "{{organization:highline}}",
+          "dealUuid": "{{deal:repairs}}",
+          "issueDate": "{{date:-20}}",
+          "dueDate": "{{date:-6}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_carpenter}}",
+              "name": "Carpenter (hour)",
+              "quantity": 24,
+              "unitPrice": 85
+            },
+            {
+              "productUuid": "{{req:p_labourer}}",
+              "name": "Laborer (hour)",
+              "quantity": 16,
+              "unitPrice": 55
+            },
+            { "name": "Drywall, subfloor and paint", "quantity": 1, "unitPrice": 980 }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_repairs}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_repairs}}/payments",
+        "body": {
+          "amount": 3900,
+          "paidOn": "{{date:-8}}",
+          "method": "bank_transfer",
+          "reference": "HPG-ACH-7731"
+        }
+      },
+      {
+        "ref": "inv_bluebird",
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Retaining walls, Elk Hollow – final claim",
+          "contactUuid": "{{contact:ben}}",
+          "organizationUuid": "{{organization:bluebird}}",
+          "dealUuid": "{{deal:bluebird_walls}}",
+          "issueDate": "{{date:-45}}",
+          "dueDate": "{{date:-15}}",
+          "lines": [{ "name": "Retaining walls, lots 1–9 (final 50%)", "quantity": 1, "unitPrice": 11200 }]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_bluebird}}/issue",
+        "body": {}
+      },
+      {
+        "ref": "inv_gutters",
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Gutter and fascia replacement",
+          "contactUuid": "{{contact:tom}}",
+          "dealUuid": "{{deal:gutters}}",
+          "issueDate": "{{date:-170}}",
+          "dueDate": "{{date:-156}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_crew_day}}",
+              "name": "Two-person crew (day)",
+              "quantity": 2,
+              "unitPrice": 1150
+            },
+            { "name": "Seamless aluminum gutters and fascia, 140 ft", "quantity": 1, "unitPrice": 1800 }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_gutters}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_gutters}}/payments",
+        "body": { "amount": 4100, "paidOn": "{{date:-160}}", "method": "cheque", "reference": "Check 1184" }
+      },
+      {
+        "ref": "inv_ext_deposit",
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Two-room addition – 20% deposit",
+          "contactUuid": "{{contact:sarah}}",
+          "dealUuid": "{{deal:extension}}",
+          "issueDate": "{{date:-4}}",
+          "dueDate": "{{date:+7}}",
+          "lines": [{ "name": "Deposit, 20% of contract price", "quantity": 1, "unitPrice": 16800 }]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_ext_deposit}}/issue",
+        "body": {}
+      },
+      {
+        "ref": "r_crew_a",
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": { "name": "Crew A", "kind": "crew", "location": "Yard", "capacity": 4 }
+      },
+      {
+        "ref": "r_crew_b",
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": { "name": "Crew B", "kind": "crew", "location": "Yard", "capacity": 3 }
+      },
+      {
+        "ref": "r_excavator",
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": { "name": "Excavator, 5-ton", "kind": "equipment", "location": "Yard", "hourlyRate": 175 }
+      },
+      {
+        "ref": "r_truck",
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": { "name": "Tipper truck", "kind": "vehicle", "location": "Yard", "hourlyRate": 95 }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_crew_a}}",
+          "contactUuid": "{{contact:greg}}",
+          "organizationUuid": "{{organization:summit}}",
+          "title": "Framing, lot 14 – day 1",
+          "startsAt": "{{datetime:+1@7}}",
+          "endsAt": "{{datetime:+1@15:30}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_crew_a}}",
+          "contactUuid": "{{contact:greg}}",
+          "organizationUuid": "{{organization:summit}}",
+          "title": "Framing, lot 14 – day 2",
+          "startsAt": "{{datetime:+2@7}}",
+          "endsAt": "{{datetime:+2@15:30}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_crew_b}}",
+          "contactUuid": "{{contact:carlos}}",
+          "title": "Bathroom strip-out, 17 Cypress Way",
+          "startsAt": "{{datetime:+3@7}}",
+          "endsAt": "{{datetime:+3@15}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_truck}}",
+          "contactUuid": "{{contact:carlos}}",
+          "title": "Tip run: bathroom demolition",
+          "startsAt": "{{datetime:+3@13}}",
+          "endsAt": "{{datetime:+3@15}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_excavator}}",
+          "contactUuid": "{{contact:tanya}}",
+          "organizationUuid": "{{organization:cedar}}",
+          "title": "Hold: driveway excavation (pending acceptance)",
+          "startsAt": "{{datetime:+9@7}}",
+          "endsAt": "{{datetime:+9@15}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_excavator}}",
+          "contactUuid": "{{contact:sarah}}",
+          "title": "Footings for the Kowalski addition",
+          "startsAt": "{{datetime:+12@7}}",
+          "endsAt": "{{datetime:+12@14}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_crew_b}}",
+          "contactUuid": "{{contact:nina}}",
+          "organizationUuid": "{{organization:highline}}",
+          "title": "Highline maintenance round",
+          "startsAt": "{{datetime:+2@8}}",
+          "endsAt": "{{datetime:+2@12}}"
+        }
+      },
+      {
+        "ref": "a_laser",
+        "method": "post",
+        "path": "/m/assets/assets",
+        "body": {
+          "tag": "T-001",
+          "name": "Rotary laser level",
+          "category": "Survey",
+          "serial": "RL-88213",
+          "location": "Yard",
+          "purchasedOn": "{{date:-400}}",
+          "purchaseCost": 1450
+        }
+      },
+      {
+        "ref": "a_scaffold",
+        "method": "post",
+        "path": "/m/assets/assets",
+        "body": {
+          "tag": "T-002",
+          "name": "Scaffold tower set",
+          "category": "Access",
+          "location": "Yard",
+          "purchasedOn": "{{date:-700}}",
+          "purchaseCost": 2900
+        }
+      },
+      {
+        "ref": "a_mixer",
+        "method": "post",
+        "path": "/m/assets/assets",
+        "body": {
+          "tag": "T-003",
+          "name": "Concrete mixer, 6 cu ft",
+          "category": "Concrete",
+          "serial": "CM-6-1173",
+          "location": "Yard",
+          "purchasedOn": "{{date:-520}}",
+          "purchaseCost": 980
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/assets/assets",
+        "body": {
+          "tag": "T-004",
+          "name": "Wet tile saw",
+          "category": "Cutting",
+          "serial": "TS-10-5521",
+          "location": "Van 2",
+          "purchasedOn": "{{date:-260}}",
+          "purchaseCost": 760
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/assets/assets/{{req:a_scaffold}}/assign",
+        "body": {
+          "contactUuid": "{{contact:greg}}",
+          "dueBack": "{{date:+10}}",
+          "note": "Lent to Summit Ridge for lot 14 framing"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/assets/assets/{{req:a_mixer}}/assign",
+        "body": {
+          "contactUuid": "{{contact:ben}}",
+          "dueBack": "{{date:-3}}",
+          "note": "Lent to Bluebird for the Elk Hollow footpaths"
+        }
+      },
+      {
+        "ref": "s_screws",
+        "method": "post",
+        "path": "/m/assets/stock",
+        "body": {
+          "sku": "CON-SCREW",
+          "name": "Deck screws, box of 1,000",
+          "unit": "box",
+          "location": "Yard",
+          "reorderLevel": 10,
+          "quantity": 24
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/assets/stock/{{req:s_screws}}/movements",
+        "body": { "kind": "out", "quantity": 6, "reason": "Ironbark townhouse decks" }
+      },
+      {
+        "method": "post",
+        "path": "/m/assets/stock",
+        "body": {
+          "sku": "CON-ADH",
+          "name": "Construction adhesive, 28 oz",
+          "unit": "tube",
+          "location": "Van 1",
+          "reorderLevel": 12,
+          "quantity": 40
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/assets/stock",
+        "body": {
+          "sku": "CON-CEM",
+          "name": "Concrete mix, 80 lb bag",
+          "unit": "bag",
+          "location": "Yard",
+          "reorderLevel": 40,
+          "quantity": 28
+        }
+      }
+    ]
+  }
+}

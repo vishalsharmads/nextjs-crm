@@ -10,10 +10,15 @@ export const site = {
   signInUrl: import.meta.env.PUBLIC_APP_URL ?? '/app',
   /** Where lead forms post. Set PUBLIC_LEAD_ENDPOINT to the CRM web form submit URL. */
   leadEndpoint: import.meta.env.PUBLIC_LEAD_ENDPOINT ?? '',
+  /** Asks the demo app which industry it currently shows (`npm run demo:reset`); that one links to it live. */
+  demoInfoUrl: import.meta.env.PUBLIC_DEMO_INFO_URL ?? '/api/v1/public/demo',
 };
 
-/** Live demo links per industry. PLACEHOLDER: add each industry as its demo instance goes live. */
-export const demoLinks: Record<string, string> = { coworking: site.signInUrl };
+/**
+ * Fixed demo links per industry, for industries with their own always-on demo instance. Empty while one
+ * demo instance is switched between industries: then the industry it shows is detected at runtime.
+ */
+export const demoLinks: Record<string, string> = {};
 
 export const nav = [
   { href: '/industries', label: 'Industries' },

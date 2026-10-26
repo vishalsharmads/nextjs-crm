@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
-# Prepare a demo instance for one industry: install the blueprint with sample data and one demo
-# user per role. Run once per industry, each with its own database (and, on a server, its own
-# checkout, .env, vhost and systemd unit).
+# Install (or switch) the demo to one industry: wipes the demo database and its uploaded files, then
+# installs the industry's template with sample data and one demo user per role.
 #
-#   DATABASE_URL=mysql://crm:pass@127.0.0.1:3306/crm_demo_coworking deploy/setup-demo.sh coworking
-#   DATABASE_URL=mysql://crm:pass@127.0.0.1:3306/crm_demo_visa      deploy/setup-demo.sh visa-consultancy
+#   deploy/setup-demo.sh law-firms
 #
-# Then start it with DEMO_MODE=true so the demo accounts show on the sign-in screen.
-# Never run this against a client instance.
+# Runs only on a demo instance: DEMO_MODE=true, a database whose name contains "demo" (crm_demo) and
+# an upload folder whose own name contains "demo" (STORAGE_DIR=./storage-demo). Set them in .env or inline:
+#
+#   DEMO_MODE=true DATABASE_URL=mysql://crm:pass@127.0.0.1:3306/crm_demo STORAGE_DIR=./storage-demo deploy/setup-demo.sh coworking
+#
+# Restart the app afterwards (or pass RESTART_FILE=tmp/restart.txt on Passenger hosts).
 set -euo pipefail
-BLUEPRINT="${1:?blueprint key (generic, coworking, visa-consultancy)}"
-: "${DATABASE_URL:?set DATABASE_URL to an empty database for this demo}"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@demo.test}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-DemoAccess2026!}"
+INDUSTRY="${1:?industry, e.g. coworking, law-firms, real-estate}"
 cd "$(dirname "$0")/.."
-npm run install:instance -- --blueprint="$BLUEPRINT" --admin-email="$ADMIN_EMAIL" --admin-password="$ADMIN_PASSWORD" --sample-data
-npm run cli -w @app/api -- demo:seed --password="$ADMIN_PASSWORD"
-echo
-echo "Demo for \"$BLUEPRINT\" is ready. Start it with DEMO_MODE=true (and its own PORT if several run on one machine)."
+npm run demo:reset -- --industry="$INDUSTRY" --yes ${RESTART_FILE:+--restart-file="$RESTART_FILE"}

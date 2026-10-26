@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "coworking",
   "name": "Coworking space",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Members, companies and memberships for coworking and flexible-office operators, with front-desk roles.",
   "settings": {
     "features": {
@@ -341,13 +341,43 @@
         "ref": "northwind",
         "name": "Northwind Studio",
         "website": "https://northwind.test",
-        "industry": "Design"
+        "industry": "Design",
+        "days": -210
       },
       {
         "ref": "fable",
         "name": "Fable Analytics",
         "website": "https://fable-analytics.test",
-        "industry": "Software"
+        "industry": "Software",
+        "days": -40
+      },
+      {
+        "ref": "harbor",
+        "name": "Harbor & Pine Legal",
+        "website": "https://harborpine.test",
+        "industry": "Legal",
+        "days": -320
+      },
+      {
+        "ref": "kitebox",
+        "name": "Kitebox Robotics",
+        "website": "https://kitebox.test",
+        "industry": "Hardware",
+        "days": -95
+      },
+      {
+        "ref": "lumen",
+        "name": "Lumen Health",
+        "website": "https://lumenhealth.test",
+        "industry": "Healthcare",
+        "days": -18
+      },
+      {
+        "ref": "ostra",
+        "name": "Ostra Media",
+        "website": "https://ostra.test",
+        "industry": "Media",
+        "days": -150
       }
     ],
     "contacts": [
@@ -356,24 +386,51 @@
         "first_name": "Amara",
         "last_name": "Okafor",
         "email": "amara@northwind.test",
+        "phone": "+1 415 555 0101",
+        "job_title": "Studio lead",
         "organization": "northwind",
         "lifecycle_status": "Member",
+        "source": "Referral",
         "custom": {
           "preferred_plan": "dedicated_desk",
-          "id_verified": true
-        }
+          "id_verified": true,
+          "access_card_no": "NW-0142"
+        },
+        "days": -210,
+        "owner": "community_manager"
+      },
+      {
+        "ref": "tom",
+        "first_name": "Tom",
+        "last_name": "Reyes",
+        "email": "tom@northwind.test",
+        "job_title": "Designer",
+        "organization": "northwind",
+        "lifecycle_status": "Member",
+        "source": "Referral",
+        "custom": {
+          "preferred_plan": "dedicated_desk",
+          "id_verified": true,
+          "access_card_no": "NW-0143"
+        },
+        "days": -200,
+        "owner": "community_manager"
       },
       {
         "ref": "lukas",
         "first_name": "Lukas",
         "last_name": "Brandt",
         "email": "lukas@fable-analytics.test",
+        "phone": "+1 415 555 0102",
+        "job_title": "COO",
         "organization": "fable",
         "lifecycle_status": "Enquirer",
+        "source": "Website",
         "custom": {
           "preferred_plan": "private_office",
           "id_verified": false
-        }
+        },
+        "days": -40
       },
       {
         "ref": "mei",
@@ -381,45 +438,937 @@
         "last_name": "Tanaka",
         "email": "mei.tanaka@example.test",
         "lifecycle_status": "Enquirer",
+        "source": "Walk-in",
         "custom": {
           "preferred_plan": "hot_desk"
-        }
+        },
+        "days": -9,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "grace",
+        "first_name": "Grace",
+        "last_name": "Hollis",
+        "email": "grace@harborpine.test",
+        "phone": "+1 415 555 0103",
+        "job_title": "Managing partner",
+        "organization": "harbor",
+        "lifecycle_status": "Member",
+        "source": "Broker",
+        "custom": {
+          "preferred_plan": "private_office",
+          "id_verified": true,
+          "access_card_no": "HP-0007"
+        },
+        "days": -320,
+        "owner": "community_manager"
+      },
+      {
+        "ref": "dev",
+        "first_name": "Dev",
+        "last_name": "Malhotra",
+        "email": "dev@harborpine.test",
+        "job_title": "Associate",
+        "organization": "harbor",
+        "lifecycle_status": "Member",
+        "source": "Broker",
+        "custom": {
+          "preferred_plan": "private_office",
+          "id_verified": true,
+          "access_card_no": "HP-0008"
+        },
+        "days": -300
+      },
+      {
+        "ref": "sofia",
+        "first_name": "Sofia",
+        "last_name": "Marquez",
+        "email": "sofia@kitebox.test",
+        "phone": "+1 415 555 0104",
+        "job_title": "Founder",
+        "organization": "kitebox",
+        "lifecycle_status": "Member",
+        "source": "Event",
+        "custom": {
+          "preferred_plan": "private_office",
+          "id_verified": true,
+          "access_card_no": "KB-0021"
+        },
+        "days": -95,
+        "owner": "community_manager"
+      },
+      {
+        "ref": "jonah",
+        "first_name": "Jonah",
+        "last_name": "Pike",
+        "email": "jonah@kitebox.test",
+        "job_title": "Engineer",
+        "organization": "kitebox",
+        "lifecycle_status": "Member",
+        "source": "Event",
+        "custom": {
+          "preferred_plan": "dedicated_desk",
+          "id_verified": true
+        },
+        "days": -90
+      },
+      {
+        "ref": "priya",
+        "first_name": "Priya",
+        "last_name": "Nair",
+        "email": "priya@lumenhealth.test",
+        "phone": "+1 415 555 0105",
+        "job_title": "Head of operations",
+        "organization": "lumen",
+        "lifecycle_status": "Enquirer",
+        "source": "Website",
+        "custom": {
+          "preferred_plan": "private_office"
+        },
+        "days": -18
+      },
+      {
+        "ref": "ollie",
+        "first_name": "Ollie",
+        "last_name": "Brennan",
+        "email": "ollie@ostra.test",
+        "job_title": "Producer",
+        "organization": "ostra",
+        "lifecycle_status": "Former member",
+        "source": "Social",
+        "custom": {
+          "preferred_plan": "hot_desk",
+          "id_verified": true
+        },
+        "days": -150
+      },
+      {
+        "ref": "hana",
+        "first_name": "Hana",
+        "last_name": "Kim",
+        "email": "hana.kim@example.test",
+        "phone": "+1 415 555 0106",
+        "lifecycle_status": "Member",
+        "source": "Website",
+        "custom": {
+          "preferred_plan": "hot_desk",
+          "id_verified": true,
+          "access_card_no": "HD-0311"
+        },
+        "days": -60,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "marcus",
+        "first_name": "Marcus",
+        "last_name": "Dowd",
+        "email": "marcus.dowd@example.test",
+        "lifecycle_status": "Enquirer",
+        "source": "Walk-in",
+        "custom": {
+          "preferred_plan": "virtual_office"
+        },
+        "days": -4,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "elena",
+        "first_name": "Elena",
+        "last_name": "Petrova",
+        "email": "elena.p@example.test",
+        "lifecycle_status": "Enquirer",
+        "source": "Social",
+        "custom": {
+          "preferred_plan": "hot_desk"
+        },
+        "days": -2
+      },
+      {
+        "ref": "sam",
+        "first_name": "Sam",
+        "last_name": "Whitaker",
+        "email": "sam.w@example.test",
+        "phone": "+1 415 555 0107",
+        "lifecycle_status": "Member",
+        "source": "Referral",
+        "custom": {
+          "preferred_plan": "virtual_office",
+          "id_verified": true
+        },
+        "days": -130
+      },
+      {
+        "ref": "nora",
+        "first_name": "Nora",
+        "last_name": "Lindqvist",
+        "email": "nora@ostra.test",
+        "job_title": "Editor",
+        "organization": "ostra",
+        "lifecycle_status": "Enquirer",
+        "source": "Referral",
+        "custom": {
+          "preferred_plan": "dedicated_desk"
+        },
+        "days": -12
+      },
+      {
+        "ref": "kwame",
+        "first_name": "Kwame",
+        "last_name": "Asante",
+        "email": "kwame.a@example.test",
+        "lifecycle_status": "Former member",
+        "source": "Website",
+        "custom": {
+          "preferred_plan": "hot_desk",
+          "id_verified": true
+        },
+        "days": -240
       }
     ],
     "deals": [
       {
+        "ref": "northwind",
         "title": "Northwind – 4 dedicated desks",
         "contact": "amara",
         "organization": "northwind",
         "stage": "active",
         "value": 1600,
+        "days": -200,
+        "owner": "community_manager",
         "custom": {
-          "start_date": "2026-01-01",
-          "end_date": "2026-11-10",
+          "desk_or_room": "Desks 12–15",
+          "start_date": "{{date:-180}}",
+          "end_date": "{{date:+16}}",
           "monthly_fee": 1600,
           "billing_cycle": "monthly",
           "deposit_paid": true
         }
       },
       {
+        "ref": "harbor",
+        "title": "Harbor & Pine – office 3",
+        "contact": "grace",
+        "organization": "harbor",
+        "stage": "active",
+        "value": 4200,
+        "days": -310,
+        "owner": "community_manager",
+        "custom": {
+          "desk_or_room": "Office 3",
+          "start_date": "{{date:-300}}",
+          "end_date": "{{date:+65}}",
+          "monthly_fee": 4200,
+          "billing_cycle": "annual",
+          "deposit_paid": true
+        }
+      },
+      {
+        "ref": "kitebox",
+        "title": "Kitebox – office 6 + 2 desks",
+        "contact": "sofia",
+        "organization": "kitebox",
+        "stage": "active",
+        "value": 3100,
+        "days": -92,
+        "custom": {
+          "desk_or_room": "Office 6",
+          "start_date": "{{date:-85}}",
+          "end_date": "{{date:+280}}",
+          "monthly_fee": 3100,
+          "billing_cycle": "quarterly",
+          "deposit_paid": true
+        }
+      },
+      {
+        "ref": "hana",
+        "title": "Hana Kim – hot desk",
+        "contact": "hana",
+        "stage": "active",
+        "value": 250,
+        "days": -58,
+        "owner": "front_desk",
+        "custom": {
+          "start_date": "{{date:-55}}",
+          "monthly_fee": 250,
+          "billing_cycle": "monthly",
+          "deposit_paid": false
+        }
+      },
+      {
+        "ref": "sam",
+        "title": "Sam Whitaker – virtual office",
+        "contact": "sam",
+        "stage": "active",
+        "value": 90,
+        "days": -128,
+        "custom": {
+          "start_date": "{{date:-120}}",
+          "monthly_fee": 90,
+          "billing_cycle": "monthly"
+        }
+      },
+      {
+        "ref": "fable",
         "title": "Fable – private office",
         "contact": "lukas",
         "organization": "fable",
         "stage": "proposal_sent",
         "value": 2400,
+        "days": -30,
+        "expected_close": "{{date:+10}}",
         "custom": {
-          "start_date": "2026-12-01",
-          "monthly_fee": 2400
+          "desk_or_room": "Office 9",
+          "start_date": "{{date:+21}}",
+          "monthly_fee": 2400,
+          "billing_cycle": "monthly"
         }
       },
       {
+        "ref": "lumen",
+        "title": "Lumen Health – team room for 8",
+        "contact": "priya",
+        "organization": "lumen",
+        "stage": "contract_signed",
+        "value": 5200,
+        "days": -16,
+        "stage_days": -1,
+        "owner": "community_manager",
+        "custom": {
+          "desk_or_room": "Suite B",
+          "start_date": "{{date:+14}}",
+          "monthly_fee": 5200,
+          "billing_cycle": "annual",
+          "deposit_paid": true
+        }
+      },
+      {
+        "ref": "mei",
         "title": "Mei – hot desk",
         "contact": "mei",
         "stage": "tour_booked",
         "value": 250,
+        "days": -8,
+        "owner": "front_desk",
         "custom": {
-          "start_date": "2026-11-15",
+          "start_date": "{{date:+7}}",
           "monthly_fee": 250
+        }
+      },
+      {
+        "ref": "nora",
+        "title": "Ostra – 2 dedicated desks",
+        "contact": "nora",
+        "organization": "ostra",
+        "stage": "tour_booked",
+        "value": 800,
+        "days": -11,
+        "custom": {
+          "monthly_fee": 800
+        }
+      },
+      {
+        "ref": "marcus",
+        "title": "Marcus Dowd – virtual office",
+        "contact": "marcus",
+        "stage": "enquiry",
+        "value": 90,
+        "days": -4,
+        "owner": "front_desk"
+      },
+      {
+        "ref": "elena",
+        "title": "Elena – hot desk",
+        "contact": "elena",
+        "stage": "enquiry",
+        "value": 250,
+        "days": -2
+      },
+      {
+        "ref": "ostra_old",
+        "title": "Ostra – hot desks (ended)",
+        "contact": "ollie",
+        "organization": "ostra",
+        "stage": "lost",
+        "value": 500,
+        "days": -150,
+        "stage_days": -35,
+        "lost_reason": "Price"
+      },
+      {
+        "ref": "kwame",
+        "title": "Kwame – hot desk renewal",
+        "contact": "kwame",
+        "stage": "lost",
+        "value": 250,
+        "days": -60,
+        "stage_days": -25,
+        "lost_reason": "Location"
+      }
+    ],
+    "activities": [
+      {
+        "type": "note",
+        "related": "deal:northwind",
+        "body": "<p>Amara asked about adding a fifth desk in spring. Keep desk 16 free if we can.</p>",
+        "days": -12,
+        "owner": "community_manager"
+      },
+      {
+        "type": "task",
+        "related": "deal:northwind",
+        "subject": "Send renewal options to Northwind",
+        "due_days": 3,
+        "priority": "high",
+        "days": -2,
+        "owner": "community_manager"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:fable",
+        "subject": "Walkthrough of office 9 with Lukas",
+        "due_days": -26,
+        "hour": 15,
+        "done": true,
+        "days": -28
+      },
+      {
+        "type": "note",
+        "related": "deal:fable",
+        "body": "<p>Lukas liked office 9. Wants a 12-month term with a 2-month break clause. Proposal sent.</p>",
+        "days": -25
+      },
+      {
+        "type": "call",
+        "related": "deal:fable",
+        "subject": "Follow up on the proposal",
+        "due_days": 1,
+        "days": -1
+      },
+      {
+        "type": "note",
+        "related": "deal:lumen",
+        "body": "<p>Contract signed for Suite B. Move-in pack and access cards for 8 people needed before start date.</p>",
+        "days": -1,
+        "owner": "community_manager"
+      },
+      {
+        "type": "task",
+        "related": "deal:lumen",
+        "subject": "Order 8 access cards for Lumen Health",
+        "due_days": 5,
+        "priority": "high",
+        "days": -1,
+        "owner": "front_desk"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:mei",
+        "subject": "Tour for Mei Tanaka",
+        "due_days": 1,
+        "hour": 11,
+        "days": -8,
+        "owner": "front_desk"
+      },
+      {
+        "type": "note",
+        "related": "contact:mei",
+        "body": "<p>Freelance illustrator, needs a quiet spot and good light. Mostly mornings.</p>",
+        "days": -9,
+        "owner": "front_desk"
+      },
+      {
+        "type": "call",
+        "related": "deal:nora",
+        "subject": "Confirm tour time with Nora",
+        "due_days": -3,
+        "done": true,
+        "outcome": "Booked for Thursday",
+        "days": -6
+      },
+      {
+        "type": "meeting",
+        "related": "deal:nora",
+        "subject": "Tour: Ostra team",
+        "due_days": 2,
+        "hour": 14,
+        "days": -5
+      },
+      {
+        "type": "call",
+        "related": "deal:marcus",
+        "subject": "Call Marcus about mail handling",
+        "due_days": 0,
+        "days": -4,
+        "owner": "front_desk"
+      },
+      {
+        "type": "task",
+        "related": "deal:elena",
+        "subject": "Reply to Elena’s enquiry",
+        "due_days": -1,
+        "priority": "high",
+        "days": -2
+      },
+      {
+        "type": "note",
+        "related": "deal:ostra_old",
+        "body": "<p>Ostra moved to a cheaper space across town. Open to coming back for desks only.</p>",
+        "days": -35
+      },
+      {
+        "type": "note",
+        "related": "contact:grace",
+        "body": "<p>Grace prefers invoices addressed to accounts@harborpine.test.</p>",
+        "days": -120,
+        "owner": "community_manager"
+      },
+      {
+        "type": "task",
+        "related": "deal:harbor",
+        "subject": "Prepare annual renewal for Harbor & Pine",
+        "due_days": 20,
+        "days": -3,
+        "owner": "community_manager"
+      },
+      {
+        "type": "note",
+        "related": "organization:kitebox",
+        "body": "<p>Kitebox stores prototypes in the workshop. Check insurance cover at renewal.</p>",
+        "days": -40
+      },
+      {
+        "type": "task",
+        "related": "contact:hana",
+        "subject": "Collect deposit from Hana",
+        "due_days": -5,
+        "priority": "high",
+        "days": -20,
+        "owner": "front_desk"
+      },
+      {
+        "type": "call",
+        "related": "contact:sam",
+        "subject": "Check mail forwarding address",
+        "due_days": -14,
+        "done": true,
+        "outcome": "Updated",
+        "days": -15,
+        "owner": "front_desk"
+      },
+      {
+        "type": "note",
+        "related": "contact:jonah",
+        "body": "<p>Jonah asked for a standing desk. Ordered, arriving next week.</p>",
+        "days": -6,
+        "owner": "front_desk"
+      },
+      {
+        "type": "task",
+        "related": "deal:kitebox",
+        "subject": "Quarterly invoice check for Kitebox",
+        "due_days": 8,
+        "days": -1
+      },
+      {
+        "type": "meeting",
+        "related": "organization:northwind",
+        "subject": "Member breakfast: Northwind team",
+        "due_days": 6,
+        "hour": 9,
+        "days": -4,
+        "owner": "community_manager"
+      },
+      {
+        "type": "task",
+        "subject": "Restock the coffee bar",
+        "due_days": 0,
+        "days": -1,
+        "owner": "front_desk"
+      },
+      {
+        "type": "task",
+        "subject": "Plan this month’s member event",
+        "due_days": 9,
+        "days": -3,
+        "owner": "community_manager"
+      }
+    ],
+    "requests": [
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "HD-M",
+          "name": "Hot desk (monthly)",
+          "unit": "month",
+          "unitPrice": 250,
+          "taxRate": 0,
+          "recurring": true
+        },
+        "ref": "p_hot"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "DD-M",
+          "name": "Dedicated desk (monthly)",
+          "unit": "month",
+          "unitPrice": 400,
+          "recurring": true
+        },
+        "ref": "p_desk"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "PO-M",
+          "name": "Private office (monthly)",
+          "unit": "month",
+          "unitPrice": 2400,
+          "recurring": true
+        },
+        "ref": "p_office"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "VO-M",
+          "name": "Virtual office (monthly)",
+          "unit": "month",
+          "unitPrice": 90,
+          "recurring": true
+        },
+        "ref": "p_virtual"
+      },
+      {
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "MR-H",
+          "name": "Meeting room (hour)",
+          "unit": "hour",
+          "unitPrice": 35
+        },
+        "ref": "p_room"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": {
+          "name": "Boardroom",
+          "kind": "room",
+          "location": "Level 2",
+          "capacity": 12,
+          "hourlyRate": 60,
+          "openTime": "08:00",
+          "closeTime": "20:00",
+          "openDays": [1, 2, 3, 4, 5]
+        },
+        "ref": "r_board"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": {
+          "name": "Focus room",
+          "kind": "room",
+          "location": "Level 1",
+          "capacity": 4,
+          "hourlyRate": 35,
+          "openTime": "08:00",
+          "closeTime": "20:00",
+          "openDays": [1, 2, 3, 4, 5]
+        },
+        "ref": "r_focus"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/resources",
+        "body": {
+          "name": "Podcast studio",
+          "kind": "studio",
+          "location": "Level 1",
+          "capacity": 3,
+          "hourlyRate": 45
+        },
+        "ref": "r_pod"
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_board}}",
+          "contactUuid": "{{contact:grace}}",
+          "organizationUuid": "{{organization:harbor}}",
+          "title": "Harbor & Pine client meeting",
+          "startsAt": "{{datetime:+1@14}}",
+          "endsAt": "{{datetime:+1@16}}",
+          "attendees": 8
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_focus}}",
+          "contactUuid": "{{contact:sofia}}",
+          "title": "Kitebox standup",
+          "startsAt": "{{datetime:+2@9}}",
+          "endsAt": "{{datetime:+2@10}}",
+          "attendees": 4
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_pod}}",
+          "contactUuid": "{{contact:nora}}",
+          "title": "Ostra podcast recording",
+          "startsAt": "{{datetime:+3@13}}",
+          "endsAt": "{{datetime:+3@15}}",
+          "attendees": 3
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/bookings/bookings",
+        "body": {
+          "resourceUuid": "{{req:r_board}}",
+          "contactUuid": "{{contact:amara}}",
+          "organizationUuid": "{{organization:northwind}}",
+          "title": "Northwind design review",
+          "startsAt": "{{datetime:+4@10}}",
+          "endsAt": "{{datetime:+4@12}}",
+          "attendees": 6
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Northwind – desks, this month",
+          "contactUuid": "{{contact:amara}}",
+          "organizationUuid": "{{organization:northwind}}",
+          "dealUuid": "{{deal:northwind}}",
+          "issueDate": "{{date:-20}}",
+          "dueDate": "{{date:-6}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_desk}}",
+              "name": "Dedicated desk (monthly)",
+              "quantity": 4,
+              "unitPrice": 400
+            }
+          ]
+        },
+        "ref": "inv_nw"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_nw}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_nw}}/payments",
+        "body": {
+          "amount": 1600,
+          "paidOn": "{{date:-8}}",
+          "method": "bank_transfer",
+          "reference": "NW-BACS-2211"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Kitebox – quarter",
+          "contactUuid": "{{contact:sofia}}",
+          "organizationUuid": "{{organization:kitebox}}",
+          "dealUuid": "{{deal:kitebox}}",
+          "issueDate": "{{date:-10}}",
+          "dueDate": "{{date:+4}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_office}}",
+              "name": "Private office (monthly)",
+              "quantity": 3,
+              "unitPrice": 2400
+            },
+            {
+              "productUuid": "{{req:p_desk}}",
+              "name": "Dedicated desk (monthly)",
+              "quantity": 6,
+              "unitPrice": 400,
+              "discountPct": 10
+            }
+          ]
+        },
+        "ref": "inv_kb"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_kb}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Hana Kim – hot desk",
+          "contactUuid": "{{contact:hana}}",
+          "dealUuid": "{{deal:hana}}",
+          "issueDate": "{{date:-35}}",
+          "dueDate": "{{date:-21}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_hot}}",
+              "name": "Hot desk (monthly)",
+              "quantity": 1,
+              "unitPrice": 250
+            }
+          ]
+        },
+        "ref": "inv_hk"
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_hk}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Lumen Health – deposit",
+          "contactUuid": "{{contact:priya}}",
+          "organizationUuid": "{{organization:lumen}}",
+          "dealUuid": "{{deal:lumen}}",
+          "issueDate": "{{date:0}}",
+          "dueDate": "{{date:+14}}",
+          "lines": [
+            {
+              "name": "Security deposit, Suite B",
+              "quantity": 1,
+              "unitPrice": 5200
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts",
+        "body": {
+          "title": "Harbor & Pine – office 3 licence",
+          "contactUuid": "{{contact:grace}}",
+          "organizationUuid": "{{organization:harbor}}",
+          "dealUuid": "{{deal:harbor}}",
+          "startDate": "{{date:-300}}",
+          "endDate": "{{date:+65}}",
+          "signedOn": "{{date:-305}}",
+          "value": 50400,
+          "billingCycle": "yearly",
+          "autoRenew": true,
+          "renewalTermMonths": 12,
+          "noticeDays": 60
+        },
+        "ref": "c_hp"
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts/{{req:c_hp}}/activate",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts",
+        "body": {
+          "title": "Northwind – membership agreement",
+          "contactUuid": "{{contact:amara}}",
+          "organizationUuid": "{{organization:northwind}}",
+          "dealUuid": "{{deal:northwind}}",
+          "startDate": "{{date:-180}}",
+          "endDate": "{{date:+16}}",
+          "signedOn": "{{date:-182}}",
+          "value": 19200,
+          "billingCycle": "monthly",
+          "noticeDays": 30
+        },
+        "ref": "c_nw"
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts/{{req:c_nw}}/activate",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts",
+        "body": {
+          "title": "Lumen Health – Suite B licence",
+          "contactUuid": "{{contact:priya}}",
+          "organizationUuid": "{{organization:lumen}}",
+          "dealUuid": "{{deal:lumen}}",
+          "startDate": "{{date:+14}}",
+          "endDate": "{{date:+379}}",
+          "value": 62400,
+          "billingCycle": "yearly"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "Wi-Fi drops in office 3",
+          "description": "Connection drops every afternoon around 3pm.",
+          "priority": "high",
+          "category": "IT",
+          "contactUuid": "{{contact:grace}}",
+          "organizationUuid": "{{organization:harbor}}",
+          "assigneeUuid": "{{user:community_manager}}"
+        },
+        "ref": "t_wifi"
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets/{{req:t_wifi}}/comments",
+        "body": {
+          "body": "Router in office 3 replaced. Can you let us know if it happens again today?",
+          "status": "pending"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "Access card not working",
+          "priority": "normal",
+          "category": "Access",
+          "channel": "phone",
+          "contactUuid": "{{contact:jonah}}",
+          "assigneeUuid": "{{user:front_desk}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "Can we get a second monitor?",
+          "category": "Facilities",
+          "contactUuid": "{{contact:hana}}"
+        },
+        "ref": "t_mon"
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets/{{req:t_mon}}/comments",
+        "body": {
+          "body": "Monitor added to desk 22.",
+          "status": "resolved"
         }
       }
     ]

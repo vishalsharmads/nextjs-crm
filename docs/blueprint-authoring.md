@@ -66,19 +66,41 @@ packages/blueprints/<key>/blueprint.json
 
 ## Sections
 
-| Section               | Notes                                                                                                                                                                                             |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `settings`            | Partial settings groups (`general`, `features`, `contacts`, `deals`, `security`). Merged over defaults                                                                                            |
-| `vocabulary`          | Label overrides for `contact`, `organization`, `lead`, `deal`, `activity`, `pipeline`, `stage`, `tag`, `user`, `team`                                                                             |
-| `modules`             | Module keys to enable. Stub modules are recorded and enabled once released                                                                                                                        |
-| `custom_field_groups` | Sections that group fields in forms and record pages                                                                                                                                              |
-| `custom_fields`       | Per entity. Types: `text textarea number decimal currency date datetime boolean select multi_select url email phone user file`. Set `filterable: true` for anything people will filter or sort by |
-| `pipelines`           | At most one `is_won` and one `is_lost` stage each. `rotting_days` flags stalled records                                                                                                           |
-| `roles`               | `permissions` are patterns; `scopes` map resources (or `*`) to `own`, `team` or `all`. Do not define `admin` (system-managed)                                                                     |
-| `layouts`             | `form`/`detail` sections (`fields` can mix core inputs and `cf.<key>`), or `list` `columns`                                                                                                       |
-| `dashboard`           | Widgets: `pipeline_value`, `tasks_due`, `conversion`, `activity_by_user`, `date_window`, or a module widget `module:<key>.<name>`                                                                 |
-| `templates`           | Email, notification or document templates (Handlebars, auto-escaped). `{{branding.appName}}` and `{{labels.contact.singular}}` are available                                                      |
-| `sample_data`         | Optional demo organizations, contacts and deals, seeded only with `--sample-data` on first install                                                                                                |
+| Section               | Notes                                                                                                                                                                                                    |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings`            | Partial settings groups (`general`, `features`, `contacts`, `deals`, `security`). Merged over defaults                                                                                                   |
+| `vocabulary`          | Label overrides for `contact`, `organization`, `lead`, `deal`, `activity`, `pipeline`, `stage`, `tag`, `user`, `team`                                                                                    |
+| `modules`             | Module keys to enable. Stub modules are recorded and enabled once released                                                                                                                               |
+| `custom_field_groups` | Sections that group fields in forms and record pages                                                                                                                                                     |
+| `custom_fields`       | Per entity. Types: `text textarea number decimal currency date datetime boolean select multi_select url email phone user file`. Set `filterable: true` for anything people will filter or sort by        |
+| `pipelines`           | At most one `is_won` and one `is_lost` stage each. `rotting_days` flags stalled records                                                                                                                  |
+| `roles`               | `permissions` are patterns; `scopes` map resources (or `*`) to `own`, `team` or `all`. Do not define `admin` (system-managed)                                                                            |
+| `layouts`             | `form`/`detail` sections (`fields` can mix core inputs and `cf.<key>`), or `list` `columns`                                                                                                              |
+| `dashboard`           | Widgets: `pipeline_value`, `tasks_due`, `conversion`, `activity_by_user`, `date_window`, or a module widget `module:<key>.<name>`                                                                        |
+| `templates`           | Email, notification or document templates (Handlebars, auto-escaped). `{{branding.appName}}` and `{{labels.contact.singular}}` are available                                                             |
+| `sample_data`         | Demo data: `organizations`, `contacts`, `leads`, `deals`, `activities` (seeded on first install with `--sample-data`, and by `demo:reset`) and `requests` (module records, `demo:reset` only). See below |
+
+## Sample data
+
+Sample data makes a demo look like a business that has been running for months. `demo:reset` uses all of
+it; `install --sample-data` seeds everything except `requests`.
+
+- **Records** (`organizations`, `contacts`, `leads`, `deals`) take a `ref` so others can point at them
+  (`contact.organization`, `deal.contact`), `custom` values by field key, an `owner` role key (the demo
+  user with that role owns it; otherwise owners rotate), and `days` (negative) to backdate them. Deals take
+  a `stage` key, `stage_days`, `expected_close` and, in the lost stage, a `lost_reason`.
+- **Activities**: `type` (`note`, `task`, `call`, `meeting`), `subject`/`body`, `related: "deal:<ref>"`,
+  `due_days` and `hour` for tasks, calls and meetings, `done`, `outcome`, `priority`.
+- **Requests**: module records created through the app's own API as the demo admin, so numbering, totals
+  and statuses follow the module's rules: `{ "ref": "q1", "method": "post", "path": "/m/quotes/quotes",
+"body": {…} }`.
+- **Placeholders** anywhere in values: `{{date:+7}}` (date relative to today), `{{datetime:+2@14:30}}`,
+  and in requests `{{contact:<ref>}}`, `{{organization:<ref>}}`, `{{deal:<ref>}}`, `{{lead:<ref>}}`,
+  `{{req:<ref>}}` (an earlier request's result) and `{{user:<role key>}}`. Never hard-code dates.
+- Fictional data only: `*.test` emails and fictional phone ranges.
+
+`npx vitest run test/blueprint-catalog.test.ts` (in `apps/api`) checks every reference statically: records,
+stages, custom fields and options, roles, modules and placeholders.
 
 ## Rules that keep upgrades safe
 

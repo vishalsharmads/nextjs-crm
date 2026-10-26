@@ -471,8 +471,8 @@ export async function applyBlueprint(
   report.ddl = await ensureCustomFieldIndexes();
 
   if (opts.sampleData && bp.sample_data && !last) {
-    const n = await seedSampleData(knex, bp);
-    report.warnings.push(`Seeded ${n} sample records`);
+    const { count } = await seedSampleData(knex, bp);
+    report.warnings.push(`Seeded ${count} sample records`);
   }
 
   const nothingChanged = !report.created.length && !report.updated.length && !report.ddl.length;

@@ -1,0 +1,1660 @@
+{
+  "$schema": "../schema.json",
+  "key": "education-training",
+  "name": "Education and training",
+  "version": "1.0.0",
+  "description": "Students, agents and enrolments for colleges, training providers and tutoring businesses: enquiry to application, offer, enrolment and completion, with document collection, fee invoices and a student support desk.",
+  "settings": {
+    "features": {
+      "leads": true
+    },
+    "general": {
+      "currency": "USD"
+    },
+    "contacts": {
+      "sources": [
+        "Website",
+        "Education agent",
+        "Open day",
+        "Referral",
+        "Employer",
+        "Education fair",
+        "Social",
+        "Other"
+      ],
+      "lifecycleStatuses": ["Enquirer", "Applicant", "Offer holder", "Enrolled", "Graduate", "Withdrawn"]
+    },
+    "deals": {
+      "lostReasons": [
+        "Chose another provider",
+        "Visa refused",
+        "Could not afford fees",
+        "Did not meet entry requirements",
+        "Deferred to a later intake",
+        "No response"
+      ]
+    }
+  },
+  "vocabulary": {
+    "contact": {
+      "singular": "Student",
+      "plural": "Students"
+    },
+    "organization": {
+      "singular": "Agent",
+      "plural": "Agents"
+    },
+    "deal": {
+      "singular": "Enrolment",
+      "plural": "Enrolments"
+    }
+  },
+  "modules": ["documents", "invoices", "tickets", "portal"],
+  "custom_field_groups": {
+    "contact": [
+      {
+        "key": "background",
+        "label": "Background"
+      }
+    ],
+    "organization": [
+      {
+        "key": "agreement",
+        "label": "Agent agreement"
+      }
+    ],
+    "deal": [
+      {
+        "key": "course",
+        "label": "Course and intake"
+      },
+      {
+        "key": "admissions",
+        "label": "Admissions"
+      }
+    ]
+  },
+  "custom_fields": {
+    "contact": [
+      {
+        "key": "nationality",
+        "label": "Nationality",
+        "type": "text",
+        "group": "background",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "highest_qualification",
+        "label": "Highest qualification",
+        "type": "select",
+        "group": "background",
+        "filterable": true,
+        "options": [
+          { "key": "high_school", "label": "High school diploma" },
+          { "key": "associate", "label": "Associate degree" },
+          { "key": "bachelor", "label": "Bachelor's degree" },
+          { "key": "master", "label": "Master's degree or higher" },
+          { "key": "other", "label": "Other" }
+        ]
+      }
+    ],
+    "organization": [
+      {
+        "key": "commission_rate",
+        "label": "Commission rate (%)",
+        "type": "decimal",
+        "group": "agreement",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ],
+    "deal": [
+      {
+        "key": "course",
+        "label": "Course",
+        "type": "select",
+        "group": "course",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          { "key": "web_dev", "label": "Full-stack web development certificate" },
+          { "key": "data_analytics", "label": "Data analytics certificate" },
+          { "key": "cybersecurity", "label": "Cybersecurity certificate" },
+          { "key": "project_mgmt", "label": "Project management certificate" },
+          { "key": "medical_assistant", "label": "Medical assistant certificate" },
+          { "key": "early_childhood", "label": "Early childhood education certificate" },
+          { "key": "esl", "label": "Intensive English (ESL)" }
+        ]
+      },
+      {
+        "key": "intake_date",
+        "label": "Intake start",
+        "type": "date",
+        "group": "course",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "study_mode",
+        "label": "Study mode",
+        "type": "select",
+        "group": "course",
+        "filterable": true,
+        "options": [
+          { "key": "full_time", "label": "Full time, on campus" },
+          { "key": "part_time", "label": "Part time, evenings" },
+          { "key": "online", "label": "Online" }
+        ]
+      },
+      {
+        "key": "tuition_fee",
+        "label": "Tuition fee",
+        "type": "currency",
+        "group": "admissions",
+        "filterable": true
+      },
+      {
+        "key": "documents_complete",
+        "label": "Documents complete",
+        "type": "boolean",
+        "group": "admissions",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "enrolments",
+      "name": "Enrolments",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        { "key": "enquiry", "name": "Enquiry", "probability": 10, "rotting_days": 3 },
+        { "key": "applied", "name": "Applied", "probability": 30, "rotting_days": 7 },
+        { "key": "offer_sent", "name": "Offer sent", "probability": 60, "rotting_days": 14 },
+        { "key": "enrolled", "name": "Enrolled", "probability": 90 },
+        { "key": "completed", "name": "Completed", "probability": 100, "is_won": true },
+        { "key": "withdrawn", "name": "Withdrawn", "probability": 0, "is_lost": true }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "admissions_officer",
+      "name": "Admissions officer",
+      "description": "Handles enquiries and applications, collects documents, issues offer letters and fee invoices, and manages agents",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.view",
+        "core.saved_views.share",
+        "documents.documents.*",
+        "products.products.view",
+        "invoices.invoices.view",
+        "invoices.invoices.create",
+        "tickets.tickets.view"
+      ],
+      "scopes": {
+        "*": "all"
+      }
+    },
+    {
+      "key": "student_support",
+      "name": "Student support",
+      "description": "Answers student questions on the support desk and keeps student details up to date",
+      "permissions": [
+        "core.contacts.view",
+        "core.contacts.update",
+        "core.organizations.view",
+        "core.deals.view",
+        "core.activities.view",
+        "core.activities.create",
+        "core.activities.update",
+        "core.tags.view",
+        "core.files.view",
+        "core.dashboard.view",
+        "documents.documents.view",
+        "invoices.invoices.view",
+        "tickets.tickets.*"
+      ],
+      "scopes": {
+        "core.contacts": "all",
+        "core.organizations": "all",
+        "core.deals": "all",
+        "core.activities": "own",
+        "invoices.invoices": "all",
+        "tickets.tickets": "all"
+      }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": [
+        "full_name",
+        "email",
+        "phone",
+        "organization",
+        "cf.nationality",
+        "lifecycle_status",
+        "owner"
+      ]
+    },
+    {
+      "entity": "organization",
+      "context": "list",
+      "columns": ["name", "country", "cf.commission_rate", "contact_count", "owner"]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": [
+        "title",
+        "contact",
+        "organization",
+        "stage",
+        "cf.course",
+        "cf.intake_date",
+        "cf.documents_complete",
+        "owner"
+      ]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "awaiting_documents",
+        "type": "module:documents.awaiting",
+        "title": "Documents awaiting action",
+        "size": "sm"
+      },
+      {
+        "key": "open_tickets",
+        "type": "module:tickets.open_count",
+        "title": "Open student questions",
+        "size": "sm"
+      },
+      {
+        "key": "pipeline_value",
+        "type": "pipeline_value",
+        "title": "Enrolments by stage",
+        "size": "lg",
+        "params": {
+          "pipeline": "enrolments"
+        }
+      },
+      {
+        "key": "intakes",
+        "type": "date_window",
+        "title": "Intakes starting in the next 30 days",
+        "size": "md",
+        "params": {
+          "entity": "deal",
+          "field": "cf.intake_date",
+          "days": 30,
+          "status": "open"
+        }
+      },
+      {
+        "key": "receivables",
+        "type": "module:invoices.receivables",
+        "title": "Outstanding fees",
+        "size": "sm"
+      },
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      }
+    ]
+  },
+  "templates": [],
+  "sample_data": {
+    "organizations": [
+      {
+        "ref": "bridgeway",
+        "name": "Bridgeway Education Consultants",
+        "website": "https://bridgeway-edu.test",
+        "industry": "Education agent",
+        "custom": { "commission_rate": 15 },
+        "days": -260,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "lotus",
+        "name": "Lotus Study Abroad",
+        "website": "https://lotusstudy.test",
+        "industry": "Education agent",
+        "custom": { "commission_rate": 12 },
+        "days": -230
+      },
+      {
+        "ref": "andes",
+        "name": "Andes Pathways",
+        "website": "https://andespathways.test",
+        "industry": "Education agent",
+        "custom": { "commission_rate": 15 },
+        "days": -150,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "pacific",
+        "name": "Pacific Rim Student Services",
+        "website": "https://pacificrim-students.test",
+        "industry": "Education agent",
+        "custom": { "commission_rate": 10 },
+        "days": -200
+      },
+      {
+        "ref": "crescent",
+        "name": "Crescent Education Partners",
+        "website": "https://crescent-edu.test",
+        "industry": "Education agent",
+        "custom": { "commission_rate": 12.5 },
+        "days": -95,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "harborview",
+        "name": "Harborview Health Network",
+        "website": "https://harborviewhealth.test",
+        "industry": "Employer sponsor",
+        "days": -180
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "priya",
+        "first_name": "Priya",
+        "last_name": "Sharma",
+        "email": "priya.sharma@example.test",
+        "phone": "+1 206 555 0131",
+        "organization": "bridgeway",
+        "lifecycle_status": "Enquirer",
+        "source": "Education agent",
+        "custom": { "nationality": "Indian", "highest_qualification": "bachelor" },
+        "days": -4,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "santiago",
+        "first_name": "Santiago",
+        "last_name": "Gómez",
+        "email": "santiago.gomez@example.test",
+        "organization": "andes",
+        "lifecycle_status": "Enquirer",
+        "source": "Education fair",
+        "custom": { "nationality": "Colombian", "highest_qualification": "high_school" },
+        "days": -6
+      },
+      {
+        "ref": "junwei",
+        "first_name": "Jun Wei",
+        "last_name": "Chen",
+        "email": "junwei.chen@example.test",
+        "phone": "+1 206 555 0132",
+        "lifecycle_status": "Applicant",
+        "source": "Website",
+        "custom": { "nationality": "Malaysian", "highest_qualification": "bachelor" },
+        "days": -21,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "valentina",
+        "first_name": "Valentina",
+        "last_name": "Rojas",
+        "email": "valentina.rojas@example.test",
+        "phone": "+1 206 555 0133",
+        "organization": "andes",
+        "lifecycle_status": "Applicant",
+        "source": "Education agent",
+        "custom": { "nationality": "Colombian", "highest_qualification": "bachelor" },
+        "days": -30,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "kayla",
+        "first_name": "Kayla",
+        "last_name": "Brooks",
+        "email": "kayla.brooks@example.test",
+        "phone": "+1 206 555 0134",
+        "lifecycle_status": "Applicant",
+        "source": "Open day",
+        "custom": { "nationality": "American", "highest_qualification": "high_school" },
+        "days": -15
+      },
+      {
+        "ref": "fatima",
+        "first_name": "Fatima",
+        "last_name": "Khan",
+        "email": "fatima.khan@example.test",
+        "phone": "+1 206 555 0135",
+        "organization": "crescent",
+        "lifecycle_status": "Offer holder",
+        "source": "Education agent",
+        "custom": { "nationality": "Pakistani", "highest_qualification": "bachelor" },
+        "days": -44,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "minh",
+        "first_name": "Minh",
+        "last_name": "Pham",
+        "email": "minh.pham@example.test",
+        "organization": "lotus",
+        "lifecycle_status": "Offer holder",
+        "source": "Education agent",
+        "custom": { "nationality": "Vietnamese", "highest_qualification": "associate" },
+        "days": -52
+      },
+      {
+        "ref": "sophie",
+        "first_name": "Sophie",
+        "last_name": "Martin",
+        "email": "sophie.martin@example.test",
+        "phone": "+1 206 555 0136",
+        "lifecycle_status": "Offer holder",
+        "source": "Social",
+        "custom": { "nationality": "American", "highest_qualification": "associate" },
+        "days": -25,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "omar",
+        "first_name": "Omar",
+        "last_name": "Hassan",
+        "email": "omar.hassan@example.test",
+        "phone": "+1 206 555 0137",
+        "organization": "crescent",
+        "lifecycle_status": "Enrolled",
+        "source": "Education agent",
+        "custom": { "nationality": "Egyptian", "highest_qualification": "bachelor" },
+        "days": -90,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "linh",
+        "first_name": "Linh",
+        "last_name": "Tran",
+        "email": "linh.tran@example.test",
+        "phone": "+1 206 555 0138",
+        "organization": "lotus",
+        "lifecycle_status": "Enrolled",
+        "source": "Education agent",
+        "custom": { "nationality": "Vietnamese", "highest_qualification": "high_school" },
+        "days": -110,
+        "owner": "student_support"
+      },
+      {
+        "ref": "jiwoo",
+        "first_name": "Ji-woo",
+        "last_name": "Park",
+        "email": "jiwoo.park@example.test",
+        "organization": "pacific",
+        "lifecycle_status": "Enrolled",
+        "source": "Education agent",
+        "custom": { "nationality": "South Korean", "highest_qualification": "bachelor" },
+        "days": -75
+      },
+      {
+        "ref": "maria",
+        "first_name": "Maria",
+        "last_name": "Santos",
+        "email": "maria.santos@harborviewhealth.test",
+        "phone": "+1 206 555 0139",
+        "job_title": "Patient services associate",
+        "organization": "harborview",
+        "lifecycle_status": "Enrolled",
+        "source": "Employer",
+        "custom": { "nationality": "American", "highest_qualification": "high_school" },
+        "days": -120,
+        "owner": "student_support"
+      },
+      {
+        "ref": "ada",
+        "first_name": "Ada",
+        "last_name": "Nwosu",
+        "email": "ada.nwosu@example.test",
+        "phone": "+1 206 555 0140",
+        "lifecycle_status": "Graduate",
+        "source": "Referral",
+        "custom": { "nationality": "Nigerian", "highest_qualification": "bachelor" },
+        "days": -270,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "derrick",
+        "first_name": "Derrick",
+        "last_name": "Johnson",
+        "email": "derrick.johnson@example.test",
+        "lifecycle_status": "Graduate",
+        "source": "Website",
+        "custom": { "nationality": "American", "highest_qualification": "bachelor" },
+        "days": -240
+      },
+      {
+        "ref": "elena",
+        "first_name": "Elena",
+        "last_name": "Popescu",
+        "email": "elena.popescu@example.test",
+        "phone": "+1 206 555 0141",
+        "lifecycle_status": "Graduate",
+        "source": "Website",
+        "custom": { "nationality": "Romanian", "highest_qualification": "master" },
+        "days": -255,
+        "owner": "student_support"
+      },
+      {
+        "ref": "aarav",
+        "first_name": "Aarav",
+        "last_name": "Mehta",
+        "email": "aarav.mehta@example.test",
+        "organization": "bridgeway",
+        "lifecycle_status": "Withdrawn",
+        "source": "Education agent",
+        "custom": { "nationality": "Indian", "highest_qualification": "bachelor" },
+        "days": -160,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "yusuf",
+        "first_name": "Yusuf",
+        "last_name": "Demir",
+        "email": "yusuf.demir@example.test",
+        "organization": "crescent",
+        "lifecycle_status": "Withdrawn",
+        "source": "Education agent",
+        "custom": { "nationality": "Turkish", "highest_qualification": "high_school" },
+        "days": -85
+      },
+      {
+        "ref": "rohan",
+        "first_name": "Rohan",
+        "last_name": "Iyer",
+        "email": "rohan.iyer@example.test",
+        "organization": "bridgeway",
+        "lifecycle_status": "Enrolled",
+        "source": "Education agent",
+        "custom": { "nationality": "Indian", "highest_qualification": "bachelor" },
+        "days": -65,
+        "owner": "admissions_officer"
+      }
+    ],
+    "leads": [
+      {
+        "ref": "grace",
+        "first_name": "Grace",
+        "last_name": "Okoye",
+        "email": "grace.okoye@example.test",
+        "phone": "+1 206 555 0142",
+        "source": "Website",
+        "status": "new",
+        "days": -1
+      },
+      {
+        "ref": "lucas",
+        "first_name": "Lucas",
+        "last_name": "Ferreira",
+        "email": "lucas.ferreira@example.test",
+        "source": "Education fair",
+        "status": "contacted",
+        "days": -5,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "nadia",
+        "first_name": "Nadia",
+        "last_name": "Ali",
+        "email": "nadia.ali@example.test",
+        "phone": "+1 206 555 0143",
+        "source": "Open day",
+        "status": "qualified",
+        "days": -8,
+        "owner": "admissions_officer"
+      },
+      {
+        "ref": "cascade",
+        "first_name": "Brian",
+        "last_name": "Walsh",
+        "email": "brian.walsh@cascadelogistics.test",
+        "company_name": "Cascade Logistics",
+        "job_title": "Learning and development manager",
+        "source": "Employer",
+        "status": "contacted",
+        "days": -12
+      },
+      {
+        "ref": "hamid",
+        "first_name": "Hamid",
+        "last_name": "Rezaei",
+        "email": "hamid@silkroadedu.test",
+        "company_name": "Silk Road Education",
+        "job_title": "Director",
+        "source": "Referral",
+        "status": "new",
+        "days": -3
+      }
+    ],
+    "deals": [
+      {
+        "ref": "priya",
+        "title": "Priya Sharma – Web development, January intake",
+        "contact": "priya",
+        "organization": "bridgeway",
+        "stage": "enquiry",
+        "value": 14500,
+        "days": -4,
+        "owner": "admissions_officer",
+        "custom": {
+          "course": "web_dev",
+          "intake_date": "{{date:+70}}",
+          "study_mode": "full_time",
+          "tuition_fee": 14500,
+          "documents_complete": false
+        }
+      },
+      {
+        "ref": "junwei",
+        "title": "Jun Wei Chen – Data analytics, January intake",
+        "contact": "junwei",
+        "stage": "applied",
+        "value": 12800,
+        "days": -20,
+        "stage_days": -9,
+        "owner": "admissions_officer",
+        "custom": {
+          "course": "data_analytics",
+          "intake_date": "{{date:+70}}",
+          "study_mode": "full_time",
+          "tuition_fee": 12800,
+          "documents_complete": false
+        }
+      },
+      {
+        "ref": "valentina",
+        "title": "Valentina Rojas – Project management, January intake",
+        "contact": "valentina",
+        "organization": "andes",
+        "stage": "applied",
+        "value": 6200,
+        "days": -28,
+        "stage_days": -12,
+        "owner": "admissions_officer",
+        "custom": {
+          "course": "project_mgmt",
+          "intake_date": "{{date:+70}}",
+          "study_mode": "full_time",
+          "tuition_fee": 6200,
+          "documents_complete": false
+        }
+      },
+      {
+        "ref": "kayla",
+        "title": "Kayla Brooks – Early childhood education",
+        "contact": "kayla",
+        "stage": "applied",
+        "value": 7400,
+        "days": -14,
+        "stage_days": -6,
+        "custom": {
+          "course": "early_childhood",
+          "intake_date": "{{date:+70}}",
+          "study_mode": "part_time",
+          "tuition_fee": 7400,
+          "documents_complete": false
+        }
+      },
+      {
+        "ref": "fatima",
+        "title": "Fatima Khan – Cybersecurity, January intake",
+        "contact": "fatima",
+        "organization": "crescent",
+        "stage": "offer_sent",
+        "value": 15900,
+        "days": -42,
+        "stage_days": -5,
+        "owner": "admissions_officer",
+        "expected_close": "{{date:+14}}",
+        "custom": {
+          "course": "cybersecurity",
+          "intake_date": "{{date:+70}}",
+          "study_mode": "full_time",
+          "tuition_fee": 15900,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "minh",
+        "title": "Minh Pham – Web development, January intake",
+        "contact": "minh",
+        "organization": "lotus",
+        "stage": "offer_sent",
+        "value": 14500,
+        "days": -50,
+        "stage_days": -16,
+        "expected_close": "{{date:+7}}",
+        "custom": {
+          "course": "web_dev",
+          "intake_date": "{{date:+70}}",
+          "study_mode": "full_time",
+          "tuition_fee": 14500,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "sophie",
+        "title": "Sophie Martin – Cybersecurity online",
+        "contact": "sophie",
+        "stage": "offer_sent",
+        "value": 15900,
+        "days": -24,
+        "stage_days": -1,
+        "owner": "admissions_officer",
+        "expected_close": "{{date:+10}}",
+        "custom": {
+          "course": "cybersecurity",
+          "intake_date": "{{date:+25}}",
+          "study_mode": "online",
+          "tuition_fee": 15900,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "omar",
+        "title": "Omar Hassan – Data analytics, February intake",
+        "contact": "omar",
+        "organization": "crescent",
+        "stage": "enrolled",
+        "value": 12800,
+        "days": -88,
+        "stage_days": -20,
+        "owner": "admissions_officer",
+        "custom": {
+          "course": "data_analytics",
+          "intake_date": "{{date:+100}}",
+          "study_mode": "full_time",
+          "tuition_fee": 12800,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "linh",
+        "title": "Linh Tran – Intensive English, fall term",
+        "contact": "linh",
+        "organization": "lotus",
+        "stage": "enrolled",
+        "value": 4800,
+        "days": -105,
+        "stage_days": -60,
+        "owner": "student_support",
+        "custom": {
+          "course": "esl",
+          "intake_date": "{{date:-45}}",
+          "study_mode": "full_time",
+          "tuition_fee": 4800,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "jiwoo",
+        "title": "Ji-woo Park – Cybersecurity, November intake",
+        "contact": "jiwoo",
+        "organization": "pacific",
+        "stage": "enrolled",
+        "value": 15900,
+        "days": -72,
+        "stage_days": -15,
+        "custom": {
+          "course": "cybersecurity",
+          "intake_date": "{{date:+18}}",
+          "study_mode": "full_time",
+          "tuition_fee": 15900,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "maria",
+        "title": "Maria Santos – Medical assistant (employer sponsored)",
+        "contact": "maria",
+        "organization": "harborview",
+        "stage": "enrolled",
+        "value": 9800,
+        "days": -115,
+        "stage_days": -70,
+        "owner": "student_support",
+        "custom": {
+          "course": "medical_assistant",
+          "intake_date": "{{date:-60}}",
+          "study_mode": "part_time",
+          "tuition_fee": 9800,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "rohan",
+        "title": "Rohan Iyer – Data analytics, November intake",
+        "contact": "rohan",
+        "organization": "bridgeway",
+        "stage": "enrolled",
+        "value": 12800,
+        "days": -62,
+        "stage_days": -10,
+        "owner": "admissions_officer",
+        "custom": {
+          "course": "data_analytics",
+          "intake_date": "{{date:+18}}",
+          "study_mode": "full_time",
+          "tuition_fee": 12800,
+          "documents_complete": false
+        }
+      },
+      {
+        "ref": "ada",
+        "title": "Ada Nwosu – Web development, spring intake",
+        "contact": "ada",
+        "stage": "completed",
+        "value": 14500,
+        "days": -265,
+        "stage_days": -20,
+        "owner": "admissions_officer",
+        "custom": {
+          "course": "web_dev",
+          "intake_date": "{{date:-200}}",
+          "study_mode": "full_time",
+          "tuition_fee": 14500,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "derrick",
+        "title": "Derrick Johnson – Project management, evenings",
+        "contact": "derrick",
+        "stage": "completed",
+        "value": 6200,
+        "days": -235,
+        "stage_days": -50,
+        "custom": {
+          "course": "project_mgmt",
+          "intake_date": "{{date:-180}}",
+          "study_mode": "part_time",
+          "tuition_fee": 6200,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "elena",
+        "title": "Elena Popescu – Data analytics online",
+        "contact": "elena",
+        "stage": "completed",
+        "value": 12800,
+        "days": -250,
+        "stage_days": -35,
+        "owner": "student_support",
+        "custom": {
+          "course": "data_analytics",
+          "intake_date": "{{date:-210}}",
+          "study_mode": "online",
+          "tuition_fee": 12800,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "aarav",
+        "title": "Aarav Mehta – Data analytics, fall intake",
+        "contact": "aarav",
+        "organization": "bridgeway",
+        "stage": "withdrawn",
+        "value": 12800,
+        "days": -155,
+        "stage_days": -70,
+        "owner": "admissions_officer",
+        "lost_reason": "Visa refused",
+        "custom": {
+          "course": "data_analytics",
+          "intake_date": "{{date:-45}}",
+          "study_mode": "full_time",
+          "tuition_fee": 12800,
+          "documents_complete": true
+        }
+      },
+      {
+        "ref": "yusuf",
+        "title": "Yusuf Demir – Intensive English, fall term",
+        "contact": "yusuf",
+        "organization": "crescent",
+        "stage": "withdrawn",
+        "value": 4800,
+        "days": -82,
+        "stage_days": -55,
+        "lost_reason": "Chose another provider",
+        "custom": {
+          "course": "esl",
+          "intake_date": "{{date:-45}}",
+          "study_mode": "full_time",
+          "tuition_fee": 4800,
+          "documents_complete": false
+        }
+      }
+    ],
+    "activities": [
+      {
+        "type": "note",
+        "related": "deal:priya",
+        "body": "<p>Priya has a BSc in physics and has been teaching herself JavaScript. Wants to know whether the program includes an internship and if she can work part time while studying.</p>",
+        "days": -4,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "task",
+        "related": "deal:priya",
+        "subject": "Send Priya the course guide and fee schedule",
+        "due_days": -1,
+        "priority": "high",
+        "days": -4,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "call",
+        "related": "contact:santiago",
+        "subject": "Call Santiago about English entry requirements",
+        "due_days": 1,
+        "days": -6
+      },
+      {
+        "type": "note",
+        "related": "deal:junwei",
+        "body": "<p>Application received. Passport copy is in; still waiting on the certified academic transcript. File request sent through the portal.</p>",
+        "days": -9,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "task",
+        "related": "deal:junwei",
+        "subject": "Chase Jun Wei's transcript",
+        "due_days": -2,
+        "priority": "high",
+        "days": -8,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "task",
+        "related": "deal:valentina",
+        "subject": "Check Valentina's English test score meets the entry requirement",
+        "due_days": 2,
+        "days": -3,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:kayla",
+        "subject": "Admissions interview with Kayla Brooks",
+        "due_days": 3,
+        "hour": 16,
+        "days": -5
+      },
+      {
+        "type": "note",
+        "related": "deal:fatima",
+        "body": "<p>Offer letter shared in the portal. Crescent confirmed Fatima will sign this week and pay the deposit so the enrolment confirmation can go out for her visa interview.</p>",
+        "days": -5,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "call",
+        "related": "deal:minh",
+        "subject": "Follow up Minh's unsigned offer with Lotus",
+        "due_days": -4,
+        "done": true,
+        "outcome": "Agent says Minh is waiting on a family loan; expects to accept next week",
+        "days": -7
+      },
+      {
+        "type": "task",
+        "related": "deal:minh",
+        "subject": "Offer expires soon: confirm Minh's decision",
+        "due_days": 5,
+        "priority": "high",
+        "days": -4
+      },
+      {
+        "type": "task",
+        "related": "deal:sophie",
+        "subject": "Share the offer letter with Sophie",
+        "due_days": 0,
+        "priority": "high",
+        "days": -1,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "note",
+        "related": "deal:omar",
+        "body": "<p>Deposit paid and enrolment confirmation issued. Omar's visa appointment is next month; he asked for an updated letter with the February start date.</p>",
+        "days": -18,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:jiwoo",
+        "subject": "Pre-arrival video call with Ji-woo",
+        "due_days": 6,
+        "hour": 17,
+        "days": -3,
+        "owner": "student_support"
+      },
+      {
+        "type": "task",
+        "related": "deal:rohan",
+        "subject": "Collect Rohan's proof of health insurance before orientation",
+        "due_days": 8,
+        "days": -2,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "note",
+        "related": "deal:linh",
+        "body": "<p>Linh moved from level 3 to level 4 after the mid-term assessment. Attendance 96%.</p>",
+        "days": -12,
+        "owner": "student_support"
+      },
+      {
+        "type": "call",
+        "related": "deal:maria",
+        "subject": "Check on Maria's clinical placement hours",
+        "due_days": -10,
+        "done": true,
+        "outcome": "42 of 160 hours logged; on track",
+        "days": -11,
+        "owner": "student_support"
+      },
+      {
+        "type": "note",
+        "related": "organization:harborview",
+        "body": "<p>Harborview sponsors up to six staff a year through the medical assistant program. Invoices go to their accounts payable team with the employee's name in the reference.</p>",
+        "days": -100
+      },
+      {
+        "type": "call",
+        "related": "organization:harborview",
+        "subject": "Chase Harborview's overdue sponsorship invoice",
+        "due_days": 1,
+        "priority": "high",
+        "days": -1
+      },
+      {
+        "type": "note",
+        "related": "deal:ada",
+        "body": "<p>Ada graduated with distinction and has accepted a junior developer role. Happy to speak at the next open day.</p>",
+        "days": -20,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "task",
+        "related": "contact:ada",
+        "subject": "Invite Ada to speak at the open day",
+        "due_days": 10,
+        "days": -15,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "note",
+        "related": "deal:aarav",
+        "body": "<p>Aarav's student visa was refused. Bridgeway is helping him reapply; deposit refunded less the application fee.</p>",
+        "days": -70,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "note",
+        "related": "deal:yusuf",
+        "body": "<p>Yusuf chose a language school closer to family. Crescent asked us to keep his file open for next year.</p>",
+        "days": -55
+      },
+      {
+        "type": "note",
+        "related": "organization:bridgeway",
+        "body": "<p>Bridgeway sent 9 students this year. Commission is paid once the first tuition installment clears.</p>",
+        "days": -30,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "meeting",
+        "related": "organization:crescent",
+        "subject": "Quarterly review with Crescent Education Partners",
+        "due_days": 7,
+        "hour": 15,
+        "days": -6,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "call",
+        "related": "organization:andes",
+        "subject": "Agent check-in: Andes Pathways",
+        "due_days": -20,
+        "done": true,
+        "outcome": "Three more applications coming for the January intake",
+        "days": -22,
+        "owner": "admissions_officer"
+      },
+      {
+        "type": "task",
+        "related": "contact:elena",
+        "subject": "Reissue Elena's certificate with the corrected name spelling",
+        "due_days": -3,
+        "done": true,
+        "days": -9,
+        "owner": "student_support"
+      },
+      {
+        "type": "task",
+        "subject": "Prepare the welcome packs for the November intake",
+        "due_days": 9,
+        "days": -2,
+        "owner": "student_support"
+      },
+      {
+        "type": "task",
+        "subject": "Book the hall for the next open day",
+        "due_days": 4,
+        "days": -3
+      }
+    ],
+    "requests": [
+      {
+        "ref": "p_web",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "CRS-WEB",
+          "name": "Tuition: Full-stack web development certificate",
+          "unit": "course",
+          "unitPrice": 14500
+        }
+      },
+      {
+        "ref": "p_data",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "CRS-DATA",
+          "name": "Tuition: Data analytics certificate",
+          "unit": "course",
+          "unitPrice": 12800
+        }
+      },
+      {
+        "ref": "p_cyber",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "CRS-CYB",
+          "name": "Tuition: Cybersecurity certificate",
+          "unit": "course",
+          "unitPrice": 15900
+        }
+      },
+      {
+        "ref": "p_pm",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "CRS-PM",
+          "name": "Tuition: Project management certificate",
+          "unit": "course",
+          "unitPrice": 6200
+        }
+      },
+      {
+        "ref": "p_med",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "CRS-MED",
+          "name": "Tuition: Medical assistant certificate",
+          "unit": "course",
+          "unitPrice": 9800
+        }
+      },
+      {
+        "ref": "p_esl",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": {
+          "sku": "CRS-ESL",
+          "name": "Tuition: Intensive English (one term)",
+          "unit": "term",
+          "unitPrice": 4800
+        }
+      },
+      {
+        "ref": "p_appfee",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "FEE-APP", "name": "Application fee", "unit": "each", "unitPrice": 100 }
+      },
+      {
+        "ref": "p_materials",
+        "method": "post",
+        "path": "/m/products/products",
+        "body": { "sku": "FEE-MAT", "name": "Course materials and lab fee", "unit": "each", "unitPrice": 350 }
+      },
+      {
+        "ref": "t_offer",
+        "method": "post",
+        "path": "/m/documents/templates",
+        "body": {
+          "name": "Letter of offer",
+          "description": "Conditional or full offer for a course and intake, signed by the student in the portal.",
+          "requiresSignature": true,
+          "body": "<h1>Letter of offer</h1><p>{{today}}</p><p>Dear {{contact.firstName}},</p><p>We are pleased to offer you a place in the following enrolment: <strong>{{deal.title}}</strong>.</p><p>To accept this offer, sign below and pay the enrolment deposit shown on your fee invoice within 14 days. Your place is held until then.</p><p>Once we receive your signed offer and deposit, we will issue your enrolment confirmation.</p><p>We look forward to welcoming you.</p><p>{{user.name}}<br>Admissions<br>{{business.name}}</p>"
+        }
+      },
+      {
+        "ref": "t_confirm",
+        "method": "post",
+        "path": "/m/documents/templates",
+        "body": {
+          "name": "Enrolment confirmation",
+          "description": "Confirms a student's enrolment, for visa appointments and sponsors.",
+          "body": "<h1>Enrolment confirmation</h1><p>{{today}}</p><p>This letter confirms that {{contact.fullName}} has accepted an offer and paid the enrolment deposit for: <strong>{{deal.title}}</strong>.</p><p>{{user.name}}<br>Admissions<br>{{business.name}}</p>"
+        }
+      },
+      {
+        "ref": "d_fatima",
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:t_offer}}",
+          "contactUuid": "{{contact:fatima}}",
+          "dealUuid": "{{deal:fatima}}",
+          "title": "Letter of offer – Fatima Khan"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents/{{req:d_fatima}}/share",
+        "body": {}
+      },
+      {
+        "ref": "d_minh",
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:t_offer}}",
+          "contactUuid": "{{contact:minh}}",
+          "dealUuid": "{{deal:minh}}",
+          "title": "Letter of offer – Minh Pham"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents/{{req:d_minh}}/share",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:t_offer}}",
+          "contactUuid": "{{contact:sophie}}",
+          "dealUuid": "{{deal:sophie}}",
+          "title": "Letter of offer – Sophie Martin"
+        }
+      },
+      {
+        "ref": "d_omar",
+        "method": "post",
+        "path": "/m/documents/documents",
+        "body": {
+          "templateUuid": "{{req:t_confirm}}",
+          "contactUuid": "{{contact:omar}}",
+          "dealUuid": "{{deal:omar}}",
+          "title": "Enrolment confirmation – Omar Hassan"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/documents/{{req:d_omar}}/share",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:junwei}}",
+          "dealUuid": "{{deal:junwei}}",
+          "items": [
+            {
+              "name": "Certified academic transcript",
+              "description": "All years of your bachelor's degree, certified by the issuing university.",
+              "dueDate": "{{date:+5}}"
+            },
+            {
+              "name": "English test results",
+              "description": "Score report from an accepted English test, taken in the last two years.",
+              "dueDate": "{{date:+10}}"
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:valentina}}",
+          "dealUuid": "{{deal:valentina}}",
+          "items": [
+            { "name": "Passport photo page", "dueDate": "{{date:+7}}" },
+            {
+              "name": "English test results",
+              "description": "Score report from an accepted English test.",
+              "dueDate": "{{date:+7}}"
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:kayla}}",
+          "dealUuid": "{{deal:kayla}}",
+          "items": [
+            { "name": "High school diploma or GED", "dueDate": "{{date:+14}}" },
+            {
+              "name": "Background check consent form",
+              "description": "Required for placements in early learning centers.",
+              "dueDate": "{{date:+14}}"
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/documents/requests",
+        "body": {
+          "contactUuid": "{{contact:rohan}}",
+          "dealUuid": "{{deal:rohan}}",
+          "items": [{ "name": "Proof of health insurance", "dueDate": "{{date:+8}}" }]
+        }
+      },
+      {
+        "ref": "inv_omar",
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Enrolment deposit – Data analytics",
+          "contactUuid": "{{contact:omar}}",
+          "dealUuid": "{{deal:omar}}",
+          "issueDate": "{{date:-30}}",
+          "dueDate": "{{date:-16}}",
+          "lines": [
+            { "productUuid": "{{req:p_appfee}}", "name": "Application fee", "quantity": 1, "unitPrice": 100 },
+            {
+              "productUuid": "{{req:p_data}}",
+              "name": "Tuition: Data analytics certificate (25% deposit)",
+              "quantity": 0.25,
+              "unitPrice": 12800
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_omar}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_omar}}/payments",
+        "body": {
+          "amount": 3300,
+          "paidOn": "{{date:-21}}",
+          "method": "bank_transfer",
+          "reference": "Intl wire OH-2291"
+        }
+      },
+      {
+        "ref": "inv_linh",
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Intensive English – fall term",
+          "contactUuid": "{{contact:linh}}",
+          "organizationUuid": "{{organization:lotus}}",
+          "dealUuid": "{{deal:linh}}",
+          "issueDate": "{{date:-70}}",
+          "dueDate": "{{date:-50}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_esl}}",
+              "name": "Tuition: Intensive English (one term)",
+              "quantity": 1,
+              "unitPrice": 4800
+            },
+            {
+              "productUuid": "{{req:p_materials}}",
+              "name": "Course materials and lab fee",
+              "quantity": 1,
+              "unitPrice": 350
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_linh}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_linh}}/payments",
+        "body": { "amount": 5150, "paidOn": "{{date:-55}}", "method": "card" }
+      },
+      {
+        "ref": "inv_jiwoo",
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Cybersecurity tuition – installment 1 of 2",
+          "contactUuid": "{{contact:jiwoo}}",
+          "organizationUuid": "{{organization:pacific}}",
+          "dealUuid": "{{deal:jiwoo}}",
+          "issueDate": "{{date:-10}}",
+          "dueDate": "{{date:+10}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_cyber}}",
+              "name": "Tuition: Cybersecurity certificate (installment 1 of 2)",
+              "quantity": 0.5,
+              "unitPrice": 15900
+            },
+            {
+              "productUuid": "{{req:p_materials}}",
+              "name": "Course materials and lab fee",
+              "quantity": 1,
+              "unitPrice": 350
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_jiwoo}}/issue",
+        "body": {}
+      },
+      {
+        "ref": "inv_maria",
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Employer sponsorship – Maria Santos, medical assistant",
+          "contactUuid": "{{contact:maria}}",
+          "organizationUuid": "{{organization:harborview}}",
+          "dealUuid": "{{deal:maria}}",
+          "issueDate": "{{date:-50}}",
+          "dueDate": "{{date:-20}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_med}}",
+              "name": "Tuition: Medical assistant certificate",
+              "quantity": 1,
+              "unitPrice": 9800
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_maria}}/issue",
+        "body": {}
+      },
+      {
+        "ref": "inv_ada",
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Web development tuition – final installment",
+          "contactUuid": "{{contact:ada}}",
+          "dealUuid": "{{deal:ada}}",
+          "issueDate": "{{date:-120}}",
+          "dueDate": "{{date:-100}}",
+          "lines": [
+            {
+              "productUuid": "{{req:p_web}}",
+              "name": "Tuition: Full-stack web development certificate (final 50%)",
+              "quantity": 0.5,
+              "unitPrice": 14500
+            }
+          ]
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_ada}}/issue",
+        "body": {}
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_ada}}/payments",
+        "body": {
+          "amount": 7250,
+          "paidOn": "{{date:-104}}",
+          "method": "bank_transfer",
+          "reference": "AN-ACH-5520"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices",
+        "body": {
+          "title": "Application fee – Sophie Martin",
+          "contactUuid": "{{contact:sophie}}",
+          "dealUuid": "{{deal:sophie}}",
+          "issueDate": "{{date:0}}",
+          "dueDate": "{{date:+14}}",
+          "lines": [
+            { "productUuid": "{{req:p_appfee}}", "name": "Application fee", "quantity": 1, "unitPrice": 100 }
+          ]
+        }
+      },
+      {
+        "ref": "tk_timetable",
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "When is my level 4 timetable available?",
+          "description": "I moved up to level 4. Which room and times are my classes next week?",
+          "priority": "normal",
+          "category": "Timetable",
+          "channel": "email",
+          "contactUuid": "{{contact:linh}}",
+          "assigneeUuid": "{{user:student_support}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets/{{req:tk_timetable}}/comments",
+        "body": {
+          "body": "Hi Linh, your level 4 classes are Monday to Thursday, 9:00 to 12:30, in room B204. The new timetable is in your student portal now.",
+          "status": "resolved"
+        }
+      },
+      {
+        "ref": "tk_letter",
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "Updated enrolment letter for my visa appointment",
+          "description": "My visa appointment is on the 14th. Can you send a letter with the February start date?",
+          "priority": "high",
+          "category": "Admissions",
+          "contactUuid": "{{contact:omar}}",
+          "organizationUuid": "{{organization:crescent}}",
+          "assigneeUuid": "{{user:admissions_officer}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets/{{req:tk_letter}}/comments",
+        "body": {
+          "body": "Your updated enrolment confirmation is in your portal. Can you confirm the name matches your passport exactly?",
+          "status": "pending"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "Cannot sign in to the learning platform",
+          "description": "The password reset link says it has expired.",
+          "priority": "high",
+          "category": "IT access",
+          "channel": "phone",
+          "contactUuid": "{{contact:maria}}",
+          "assigneeUuid": "{{user:student_support}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "Airport pickup on arrival",
+          "description": "I land on the Sunday before orientation. Is there a pickup service?",
+          "category": "Arrival",
+          "contactUuid": "{{contact:jiwoo}}",
+          "organizationUuid": "{{organization:pacific}}"
+        }
+      },
+      {
+        "ref": "tk_cert",
+        "method": "post",
+        "path": "/m/tickets/tickets",
+        "body": {
+          "subject": "My name is misspelled on my certificate",
+          "priority": "normal",
+          "category": "Certificates",
+          "channel": "email",
+          "contactUuid": "{{contact:elena}}",
+          "assigneeUuid": "{{user:student_support}}"
+        }
+      },
+      {
+        "method": "post",
+        "path": "/m/tickets/tickets/{{req:tk_cert}}/comments",
+        "body": {
+          "body": "Sorry about that, Elena. A corrected certificate has been posted today, and the digital copy is in your portal.",
+          "status": "resolved"
+        }
+      }
+    ]
+  }
+}
