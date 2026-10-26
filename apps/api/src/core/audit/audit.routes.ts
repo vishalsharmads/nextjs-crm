@@ -8,6 +8,9 @@ import type { AuthUser } from '../../http/context';
 import { db } from '../../db/knex';
 import { notFound } from '../../lib/errors';
 import { escapeLike } from '../records/filters';
+import { recordDefs } from '../records/registry';
+import { scopedQuery } from '../records/service';
+import { can } from '../rbac/access';
 import { fieldAccessMap, getDefinitions } from '../custom-fields/definitions';
 import { redactDiff } from '../records/custom';
 import { audit } from './audit.service';
@@ -130,14 +133,45 @@ async function streamCsv(
   });
 }
 
-const auditQuery = (f: Filters) => {
+/**
+ * Entries about core records follow the viewer's record scope: someone who sees only their own
+ * contacts sees only those contacts' history. Workspace entries (settings, sign-ins) are not
+ * record data and stay visible to every audit viewer. Mutates `qb`.
+ */
+async function applyRecordScope(qb: Knex.QueryBuilder, user: AuthUser, alias: 'a' | 'x') {
+  if (user.isAdmin) return;
+  const limited: [string, Knex.QueryBuilder | null][] = [];
+  for (const [entity, def] of Object.entries(recordDefs)) {
+    const canView = can(user, `${def.resource}.view`);
+    if (canView && user.scopes[def.resource] === 'all') continue;
+    let sub: Knex.QueryBuilder | null = null;
+    if (canView) {
+      ({ qb: sub } = await scopedQuery(def, user, db, 'with'));
+      sub.select(`${def.table}.id`);
+    }
+    limited.push([entity, sub]);
+  }
+  if (!limited.length) return;
+  qb.where((w) => {
+    w.whereNotIn(
+      `${alias}.entity`,
+      limited.map(([e]) => e),
+    );
+    for (const [entity, sub] of limited)
+      if (sub) w.orWhere((o) => o.where(`${alias}.entity`, entity).whereIn(`${alias}.entity_id`, sub));
+  });
+}
+
+const auditQuery = async (f: Filters, user: AuthUser) => {
   const qb = db('audit_logs as a').leftJoin('users as u', 'u.id', 'a.actor_id');
   applyFilters(qb, f, 'a');
+  await applyRecordScope(qb, user, 'a');
   return { qb };
 };
-const accessQuery = (f: Filters) => {
+const accessQuery = async (f: Filters, user: AuthUser) => {
   const qb = db('access_logs as x').leftJoin('users as u', 'u.id', 'x.actor_id');
   applyFilters(qb, f, 'x');
+  await applyRecordScope(qb, user, 'x');
   return { qb };
 };
 
@@ -148,7 +182,7 @@ export const auditRoutes = defineRoutes('/audit-logs', ['audit'])
     permission: 'core.audit.view',
     query: auditFilters.extend(page),
     handler: async ({ ctx, user, query }) => {
-      const { qb } = auditQuery(query);
+      const { qb } = await auditQuery(query, user);
       const total = Number(((await qb.clone().count({ c: '*' }).first()) as { c: number }).c);
       const rows = await qb
         .orderBy('a.id', 'desc')
@@ -174,7 +208,7 @@ export const auditRoutes = defineRoutes('/audit-logs', ['audit'])
     query: auditFilters,
     summary: 'CSV of matching audit entries, newest first (at most 100,000 rows)',
     handler: async ({ ctx, user, query, res }) => {
-      const { qb } = auditQuery(query);
+      const { qb } = await auditQuery(query, user);
       qb.select('a.*', ...ACTOR_COLS);
       const redact = await viewerRedactor(user);
       await streamCsv(
@@ -241,10 +275,8 @@ export const auditRoutes = defineRoutes('/audit-logs', ['audit'])
     permission: 'core.audit.view',
     params: z.object({ id: z.coerce.number().int().positive() }),
     handler: async ({ ctx, user, params }) => {
-      const row = await db('audit_logs as a')
-        .leftJoin('users as u', 'u.id', 'a.actor_id')
-        .where('a.id', params.id)
-        .first('a.*', ...ACTOR_COLS);
+      const { qb } = await auditQuery({}, user);
+      const row = await qb.where('a.id', params.id).first('a.*', ...ACTOR_COLS);
       if (!row) throw notFound('Audit entry');
       await logAccess(ctx, { action: 'audit_view', entity: 'audit_log', entityId: params.id });
       return auditDto(row, await viewerRedactor(user));
@@ -257,8 +289,8 @@ export const accessLogRoutes = defineRoutes('/access-logs', ['audit'])
     path: '/',
     permission: 'core.audit.view',
     query: auditFilters.extend(page),
-    handler: async ({ ctx, query }) => {
-      const { qb } = accessQuery(query);
+    handler: async ({ ctx, user, query }) => {
+      const { qb } = await accessQuery(query, user);
       const total = Number(((await qb.clone().count({ c: '*' }).first()) as { c: number }).c);
       const rows = await qb
         .orderBy('x.id', 'desc')
@@ -279,8 +311,8 @@ export const accessLogRoutes = defineRoutes('/access-logs', ['audit'])
     permission: 'core.audit.export',
     query: auditFilters,
     summary: 'CSV of matching access log entries, newest first (at most 100,000 rows)',
-    handler: async ({ ctx, query, res }) => {
-      const { qb } = accessQuery(query);
+    handler: async ({ ctx, user, query, res }) => {
+      const { qb } = await accessQuery(query, user);
       qb.select('x.*', ...ACTOR_COLS);
       await streamCsv(
         res,

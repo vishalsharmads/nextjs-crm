@@ -84,6 +84,22 @@ describe('audit viewer', () => {
     await client.get('/access-logs/export').expect(403);
   });
 
+  it('shows record history only inside the viewer’s record scope', async () => {
+    const { client: admin } = await clientWithRoles(['admin']);
+    const theirs = await admin.post('/contacts', { firstName: 'Not yours' }).expect(201);
+    const role = await createRole(['core.audit.view', 'core.contacts.view', 'core.contacts.create'], {
+      'core.contacts': 'own',
+    });
+    const { client } = await clientWithRoles([role]);
+    const mine = await client.post('/contacts', { firstName: 'Mine' }).expect(201);
+    expect((await client.get(`/audit-logs?entityUuid=${theirs.body.uuid}`)).body.data).toHaveLength(0);
+    expect((await client.get(`/audit-logs?entityUuid=${mine.body.uuid}`)).body.data).toHaveLength(1);
+    const theirEntry = (await admin.get(`/audit-logs?entityUuid=${theirs.body.uuid}`)).body.data[0];
+    expect((await client.get(`/audit-logs/${theirEntry.id}`)).status).toBe(404);
+    // Workspace entries are not record data.
+    expect((await client.get('/audit-logs?action=auth.login')).body.meta.total).toBeGreaterThan(0);
+  });
+
   it('hides custom fields the viewer cannot see from diffs', async () => {
     const viewer = await createRole(['core.audit.view']);
     const { client: admin } = await clientWithRoles(['admin']);
