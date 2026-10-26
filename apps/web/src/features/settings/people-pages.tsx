@@ -60,6 +60,7 @@ export function UsersPage() {
   const t = useT();
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<UserDto | 'new' | null>(null);
+  const [transferring, setTransferring] = useState<UserDto | null>(null);
   const users = useQuery({
     queryKey: ['users', q],
     queryFn: () => apiGet<{ data: UserDto[] }>('/users', { q, pageSize: 100 }).then((r) => r.data),
@@ -156,6 +157,7 @@ export function UsersPage() {
                           Reset two-factor
                         </MenuItem>
                       ) : null}
+                      <MenuItem onSelect={() => setTransferring(u)}>Transfer records</MenuItem>
                       {u.status === 'disabled' ? (
                         <MenuItem onSelect={() => action.mutate({ uuid: u.uuid, op: 'enable' })}>
                           Enable
@@ -176,7 +178,69 @@ export function UsersPage() {
       {editing ? (
         <UserSheet user={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />
       ) : null}
+      {transferring ? (
+        <TransferDialog from={transferring} users={users.data ?? []} onClose={() => setTransferring(null)} />
+      ) : null}
     </SettingsPage>
+  );
+}
+
+/** Hand everything a user owns or is assigned to another active user (use before or after disabling them). */
+export function TransferDialog({
+  from,
+  users,
+  onClose,
+}: {
+  from: UserDto;
+  users: UserDto[];
+  onClose: () => void;
+}) {
+  const [toUuid, setToUuid] = useState('');
+  const candidates = users.filter((u) => u.uuid !== from.uuid && u.status === 'active');
+  const name = (u: UserDto) => `${u.firstName} ${u.lastName}`.trim() || u.email;
+  const transfer = useMutation({
+    mutationFn: () =>
+      apiPost<{ moved: Record<string, number> }>(`/users/${from.uuid}/transfer-records`, { toUuid }),
+    onSuccess: ({ moved }) => {
+      const total = Object.values(moved).reduce((a, b) => a + b, 0);
+      toast.success(`Transferred ${total} ${total === 1 ? 'record' : 'records'}`);
+      onClose();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not transfer records'),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        title={`Transfer records from ${name(from)}`}
+        description="Everything they own or are assigned to moves to the person you choose. This is recorded in the audit log."
+        footer={
+          <>
+            <Button onClick={onClose}>Cancel</Button>
+            <Button
+              variant="primary"
+              onClick={() => transfer.mutate()}
+              loading={transfer.isPending}
+              disabled={!toUuid}
+            >
+              Transfer
+            </Button>
+          </>
+        }
+      >
+        <Field label="New owner" required>
+          {(p) => (
+            <NativeSelect {...p} value={toUuid} onChange={(e) => setToUuid(e.target.value)}>
+              <option value="">Choose a user</option>
+              {candidates.map((u) => (
+                <option key={u.uuid} value={u.uuid}>
+                  {name(u)}
+                </option>
+              ))}
+            </NativeSelect>
+          )}
+        </Field>
+      </DialogContent>
+    </Dialog>
   );
 }
 
