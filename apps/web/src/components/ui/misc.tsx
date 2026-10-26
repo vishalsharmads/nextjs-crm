@@ -113,7 +113,7 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
   return (
     <TabsPrimitive.Trigger
       value={value}
-      className="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-muted transition-colors hover:text-ink data-[state=active]:border-primary data-[state=active]:font-medium data-[state=active]:text-ink"
+      className="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-muted transition-[color,border-color] duration-150 ease-out hover:text-ink data-[state=active]:border-primary data-[state=active]:font-medium data-[state=active]:text-ink"
     >
       {children}
     </TabsPrimitive.Trigger>
@@ -160,7 +160,7 @@ export function Pane({
   padded?: boolean;
 }) {
   return (
-    <section className={cn('rounded-md border border-line bg-surface', className)}>
+    <section className={cn('rounded-md border border-line bg-surface shadow-raised', className)}>
       {title ? (
         <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-2.5">
           <h2 className="text-sm font-semibold">{title}</h2>

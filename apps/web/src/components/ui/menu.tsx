@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn';
 export const Menu = M.Root;
 export const MenuTrigger = M.Trigger;
 
-const panel = 'anim-pop z-50 min-w-44 rounded-md border border-line bg-surface p-1 shadow-xl';
+const panel = 'anim-pop z-50 min-w-44 rounded-md border border-line bg-surface p-1 shadow-overlay';
 
 export function MenuContent({
   children,
@@ -18,7 +18,11 @@ export function MenuContent({
 }) {
   return (
     <M.Portal>
-      <M.Content align={align} sideOffset={4} className={cn(panel, className)}>
+      <M.Content
+        align={align}
+        sideOffset={4}
+        className={cn(panel, 'origin-(--radix-dropdown-menu-content-transform-origin)', className)}
+      >
         {children}
       </M.Content>
     </M.Portal>
@@ -69,7 +73,11 @@ export function PopoverContent({
 }) {
   return (
     <P.Portal>
-      <P.Content align={align} sideOffset={4} className={cn(panel, 'p-3', className)}>
+      <P.Content
+        align={align}
+        sideOffset={4}
+        className={cn(panel, 'origin-(--radix-popover-content-transform-origin) p-3', className)}
+      >
         {children}
       </P.Content>
     </P.Portal>
