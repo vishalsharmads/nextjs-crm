@@ -73,14 +73,14 @@ const { heading = 'Templates for nine industries', id = 'industries' } = Astro.p
   td {
     text-align: start;
     padding: 18px 16px 18px 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--border);
     vertical-align: middle;
   }
   thead th {
     font-weight: 600;
     font-size: 14px;
-    color: var(--steel);
-    border-bottom: 2px solid var(--ink);
+    color: var(--muted);
+    border-bottom: 2px solid var(--border-strong);
   }
   tbody th a {
     font-family: var(--font-display);
@@ -107,7 +107,7 @@ const { heading = 'Templates for nine industries', id = 'industries' } = Astro.p
     margin: 0;
     padding: 0;
     font-size: 14px;
-    color: var(--steel);
+    color: var(--muted);
   }
   .stages li + li::before {
     content: '';
@@ -115,7 +115,7 @@ const { heading = 'Templates for nine industries', id = 'industries' } = Astro.p
     width: 14px;
     height: 0;
     margin: 0 6px 4px;
-    border-top: 2px dashed rgb(18 32 27 / 0.3);
+    border-top: 2px dashed rgb(238 242 236 / 0.3);
     vertical-align: middle;
   }
 </style>

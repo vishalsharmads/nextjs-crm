@@ -1,19 +1,28 @@
 @import '@fontsource-variable/bricolage-grotesque';
 @import '@fontsource-variable/instrument-sans';
 
-/* ---------- Tokens: a tailor's cutting mat ---------- */
+/* ---------- Tokens: a tailor's cutting mat, after dark ---------- */
 :root {
-  --mat: #0f3b2e; /* cutting-mat green */
-  --mat-deep: #0a2c22;
-  --mat-line: #2e6b57; /* mat grid lines */
-  --chalk: #f3f6f1; /* tailor's chalk, cool white */
+  /* The page: deep cutting-mat green, near black. */
+  --bg: #0b1a15;
+  --surface: #11231c; /* cards, menus, tiles */
+  --surface-2: #172e25; /* hover */
+  --text: #eef2ec;
+  --muted: rgb(238 242 236 / 0.64);
+  --border: rgb(238 242 236 / 0.12);
+  --border-strong: rgb(238 242 236 / 0.28);
+  --mat: #0e2119; /* gridded feature sections */
+  --mat-deep: #081510;
+  --mat-line: rgb(238 242 236 / 0.09); /* mat grid lines */
+  --tape: #d9b25a; /* the accent: tailor's gold, used sparingly */
+  --tape-ink: #1a1405;
+  --tape-hover: #e6c374;
+  /* Light "paper" palette, only for product screenshots (the app itself is light). */
+  --chalk: #f3f6f1;
   --chalk-2: #e6ece6;
   --ink: #12201b;
   --steel: #5e6b66;
-  --tape: #f2c230; /* measuring-tape yellow */
-  --tape-ink: #2b2206;
   --line: rgb(18 32 27 / 0.14);
-  --line-on-mat: rgb(243 246 241 / 0.16);
 
   --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, sans-serif;
   --font-body: 'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
@@ -38,8 +47,8 @@ html {
 }
 body {
   margin: 0;
-  background: var(--chalk);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font-body);
   font-size: 17px;
   line-height: 1.6;
@@ -60,8 +69,8 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  font-weight: 650;
-  line-height: 1.02;
+  font-weight: 560;
+  line-height: 1.04;
   letter-spacing: -0.025em;
   margin: 0;
   text-wrap: balance;
@@ -114,17 +123,17 @@ p {
   padding-block: clamp(72px, 10vw, 140px);
 }
 .section + .section {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
 }
 .on-mat {
   background-color: var(--mat);
-  color: var(--chalk);
+  color: var(--text);
   /* the cutting mat: a 1-inch grid with stronger 5-inch lines */
   background-image:
-    linear-gradient(var(--line-on-mat) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line-on-mat) 1px, transparent 1px),
-    linear-gradient(rgb(243 246 241 / 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(243 246 241 / 0.06) 1px, transparent 1px);
+    linear-gradient(var(--mat-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mat-line) 1px, transparent 1px),
+    linear-gradient(rgb(238 242 236 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(238 242 236 / 0.035) 1px, transparent 1px);
   background-size:
     200px 200px,
     200px 200px,
@@ -133,16 +142,16 @@ p {
   background-position: -1px -1px;
 }
 .on-mat .muted {
-  color: rgb(243 246 241 / 0.72);
+  color: var(--muted);
 }
 
 /* ---------- Type scale (perfect fourth, 1.333) ---------- */
 .display {
   font-size: clamp(52px, 7.4vw, 112px);
-  font-weight: 700;
+  font-weight: 600;
   font-variation-settings: 'wdth' 85;
-  letter-spacing: -0.045em;
-  line-height: 0.88;
+  letter-spacing: -0.04em;
+  line-height: 0.92;
 }
 .h1 {
   font-size: clamp(42px, 6.4vw, 84px);
@@ -164,7 +173,7 @@ p {
   max-width: 62ch;
 }
 .muted {
-  color: var(--steel);
+  color: var(--muted);
 }
 .measure {
   max-width: 64ch;
@@ -172,8 +181,8 @@ p {
 
 /* ---------- Buttons ---------- */
 .btn {
-  --bg: var(--ink);
-  --fg: var(--chalk);
+  --btn-bg: var(--text);
+  --btn-fg: var(--bg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -181,9 +190,9 @@ p {
   min-height: 48px;
   padding: 0 22px;
   border-radius: 999px;
-  border: 1.5px solid var(--bg);
-  background: var(--bg);
-  color: var(--fg);
+  border: 1.5px solid var(--btn-bg);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
   font: 600 16px/1 var(--font-body);
   text-decoration: none;
   cursor: pointer;
@@ -197,35 +206,29 @@ p {
   transform: scale(0.97);
 }
 .btn-tape {
-  --bg: var(--tape);
-  --fg: var(--tape-ink);
+  --btn-bg: var(--tape);
+  --btn-fg: var(--tape-ink);
 }
 .btn-ghost {
-  --bg: transparent;
-  --fg: currentColor;
-  border-color: currentColor;
+  --btn-bg: transparent;
+  --btn-fg: currentColor;
+  border-color: var(--border-strong);
 }
 @media (hover: hover) and (pointer: fine) {
   .btn:hover {
-    --bg: var(--mat);
-    border-color: var(--mat);
-    --fg: var(--chalk);
+    --btn-bg: var(--tape-hover);
+    border-color: var(--tape-hover);
+    --btn-fg: var(--tape-ink);
   }
   .btn-tape:hover {
-    --bg: #ffd54a;
-    border-color: #ffd54a;
-    --fg: var(--tape-ink);
+    --btn-bg: var(--tape-hover);
+    border-color: var(--tape-hover);
+    --btn-fg: var(--tape-ink);
   }
   .btn-ghost:hover {
-    --bg: var(--chalk);
-    --fg: var(--ink);
-    border-color: var(--chalk);
-  }
-  .on-chalk .btn-ghost:hover,
-  main > .section:not(.on-mat) .btn-ghost:hover {
-    --bg: var(--ink);
-    --fg: var(--chalk);
-    border-color: var(--ink);
+    --btn-bg: var(--text);
+    --btn-fg: var(--bg);
+    border-color: var(--text);
   }
 }
 .link {
@@ -266,9 +269,9 @@ p {
   min-height: 48px;
   padding: 12px 14px;
   border-radius: 8px;
-  border: 1.5px solid var(--line);
-  background: #fff;
-  color: var(--ink);
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
   font: 400 16px/1.4 var(--font-body);
   transition: border-color 160ms ease;
 }
@@ -280,8 +283,8 @@ p {
 .select:focus-visible,
 .textarea:focus-visible {
   outline: none;
-  border-color: var(--mat);
-  box-shadow: 0 0 0 3px rgb(242 194 48 / 0.6);
+  border-color: var(--tape);
+  box-shadow: 0 0 0 3px rgb(217 178 90 / 0.35);
 }
 
 @media (prefers-reduced-motion: reduce) {

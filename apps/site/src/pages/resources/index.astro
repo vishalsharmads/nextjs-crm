@@ -44,7 +44,7 @@ const fmt = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' });
     list-style: none;
     margin: 0;
     padding: 0;
-    border-top: 1px solid var(--line);
+    border-top: 1px solid var(--border);
   }
   .list a {
     display: grid;
@@ -53,12 +53,12 @@ const fmt = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' });
     column-gap: 32px;
     row-gap: 8px;
     padding-block: 28px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--border);
     text-decoration: none;
   }
   time {
     grid-row: span 2;
-    color: var(--steel);
+    color: var(--muted);
     font-size: 15px;
     padding-top: 4px;
   }

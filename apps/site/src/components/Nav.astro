@@ -60,13 +60,13 @@ const path = Astro.url.pathname;
     position: sticky;
     top: 0;
     z-index: 50;
-    background: rgb(243 246 241 / 0.86);
+    background: rgb(11 26 21 / 0.82);
     backdrop-filter: saturate(140%) blur(12px);
     border-bottom: 1px solid transparent;
     transition: border-color 200ms ease;
   }
   .nav.scrolled {
-    border-bottom-color: var(--line);
+    border-bottom-color: var(--border);
   }
   .bar {
     display: flex;
@@ -91,15 +91,15 @@ const path = Astro.url.pathname;
     text-decoration: none;
     font-weight: 500;
     font-size: 15.5px;
-    color: var(--ink);
+    color: var(--text);
     transition: background-color 160ms ease;
   }
   .links a[aria-current='page'] {
-    background: var(--chalk-2);
+    background: var(--surface-2);
   }
   @media (hover: hover) and (pointer: fine) {
     .links a:hover {
-      background: var(--chalk-2);
+      background: var(--surface-2);
     }
   }
   .actions {
@@ -113,13 +113,13 @@ const path = Astro.url.pathname;
     border-radius: 6px;
     font-weight: 500;
     font-size: 15.5px;
-    color: var(--ink);
+    color: var(--text);
     text-decoration: none;
     transition: background-color 160ms ease;
   }
   @media (hover: hover) and (pointer: fine) {
     .signin:hover {
-      background: var(--chalk-2);
+      background: var(--surface-2);
     }
   }
   .btn.sm {
@@ -142,7 +142,7 @@ const path = Astro.url.pathname;
     display: block;
     width: 22px;
     height: 2px;
-    background: var(--ink);
+    background: var(--text);
     margin-inline: auto;
     transition: transform 200ms var(--ease-out);
   }
@@ -191,8 +191,8 @@ const path = Astro.url.pathname;
       display: none;
       flex-direction: column;
       padding: 12px var(--gutter) 24px;
-      background: var(--chalk);
-      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
     }
     .open .links {
       display: flex;

@@ -63,8 +63,8 @@ import { breadcrumbSchema } from '../../data/schema';
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1px;
-    background: var(--line);
-    border: 1px solid var(--line);
+    background: var(--border);
+    border: 1px solid var(--border);
   }
   .cards a {
     display: grid;
@@ -72,7 +72,7 @@ import { breadcrumbSchema } from '../../data/schema';
     align-content: start;
     height: 100%;
     padding: 28px 24px 30px;
-    background: var(--chalk);
+    background: var(--surface);
     text-decoration: none;
     transition: background-color 200ms ease;
   }
@@ -86,7 +86,7 @@ import { breadcrumbSchema } from '../../data/schema';
   }
   @media (hover: hover) and (pointer: fine) {
     .cards a:hover {
-      background: #fff;
+      background: var(--surface-2);
     }
   }
   @media (max-width: 900px) {

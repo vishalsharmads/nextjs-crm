@@ -33,10 +33,10 @@ const { items, heading = 'Questions people ask' } = Astro.props;
     gap: clamp(32px, 6vw, 96px);
   }
   details {
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--border);
   }
   details:first-child {
-    border-top: 1px solid var(--line);
+    border-top: 1px solid var(--border);
   }
   summary {
     list-style: none;
@@ -68,7 +68,7 @@ const { items, heading = 'Questions people ask' } = Astro.props;
     position: absolute;
     inset: 10px 3px auto;
     height: 2px;
-    background: var(--ink);
+    background: var(--text);
     transition: transform 200ms var(--ease-out);
   }
   .icon::after {
