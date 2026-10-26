@@ -1,4 +1,10 @@
 # One server block per client instance. Web and API share an origin, so auth cookies stay first-party.
+
+# Access log without query strings: search terms and filters often contain names and emails.
+# (Site files are included inside the http block, where log_format belongs. Define it once.)
+log_format crm_minimal '$remote_addr - [$time_local] "$request_method $uri $server_protocol" '
+                       '$status $body_bytes_sent "$http_user_agent"';
+
 server {
     listen 443 ssl http2;
     server_name crm.client.example;
@@ -6,11 +12,14 @@ server {
     ssl_certificate     /etc/letsencrypt/live/crm.client.example/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/crm.client.example/privkey.pem;
 
+    access_log /var/log/nginx/crm.client.example.access.log crm_minimal;
+
     root /srv/crm/client/apps/web/dist;
     index index.html;
     client_max_body_size 25m;
 
     # Security headers for the SPA (the API sets its own).
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy no-referrer always;
     add_header X-Frame-Options SAMEORIGIN always;

@@ -7,7 +7,8 @@ For the people who run an instance for a client who holds personal or health dat
 1. **Pick the profile.** Settings → Compliance: **Privacy** for personal data under GDPR, UK GDPR, DPDP, CCPA/CPRA, PIPEDA or LGPD; **Health data** for HIPAA. The profile's minimums cannot be lowered while it is active.
 2. **Agreements.** Sign a data processing agreement (GDPR Art. 28) with the client, and with each provider that touches the data: hosting, email delivery (SMTP), off-site backup storage, log shipping. For health data, sign business associate agreements (HIPAA §164.314) with the client and with each of those providers. Use only providers that will sign one.
 3. **Hosting safeguards** the software cannot enforce. `npm run doctor` reports them under a compliance profile:
-   - HTTPS only (HSTS on in nginx) and TLS on any database connection that leaves the server.
+   - HTTPS only (HSTS on in nginx, as in `deploy/nginx.conf.example`) and TLS on any database connection that leaves the server.
+   - nginx access logs without query strings (the `crm_minimal` log format in the example).
    - Full-disk encryption on the server and on backup storage.
    - MySQL encryption at rest: install a keyring component, then `SET PERSIST default_table_encryption = ON`, `ALTER TABLE … ENCRYPTION = 'Y'` for existing tables, and `SET PERSIST binlog_encryption = ON`.
    - Encrypted backups: create a key file (`openssl rand -hex 32 > /etc/crm/backup.key`, `chmod 600`), set `BACKUP_ENCRYPTION_KEY_FILE` for `deploy/backup.sh`, and store a copy of the key away from the server. A backup without its key cannot be restored.
@@ -64,3 +65,9 @@ For the people who run an instance for a client who holds personal or health dat
 - Modules other than the core record types do not log record views yet (they do take part in export and erasure).
 - Sensitive fields cannot be filtered, sorted or searched: they are encrypted.
 - Sensitivity is fixed when a field is created. To change it, create a new field and move the values.
+- Holders of `core.privacy.manage` see everything about a person in a data export, including fields hidden from their role: give that permission only to the people who answer privacy requests.
+- The audit and access logs are not limited by record scope: `core.audit.view` shows every record's history. Give it only to people who may see all records.
+- Audit entries a former staff member made keep their IP address and user agent after the staff member is erased, as evidence of who did what.
+- Staff can record consent manually (phone, paper) even after someone unsubscribed: only do so when the person asked, and write how in the note.
+- A web form submission is saved before its consent; if recording the consent fails, the record exists without it (the error is logged). Check the record's Privacy tab if a submission reports an error.
+- nginx's own access log is outside the app: use the `crm_minimal` log format from `deploy/nginx.conf.example`, which leaves out query strings (search terms and filters).

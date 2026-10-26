@@ -25,7 +25,16 @@ open_backup() {
   esac
 }
 
-open_backup "$DUMP" | gunzip -c | mysql --defaults-extra-file="$DEFAULTS" "$DB_NAME"
+# Check the files against the checksums written at backup time, when they are there.
+SUMS="$(dirname "$DUMP")/sha256-$(basename "$DUMP" | sed -E 's/^db-([^.]+)\..*/\1/').txt"
+if [ -f "$SUMS" ]; then
+  ( cd "$(dirname "$DUMP")" && sha256sum --ignore-missing -c "$(basename "$SUMS")" ) || { echo "Checksum mismatch: not restoring." >&2; exit 1; }
+fi
+# Decrypt and decompress fully before touching the database, so a damaged file cannot half-restore it.
+SQL="$(mktemp)"
+trap 'rm -f "$DEFAULTS" "$SQL"' EXIT
+open_backup "$DUMP" | gunzip -c > "$SQL"
+mysql --defaults-extra-file="$DEFAULTS" "$DB_NAME" < "$SQL"
 if [ -n "$FILES" ]; then
   mkdir -p "$STORAGE_PATH"
   open_backup "$FILES" | tar -C "$STORAGE_PATH" -xzf -
