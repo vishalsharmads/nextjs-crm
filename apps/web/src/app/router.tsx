@@ -39,6 +39,7 @@ const AuditPage = lazyPage(() => import('@/features/audit/audit-page'), 'AuditPa
 const ModulesPage = lazyPage(() => import('@/features/settings/platform-pages'), 'ModulesPage');
 const BlueprintPage = lazyPage(() => import('@/features/settings/platform-pages'), 'BlueprintPage');
 const PrivacyPage = lazyPage(() => import('@/features/privacy/privacy-page'), 'PrivacyPage');
+const DataMapPage = lazyPage(() => import('@/features/privacy/data-map-page'), 'DataMapPage');
 const ApiKeysPage = lazyPage(() => import('@/features/settings/integration-pages'), 'ApiKeysPage');
 const WebhooksPage = lazyPage(() => import('@/features/settings/integration-pages'), 'WebhooksPage');
 const TemplatesPage = lazyPage(() => import('@/features/settings/integration-pages'), 'TemplatesPage');
@@ -98,6 +99,7 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'modules', element: <ModulesPage /> },
   { path: 'blueprint', element: <BlueprintPage /> },
   { path: 'privacy', element: <PrivacyPage /> },
+  { path: 'data-map', element: <DataMapPage /> },
   { path: 'api-keys', element: <ApiKeysPage /> },
   { path: 'webhooks', element: <WebhooksPage /> },
   { path: 'templates', element: <TemplatesPage /> },

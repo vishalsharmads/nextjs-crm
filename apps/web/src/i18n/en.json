@@ -131,7 +131,8 @@
     "lostReasonsHelp": "Asked whenever {{dealPluralLower}} are marked lost, so you can see why.",
     "vocabularyHelp": "Use the words your team already uses. Names change everywhere: menus, titles, buttons, empty states and emails.",
     "layouts": "Layouts",
-    "compliance": "Compliance"
+    "compliance": "Compliance",
+    "dataMap": "Data map"
   },
   "idle": {
     "title": "Are you still there?",

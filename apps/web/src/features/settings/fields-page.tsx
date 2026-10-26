@@ -24,6 +24,8 @@ import {
   FIELD_KEY_RE,
   FIELD_TYPES,
   FILTERABLE_TYPES,
+  SENSITIVE_TYPES,
+  type Sensitivity,
   type CustomFieldDef,
   type CustomizableEntity,
   type FieldOption,
@@ -253,6 +255,7 @@ interface Draft {
   showInList: boolean;
   defaultValue: unknown;
   visibility: { default: VisibilityLevel; roles: Record<string, VisibilityLevel> };
+  sensitivity: Sensitivity;
 }
 
 function FieldEditor({
@@ -286,13 +289,16 @@ function FieldEditor({
     showInList: field?.showInList ?? false,
     defaultValue: field?.defaultValue ?? null,
     visibility: field?.visibility ?? { default: 'write', roles: {} },
+    sensitivity: field?.sensitivity ?? 'normal',
   }));
   const [keyTouched, setKeyTouched] = useState(!!field);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [missing, setMissing] = useState(0);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
   const isSelect = d.type === 'select' || d.type === 'multi_select';
-  const canFilter = FILTERABLE_TYPES.includes(d.type);
+  const special = d.sensitivity === 'special';
+  // Encrypted values cannot be indexed.
+  const canFilter = FILTERABLE_TYPES.includes(d.type) && !special;
 
   const save = useMutation({
     mutationFn: () => {
@@ -310,7 +316,14 @@ function FieldEditor({
       };
       return field
         ? apiPatch<CustomFieldDef & { missingCount: number }>(`/custom-fields/${field.uuid}`, payload)
-        : apiPost<CustomFieldDef>('/custom-fields', { ...payload, entity, key: d.key, type: d.type });
+        : apiPost<CustomFieldDef>('/custom-fields', {
+            ...payload,
+            defaultValue: special ? null : payload.defaultValue,
+            entity,
+            key: d.key,
+            type: d.type,
+            sensitivity: d.sensitivity,
+          });
     },
     onSuccess: (res) => {
       onSaved();
@@ -391,11 +404,39 @@ function FieldEditor({
                 disabled={!!field}
                 onChange={(e) => set('type', e.target.value as FieldType)}
               >
-                {FIELD_TYPES.map((t) => (
+                {FIELD_TYPES.filter((t) => !special || SENSITIVE_TYPES.includes(t)).map((t) => (
                   <option key={t} value={t}>
                     {TYPE_LABEL[t]}
                   </option>
                 ))}
+              </NativeSelect>
+            )}
+          </Field>
+          <Field
+            label="Data protection"
+            error={errors.sensitivity}
+            help={
+              field
+                ? 'Fixed once created.'
+                : special
+                  ? 'Encrypted, hidden behind a reveal button that is logged, and never filterable. Text, long text, email, phone or URL only.'
+                  : 'Mark personal data so it appears in the data map.'
+            }
+          >
+            {(p) => (
+              <NativeSelect
+                {...p}
+                value={d.sensitivity}
+                disabled={!!field}
+                onChange={(e) => {
+                  const s = e.target.value as Sensitivity;
+                  set('sensitivity', s);
+                  if (s === 'special' && !SENSITIVE_TYPES.includes(d.type)) set('type', 'textarea');
+                }}
+              >
+                <option value="normal">Not personal data</option>
+                <option value="personal">Personal data</option>
+                <option value="special">Sensitive (health or special category)</option>
               </NativeSelect>
             )}
           </Field>

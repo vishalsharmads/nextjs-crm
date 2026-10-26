@@ -149,6 +149,26 @@ function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
           ))}
         </div>
       </Pane>
+      <Pane title="Encryption">
+        <div className="flex flex-col gap-2 text-sm">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              className="size-4 accent-[var(--primary)]"
+              {...form.register('encryptUploads')}
+            />
+            Encrypt uploaded files at rest
+            {hint('encryptUploads') ? (
+              <span className="text-xs text-muted">({hint('encryptUploads')})</span>
+            ) : null}
+          </label>
+          <p className="text-xs text-muted">
+            Applies to new uploads. Your administrator can encrypt earlier files with{' '}
+            <code className="font-mono">files:encrypt-existing</code>. Sensitive custom fields are always
+            encrypted. Encrypt the database, its backups and the server disk too: see the operator guide.
+          </p>
+        </div>
+      </Pane>
       <Pane title="Sharing less">
         <div className="flex flex-col gap-3 text-sm">
           <label className="flex items-center gap-3">
