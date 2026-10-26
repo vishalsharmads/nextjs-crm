@@ -15,6 +15,7 @@ coverage/
 
 # Local storage driver uploads
 storage/
+storage-demo*/
 uploads/
 
 # Test artifacts

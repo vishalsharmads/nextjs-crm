@@ -303,28 +303,34 @@ function DemoAccounts({ accounts, onUse }: { accounts: DemoAccount[]; onUse: (a:
   const t = useT();
   const shared = accounts.every((a) => a.password === accounts[0]!.password) ? accounts[0]!.password : null;
   return (
-    <section
-      aria-labelledby="demo-accounts"
-      className="mt-8 rounded-md border border-dashed border-line-strong bg-subtle p-4"
-    >
+    <section aria-labelledby="demo-accounts" className="mt-10 border-t border-line pt-6">
       <h2 id="demo-accounts" className="text-sm font-semibold">
         {t(accounts.length === 1 ? 'auth.demoTitle' : 'auth.demoTitlePlural')}
       </h2>
-      <p className="mt-1 text-xs text-muted">{t('auth.demoHelp')}</p>
-      <ul className="mt-3 flex flex-col gap-2">
+      <p className="mt-1 text-sm text-muted">{t('auth.demoHelp')}</p>
+      <ul className="mt-4 divide-y divide-line overflow-hidden rounded-md border border-line">
         {accounts.map((a) => (
           <li key={a.email}>
             <button
               type="button"
               onClick={() => onUse(a)}
-              className="flex w-full items-center gap-3 rounded-md border border-line bg-surface px-3 py-2 text-start transition-colors duration-150 ease-out hover:border-primary hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="group flex w-full items-center gap-3 px-3 py-2.5 text-start transition-colors duration-150 ease-out hover:bg-primary-soft focus-visible:bg-primary-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
             >
+              <span
+                aria-hidden
+                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary group-hover:bg-primary group-hover:text-primary-fg"
+              >
+                {a.label
+                  .split(/\s+/)
+                  .map((w) => w[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium">{a.label}</span>
-                <span className="block truncate font-mono text-xs text-muted">{a.email}</span>
-                {shared ? null : (
-                  <span className="block truncate font-mono text-xs text-muted">{a.password}</span>
-                )}
+                <span className="block truncate text-xs text-muted">{a.email}</span>
+                {shared ? null : <span className="block truncate text-xs text-muted">{a.password}</span>}
               </span>
               <span className="shrink-0 text-xs font-medium text-primary">{t('auth.demoUse')}</span>
             </button>
@@ -333,7 +339,7 @@ function DemoAccounts({ accounts, onUse }: { accounts: DemoAccount[]; onUse: (a:
       </ul>
       {shared ? (
         <p className="mt-3 text-xs text-muted">
-          {t('auth.password')}: <span className="font-mono select-all">{shared}</span>
+          {t('auth.password')}: <span className="font-medium text-ink select-all">{shared}</span>
         </p>
       ) : null}
     </section>
