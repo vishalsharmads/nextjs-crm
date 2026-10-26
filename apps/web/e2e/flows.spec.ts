@@ -73,3 +73,28 @@ test('moves a deal across stages on the board', async ({ page }) => {
     page.getByRole('listitem', { name: 'Meeting scheduled' }).getByText('Board mover'),
   ).toBeVisible();
 });
+
+test('moves a deal with the stage track on its page, and undoes it', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/deals');
+  await page.getByRole('button', { name: /New Deal/ }).click();
+  await page.getByLabel('Title').fill('Track mover');
+  await page.getByRole('button', { name: 'Create Deal' }).click();
+  await page.getByRole('article').filter({ hasText: 'Track mover' }).click();
+  await page.getByRole('button', { name: 'Open full page' }).click();
+
+  const track = page.getByRole('list', { name: 'Pipeline stages' });
+  await expect(track.locator('button[aria-current="step"]')).toHaveText('Qualified');
+
+  await track.getByRole('button', { name: 'Meeting scheduled' }).click();
+  await expect(track.locator('button[aria-current="step"]')).toHaveText('Meeting scheduled');
+  await expect(page.getByText('Moved to Meeting scheduled')).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole('list', { name: 'Pipeline stages' }).locator('button[aria-current="step"]'),
+  ).toHaveText('Meeting scheduled');
+
+  await track.getByRole('button', { name: 'Qualified' }).click();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(track.locator('button[aria-current="step"]')).toHaveText('Meeting scheduled');
+});
