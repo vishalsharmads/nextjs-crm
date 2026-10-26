@@ -109,6 +109,16 @@ export async function sendEmail(ctx: RequestContext, user: AuthUser, input: z.in
         AccountRow | undefined);
   if (input.accountUuid && !account) throw notFound('Mail account');
   const related = await resolveRelated(user, input.related, [...input.to, ...input.cc]);
+  if (related && (related.type === 'contact' || related.type === 'lead')) {
+    const row = await db(recordDefs[related.type].table)
+      .where({ id: related.id })
+      .first('processing_restricted');
+    if (row?.processing_restricted)
+      throw new AppError(
+        'FORBIDDEN',
+        'Processing of this record is restricted. Lift the restriction before emailing.',
+      );
+  }
   const html = sanitizeBody(input.body) ?? '';
   const text = html
     .replace(/<br\s*\/?>/g, '\n')

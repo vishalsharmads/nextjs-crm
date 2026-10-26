@@ -36,6 +36,7 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 | nodemailer, handlebars                                                                          | SMTP mail; auto-escaping templates shared with blueprints                       |
 | multer, file-type                                                                               | Multipart uploads; content sniffing instead of trusting client MIME             |
 | csv-parse, csv-stringify                                                                        | Streaming import/export                                                         |
+| yazl                                                                                            | Streaming ZIP for personal data exports (no native code)                        |
 | sanitize-html                                                                                   | Safe rich text in activity bodies                                               |
 | uuid                                                                                            | UUIDv7 public ids (time-ordered)                                                |
 | dotenv                                                                                          | Load `.env`                                                                     |

@@ -10,6 +10,8 @@ import { randomToken } from '../lib/crypto';
 import { newUuid } from '../lib/ids';
 import { clearSettingsCache } from '../core/settings/settings.service';
 import { sealPendingDays, verifyIntegrity } from '../core/audit/integrity';
+import { anonymizeUser } from '../core/privacy/staff';
+import { systemContext } from '../http/context';
 
 type Command = (args: string[]) => Promise<void>;
 
@@ -327,6 +329,15 @@ const commands: Record<string, Command> = {
     out(
       `Inserted ${orgCount} organizations, ${total} contacts and ${dealCount} deals in ${((Date.now() - started) / 1000).toFixed(1)} s.`,
     );
+  },
+
+  async 'user:anonymize'(args) {
+    const { values } = parseArgs({ args, options: { email: { type: 'string' } } });
+    if (!values.email) throw new Error('Pass --email=<email> of a disabled user');
+    const u = await db('users').where({ email: values.email.toLowerCase() }).first('uuid');
+    if (!u) throw new Error('No user with that email');
+    await anonymizeUser(systemContext('cli'), u.uuid as string);
+    out('User erased. Their audit entries remain under an anonymous name.');
   },
 
   async 'audit:seal'() {

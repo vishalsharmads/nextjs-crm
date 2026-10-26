@@ -6,6 +6,7 @@ export * from './filters';
 export * from './branding';
 export * from './settings';
 export * from './compliance';
+export * from './privacy';
 export * from './auth';
 export * from './meta';
 export * from './records';

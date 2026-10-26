@@ -6,6 +6,7 @@ import { db } from '../../db/knex';
 import { AppError, conflict, notFound } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
 import { env } from '../../config/env';
+import { anonymizeUser } from '../privacy/staff';
 import { audit } from '../audit/audit.service';
 import { clearAccessCache } from '../rbac/access';
 import { isKnownPermissionPattern, permissionCatalog } from '../rbac/catalog';
@@ -258,6 +259,20 @@ export const usersRoutes = defineRoutes('/users', ['users'])
         });
       });
       return userDto(u.id);
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/:uuid/anonymize',
+    permission: 'core.users.manage',
+    params: uuidParam,
+    summary: "Erase a disabled user's personal data (their audit trail stays, under an anonymous name)",
+    handler: async ({ ctx, user, params }) => {
+      const u = await db('users').where({ uuid: params.uuid }).first('id');
+      if (!u) throw notFound('User');
+      if (u.id === user.id) throw conflict('You cannot erase your own account');
+      await assertCanManageUser(user, u.id);
+      await anonymizeUser(ctx, params.uuid);
     },
   })
   .add({

@@ -34,6 +34,7 @@ import {
   type RequestContext,
 } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_documents';
+import { documentsPrivacy } from './privacy';
 
 const TEMPLATES = 'm_documents_templates';
 const DOCS = 'm_documents_documents';
@@ -805,6 +806,7 @@ export async function customerHasOpenRequest(contactId: number, uuid: string) {
 }
 
 export const documents: ApiModule = {
+  privacy: documentsPrivacy,
   routes: () => [templateRoutes, docRoutes, requestRoutes],
   migrations: { '0001_documents': m0001 },
 };

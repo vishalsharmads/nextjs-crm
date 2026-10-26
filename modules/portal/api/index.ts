@@ -40,6 +40,7 @@ import {
   submitFileAsCustomer,
 } from '../../documents/api';
 import * as m0001 from './migrations/0001_portal';
+import { portalPrivacy } from './privacy';
 
 const ACCOUNTS = 'm_portal_accounts';
 const TOKENS = 'm_portal_tokens';
@@ -654,6 +655,7 @@ export async function purgePortalCredentials() {
 }
 
 export const portal: ApiModule = {
+  privacy: portalPrivacy,
   routes: () => [publicRoutes, staffRoutes],
   migrations: { '0001_portal': m0001 },
   start: () => every(6 * 60 * 60_000, 'portal.purge', purgePortalCredentials),

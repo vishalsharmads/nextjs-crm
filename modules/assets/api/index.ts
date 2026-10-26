@@ -20,6 +20,7 @@ import {
   type Db,
 } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_assets';
+import { assetsPrivacy } from './privacy';
 
 const ASSETS = 'm_assets_assets';
 const EVENTS = 'm_assets_events';
@@ -611,6 +612,7 @@ registerModuleWidget('assets.overview', async (_params, user) => {
 });
 
 export const assets: ApiModule = {
+  privacy: assetsPrivacy,
   routes: () => [assetRoutes, stockRoutes],
   migrations: { '0001_assets': m0001 },
 };

@@ -19,6 +19,7 @@ import {
   type ApiModule,
 } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_checkins';
+import { checkinsPrivacy } from './privacy';
 
 const VISITS = 'm_coworking_checkins_visits';
 
@@ -228,6 +229,7 @@ registerModuleWidget('coworking-checkins.today', async (_params, user) => {
 });
 
 export const coworkingCheckins: ApiModule = {
+  privacy: checkinsPrivacy,
   routes: () => [routes],
   migrations: { '0001_checkins': m0001 },
 };

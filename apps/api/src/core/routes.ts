@@ -17,7 +17,7 @@ import { entityCollectionRoutes, importsRoutes } from './imports/imports.routes'
 import { dashboardRoutes } from './dashboard/dashboard.routes';
 import { accessLogRoutes, auditRoutes } from './audit/audit.routes';
 import { blueprintsRoutes, modulesRoutes } from './platform/platform.routes';
-import { privacyRoutes } from './privacy/privacy.routes';
+import { privacyRoutes, publicPrivacyRoutes } from './privacy/privacy.routes';
 import { docsRoutes } from './platform/docs.routes';
 import { apiKeysRoutes } from './api-keys/api-keys';
 import { webhooksRoutes } from './webhooks/webhooks';
@@ -56,6 +56,7 @@ export function coreRouteGroups(): RouteGroup[] {
     blueprintsRoutes,
     modulesRoutes,
     privacyRoutes,
+    publicPrivacyRoutes,
     docsRoutes,
     apiKeysRoutes,
     webhooksRoutes,

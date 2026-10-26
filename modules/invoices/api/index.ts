@@ -44,6 +44,7 @@ import {
   type Knex,
   type LineInput,
   type RequestContext,
+  documentPrivacyHandler,
 } from '@app/api/module-api';
 import { markQuoteConverted, quoteForConversion } from '../../quotes/api';
 import * as m0001 from './migrations/0001_invoices';
@@ -716,6 +717,7 @@ registerModuleWidget('invoices.receivables', async (_params, user) => {
 });
 
 export const invoices: ApiModule = {
+  privacy: documentPrivacyHandler('invoices', 'm_invoices_invoices'),
   routes: () => [routes],
   migrations: { '0001_invoices': m0001 },
   start: () => every(60 * 60_000, 'invoices.overdue', flagOverdueInvoices),

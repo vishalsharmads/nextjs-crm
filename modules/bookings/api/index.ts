@@ -20,6 +20,7 @@ import {
   type Db,
 } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_bookings';
+import { bookingsPrivacy } from './privacy';
 
 const RESOURCES = 'm_bookings_resources';
 const BOOKINGS = 'm_bookings_bookings';
@@ -492,6 +493,7 @@ registerModuleWidget('bookings.occupancy', async (_params, user) => {
 });
 
 export const bookings: ApiModule = {
+  privacy: bookingsPrivacy,
   routes: () => [resourceRoutes, bookingRoutes],
   migrations: { '0001_bookings': m0001 },
 };

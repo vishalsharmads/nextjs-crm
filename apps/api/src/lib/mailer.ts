@@ -12,6 +12,8 @@ export interface OutgoingMail {
   fromName?: string;
   fromAddress?: string;
   replyTo?: string;
+  /** Extra headers, for example List-Unsubscribe on marketing email. */
+  headers?: Record<string, string>;
 }
 
 /** Test hook: when set, mail is captured instead of sent. */
@@ -42,6 +44,7 @@ export async function sendMail(mail: OutgoingMail) {
       html: mail.html,
       text: mail.text,
       replyTo: mail.replyTo,
+      headers: mail.headers,
     });
   } catch (err) {
     logger.error({ err, to: mail.to }, 'Failed to send mail');
