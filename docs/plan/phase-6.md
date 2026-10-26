@@ -83,7 +83,7 @@ Severity: **B** blocker · **I** important · **N** nice-to-have. Effort: **S / 
 
 | Area | Gap | Sev | Eff |
 |---|---|---|---|
-| Tables | No virtualization in `components/data/data-table.tsx` | I | M |
+| Tables | ~~No virtualization in `components/data/data-table.tsx`~~ Not needed: lists are server-paginated (`pageSize` max 100), so a page never holds more than 100 rows. Revisit only if a view needs infinite scroll. | — | — |
 | | No inline cell edit | N | M |
 | i18n | About 140 hard-coded strings; 21 of 59 files use `useT` **F** | I | L |
 | Onboarding | No first-run checklist or setup flow | I | M |
@@ -188,7 +188,7 @@ Severity: **B** blocker · **I** important · **N** nice-to-have. Effort: **S / 
 
 | Branch | Content | Why this order |
 |---|---|---|
-| `phase-6a-quick-wins` | Trash screen; record transfer on disable; ⌘K create commands; table virtualization | Cheap, visible fixes |
+| `phase-6a-quick-wins` | Trash screen; record transfer on disable; ⌘K create commands. **Done.** Table virtualization dropped (see §1: pages are capped at 100 rows) | Cheap, visible fixes |
 | `phase-6b-records-engine` | ResourceDef for modules; module scaffolding CLI; search provider registry | Prerequisite for 6c and for good MCP coverage |
 | `phase-6c-custom-objects` | Admin-defined entities (#5 amended) | Builds on 6b |
 | `phase-6d-tool-layer-mcp` | `defineTool` registry; personal access tokens; MCP endpoint and stdio wrapper | Shared foundation for AI |
