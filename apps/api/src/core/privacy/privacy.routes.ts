@@ -100,7 +100,7 @@ export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
     path: '/:entity/:uuid/anonymize',
     permission: 'core.privacy.manage',
     params,
-    summary: 'Erase personal data everywhere but keep the record (and its deals/activities) for reporting',
+    summary: 'Erase personal data everywhere but keep the record and its linked records for reporting',
     handler: ({ ctx, user, params: p }) => eraseSubject(ctx, user, p.entity, p.uuid, 'anonymize'),
   })
   .add({

@@ -13,7 +13,7 @@ const CORE_PERSONAL: Record<CustomizableEntity, string[]> = {
     'Phone',
     'Job title',
     'Photo',
-    'Organization links',
+    'Links to other records',
     'Source',
     'Lifecycle status',
   ],
