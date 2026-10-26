@@ -12,6 +12,7 @@ const make = (p: Partial<PublicBranding> = {}): PublicBranding => ({
   locale: 'en',
   installed: true,
   demoAccounts: [],
+  loginNotice: '',
   ...p,
 });
 
