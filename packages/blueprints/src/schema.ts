@@ -140,7 +140,10 @@ export const blueprintSchema = z.object({
               .regex(/^[a-z][a-z0-9_]*$/)
               .optional(),
             method: z.enum(['post', 'patch', 'put']),
-            path: z.string().regex(/^\/[A-Za-z0-9/_{}:+.-]+$/),
+            path: z
+              .string()
+              .regex(/^\/[A-Za-z0-9/_{}:+.-]+$/)
+              .refine((p) => !p.split('/').some((seg) => seg === '.' || seg === '..'), 'No . or .. segments'),
             body: z.record(z.string(), z.unknown()).default({}),
           }),
         )

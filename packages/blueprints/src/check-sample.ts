@@ -106,6 +106,19 @@ export function checkSampleData(bp: Blueprint, moduleDeps: Record<string, string
     }
   }
 
+  // Records and activities only take date placeholders; record references are for requests.
+  for (const section of ['organizations', 'contacts', 'leads', 'deals', 'activities'] as const) {
+    data[section].forEach((row, i) => {
+      for (const [, type, arg] of JSON.stringify(row).matchAll(/\{\{([a-z_]+):([^}]+)\}\}/g)) {
+        const problem =
+          type === 'date' || type === 'datetime'
+            ? timingProblem(type, arg!)
+            : `{{${type}:…}} only works in requests`;
+        if (problem) problems.push(`${section} #${i + 1}: ${problem}`);
+      }
+    });
+  }
+
   const enabled = new Set<string>();
   const enable = (key: string) => {
     if (enabled.has(key)) return;
@@ -120,9 +133,9 @@ export function checkSampleData(bp: Blueprint, moduleDeps: Record<string, string
     if (mod && !enabled.has(mod)) problems.push(`${where}: module "${mod}" is not enabled by this blueprint`);
     const text = JSON.stringify([r.path, r.body]);
     for (const [, type, arg] of text.matchAll(/\{\{([a-z_]+):([^}]+)\}\}/g)) {
-      if (type === 'date' && !/^[+-]?\d+$/.test(arg!)) problems.push(`${where}: bad date "${arg}"`);
-      else if (type === 'datetime' && !/^[+-]?\d+(@\d{1,2}(:\d{2})?)?$/.test(arg!))
-        problems.push(`${where}: bad datetime "${arg}"`);
+      const timing = timingProblem(type!, arg!);
+      if (timing) problems.push(`${where}: ${timing}`);
+      else if (type === 'date' || type === 'datetime') continue;
       else if (type === 'req' && !results.has(arg!))
         problems.push(`${where}: {{req:${arg}}} is not created by an earlier request`);
       else if (type === 'user' && !roles.has(arg!)) problems.push(`${where}: unknown role "${arg}"`);
@@ -137,4 +150,12 @@ export function checkSampleData(bp: Blueprint, moduleDeps: Record<string, string
     }
   }
   return problems;
+}
+
+/** A date placeholder's argument is valid: `{{date:-3}}`, `{{datetime:+2@14:30}}` (hours 0–23, minutes 0–59). */
+function timingProblem(type: string, arg: string): string | null {
+  if (type === 'date') return /^[+-]?\d+$/.test(arg) ? null : `bad date "${arg}"`;
+  if (type !== 'datetime') return null;
+  const m = /^[+-]?\d+(?:@(\d{1,2})(?::(\d{2}))?)?$/.exec(arg);
+  return m && Number(m[1] ?? 0) <= 23 && Number(m[2] ?? 0) <= 59 ? null : `bad datetime "${arg}"`;
 }

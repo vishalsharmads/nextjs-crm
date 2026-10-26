@@ -29,11 +29,15 @@ export function fillPlaceholders(
 ): unknown {
   if (typeof value === 'string') {
     return value.replace(/\{\{([a-z_]+):([^}]+)\}\}/g, (whole, type: string, arg: string) => {
-      if (type === 'date') return relativeDate(Number(arg));
+      if (type === 'date') {
+        if (!/^[+-]?\d+$/.test(arg)) throw new Error(`Sample data: bad date ${whole}`);
+        return relativeDate(Number(arg));
+      }
       if (type === 'datetime') {
         // `+2@14:30`: two days from now at 14:30 UTC.
         const m = /^([+-]?\d+)(?:@(\d{1,2})(?::(\d{2}))?)?$/.exec(arg);
-        if (!m) throw new Error(`Sample data: bad datetime ${whole}`);
+        if (!m || Number(m[2] ?? 0) > 23 || Number(m[3] ?? 0) > 59)
+          throw new Error(`Sample data: bad datetime ${whole}`);
         const d = relativeTime(Number(m[1]), Number(m[2] ?? 10));
         d.setUTCMinutes(Number(m[3] ?? 0));
         return d.toISOString();
@@ -78,15 +82,21 @@ export async function seedSampleData(
       .where('u.status', 'active')
       .whereNull('u.deleted_at')
       .orderBy('u.id')
-      .select('u.id', 'r.key as role')) as { id: number; role: string }[];
-    const adminId = users.find((u) => u.role === 'admin')?.id ?? users[0]?.id ?? null;
+      .select('u.id', 'u.email', 'r.key as role')) as { id: number; email: string; role: string }[];
+    // On a demo, owners are the accounts listed on the sign-in screen, not the installer's admin.
+    const demo = users.filter((u) => u.email.startsWith('demo.'));
+    const pool = demo.length ? demo : users;
+    const adminId = pool.find((u) => u.role === 'admin')?.id ?? pool[0]?.id ?? null;
     let turn = 0;
     const owner = (row: Record<string, unknown>) => {
       const role = str(row.owner);
-      if (role) return users.find((u) => u.role === role)?.id ?? adminId;
-      return users.length ? users[turn++ % users.length]!.id : adminId;
+      if (role) return pool.find((u) => u.role === role)?.id ?? adminId;
+      return pool.length ? pool[turn++ % pool.length]!.id : adminId;
     };
-    const at = (row: Record<string, unknown>) => relativeTime(num(row.days) ?? 0, 9);
+    // Backdated moments never land in the future (a reset before 09:00 UTC with `days: 0`).
+    const now = new Date();
+    const past = (d: Date) => (d > now ? now : d);
+    const at = (row: Record<string, unknown>) => past(relativeTime(num(row.days) ?? 0, 9));
     const general = (await trx('settings').where({ key: 'general' }).first())?.value as
       { currency?: string } | undefined;
     const currency = general?.currency ?? 'USD';
@@ -182,7 +192,7 @@ export async function seedSampleData(
         if (!stage) continue;
         const status = stage.is_won ? 'won' : stage.is_lost ? 'lost' : 'open';
         const created = at(d);
-        const entered = relativeTime(num(d.stage_days) ?? Math.min((num(d.days) ?? 0) + 2, 0), 11);
+        const entered = past(relativeTime(num(d.stage_days) ?? Math.min((num(d.days) ?? 0) + 2, 0), 11));
         const uuid = newUuid();
         const ownerId = owner(d);
         const [id] = await trx('deals').insert({
@@ -231,7 +241,7 @@ export async function seedSampleData(
         due_at: kind === 'task' || kind === 'call' ? due : null,
         start_at: kind === 'meeting' ? due : null,
         end_at: kind === 'meeting' && due ? new Date(due.getTime() + 3_600_000) : null,
-        completed_at: done ? (due && due < new Date() ? due : created) : null,
+        completed_at: done ? past(due ?? created) : null,
         priority: str(a.priority) ?? 'normal',
         outcome: str(a.outcome),
         owner_id: ownerId,
