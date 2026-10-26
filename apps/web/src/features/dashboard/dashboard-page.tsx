@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -155,6 +155,9 @@ function PipelineValue({
 }) {
   const { settings } = useBoot();
   const money = (v: number) => formatMoney(v, settings.general.currency);
+  // Stage names collide when each gets less than about 96px, so they are tilted instead of overlapping.
+  const [chartWidth, setChartWidth] = useState(0);
+  const crowded = chartWidth > 0 && chartWidth / Math.max(1, data.stages.length) < 96;
   return (
     <div className="flex flex-1 flex-col gap-4">
       <dl className="flex gap-8">
@@ -163,7 +166,7 @@ function PipelineValue({
         <Stat label="Open" value={data.count} />
       </dl>
       <div className="h-44 min-h-0 flex-1" aria-label="Value by stage">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" onResize={(w) => setChartWidth(w)}>
           <BarChart data={data.stages} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
             <XAxis
               dataKey="name"
@@ -171,6 +174,10 @@ function PipelineValue({
               axisLine={{ stroke: 'var(--line)' }}
               tick={{ fontSize: 11, fill: 'var(--muted)' }}
               interval={0}
+              angle={crowded ? -35 : 0}
+              textAnchor={crowded ? 'end' : 'middle'}
+              height={crowded ? 56 : 30}
+              tickMargin={crowded ? 8 : 2}
             />
             <YAxis
               tickLine={false}

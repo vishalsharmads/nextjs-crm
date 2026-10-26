@@ -38,7 +38,10 @@
     "unassigned": "Unassigned",
     "copy": "Copy",
     "open": "Open",
-    "showing": "{{from}}–{{to}} of {{total}}"
+    "showing": "{{from}}–{{to}} of {{total}}",
+    "showEmptyFields_one": "Show {{count}} empty field",
+    "showEmptyFields_other": "Show {{count}} empty fields",
+    "hideEmptyFields": "Hide empty fields"
   },
   "nav": {
     "home": "Home",
