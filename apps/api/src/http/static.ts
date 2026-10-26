@@ -27,11 +27,14 @@ const securityHeaders: RequestHandler = (_req, res, next) => {
   next();
 };
 
-/** Hashed build files never change; HTML must be revalidated so a deploy shows up at once. */
-function cacheHeaders(res: express.Response, file: string) {
-  const hashed = /[\\/](assets|_astro)[\\/]/.test(file);
+/**
+ * Hashed build files (`assets/`, `_astro/` at the build root) never change; everything else must be
+ * revalidated so a deploy shows up at once. Judged relative to the build root, not the install path.
+ */
+const cacheHeaders = (root: string) => (res: express.Response, file: string) => {
+  const hashed = /^(assets|_astro)[\\/]/.test(path.relative(root, file));
   res.setHeader('Cache-Control', hashed ? 'public, max-age=31536000, immutable' : 'no-cache');
-}
+};
 
 const isPageRequest = (req: express.Request) =>
   (req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/');
@@ -45,7 +48,7 @@ export function mountStatic(app: Express, opts: StaticOptions): void {
     const webDir = path.resolve(opts.webDir);
     const index = path.join(webDir, 'index.html');
     const spa = express.Router();
-    spa.use(express.static(webDir, { index: false, redirect: false, setHeaders: cacheHeaders }));
+    spa.use(express.static(webDir, { index: false, redirect: false, setHeaders: cacheHeaders(webDir) }));
     // Client-side routes: any other page under the app path gets the SPA shell.
     spa.use((req, res, next) => {
       if (!isPageRequest(req) || path.extname(req.path)) return next();
@@ -57,7 +60,9 @@ export function mountStatic(app: Express, opts: StaticOptions): void {
 
   if (opts.siteDir && appPath) {
     const siteDir = path.resolve(opts.siteDir);
-    app.use(express.static(siteDir, { extensions: ['html'], redirect: false, setHeaders: cacheHeaders }));
+    app.use(
+      express.static(siteDir, { extensions: ['html'], redirect: false, setHeaders: cacheHeaders(siteDir) }),
+    );
     // Pages are built as `name.html` next to a `name/` folder; serve the file for `/name` and `/name/`.
     app.use((req, res, next) => {
       if (!isPageRequest(req)) return next();

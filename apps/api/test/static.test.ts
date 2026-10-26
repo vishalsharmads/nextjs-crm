@@ -7,8 +7,9 @@ import type { Express } from 'express';
 import { createApp } from '../src/http/app';
 
 /** Writes a fake build: files keyed by relative path. */
-function fakeBuild(files: Record<string, string>): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'static-'));
+function fakeBuild(files: Record<string, string>, parent = os.tmpdir()): string {
+  fs.mkdirSync(parent, { recursive: true });
+  const dir = fs.mkdtempSync(path.join(parent, 'static-'));
   for (const [rel, body] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
     fs.writeFileSync(path.join(dir, rel), body);
@@ -67,6 +68,21 @@ describe('single-server mode (site at /, app at /app)', () => {
 
   it('does not serve files outside the site folder', async () => {
     await request(app).get('/..%2f..%2fetc%2fpasswd').expect(404);
+  });
+});
+
+describe('single-server mode installed under a folder named assets', () => {
+  it('still revalidates pages and plain files; only hashed build files are immutable', async () => {
+    const parent = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'install-')), 'assets');
+    const webDir = fakeBuild({ 'index.html': 'app shell', 'assets/main-abc123.js': 'app js' }, parent);
+    const siteDir = fakeBuild({ 'index.html': 'site home', 'favicon.svg': '<svg/>' }, parent);
+    const app = createApp({ static: { webDir, siteDir, appPath: '/app' } });
+    expect((await request(app).get('/favicon.svg').expect(200)).headers['cache-control']).toBe('no-cache');
+    expect((await request(app).get('/').expect(200)).headers['cache-control']).toBe('no-cache');
+    expect((await request(app).get('/app/index.html').expect(200)).headers['cache-control']).toBe('no-cache');
+    expect(
+      (await request(app).get('/app/assets/main-abc123.js').expect(200)).headers['cache-control'],
+    ).toContain('immutable');
   });
 });
 
