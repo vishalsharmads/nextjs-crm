@@ -95,7 +95,7 @@ async function deliver(deliveryId: number) {
         'X-Webhook-Id': d.uuid,
         'X-Webhook-Event': d.event,
         'X-Webhook-Timestamp': timestamp,
-        'X-Webhook-Signature': sign(decrypt(d.secret_enc), timestamp, body),
+        'X-Webhook-Signature': sign(decrypt(d.secret_enc, 'webhooks.secret_enc'), timestamp, body),
       },
       body,
       redirect: 'manual',
@@ -228,7 +228,7 @@ export const webhooksRoutes = defineRoutes('/webhooks', ['webhooks'])
           name: b.name,
           url: b.url,
           events: JSON.stringify(b.events),
-          secret_enc: encrypt(secret),
+          secret_enc: encrypt(secret, 'webhooks.secret_enc'),
           active: b.active,
           created_by: user.id,
         });

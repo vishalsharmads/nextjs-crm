@@ -66,29 +66,36 @@ function legacyKeys(): Buffer[] {
   return [legacy, ...keys.filter((k) => !k.equals(legacy))];
 }
 
-/** AES-256-GCM. Output: `v1.<kid>.<iv>.<tag>.<ciphertext>` (base64url parts). */
-export function encrypt(plain: string): string {
+/**
+ * AES-256-GCM. Output: `v1.<kid>.<iv>.<tag>.<ciphertext>` (base64url parts).
+ * `aad` names where the value belongs (for example `custom:contact:diagnosis` or a user id): it is
+ * authenticated but not stored, so a ciphertext copied to another field or row fails to decrypt.
+ */
+export function encrypt(plain: string, aad = ''): string {
   const { kid, key } = keyRing()[0]!;
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(Buffer.from(aad));
   const data = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   return ['v1', kid, ...[iv, cipher.getAuthTag(), data].map((b) => b.toString('base64url'))].join('.');
 }
 
-function open(key: Buffer, iv: Buffer, tag: Buffer, data: Buffer): Buffer {
+function open(key: Buffer, iv: Buffer, tag: Buffer, data: Buffer, aad?: string): Buffer {
   // Full-length tags only: a truncated tag would weaken forgery resistance.
   if (tag.length !== 16) throw new Error('Malformed ciphertext');
   const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
+  if (aad !== undefined) decipher.setAAD(Buffer.from(aad));
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(data), decipher.final()]);
 }
 
-export function decrypt(payload: string): string {
+/** Decrypt with the same `aad` used to encrypt. Pre-ring ciphertext (no key id) carries no binding. */
+export function decrypt(payload: string, aad = ''): string {
   const parts = payload.split('.');
+  const b = (s: string) => Buffer.from(s, 'base64url');
   if (parts[0] === 'v1' && parts.length === 5) {
     const [, kid, iv, tag, data] = parts as [string, string, string, string, string];
-    const b = (s: string) => Buffer.from(s, 'base64url');
-    return open(keyFor(kid), b(iv), b(tag), b(data)).toString('utf8');
+    return open(keyFor(kid), b(iv), b(tag), b(data), aad).toString('utf8');
   }
   const [iv, tag, data] = parts.map((p) => Buffer.from(p, 'base64url'));
   if (!iv || !tag || !data || parts.length !== 3) throw new Error('Malformed ciphertext');
@@ -102,7 +109,7 @@ export function decrypt(payload: string): string {
   throw new Error('Cannot decrypt: no key in the ring matches');
 }
 
-/** Whether a ciphertext uses the active key (rotation re-encrypts the rest). */
+/** Whether a ciphertext is in the current format with the active key (rotation redoes the rest). */
 export function isCurrent(payload: string): boolean {
   const parts = payload.split('.');
   return parts[0] === 'v1' && parts[1] === activeKid();
@@ -110,11 +117,15 @@ export function isCurrent(payload: string): boolean {
 
 const MAGIC = Buffer.from('ENC1');
 
-/** Encrypt bytes (files). Layout: ENC1 | kid length | kid | iv(12) | tag(16) | ciphertext. */
-export function encryptBuffer(plain: Buffer): { data: Buffer; kid: string } {
+/**
+ * Encrypt bytes (files). Layout: ENC1 | kid length | kid | iv(12) | tag(16) | ciphertext.
+ * `aad` binds the bytes to their file (its uuid).
+ */
+export function encryptBuffer(plain: Buffer, aad = ''): { data: Buffer; kid: string } {
   const { kid, key } = keyRing()[0]!;
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(Buffer.from(aad));
   const body = Buffer.concat([cipher.update(plain), cipher.final()]);
   const kidBuf = Buffer.from(kid);
   return {
@@ -123,7 +134,7 @@ export function encryptBuffer(plain: Buffer): { data: Buffer; kid: string } {
   };
 }
 
-export function decryptBuffer(data: Buffer): Buffer {
+export function decryptBuffer(data: Buffer, aad = ''): Buffer {
   if (!data.subarray(0, 4).equals(MAGIC)) throw new Error('Not an encrypted file');
   const len = data[4]!;
   const kid = data.subarray(5, 5 + len).toString();
@@ -133,5 +144,6 @@ export function decryptBuffer(data: Buffer): Buffer {
     data.subarray(at, at + 12),
     data.subarray(at + 12, at + 28),
     data.subarray(at + 28),
+    aad,
   );
 }

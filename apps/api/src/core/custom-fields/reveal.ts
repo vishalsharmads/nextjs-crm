@@ -31,5 +31,5 @@ export async function revealField(
     { action: 'reveal', entity, entityId: row.id as number, entityUuid: uuid, detail: { field: key } },
     { always: true, required: true },
   );
-  return { value: isEncryptedValue(raw) ? decryptValue(raw) : (raw ?? null) };
+  return { value: isEncryptedValue(raw) ? decryptValue(raw, entity, key) : (raw ?? null) };
 }

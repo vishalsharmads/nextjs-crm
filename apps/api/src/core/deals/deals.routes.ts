@@ -187,7 +187,7 @@ export const leadsRoutes = [
           if (lead.converted_at) throw new AppError('CONFLICT', 'This lead was already converted');
           // Sensitive values are stored encrypted: carry the plain value; the target encrypts it again
           // if it is sensitive too.
-          const leadCustom = decryptCustom(lead.custom);
+          const leadCustom = decryptCustom(lead.custom, 'lead');
           // Custom values carry over to fields with the same key on the new records.
           const carry = async (entity: 'contact' | 'organization' | 'deal') => {
             const keys = (await trx('custom_field_definitions')

@@ -5,6 +5,9 @@ import { activeKid, decrypt, decryptBuffer, encrypt, encryptBuffer, isCurrent } 
 import { newStorageKey, storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
 import { ENTITY_TABLE } from '../custom-fields/definitions';
+import { reencryptValue } from '../records/custom';
+import { totpAad } from '../auth/auth.service';
+import { fileAad } from '../files/files.service';
 
 const ENC = 'enc:';
 
@@ -42,11 +45,11 @@ async function replaceFile(
   }
 }
 
-/** Columns holding a single encrypted string. */
-const SECRET_COLUMNS: [table: string, column: string][] = [
-  ['users', 'totp_secret_enc'],
-  ['webhooks', 'secret_enc'],
-  ['mail_accounts', 'password_enc'],
+/** Columns holding a single encrypted string, with the binding each value is encrypted with. */
+const SECRET_COLUMNS: [table: string, column: string, aad: (id: number) => string][] = [
+  ['users', 'totp_secret_enc', totpAad],
+  ['webhooks', 'secret_enc', () => 'webhooks.secret_enc'],
+  ['mail_accounts', 'password_enc', () => 'mail_accounts.password_enc'],
 ];
 
 /**
@@ -57,7 +60,7 @@ const SECRET_COLUMNS: [table: string, column: string][] = [
 export async function rotateKeys(): Promise<RotationReport> {
   const report = newReport();
 
-  for (const [table, column] of SECRET_COLUMNS) {
+  for (const [table, column, aadFor] of SECRET_COLUMNS) {
     const area = `${table}.${column}`;
     for (const { id } of await db(table).whereNotNull(column).select('id')) {
       try {
@@ -67,7 +70,7 @@ export async function rotateKeys(): Promise<RotationReport> {
           if (!value || isCurrent(value)) return;
           await trx(table)
             .where({ id })
-            .update({ [column]: encrypt(decrypt(value)) });
+            .update({ [column]: encrypt(decrypt(value, aadFor(id)), aadFor(id)) });
           bump(report.done, area);
         });
       } catch (err) {
@@ -77,7 +80,7 @@ export async function rotateKeys(): Promise<RotationReport> {
     }
   }
 
-  for (const table of new Set(Object.values(ENTITY_TABLE))) {
+  for (const [entity, table] of Object.entries(ENTITY_TABLE)) {
     const area = `${table}.custom`;
     for (const { id } of await db(table).where('custom', 'like', `%"${ENC}%`).select('id')) {
       try {
@@ -87,7 +90,7 @@ export async function rotateKeys(): Promise<RotationReport> {
           let changed = false;
           for (const [k, v] of Object.entries(custom)) {
             if (typeof v === 'string' && v.startsWith(ENC) && !isCurrent(v.slice(ENC.length))) {
-              custom[k] = `${ENC}${encrypt(decrypt(v.slice(ENC.length)))}`;
+              custom[k] = reencryptValue(v, entity, k);
               changed = true;
             }
           }
@@ -107,7 +110,8 @@ export async function rotateKeys(): Promise<RotationReport> {
 
   for (const f of await db('files').whereNotNull('enc_kid').whereNot('enc_kid', activeKid())) {
     try {
-      const sealed = encryptBuffer(decryptBuffer(await storage.get(f.storage_key)));
+      const aad = fileAad(f.uuid as string);
+      const sealed = encryptBuffer(decryptBuffer(await storage.get(f.storage_key), aad), aad);
       await replaceFile(f, sealed.data, sealed.kid, report);
       bump(report.done, 'files');
     } catch (err) {
@@ -129,7 +133,7 @@ export async function encryptExistingFiles(): Promise<RotationReport> {
   const report = newReport();
   for (const f of await db('files').whereNull('enc_kid').where({ is_public: false })) {
     try {
-      const sealed = encryptBuffer(await storage.get(f.storage_key));
+      const sealed = encryptBuffer(await storage.get(f.storage_key), fileAad(f.uuid as string));
       await replaceFile(f, sealed.data, sealed.kid, report);
       bump(report.done, 'files');
     } catch (err) {

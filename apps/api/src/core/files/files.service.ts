@@ -94,16 +94,18 @@ export async function storeFile(
     );
   }
   const key = newStorageKey();
+  const uuid = newUuid();
   // Public files (branding) are served to anyone, so encrypting them would add nothing.
   const sealed =
-    !input.isPublic && (await effectiveCompliance()).encryptUploads ? encryptBuffer(input.buffer) : null;
+    !input.isPublic && (await effectiveCompliance()).encryptUploads
+      ? encryptBuffer(input.buffer, fileAad(uuid))
+      : null;
   await storage.put(key, sealed ? sealed.data : input.buffer);
   // The bytes are written before the row commits: if the surrounding transaction rolls back,
   // delete them so no orphaned file is left in storage.
   const tx = conn as Partial<Knex.Transaction>;
   if (tx.isTransaction && tx.executionPromise)
     tx.executionPromise.catch(() => storage.delete(key).catch(() => undefined));
-  const uuid = newUuid();
   const safeName = input.originalName.replace(/[\r\n"\\/]/g, '_').slice(0, 255) || 'file';
   const [id] = await conn('files').insert({
     uuid,
@@ -127,13 +129,17 @@ export async function storeFile(
   return { id: id!, uuid, originalName: safeName, mime, size: input.buffer.length };
 }
 
+/** Binds encrypted bytes to their file record. */
+export const fileAad = (uuid: string) => `files:${uuid}`;
+
 /** The file's bytes as uploaded (decrypted when stored encrypted). */
 export async function readStoredFile(file: {
+  uuid: string;
   storage_key: string;
   enc_kid?: string | null;
 }): Promise<Buffer> {
   const data = await storage.get(file.storage_key);
-  return file.enc_kid ? decryptBuffer(data) : data;
+  return file.enc_kid ? decryptBuffer(data, fileAad(file.uuid)) : data;
 }
 
 /** Signed, expiring download token: base64url(uuid.exp).sig */

@@ -49,6 +49,16 @@ describe('key ring', () => {
   });
 });
 
+describe('ciphertext binding', () => {
+  it('does not decrypt a value copied to another field, user or file', async () => {
+    const sealed = encrypt('secret', 'custom:contact:diagnosis');
+    expect(decrypt(sealed, 'custom:contact:diagnosis')).toBe('secret');
+    expect(() => decrypt(sealed, 'custom:contact:other_field')).toThrow();
+    const totp = encrypt('JBSWY3DP', 'users.totp_secret_enc:1');
+    expect(() => decrypt(totp, 'users.totp_secret_enc:2')).toThrow();
+  });
+});
+
 describe('sensitive fields', () => {
   it('refuses unsuitable types and changes of sensitivity', async () => {
     expect(

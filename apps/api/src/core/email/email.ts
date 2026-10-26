@@ -63,7 +63,7 @@ function transportFor(a: AccountRow) {
     host: a.smtp.host,
     port: a.smtp.port,
     secure: a.smtp.secure,
-    auth: { user: a.email, pass: decrypt(a.password_enc) },
+    auth: { user: a.email, pass: decrypt(a.password_enc, 'mail_accounts.password_enc') },
   });
 }
 
@@ -205,7 +205,7 @@ export async function syncAccount(account: AccountRow): Promise<number> {
     host: account.imap.host,
     port: account.imap.port,
     secure: account.imap.secure,
-    auth: { user: account.email, pass: decrypt(account.password_enc) },
+    auth: { user: account.email, pass: decrypt(account.password_enc, 'mail_accounts.password_enc') },
     logger: false,
   });
   let logged = 0;
@@ -326,7 +326,7 @@ export const emailRoutes = defineRoutes('/email', ['email'])
             display_name: body.displayName,
             smtp: JSON.stringify(body.smtp),
             imap: body.imap ? JSON.stringify(body.imap) : null,
-            password_enc: encrypt(body.password),
+            password_enc: encrypt(body.password, 'mail_accounts.password_enc'),
           })
           .onConflict(['user_id', 'email'])
           .merge(['display_name', 'smtp', 'imap', 'password_enc']);

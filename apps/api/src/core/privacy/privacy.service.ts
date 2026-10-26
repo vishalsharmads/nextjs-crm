@@ -306,7 +306,7 @@ function visibleCustom(
     const v = src[d.key];
     if (v === undefined || v === null || levels[d.key] === 'hidden') continue;
     if (!isEncryptedValue(v)) out[d.key] = v;
-    else out[d.key] = canReveal ? decryptCustom({ v }).v : SENSITIVE_MASK;
+    else out[d.key] = canReveal ? decryptCustom({ [d.key]: v }, d.entity)[d.key] : SENSITIVE_MASK;
   }
   return out;
 }
@@ -475,7 +475,10 @@ export async function exportSubject(
     while (used.has(name)) name = name.replace(/(\.[^.]*)?$/, (ext) => `-${used.size}${ext}`);
     used.add(name);
     try {
-      zip.addBuffer(await readStoredFile(f as { storage_key: string; enc_kid: string | null }), name);
+      zip.addBuffer(
+        await readStoredFile(f as { uuid: string; storage_key: string; enc_kid: string | null }),
+        name,
+      );
     } catch (err) {
       logger.error({ err, file: f.uuid }, 'file missing from storage during data export');
     }

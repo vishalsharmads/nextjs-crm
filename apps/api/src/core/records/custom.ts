@@ -6,17 +6,24 @@ import { decrypt, encrypt } from '../../lib/crypto';
 const ENC_PREFIX = 'enc:';
 export const isEncryptedValue = (v: unknown): v is string =>
   typeof v === 'string' && v.startsWith(ENC_PREFIX);
-export const encryptValue = (v: unknown) => `${ENC_PREFIX}${encrypt(JSON.stringify(v))}`;
-export const decryptValue = (v: string): unknown => JSON.parse(decrypt(v.slice(ENC_PREFIX.length)));
+/** Binds a sensitive value to its field, so it cannot be copied into another one. */
+const fieldAad = (entity: string, key: string) => `custom:${entity}:${key}`;
+export const encryptValue = (v: unknown, entity: string, key: string) =>
+  `${ENC_PREFIX}${encrypt(JSON.stringify(v), fieldAad(entity, key))}`;
+export const decryptValue = (v: string, entity: string, key: string): unknown =>
+  JSON.parse(decrypt(v.slice(ENC_PREFIX.length), fieldAad(entity, key)));
+/** Re-encrypt a stored value under the active key (key rotation). */
+export const reencryptValue = (v: string, entity: string, key: string) =>
+  encryptValue(decryptValue(v, entity, key), entity, key);
 
 /** Plain values for privileged paths (data subject export, lead conversion). */
-export function decryptCustom(custom: unknown): Custom {
+export function decryptCustom(custom: unknown, entity: string): Custom {
   const src = (custom && typeof custom === 'object' ? custom : {}) as Custom;
   return Object.fromEntries(
     Object.entries(src).map(([k, v]) => {
       if (!isEncryptedValue(v)) return [k, v];
       try {
-        return [k, decryptValue(v)];
+        return [k, decryptValue(v, entity, k)];
       } catch {
         return [k, '[unreadable]'];
       }
@@ -103,7 +110,7 @@ export function prepareCustom(
     if (cleared.has(k)) continue;
     const def = defs.find((d) => d.key === k);
     const value = def?.type === 'datetime' ? new Date(String(v)).toISOString() : v;
-    merged[k] = special.has(k) ? encryptValue(value) : value;
+    merged[k] = special.has(k) ? encryptValue(value, def!.entity, k) : value;
   }
   return merged;
 }
