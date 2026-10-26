@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { Knex } from 'knex';
 import {
@@ -19,8 +20,13 @@ import { installCore, markInstalled } from './install';
 
 export const DEMO_PASSWORD = 'DemoAccess2026!';
 
-/** Settings row that marks a database as a demo created by `demo:reset`. Only such databases are wiped. */
+/** Settings row naming the industry a demo shows (read by the public demo endpoint). */
 const DEMO_KEY = 'demo';
+/**
+ * Table that marks a database as created by `demo:reset`; only such databases (or empty ones) are wiped.
+ * Written right after emptying, before migrations, so a reset that fails halfway can be retried.
+ */
+const MARKER_TABLE = 'demo_reset_marker';
 
 export interface DemoAccount {
   label: string;
@@ -99,11 +105,20 @@ export async function assertDemoResetAllowed(url: string, industry: string): Pro
     throw new DemoResetRefused(
       `Database "${name}" is not a demo database. demo:reset only wipes databases whose name contains "demo" (e.g. crm_demo).`,
     );
-  // Uploaded files are wiped too, so the upload folder must be the demo's own (default ./storage is shared).
+  // Uploaded files are wiped too, so the upload folder must be the demo's own (default ./storage is shared):
+  // its own name says demo, and it does not contain the app or a home folder.
   const storage = path.resolve(env.STORAGE_DIR);
-  if (!/demo/i.test(storage))
+  if (!/demo/i.test(path.basename(storage)))
     throw new DemoResetRefused(
-      `Upload folder "${storage}" is not a demo folder. Set STORAGE_DIR to a folder whose path contains "demo" (e.g. ./storage-demo).`,
+      `Upload folder "${storage}" is not a demo folder. Set STORAGE_DIR to a folder whose own name contains "demo" (e.g. ./storage-demo).`,
+    );
+  const inside = (dir: string) => {
+    const rel = path.relative(storage, path.resolve(dir));
+    return !rel.startsWith('..') && !path.isAbsolute(rel);
+  };
+  if (inside(process.cwd()) || inside(os.homedir()) || storage === path.parse(storage).root)
+    throw new DemoResetRefused(
+      `Upload folder "${storage}" contains the app or a home folder. Point STORAGE_DIR at a dedicated folder.`,
     );
   const blueprint = blueprintForIndustry(industry);
   if (!listBlueprintKeys().includes(blueprint))
@@ -122,9 +137,10 @@ export async function assertDemoResetAllowed(url: string, industry: string): Pro
       .from('information_schema.tables')
       .whereRaw('table_schema = DATABASE()')) as { name: string }[];
     if (tables.length) {
-      const marker = tables.some((t) => t.name === 'settings')
-        ? await check('settings').where({ key: DEMO_KEY }).first('key')
-        : null;
+      const marker =
+        tables.some((t) => t.name === MARKER_TABLE) ||
+        (tables.some((t) => t.name === 'settings') &&
+          !!(await check('settings').where({ key: DEMO_KEY }).first('key')));
       if (!marker)
         throw new DemoResetRefused(
           `Database "${name}" has data that demo:reset did not create. It never wipes such a database; ` +
@@ -154,10 +170,15 @@ async function emptyDatabase(url: string): Promise<number | null> {
       await conn.raw(r.type === 'VIEW' ? 'DROP VIEW IF EXISTS ??' : 'DROP TABLE IF EXISTS ??', [r.name]);
     }
     await conn.raw('SET FOREIGN_KEY_CHECKS = 1');
+    await markDemoDatabase(conn);
     return rows.length;
   } finally {
     await conn.destroy();
   }
+}
+
+async function markDemoDatabase(conn: Knex): Promise<void> {
+  await conn.raw('CREATE TABLE IF NOT EXISTS ?? (id INT PRIMARY KEY)', [MARKER_TABLE]);
 }
 
 /** Remove uploaded files (their rows are gone). Only the contents of the configured folder. */
@@ -171,18 +192,30 @@ function emptyStorage(dir: string): void {
 
 /**
  * Wipe the demo database and install one industry with sample data and one demo user per role.
- * Call `assertDemoResetAllowed` first.
+ * Runs every guard itself; the CLI also checks them before asking for confirmation.
  */
 export async function resetDemo(
-  opts: { url: string; blueprint: string; password?: string },
+  opts: { url: string; industry: string; password?: string },
   out: (msg: string) => void,
 ): Promise<DemoAccount[]> {
+  // Migrations and installs below use the instance connection, so it must be the database checked.
+  if (opts.url !== env.DATABASE_URL)
+    throw new DemoResetRefused("demo:reset only resets this instance's database.");
+  const { blueprint } = await assertDemoResetAllowed(opts.url, opts.industry);
   const password = opts.password ?? DEMO_PASSWORD;
   out('1/6  Emptying the demo database and uploaded files');
   const dropped = await emptyDatabase(opts.url);
   emptyStorage(env.STORAGE_DIR);
   // Create it only when missing: hosting accounts often may not create databases at all.
-  if (dropped === null) await ensureDatabase(opts.url);
+  if (dropped === null) {
+    await ensureDatabase(opts.url);
+    const conn = createKnex(opts.url, { poolMax: 1 });
+    try {
+      await markDemoDatabase(conn);
+    } finally {
+      await conn.destroy();
+    }
+  }
   out(dropped === null ? '     Created the database' : `     ${dropped} tables removed`);
 
   out('2/6  Running migrations');
@@ -192,7 +225,7 @@ export async function resetDemo(
     .insert({
       key: DEMO_KEY,
       group: 'system',
-      value: JSON.stringify({ blueprint: opts.blueprint }),
+      value: JSON.stringify({ blueprint: blueprint }),
       is_public: false,
     })
     .onConflict('key')
@@ -206,19 +239,19 @@ export async function resetDemo(
     adminLastName: 'Admin',
   });
 
-  out(`4/6  Applying "${opts.blueprint}"`);
+  out(`4/6  Applying "${blueprint}"`);
   const { applyBlueprintByKey } = await import('../blueprints/applier');
-  const report = await applyBlueprintByKey(db, opts.blueprint, {});
+  const report = await applyBlueprintByKey(db, blueprint, {});
   out(`     ${report.summary}`);
   for (const w of report.warnings) out(`     note: ${w}`);
-  await markInstalled(db, opts.blueprint);
+  await markInstalled(db, blueprint);
 
   // Users first, so sample records can be owned by (and created as) the demo roles.
   out('5/6  Creating demo users');
   const accounts = await seedDemoUsers(db, { password });
 
   out('6/6  Adding sample data');
-  const bp = loadBlueprint(opts.blueprint);
+  const bp = loadBlueprint(blueprint);
   const { count, refs } = await seedSampleData(db, bp);
   const admin = accounts.find((a) => a.email.startsWith('demo.admin@'));
   const requests = bp.sample_data?.requests ?? [];
@@ -229,8 +262,8 @@ export async function resetDemo(
     .where({ key: DEMO_KEY })
     .update({
       value: JSON.stringify({
-        blueprint: opts.blueprint,
-        industry: industryForBlueprint(opts.blueprint),
+        blueprint: blueprint,
+        industry: industryForBlueprint(blueprint),
         resetAt: new Date().toISOString(),
       }),
     });

@@ -84,6 +84,17 @@ describe('demo:reset', () => {
     expect(r.out).toContain('not a demo folder');
   });
 
+  it('judges the upload folder by its own name, not a demo-named parent', async () => {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'demo-host-'));
+    const shared = path.join(parent, 'storage');
+    fs.mkdirSync(shared);
+    fs.writeFileSync(path.join(shared, 'keep.bin'), 'x');
+    const r = await reset('coworking', { STORAGE_DIR: shared });
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain('not a demo folder');
+    expect(fs.readdirSync(shared)).toEqual(['keep.bin']);
+  });
+
   it('installs an industry with sample data and demo users, then switches to another', async () => {
     fs.writeFileSync(path.join(storage, 'old-upload.bin'), 'x');
     const first = await reset('coworking');
@@ -126,6 +137,16 @@ describe('demo:reset', () => {
       await demo.destroy();
     }
   }, 600_000);
+
+  it('can retry a reset that failed after emptying the database', async () => {
+    // A failed run leaves the marker table and whatever was created before it stopped.
+    await server.raw('DROP DATABASE IF EXISTS ??', [DEMO_DB]);
+    await server.raw('CREATE DATABASE ??', [DEMO_DB]);
+    await server.raw('CREATE TABLE ??.demo_reset_marker (id INT PRIMARY KEY)', [DEMO_DB]);
+    await server.raw('CREATE TABLE ??.knex_migrations (id INT)', [DEMO_DB]);
+    const r = await reset('law-firms');
+    expect(r.ok, r.out).toBe(true);
+  }, 120_000);
 
   it('never wipes a database it did not create', async () => {
     await server.raw('CREATE DATABASE ??', [`${DEMO_DB}_client`]);

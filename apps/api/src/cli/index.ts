@@ -156,7 +156,7 @@ const commands: Record<string, Command> = {
     });
     if (!values.industry) throw new Error('Pass --industry=<slug>, e.g. --industry=coworking');
     const { assertDemoResetAllowed, resetDemo } = await import('./demo');
-    const { blueprint } = await assertDemoResetAllowed(env.DATABASE_URL, values.industry);
+    await assertDemoResetAllowed(env.DATABASE_URL, values.industry);
     const name = new URL(env.DATABASE_URL).pathname.slice(1);
     if (!values.yes) {
       const { createInterface } = await import('node:readline/promises');
@@ -170,7 +170,10 @@ const commands: Record<string, Command> = {
         return;
       }
     }
-    const accounts = await resetDemo({ url: env.DATABASE_URL, blueprint, password: values.password }, out);
+    const accounts = await resetDemo(
+      { url: env.DATABASE_URL, industry: values.industry, password: values.password },
+      out,
+    );
     out('');
     out(`Demo for "${values.industry}" is ready in "${name}".`);
     for (const a of accounts) out(`  ${a.label.padEnd(24)} ${a.email}`);

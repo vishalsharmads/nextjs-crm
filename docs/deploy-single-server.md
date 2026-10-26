@@ -46,7 +46,7 @@ WEB_DIR=../web/dist                   # relative to apps/api
 SITE_DIR=../site/dist
 DATABASE_URL=mysql://user:pass@host:3306/dbname
 DEMO_MODE=true                        # demo server only, never a client instance
-STORAGE_DIR=./storage-demo            # demo:reset empties it, so its path must contain "demo"
+STORAGE_DIR=./storage-demo            # demo:reset empties it, so its own name must contain "demo"
 # plus the secrets from env-reference.md
 ```
 
@@ -74,8 +74,10 @@ bookings, tickets, contracts) created through the app itself. Then restart the a
 **It only ever runs on a demo.** It refuses, and changes nothing, unless all of these hold:
 
 - `DEMO_MODE=true`;
-- the database name contains `demo` (e.g. `crm_demo`) and so does the upload folder (`STORAGE_DIR`);
-- the database is empty, or was created by an earlier `demo:reset` (it carries a demo marker).
+- the database name contains `demo` (e.g. `crm_demo`), and so does the upload folder's own name
+  (`STORAGE_DIR=./storage-demo`), which must not contain the app or a home folder;
+- the database is empty, or was created by an earlier `demo:reset` (it carries a marker table, written
+  first, so a reset that fails halfway can simply be run again).
 
 It drops tables rather than the database, so the hosting account needs no `CREATE DATABASE` right.
 
