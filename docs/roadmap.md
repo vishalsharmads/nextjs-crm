@@ -17,7 +17,7 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - Sensitivity for blueprint-defined custom fields (`sensitivity` in `blueprint.json`), so an industry blueprint can ship sensitive fields.
 - WebAuthn / passkeys as a second factor.
 - Breached-password check (k-anonymity range API) when setting a password.
-- Upload `ENCRYPTION_KEYS` to an external key manager (KMS/HSM) instead of the environment.
+- Keep encryption keys in an external key manager (KMS or HSM) instead of the environment.
 
 - Field-level visibility for **core** columns (e.g. hide deal value from a role). Phase 1 covers custom fields only.
 - Activity participants (multiple contacts and users on a meeting).
