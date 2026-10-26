@@ -8,6 +8,10 @@ function isTyping(e: KeyboardEvent) {
   return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 }
 
+/** Enter on a focused link, button or menu item activates it; a shortcut must not swallow that. */
+const ACTIVATABLE =
+  'a, button, [role="button"], [role="menuitem"], [role="checkbox"], [role="tab"], [role="option"]';
+
 /**
  * Global shortcuts. Keys are single characters ("c", "/", "?") or two-key sequences ("g c").
  * "mod+k" means ⌘K on macOS and Ctrl+K elsewhere. Ignored while typing in a field.
@@ -30,6 +34,7 @@ export function useHotkeys(map: Record<string, Handler>, enabled = true) {
       }
       if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e)) return;
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (key === 'Enter' && (e.target as HTMLElement | null)?.closest?.(ACTIVATABLE)) return;
       if (pending) {
         const seq = `${pending} ${key}`;
         pending = null;

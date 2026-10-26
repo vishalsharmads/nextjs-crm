@@ -45,6 +45,7 @@ let lostReasons: string[] = [];
 const patch = vi.fn();
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
+const toastDismiss = vi.fn();
 
 vi.mock('@/app/session', () => ({
   useBoot: () => ({
@@ -56,7 +57,11 @@ vi.mock('@/app/session', () => ({
 }));
 vi.mock('@/lib/api', () => ({ apiPatch: (...a: unknown[]) => patch(...a) }));
 vi.mock('sonner', () => ({
-  toast: { success: (...a: unknown[]) => toastSuccess(...a), error: (...a: unknown[]) => toastError(...a) },
+  toast: {
+    success: (...a: unknown[]) => toastSuccess(...a),
+    error: (...a: unknown[]) => toastError(...a),
+    dismiss: (...a: unknown[]) => toastDismiss(...a),
+  },
 }));
 vi.mock('./lost-reason-dialog', () => ({
   LostReasonDialog: ({ onConfirm }: { onConfirm: (reason: string) => void }) => (
@@ -100,6 +105,8 @@ beforeEach(() => {
   patch.mockReset();
   toastSuccess.mockReset();
   toastError.mockReset();
+  toastDismiss.mockReset();
+  toastSuccess.mockReturnValue('toast-1');
 });
 afterEach(cleanup);
 
@@ -151,6 +158,8 @@ describe('StageTrack', () => {
     setup();
     await user.click(screen.getByRole('button', { name: 'Proposal' }));
     await waitFor(() => expect(toastError).toHaveBeenCalledWith('Stage is locked'));
+    // The "Moved to" toast, with its Undo, must not stay up for a move that did not happen.
+    expect(toastDismiss).toHaveBeenCalledWith('toast-1');
     expect(current()).toHaveTextContent('Tour');
   });
 

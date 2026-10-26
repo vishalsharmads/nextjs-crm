@@ -73,11 +73,25 @@ export function DataTable<T>({
     columns.findIndex((c) => c.id === linkColumnId),
   );
 
-  useEffect(() => setCursor(0), [rows]);
+  // Keep the cursor on the same row when the list refreshes; hide it when that row is gone (new page, filter).
+  const cursorKey = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const at = cursorKey.current ? keys.indexOf(cursorKey.current) : -1;
+    if (at >= 0) setCursor(at);
+    else {
+      setCursor(0);
+      setCursorActive(false);
+    }
+  }, [keys]);
+  useEffect(() => {
+    cursorKey.current = cursorActive ? keys[cursor] : undefined;
+  }, [keys, cursor, cursorActive]);
 
   // j/k to move, Enter to open, x to select — only when focus is not in a field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Something closer to the target (a menu item, say) already used this key.
+      if (e.defaultPrevented) return;
       const el = e.target as HTMLElement;
       if (
         el.isContentEditable ||
@@ -97,7 +111,8 @@ export function DataTable<T>({
         setCursorActive(true);
       } else if (e.key === 'Enter' && onRowOpen && cursorActive) {
         // Enter on a focused link or button keeps its own meaning.
-        if (el.closest('a, button')) return;
+        if (el.closest('a, button, [role="menuitem"], [role="checkbox"], [role="tab"], [role="option"]'))
+          return;
         e.preventDefault();
         onRowOpen(rows[cursor]!);
       } else if (e.key === 'x' && selectable && cursorActive) {

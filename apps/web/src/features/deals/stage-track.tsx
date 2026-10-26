@@ -78,14 +78,15 @@ export function StageTrack({ deal }: { deal: DealDto }) {
     if (stage.uuid === deal.stage.uuid) return;
     if (needsReason(stage)) return setLostFor(stage);
     const from = stages[currentIndex];
-    move.mutate({ stage });
-    toast.success(`Moved to ${stage.name}`, {
+    const toastId = toast.success(`Moved to ${stage.name}`, {
       // Going back into a lost stage would need a reason again, so only offer undo when it does not.
       action:
         from && !needsReason(from)
           ? { label: 'Undo', onClick: () => move.mutate({ stage: from }) }
           : undefined,
     });
+    // The move is shown at once; if the server refuses it, the toast (and its Undo) must not stay up.
+    move.mutate({ stage }, { onError: () => toast.dismiss(toastId) });
   };
 
   return (
