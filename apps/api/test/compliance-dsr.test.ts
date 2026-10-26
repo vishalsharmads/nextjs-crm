@@ -409,3 +409,70 @@ describe('staff erasure', () => {
     );
   });
 });
+
+describe('review fixes: merged duplicates, scope and staff audit', () => {
+  it('erases and exports merged-away duplicates, and unsubscribes the surviving record', async () => {
+    await withPurposes();
+    const keep = await admin
+      .post('/contacts', { firstName: 'Keeper', email: 'keeper@example.test' })
+      .expect(201);
+    const dup = await admin
+      .post('/contacts', { firstName: 'Dupe', email: 'dupe-old@example.test' })
+      .expect(201);
+    await admin
+      .post(`/privacy/contact/${dup.body.uuid}/consents`, { purposeKey: 'newsletter', status: 'granted' })
+      .expect(200);
+    const oldLink = unsubscribeToken('contact', dup.body.uuid);
+    await admin
+      .post('/contacts/merge', { primaryUuid: keep.body.uuid, secondaryUuids: [dup.body.uuid] })
+      .expect(200);
+    const keepId = (await db('contacts').where({ uuid: keep.body.uuid }).first('id')).id;
+    // Consent moved to the surviving record.
+    expect(await db('consents').where({ subject_type: 'contact', subject_id: keepId }).first()).toBeTruthy();
+
+    const app = await getApp();
+    await request(app).post('/api/v1/public/privacy/unsubscribe').send({ token: oldLink }).expect(200);
+    expect((await db('contacts').where({ id: keepId }).first()).marketing_opt_out).toBeTruthy();
+
+    const res = await admin.post(`/privacy/contact/${keep.body.uuid}/anonymize`).expect(200);
+    expect(res.body.cleared.mergedDuplicates).toBe(1);
+    expect(await db('contacts').where({ uuid: dup.body.uuid }).first()).toBeUndefined();
+    expect(await db('contacts').where('email', 'like', 'dupe-old%').first()).toBeUndefined();
+  });
+
+  it('keeps privacy actions inside record scope and internal ids out of exports', async () => {
+    const owner = await createUser({ roleKeys: ['admin'] });
+    const ownerClient = await loginAs(owner);
+    const c = await ownerClient.post('/contacts', { firstName: 'Scoped' }).expect(201);
+    const role = await createRole(['core.privacy.manage', 'core.contacts.view'], { 'core.contacts': 'own' });
+    const { client } = await clientWithRoles([role]);
+    expect((await client.post(`/privacy/contact/${c.body.uuid}/anonymize`)).status).toBe(404);
+    expect((await client.get(`/privacy/contact/${c.body.uuid}/export`)).status).toBe(404);
+    expect(
+      (await client.post(`/privacy/contact/${c.body.uuid}/restriction`, { restricted: true })).status,
+    ).toBe(404);
+  });
+
+  it('a user manager cannot erase an admin, and erasing staff redacts audit entries about them', async () => {
+    const manager = await createRole(['core.users.manage']);
+    const { client } = await clientWithRoles([manager]);
+    const target = await createUser({ roleKeys: ['admin'] });
+    await admin.post(`/users/${target.uuid}/disable`).expect(200);
+    expect((await client.post(`/users/${target.uuid}/anonymize`)).status).toBe(403);
+
+    await db('audit_logs').insert({
+      actor_type: 'system',
+      action: 'user.created',
+      entity: 'user',
+      entity_id: target.id,
+      diff: JSON.stringify({ email: target.email }),
+    });
+    await admin.post(`/users/${target.uuid}/anonymize`).expect(204);
+    const rows = await db('audit_logs').where({
+      entity: 'user',
+      entity_id: target.id,
+      action: 'user.created',
+    });
+    expect(JSON.stringify(rows.map((r) => r.diff))).not.toContain(target.email);
+  });
+});

@@ -90,54 +90,80 @@ async function eraseCoreTraces(
   mode: 'anonymize' | 'delete',
   cleared: Record<string, number>,
 ) {
-  const { entity, id, uuid } = subject;
+  const { entity, id, uuid, email } = subject;
+  const add = (k: string, n: number) => (cleared[k] = (cleared[k] ?? 0) + n);
   const activityIds = (await trx('activities')
     .where({ related_type: entity, related_id: id })
     .pluck('id')) as number[];
 
-  // Copies of email traffic: addresses and subjects (bodies live on the activity).
-  if (activityIds.length) {
-    cleared.emailMessages = await trx('email_messages')
-      .whereIn('activity_id', activityIds)
-      .update({
-        from_address: '',
-        to_addresses: JSON.stringify([]),
-        cc_addresses: JSON.stringify([]),
-        subject: '',
-      });
-  }
+  // Copies of email traffic: on the person's activities, and any message to or from their address.
+  const blankMail = {
+    from_address: '',
+    to_addresses: JSON.stringify([]),
+    cc_addresses: JSON.stringify([]),
+    subject: '',
+  };
+  if (activityIds.length)
+    add('emailMessages', await trx('email_messages').whereIn('activity_id', activityIds).update(blankMail));
+  if (email)
+    add(
+      'emailMessages',
+      await trx('email_messages')
+        .where((w) =>
+          w
+            .where('from_address', email)
+            .orWhereRaw('JSON_CONTAINS(to_addresses, JSON_QUOTE(?))', [email])
+            .orWhereRaw('JSON_CONTAINS(cc_addresses, JSON_QUOTE(?))', [email]),
+        )
+        .update(blankMail),
+    );
   if (mode === 'anonymize') {
-    cleared.activities = await trx('activities')
-      .where({ related_type: entity, related_id: id })
-      .update({ body: null });
-    await trx('activities')
-      .where({ related_type: entity, related_id: id, type: 'email' })
-      .update({ subject: '' });
+    // Subjects ("Call with Jane") and outcomes identify the person as much as the notes do.
+    add(
+      'activities',
+      await trx('activities')
+        .where({ related_type: entity, related_id: id })
+        .update({ subject: '', body: null, outcome: null, custom: null }),
+    );
   } else {
-    cleared.activities = await trx('activities').where({ related_type: entity, related_id: id }).delete();
+    add('activities', await trx('activities').where({ related_type: entity, related_id: id }).delete());
   }
 
   // Webhook payloads and finished jobs carried full record snapshots.
-  cleared.webhookDeliveries = await trx('webhook_deliveries')
-    .whereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.data.uuid')) = ?", [uuid])
-    .update({ payload: JSON.stringify({ redacted: true }) });
-  cleared.jobs = await trx('jobs')
-    .whereIn('status', ['succeeded', 'failed'])
-    .where('payload', 'like', `%${escapeLike(uuid)}%`)
-    .update({ payload: JSON.stringify({ redacted: true }), result: null });
-  cleared.automationRuns = await trx('automation_runs')
-    .where({ record_uuid: uuid })
-    .update({ log: JSON.stringify(['redacted']) });
-  cleared.notifications = await trx('notifications')
-    .where('link', 'like', `%${escapeLike(uuid)}%`)
-    .delete();
+  add(
+    'webhookDeliveries',
+    await trx('webhook_deliveries')
+      .whereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.data.uuid')) = ?", [uuid])
+      .update({ payload: JSON.stringify({ redacted: true }) }),
+  );
+  add(
+    'jobs',
+    await trx('jobs')
+      .whereIn('status', ['succeeded', 'failed'])
+      .where('payload', 'like', `%${escapeLike(uuid)}%`)
+      .update({ payload: JSON.stringify({ redacted: true }), result: null }),
+  );
+  add(
+    'automationRuns',
+    await trx('automation_runs')
+      .where({ record_uuid: uuid })
+      .update({ log: JSON.stringify(['redacted']) }),
+  );
+  add(
+    'notifications',
+    await trx('notifications')
+      .where('link', 'like', `%${escapeLike(uuid)}%`)
+      .delete(),
+  );
 
   // Consent proof stays on anonymized records (without the IP); it goes with a deleted one.
   await trx.raw('SET @audit_redaction = 1');
   try {
     const consents = trx('consents').where({ subject_type: entity, subject_id: id });
-    cleared.consents =
-      mode === 'delete' ? await consents.delete() : await consents.update({ ip: null, user_agent: null });
+    add(
+      'consents',
+      mode === 'delete' ? await consents.delete() : await consents.update({ ip: null, user_agent: null }),
+    );
   } finally {
     await trx.raw('SET @audit_redaction = 0');
   }
@@ -145,6 +171,29 @@ async function eraseCoreTraces(
   await trx('taggables').where({ taggable_type: entity, taggable_id: id }).delete();
   return activityIds;
 }
+
+/**
+ * The person's record plus every duplicate merged into it (merges keep the merged-away rows,
+ * soft-deleted, with their original details). Primary first.
+ */
+async function subjectRows(conn: Db, entity: DataSubjectEntity, primary: Row): Promise<Row[]> {
+  const rows: Row[] = [primary];
+  if (entity !== 'contact') return rows;
+  let frontier = [primary.id];
+  while (frontier.length) {
+    const next = (await conn('contacts').whereIn('merged_into_id', frontier)) as Row[];
+    rows.push(...next);
+    frontier = next.map((r) => r.id);
+  }
+  return rows;
+}
+
+const asSubject = (entity: DataSubjectEntity, r: Row): DataSubject => ({
+  entity,
+  id: r.id,
+  uuid: r.uuid,
+  email: (r.email as string | null) ?? null,
+});
 
 /** Anonymize (keep the record without personal data) or delete a contact or lead everywhere. */
 export async function eraseSubject(
@@ -158,39 +207,54 @@ export async function eraseSubject(
   const report: ErasureReportDto = { mode, cleared: {}, retained: [] };
   const storageKeys: string[] = [];
   await db.transaction(async (trx) => {
-    const { subject } = await loadSubject(user, entity, uuid, trx, true);
-    const files = await trx('files').where({ entity, entity_id: subject.id });
+    const { row, subject } = await loadSubject(user, entity, uuid, trx, true);
+    const rows = await subjectRows(trx, entity, row);
+    const ids = rows.map((r) => r.id);
+    if (rows.length > 1) report.cleared.mergedDuplicates = rows.length - 1;
+    const files = await trx('files').where({ entity }).whereIn('entity_id', ids);
     storageKeys.push(...files.map((f) => f.storage_key as string));
-    report.cleared.files = await trx('files').where({ entity, entity_id: subject.id }).delete();
+    report.cleared.files = await trx('files').where({ entity }).whereIn('entity_id', ids).delete();
 
-    for (const h of await privacyHandlers(trx)) {
-      const r = await h.erase(subject, trx, mode);
-      for (const [k, v] of Object.entries(r.cleared ?? {})) report.cleared[`${h.key}.${k}`] = v;
-      report.retained.push(...(r.retained ?? []));
-    }
-
-    const activityIds = await eraseCoreTraces(trx, subject, mode, report.cleared);
-
-    if (mode === 'anonymize') {
-      await trx(def.table)
-        .where({ id: subject.id })
-        .update({ ...PII[entity], custom: JSON.stringify({}), updated_by: user.id || null });
-    } else {
-      await trx('record_follows').where({ entity, entity_id: subject.id }).delete();
-      if (entity === 'contact') {
-        await trx('contact_organization').where({ contact_id: subject.id }).delete();
-        await trx('deals').where({ contact_id: subject.id }).update({ contact_id: null });
-        await trx('leads').where({ converted_contact_id: subject.id }).update({ converted_contact_id: null });
+    const handlers = await privacyHandlers(trx);
+    for (const r of rows) {
+      const s = asSubject(entity, r);
+      for (const h of handlers) {
+        const res = await h.erase(s, trx, mode);
+        for (const [k, v] of Object.entries(res.cleared ?? {}))
+          report.cleared[`${h.key}.${k}`] = (report.cleared[`${h.key}.${k}`] ?? 0) + v;
+        report.retained.push(...(res.retained ?? []));
       }
-      await trx(def.table).where({ id: subject.id }).delete();
     }
-    // Privacy requests stay (proof the request was handled), unlinked when the record goes.
-    if (mode === 'delete')
-      await trx('privacy_requests')
-        .where({ subject_type: entity, subject_id: subject.id })
-        .update({ subject_id: null });
 
-    await redactAudit(trx, entity, subject.id, activityIds);
+    // Duplicates merged away are deleted outright: their history already lives on the primary.
+    for (const r of rows) {
+      const s = asSubject(entity, r);
+      const isPrimary = r.id === subject.id;
+      const rowMode = isPrimary ? mode : 'delete';
+      const activityIds = await eraseCoreTraces(trx, s, rowMode, report.cleared);
+      if (rowMode === 'anonymize') {
+        await trx(def.table)
+          .where({ id: r.id })
+          .update({ ...PII[entity], custom: JSON.stringify({}), updated_by: user.id || null });
+        if (entity === 'contact')
+          await trx('contact_organization').where({ contact_id: r.id }).update({ job_title: null });
+      } else {
+        await trx('record_follows').where({ entity, entity_id: r.id }).delete();
+        if (entity === 'contact') {
+          await trx('contact_organization').where({ contact_id: r.id }).delete();
+          await trx('deals').where({ contact_id: r.id }).update({ contact_id: null });
+          await trx('leads').where({ converted_contact_id: r.id }).update({ converted_contact_id: null });
+          await trx('contacts').where({ merged_into_id: r.id }).update({ merged_into_id: null });
+        }
+        // Privacy requests stay (proof the request was handled), unlinked when the record goes.
+        await trx('privacy_requests')
+          .where({ subject_type: entity, subject_id: r.id })
+          .update({ subject_id: null });
+        await trx(def.table).where({ id: r.id }).delete();
+      }
+      await redactAudit(trx, entity, r.id, activityIds);
+    }
+
     await audit(trx, ctx, {
       action: `${entity}.${mode === 'delete' ? 'hard_deleted' : 'anonymized'}`,
       entity,
@@ -204,8 +268,15 @@ export async function eraseSubject(
 }
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v);
+/** JSON-ready rows without internal database ids (ids never leave the API). */
 const plain = (rows: Record<string, unknown>[]) =>
-  rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, iso(v)])));
+  rows.map((r) =>
+    Object.fromEntries(
+      Object.entries(r)
+        .filter(([k]) => k !== 'id' && !k.endsWith('_id'))
+        .map(([k, v]) => [k, iso(v)]),
+    ),
+  );
 
 /**
  * Right of access and portability: one ZIP with everything held about the person, as JSON
@@ -220,9 +291,17 @@ export async function exportSubject(
 ) {
   const { row, subject } = await loadSubject(user, entity, uuid, db);
   const { id } = subject;
-  const activities = await db('activities').where({ related_type: entity, related_id: id }).orderBy('id');
+  const rows = await subjectRows(db, entity, row);
+  const ids = rows.map((r) => r.id);
+  const activities = await db('activities')
+    .where({ related_type: entity })
+    .whereIn('related_id', ids)
+    .orderBy('id');
   const sections: Record<string, unknown> = {
     record: plain([{ ...row, custom: decryptCustom(row.custom) }])[0],
+    ...(rows.length > 1
+      ? { mergedRecords: plain(rows.slice(1).map((r) => ({ ...r, custom: decryptCustom(r.custom) }))) }
+      : {}),
     activities: plain(activities),
     emails: plain(
       activities.length
@@ -233,12 +312,24 @@ export async function exportSubject(
         : [],
     ),
     consents: await consentSummary(subject),
+    consentHistory: plain(
+      await db('consents')
+        .where({ subject_type: entity })
+        .whereIn('subject_id', ids)
+        .orderBy('id')
+        .select('purpose_key', 'status', 'lawful_basis', 'source', 'text_snapshot', 'note', 'created_at'),
+    ),
     privacyRequests: plain(
-      await db('privacy_requests').where({ subject_type: entity, subject_id: id }).orderBy('id'),
+      await db('privacy_requests')
+        .where({ subject_type: entity })
+        .whereIn('subject_id', ids)
+        .orderBy('id')
+        .select('type', 'status', 'channel', 'received_at', 'due_at', 'resolution', 'completed_at'),
     ),
     history: plain(
       await db('audit_logs')
-        .where({ entity, entity_id: id })
+        .where({ entity })
+        .whereIn('entity_id', ids)
         .orderBy('id')
         .select('action', 'diff', 'created_at'),
     ),
@@ -247,7 +338,7 @@ export async function exportSubject(
     sections.organizations = plain(
       await db('contact_organization as co')
         .join('organizations as o', 'o.id', 'co.organization_id')
-        .where('co.contact_id', id)
+        .whereIn('co.contact_id', ids)
         .select(
           'o.name',
           'co.relationship_type',
@@ -259,15 +350,25 @@ export async function exportSubject(
     );
     sections.deals = plain(
       await db('deals')
-        .where({ contact_id: id })
+        .whereIn('contact_id', ids)
         .whereNull('deleted_at')
         .select('uuid', 'title', 'value', 'currency', 'status', 'created_at'),
     );
   }
-  const modules: Record<string, unknown> = {};
-  for (const h of await privacyHandlers(db)) modules[h.key] = await h.export(subject, db);
+  const modules: Record<string, Record<string, unknown[]>> = {};
+  for (const h of await privacyHandlers(db)) {
+    for (const r of rows) {
+      for (const [area, list] of Object.entries(await h.export(asSubject(entity, r), db))) {
+        modules[h.key] ??= {};
+        modules[h.key]![area] = [
+          ...(modules[h.key]![area] ?? []),
+          ...plain((list ?? []) as Record<string, unknown>[]),
+        ];
+      }
+    }
+  }
   sections.modules = modules;
-  const files = await db('files').where({ entity, entity_id: id }).whereNull('deleted_at');
+  const files = await db('files').where({ entity }).whereIn('entity_id', ids).whereNull('deleted_at');
   sections.files = files.map((f) => ({
     name: f.original_name,
     mime: f.mime,

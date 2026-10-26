@@ -5,7 +5,7 @@ import { hmac, safeEqual } from '../../lib/crypto';
 
 /** Unsubscribe links never expire: a person must always be able to opt out. */
 export function unsubscribeToken(entity: DataSubjectEntity, uuid: string) {
-  const sig = hmac(env.CSRF_SECRET, `unsubscribe:${entity}:${uuid}`).slice(0, 32);
+  const sig = hmac(env.UNSUBSCRIBE_SECRET ?? env.CSRF_SECRET, `unsubscribe:${entity}:${uuid}`).slice(0, 32);
   return `${entity === 'contact' ? 'c' : 'l'}.${uuid}.${sig}`;
 }
 

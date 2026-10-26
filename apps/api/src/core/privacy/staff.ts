@@ -2,6 +2,7 @@ import type { RequestContext } from '../../http/context';
 import { db } from '../../db/knex';
 import { conflict, notFound } from '../../lib/errors';
 import { audit } from '../audit/audit.service';
+import { daysOf, resealDays } from '../audit/integrity';
 
 /**
  * Erase a former staff member's personal data. The row stays (anonymized and soft-deleted) so
@@ -37,6 +38,18 @@ export async function anonymizeUser(ctx: RequestContext, uuid: string) {
       .where({ created_by: u.id })
       .whereNull('revoked_at')
       .update({ revoked_at: new Date() });
+    // Entries about the account (for example its creation) hold the email. Entries the person made
+    // keep their actor id and IP: they remain evidence of who did what.
+    const days = await daysOf(trx, 'audit', { entity: 'user', entity_id: u.id });
+    await trx.raw('SET @audit_redaction = 1');
+    try {
+      await trx('audit_logs')
+        .where({ entity: 'user', entity_id: u.id })
+        .update({ diff: JSON.stringify({ redacted: true }), ip: null, user_agent: null });
+    } finally {
+      await trx.raw('SET @audit_redaction = 0');
+    }
+    await resealDays(trx, 'audit', days);
     await audit(trx, ctx, { action: 'user.anonymized', entity: 'user', entityId: u.id, entityUuid: u.uuid });
   });
 }

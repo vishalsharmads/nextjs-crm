@@ -38,6 +38,8 @@ const schema = z.object({
     )
     .optional(),
   FILE_URL_SECRET: z.string().min(16).default('dev-only-file-url-secret'),
+  /** Signs unsubscribe links. They never expire, so keep this stable (falls back to CSRF_SECRET). */
+  UNSUBSCRIBE_SECRET: z.string().min(16).optional(),
   COOKIE_SECURE: bool.optional(),
   ACCESS_TOKEN_TTL_MIN: z.coerce.number().int().min(1).default(15),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).default(14),

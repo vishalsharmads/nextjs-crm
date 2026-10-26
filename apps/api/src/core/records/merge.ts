@@ -152,11 +152,25 @@ async function repoint(
     .whereIn('related_id', secondaryIds)
     .update({ related_id: primaryId });
   await trx('files').where({ entity }).whereIn('entity_id', secondaryIds).update({ entity_id: primaryId });
-  if (entity === 'contact')
+  if (entity === 'contact') {
     await trx('leads')
       .whereIn('converted_contact_id', secondaryIds)
       .update({ converted_contact_id: primaryId });
-  else
+    await trx('privacy_requests')
+      .where({ subject_type: 'contact' })
+      .whereIn('subject_id', secondaryIds)
+      .update({ subject_id: primaryId });
+    // Consent proof is append-only; re-linking it to the surviving record is the one sanctioned change.
+    await trx.raw('SET @audit_redaction = 1');
+    try {
+      await trx('consents')
+        .where({ subject_type: 'contact' })
+        .whereIn('subject_id', secondaryIds)
+        .update({ subject_id: primaryId });
+    } finally {
+      await trx.raw('SET @audit_redaction = 0');
+    }
+  } else
     await trx('leads')
       .whereIn('converted_organization_id', secondaryIds)
       .update({ converted_organization_id: primaryId });
