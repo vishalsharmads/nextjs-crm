@@ -11,6 +11,7 @@ import {
   PanelLeftOpen,
   Search,
   Sun,
+  Trash2,
   User,
   Keyboard,
 } from 'lucide-react';
@@ -64,6 +65,19 @@ export function AppShell() {
       })),
     [nav, navigate],
   );
+  const trashCommand = useMemo<PaletteCommand[]>(
+    () => [
+      {
+        id: 'go:trash',
+        label: 'Trash',
+        group: 'Go to',
+        icon: Trash2,
+        keywords: ['deleted', 'restore'],
+        run: () => navigate('/trash'),
+      },
+    ],
+    [navigate],
+  );
   const createCommands = useMemo<PaletteCommand[]>(
     () =>
       buildCreateTargets(boot).map((c) => ({
@@ -77,7 +91,7 @@ export function AppShell() {
   );
 
   return (
-    <CommandPaletteProvider baseCommands={[...commands, ...createCommands]}>
+    <CommandPaletteProvider baseCommands={[...commands, ...trashCommand, ...createCommands]}>
       <ShellLayout nav={nav} />
     </CommandPaletteProvider>
   );
