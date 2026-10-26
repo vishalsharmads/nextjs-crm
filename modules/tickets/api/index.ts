@@ -27,6 +27,7 @@ import {
   type RequestContext,
 } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_tickets';
+import { ticketsPrivacy } from './privacy';
 
 const TICKETS = 'm_tickets_tickets';
 const COMMENTS = 'm_tickets_comments';
@@ -529,6 +530,7 @@ export async function replyAsCustomer(
 }
 
 export const tickets: ApiModule = {
+  privacy: ticketsPrivacy,
   routes: () => [routes],
   migrations: { '0001_tickets': m0001 },
 };

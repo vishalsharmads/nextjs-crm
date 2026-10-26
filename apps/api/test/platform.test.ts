@@ -81,7 +81,8 @@ describe('privacy', () => {
     const c = await client.post('/contacts', { firstName: 'Gone', email: 'gone@example.test' }).expect(201);
     const first = await client.delete(`/privacy/contact/${c.body.uuid}`).expect(422);
     const code = first.body.error.details[0].message;
-    await client.delete(`/privacy/contact/${c.body.uuid}?confirm=${code}`).expect(204);
+    const report = await client.delete(`/privacy/contact/${c.body.uuid}?confirm=${code}`).expect(200);
+    expect(report.body.mode).toBe('delete');
     expect(await db('contacts').where({ uuid: c.body.uuid }).first()).toBeUndefined();
     const role = await createRole(['core.contacts.*'], { '*': 'all' });
     const { client: other } = await clientWithRoles([role]);

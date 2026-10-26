@@ -52,10 +52,12 @@ export const metaRoutes = defineRoutes('/meta', ['meta']).add({
         deals: await getGroup('deals'),
         contacts: await getGroup('contacts'),
         commerce: await getGroup('commerce'),
-        session: await effectiveCompliance().then((c) => ({
-          idleTimeoutMinutes: c.idleTimeoutMinutes,
-          profile: c.profile,
-        })),
+        ...(await effectiveCompliance().then((c) => ({
+          session: { idleTimeoutMinutes: c.idleTimeoutMinutes, profile: c.profile },
+          consentPurposes: c.consentPurposes
+            .filter((p) => p.active)
+            .map(({ key, label, marketing }) => ({ key, label, marketing })),
+        }))),
       },
       customFields,
       fieldGroups: groups.map((g) => ({

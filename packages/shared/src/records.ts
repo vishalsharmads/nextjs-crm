@@ -48,6 +48,9 @@ export interface ContactDto extends RecordBase {
   source: string | null;
   lifecycleStatus: string | null;
   organizations: ContactOrgLink[];
+  /** Privacy: processing restricted (GDPR Art. 18) and marketing opt-out. Read-only here. */
+  processingRestricted: boolean;
+  marketingOptOut: boolean;
 }
 
 export interface OrganizationDto extends RecordBase {
@@ -81,6 +84,8 @@ export interface LeadDto extends RecordBase {
   status: LeadStatus;
   convertedAt: string | null;
   converted: { contactUuid: string | null; organizationUuid: string | null; dealUuid: string | null } | null;
+  processingRestricted: boolean;
+  marketingOptOut: boolean;
 }
 
 export interface DealDto extends RecordBase {

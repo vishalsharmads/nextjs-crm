@@ -85,6 +85,8 @@ export const leadsDef: ResourceDef<Row, LeadDto> = {
       jobTitle: (r.job_title as string | null) ?? null,
       source: (r.source as string | null) ?? null,
       status: r.status as LeadDto['status'],
+      processingRestricted: !!r.processing_restricted,
+      marketingOptOut: !!r.marketing_opt_out,
       convertedAt: iso(r.converted_at),
       converted: r.converted_at
         ? {

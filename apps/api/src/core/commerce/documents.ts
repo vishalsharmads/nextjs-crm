@@ -8,6 +8,7 @@ import { AppError } from '../../lib/errors';
 import { getRow } from '../records/service';
 import { applyScope, can } from '../rbac/access';
 import { recordDefs } from '../records/registry';
+import type { PrivacyHandler } from '../privacy/handlers';
 
 /**
  * Building blocks shared by commercial modules (quotes, invoices, contracts):
@@ -280,5 +281,37 @@ export async function visibleLinkIds(user: AuthUser, src: Record<string, unknown
     contact_id: await check('contact', src.contact_id),
     organization_id: await check('organization', src.organization_id),
     deal_id: await check('deal', src.deal_id),
+  };
+}
+
+/**
+ * Privacy handler for a commercial document table. Issued quotes, invoices and contracts are
+ * kept under tax and contract law (GDPR Art. 17(3)(b)); the person's record itself is still
+ * anonymized or deleted, and a deleted contact is unlinked by the foreign key.
+ */
+export function documentPrivacyHandler(
+  key: string,
+  table: string,
+  columns = ['number', 'title', 'currency', 'total', 'notes', 'created_at'],
+): PrivacyHandler {
+  return {
+    key,
+    tables: [table],
+    async export(subject, conn) {
+      if (subject.entity !== 'contact') return {};
+      const rows = await conn(table)
+        .where({ contact_id: subject.id })
+        .whereNull('deleted_at')
+        .orderBy('id')
+        .select(columns);
+      return { [key]: rows };
+    },
+    async erase(subject, conn) {
+      if (subject.entity !== 'contact') return {};
+      const n = Number(
+        ((await conn(table).where({ contact_id: subject.id }).count({ c: '*' }).first()) as { c: number }).c,
+      );
+      return n ? { retained: [{ area: key, reason: `${n} record(s) kept for tax and contract law` }] } : {};
+    },
   };
 }

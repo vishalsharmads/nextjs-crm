@@ -74,6 +74,8 @@ export interface BootstrapDto {
     commerce: CommerceSettings;
     /** Effective session limits (after the compliance profile's floors), for the client idle timer. */
     session: { idleTimeoutMinutes: number; profile: ComplianceProfile };
+    /** Active consent purposes (for form editors and record pages). */
+    consentPurposes: { key: string; label: string; marketing: boolean }[];
   };
   customFields: (CustomFieldDef & { level: VisibilityLevel })[];
   fieldGroups: FieldGroupDto[];

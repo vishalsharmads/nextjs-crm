@@ -8,6 +8,8 @@ export type { ApiModule } from './modules/types';
 export type { Migration } from './db/migrations';
 export { db, type Db } from './db/knex';
 export { audit } from './core/audit/audit.service';
+export { logAccess } from './core/audit/access-log';
+export type { DataSubject, ErasureResult, PrivacyHandler } from './core/privacy/handlers';
 export { AppError, notFound } from './lib/errors';
 export { newUuid } from './lib/ids';
 export { applyScope, assertCan, can } from './core/rbac/access';
@@ -23,6 +25,7 @@ export {
   linkRefs,
   loadLines,
   nextDocNumber,
+  documentPrivacyHandler,
   resolveLinks,
   visibleLinkIds,
   saveLines,

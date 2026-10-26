@@ -35,6 +35,7 @@ import {
   type Knex,
   type LineInput,
   type RequestContext,
+  documentPrivacyHandler,
 } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_quotes';
 
@@ -520,6 +521,15 @@ async function expireQuotes() {
 }
 
 export const quotes: ApiModule = {
+  privacy: documentPrivacyHandler('quotes', 'm_quotes_quotes', [
+    'number',
+    'title',
+    'currency',
+    'total',
+    'notes',
+    'accepted_by_name',
+    'created_at',
+  ]),
   routes: () => [routes],
   migrations: { '0001_quotes': m0001 },
   start: () => every(60 * 60_000, 'quotes.expire', expireQuotes),

@@ -11,6 +11,7 @@ import './core/imports/import-export';
 import { startWebhookRetries } from './core/webhooks/webhooks';
 import { startMailSync } from './core/email/email';
 import { maintainAuditLogs } from './core/audit/integrity';
+import { remindDueRequests } from './core/privacy/requests.service';
 import { installModuleGate, loadModules, moduleRouteGroups, refreshModuleStates } from './modules/registry';
 
 export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promise<void> }> {
@@ -32,6 +33,7 @@ export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promi
     startWebhookRetries();
     startMailSync();
     every(60 * 60_000, 'audit.maintain', maintainAuditLogs);
+    every(60 * 60_000, 'privacy.reminders', remindDueRequests);
     for (const m of loadModules()) m.api?.start?.();
   }
   return {

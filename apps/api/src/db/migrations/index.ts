@@ -9,6 +9,7 @@ import * as m0007 from './0007_phase2';
 import * as m0008 from './0008_commerce';
 import * as m0009 from './0009_compliance_auth';
 import * as m0010 from './0010_access_audit';
+import * as m0011 from './0011_privacy';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -27,4 +28,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0008_commerce': m0008,
   '0009_compliance_auth': m0009,
   '0010_access_audit': m0010,
+  '0011_privacy': m0011,
 };

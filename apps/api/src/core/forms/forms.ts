@@ -14,7 +14,8 @@ import { notify } from '../notifications/notifications.service';
 import { recordDefs } from '../records/registry';
 import { createRecord } from '../records/service';
 import { getDefinitions } from '../custom-fields/definitions';
-import { getBranding } from '../settings/settings.service';
+import { effectiveCompliance, getBranding } from '../settings/settings.service';
+import { recordConsent } from '../privacy/consent.service';
 
 /** Core inputs a public form may collect, per target entity. */
 const CORE_TARGETS: Record<'contact' | 'lead', string[]> = {
@@ -42,6 +43,13 @@ const settingsSchema = z.object({
   source: z.string().max(100).default('Web form'),
   tags: z.array(z.string().min(1).max(64)).max(10).default([]),
   consentText: z.string().max(500).default(''),
+  /** Consent purposes (from compliance settings) shown as unticked checkboxes. */
+  consentPurposes: z
+    .array(
+      z.object({ key: z.string().regex(/^[a-z][a-z0-9_]{0,48}$/), required: z.boolean().default(false) }),
+    )
+    .max(10)
+    .default([]),
 });
 
 const formBody = z.object({
@@ -67,6 +75,26 @@ async function validateTargets(entity: 'contact' | 'lead', fields: z.infer<typeo
   }
 }
 
+async function validatePurposes(settings: z.infer<typeof settingsSchema> | undefined) {
+  if (!settings?.consentPurposes.length) return;
+  const { consentPurposes } = await effectiveCompliance();
+  for (const p of settings.consentPurposes) {
+    if (!consentPurposes.some((c) => c.key === p.key && c.active))
+      throw new AppError('VALIDATION_FAILED', `Unknown consent purpose "${p.key}"`, [
+        { path: 'settings.consentPurposes', message: 'Choose purposes from the compliance settings' },
+      ]);
+  }
+}
+
+/** Purposes a form shows, with the wording people consent to. */
+async function formPurposes(s: z.infer<typeof settingsSchema>) {
+  const { consentPurposes } = await effectiveCompliance();
+  return s.consentPurposes.flatMap((p) => {
+    const def = consentPurposes.find((c) => c.key === p.key && c.active);
+    return def ? [{ key: def.key, label: def.label, text: def.text, required: p.required }] : [];
+  });
+}
+
 /** The public-facing definition: no owner, no internal ids. */
 async function publicForm(f: Record<string, unknown>) {
   const s = settingsSchema.parse(f.settings);
@@ -79,6 +107,7 @@ async function publicForm(f: Record<string, unknown>) {
     intro: s.intro,
     submitLabel: s.submitLabel,
     consentText: s.consentText,
+    consents: (await formPurposes(s)).map(({ key, text, required }) => ({ key, text, required })),
     fields: (f.fields as z.infer<typeof formField>[]).map((x) => {
       const def = x.target.startsWith('cf.') ? defs.find((d) => d.key === x.target.slice(3)) : undefined;
       return {
@@ -146,6 +175,13 @@ export const publicFormsRoutes = defineRoutes('/public/forms', ['forms'])
         if (field.target.startsWith('cf.')) custom[field.target.slice(3)] = raw;
         else input[field.target] = typeof raw === 'string' ? raw.slice(0, 500) : raw;
       }
+      // Consent is opt-in: only a ticked box (true) counts. Required purposes must be ticked.
+      const purposes = await formPurposes(s);
+      const ticked = (body.consents ?? {}) as Record<string, unknown>;
+      const granted = purposes.filter((p) => ticked[p.key] === true);
+      for (const p of purposes)
+        if (p.required && ticked[p.key] !== true)
+          missing.push({ path: `consents.${p.key}`, message: 'Tick this box to continue' });
       if (missing.length) throw new AppError('VALIDATION_FAILED', 'Some fields need attention', missing);
       if (Object.keys(custom).length) input.custom = custom;
 
@@ -178,6 +214,25 @@ export const publicFormsRoutes = defineRoutes('/public/forms', ['forms'])
         // Field-level messages are safe to show; anything else stays generic.
         if (err instanceof AppError && err.code === 'VALIDATION_FAILED') throw err;
         throw new AppError('INTERNAL', 'The form could not be submitted. Try again.');
+      }
+      if (granted.length) {
+        const entity = f.entity as 'contact' | 'lead';
+        await db.transaction(async (trx) => {
+          const row = await trx(def.table).where({ uuid: record.uuid }).first('id');
+          for (const p of granted)
+            await recordConsent(
+              trx,
+              ctx,
+              { entity, id: row.id as number, uuid: record.uuid },
+              {
+                purposeKey: p.key,
+                status: 'granted',
+                source: 'form',
+                text: p.text,
+                note: `Form: ${f.name as string}`,
+              },
+            );
+        });
       }
       await db('web_forms').where({ id: f.id }).increment('submission_count', 1);
       await audit(db, ctx, {
@@ -233,6 +288,7 @@ export const formsRoutes = defineRoutes('/forms', ['forms'])
     status: 201,
     handler: async ({ ctx, user, body }) => {
       await validateTargets(body.entity, body.fields);
+      await validatePurposes(body.settings);
       const uuid = newUuid();
       await db.transaction(async (trx) => {
         const [id] = await trx('web_forms').insert({
@@ -265,6 +321,7 @@ export const formsRoutes = defineRoutes('/forms', ['forms'])
       const f = await db('web_forms').where({ uuid: params.uuid }).first();
       if (!f) throw notFound('Form');
       if (body.fields) await validateTargets(body.entity ?? f.entity, body.fields);
+      await validatePurposes(body.settings as z.infer<typeof settingsSchema> | undefined);
       const patch: Record<string, unknown> = {};
       if (body.name !== undefined) patch.name = body.name;
       if (body.entity !== undefined) patch.entity = body.entity;

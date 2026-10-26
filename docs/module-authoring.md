@@ -65,6 +65,8 @@ export const notesDemo: ApiModule = { routes: () => [routes], migrations: { '000
 - Dashboard widgets: `registerModuleWidget('<key>.<name>', async (params, user) => data)`. Apply record scope inside the provider; it runs as the viewing user.
 - Recurring work: return `start: () => every(ms, '<key>.<task>', fn)` from the module. `fn` must return early while `isModuleEnabled('<key>')` is false.
 - Module-to-module calls: import the other module's exported functions directly (for example invoices imports `quoteForConversion` from quotes). Check `isModuleEnabled()` before calling into a module you do not declare in `depends_on`.
+- **Personal data:** a module that stores anything about a contact or lead must return `privacy: PrivacyHandler` from its `ApiModule` (see `modules/tickets/api/privacy.ts`). `export(subject, conn)` returns everything the module holds about the person, for access requests. `erase(subject, trx, mode)` runs inside the erasure transaction: in `anonymize` mode remove what the person wrote or what identifies them, and in `delete` mode remove their rows. Report data you must keep in `retained` with the reason, or throw `AppError('CONFLICT', …)` when deleting would destroy something the law requires you to keep. Commercial documents can use `documentPrivacyHandler(key, table)`.
+- Record reads of personal data with `logAccess(ctx, { action: 'view', entity, entityId })` so access logging covers the module.
 - Public endpoints (for customers, not users) go under `/public/...` with `permission: 'public'` and must authenticate callers themselves. Use `rateLimiter()` and `cookieOptions()` from `module-api`.
 
 ## Web

@@ -17,6 +17,9 @@ import { createRecord, updateRecord } from '../records/service';
 import { ensureTags } from '../records/hydrate';
 import { sendMail } from '../../lib/mailer';
 import { getBranding } from '../settings/settings.service';
+import { isRestricted } from '../privacy/privacy.service';
+import { unsubscribeToken } from '../privacy/unsubscribe';
+import { env } from '../../config/env';
 
 /** Automations triggered by automations stop here, so a rule can never loop forever. */
 const MAX_DEPTH = 3;
@@ -219,7 +222,20 @@ async function runAction(
       }
       if (!address) return 'skipped: no email address';
       const branding = await getBranding();
-      const html = render(action.body, vars);
+      let html = render(action.body, vars);
+      let headers: Record<string, string> | undefined;
+      // Automated email to the person counts as marketing: honour the opt-out and offer an unsubscribe.
+      if (action.to === 'record' && (e.entity === 'contact' || e.entity === 'lead')) {
+        const row = await db(recordDefs[e.entity].table).where({ uuid: e.uuid }).first('marketing_opt_out');
+        if (row?.marketing_opt_out) return 'skipped: opted out of marketing email';
+        const token = encodeURIComponent(unsubscribeToken(e.entity, e.uuid));
+        const page = `${env.APP_URL}/unsubscribe?token=${token}`;
+        html += `<p style="font-size:12px"><a href="${page}">Unsubscribe</a></p>`;
+        headers = {
+          'List-Unsubscribe': `<${env.APP_URL}/api/v1/public/privacy/unsubscribe?token=${token}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        };
+      }
       await sendMail({
         to: address,
         subject: render(action.subject, vars),
@@ -227,6 +243,7 @@ async function runAction(
         text: html.replace(/<[^>]+>/g, ''),
         fromName: branding.emailFromName || branding.appName,
         fromAddress: branding.emailFromAddress || undefined,
+        headers,
       });
       return `emailed ${address}`;
     }
@@ -292,6 +309,8 @@ registerJob('automation.run', async (job) => {
 
 onEvent(async (e) => {
   if (e.depth >= MAX_DEPTH) return;
+  // GDPR Art. 18: a restricted record is stored, not processed.
+  if (await isRestricted(e.entity, e.uuid)) return;
   const rules = await db('automations').where({ trigger_event: e.type, active: true }).select('id');
   for (const r of rules)
     await enqueue('automation.run', { automationId: r.id, event: e as unknown as Record<string, unknown> });

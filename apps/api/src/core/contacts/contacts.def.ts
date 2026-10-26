@@ -136,6 +136,8 @@ export const contactsDef: ResourceDef<Row, ContactDto> = {
       jobTitle: (r.job_title as string | null) ?? null,
       source: (r.source as string | null) ?? null,
       lifecycleStatus: (r.lifecycle_status as string | null) ?? null,
+      processingRestricted: !!r.processing_restricted,
+      marketingOptOut: !!r.marketing_opt_out,
       owner: owners.get(r.owner_id as number) ?? null,
       tags: tags.get(r.id) ?? [],
       organizations: links

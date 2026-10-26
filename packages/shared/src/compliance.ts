@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { SecuritySettings } from './settings';
+import { consentPurposeSchema } from './privacy';
 
 /**
  * Compliance profiles. `privacy` covers GDPR-style laws (GDPR, UK GDPR, DPDP, CCPA/CPRA, PIPEDA, LGPD);
@@ -27,6 +28,14 @@ export const complianceSettingsSchema = z.object({
   accessLogging: z.boolean().default(false),
   /** Delete audit and access log entries older than this many days. 0 = keep forever. */
   auditRetentionDays: z.number().int().min(0).max(36500).default(0),
+  /** Days to answer a privacy request (GDPR: one month; CCPA: 45 days). */
+  dsarDueDays: z.number().int().min(1).max(90).default(30),
+  /** What people can consent to; web forms show a checkbox per purpose they use. */
+  consentPurposes: z
+    .array(consentPurposeSchema)
+    .max(30)
+    .default([])
+    .refine((list) => new Set(list.map((p) => p.key)).size === list.length, 'Purpose keys must be unique'),
   /** Shown on the sign-in screen (for example an authorized-use warning). */
   loginNotice: z.string().trim().max(2000).default(''),
 });
@@ -49,7 +58,10 @@ export const PROFILE_FLOORS: Record<ComplianceProfile, ProfileFloors> = {
   standard: { security: {}, compliance: {} },
   privacy: {
     security: {},
-    compliance: { auditRetentionDays: { kind: 'keepAtLeast', value: 365 } },
+    compliance: {
+      auditRetentionDays: { kind: 'keepAtLeast', value: 365 },
+      dsarDueDays: { kind: 'atMost', value: 30 },
+    },
   },
   hipaa: {
     security: {
@@ -66,6 +78,7 @@ export const PROFILE_FLOORS: Record<ComplianceProfile, ProfileFloors> = {
       accessLogging: { kind: 'on' },
       // HIPAA keeps required documentation for six years.
       auditRetentionDays: { kind: 'keepAtLeast', value: 2190 },
+      dsarDueDays: { kind: 'atMost', value: 30 },
     },
   },
 };

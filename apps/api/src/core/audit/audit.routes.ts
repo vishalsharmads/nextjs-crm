@@ -93,7 +93,7 @@ function accessDto(r: Record<string, unknown>) {
 
 const ACTOR_COLS = ['u.uuid as actor_uuid', 'u.first_name', 'u.last_name', 'u.email'];
 
-/** Stream rows newest first, in id pages, up to EXPORT_MAX_ROWS. Returns the row count. */
+/** Stream rows newest first, in id pages, up to EXPORT_MAX_ROWS. */
 async function streamCsv(
   res: Response,
   name: string,
@@ -101,6 +101,8 @@ async function streamCsv(
   qb: Knex.QueryBuilder,
   alias: string,
   toRow: (r: Record<string, unknown>) => unknown[],
+  /** Runs before the response ends, so the export is recorded before the client has the file. */
+  record: (count: number) => Promise<void>,
 ) {
   const stamp = new Date().toISOString().slice(0, 10);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -118,8 +120,12 @@ async function streamCsv(
     if (rows.length < 1000) break;
     beforeId = rows[rows.length - 1]!.id as number;
   }
-  csv.end();
-  return count;
+  await record(count);
+  await new Promise<void>((resolve) => {
+    res.once('finish', resolve);
+    res.once('close', resolve);
+    csv.end();
+  });
 }
 
 const auditQuery = (f: Filters) => {
@@ -169,7 +175,7 @@ export const auditRoutes = defineRoutes('/audit-logs', ['audit'])
       const { qb } = auditQuery(query);
       qb.select('a.*', ...ACTOR_COLS);
       const redact = await viewerRedactor(user);
-      const count = await streamCsv(
+      await streamCsv(
         res,
         'audit-log',
         [
@@ -199,13 +205,15 @@ export const auditRoutes = defineRoutes('/audit-logs', ['audit'])
             d.diff === null ? '' : JSON.stringify(d.diff),
           ];
         },
+        async (count) => {
+          await audit(db, ctx, {
+            action: 'audit.exported',
+            entity: 'audit_log',
+            diff: { count, filters: filterDetail(query) },
+          });
+          await logAccess(ctx, { action: 'export', entity: 'audit_log', detail: { count } });
+        },
       );
-      await audit(db, ctx, {
-        action: 'audit.exported',
-        entity: 'audit_log',
-        diff: { count, filters: filterDetail(query) },
-      });
-      await logAccess(ctx, { action: 'export', entity: 'audit_log', detail: { count } });
     },
   })
   .add({
@@ -270,7 +278,7 @@ export const accessLogRoutes = defineRoutes('/access-logs', ['audit'])
     handler: async ({ ctx, query, res }) => {
       const { qb } = accessQuery(query);
       qb.select('x.*', ...ACTOR_COLS);
-      const count = await streamCsv(
+      await streamCsv(
         res,
         'access-log',
         ['Time (UTC)', 'Actor', 'Actor type', 'Action', 'Entity', 'Record', 'IP address', 'Details'],
@@ -289,13 +297,15 @@ export const accessLogRoutes = defineRoutes('/access-logs', ['audit'])
             d.detail === null ? '' : JSON.stringify(d.detail),
           ];
         },
+        async (count) => {
+          await audit(db, ctx, {
+            action: 'access_log.exported',
+            entity: 'access_log',
+            diff: { count, filters: filterDetail(query) },
+          });
+          await logAccess(ctx, { action: 'export', entity: 'access_log', detail: { count } });
+        },
       );
-      await audit(db, ctx, {
-        action: 'access_log.exported',
-        entity: 'access_log',
-        diff: { count, filters: filterDetail(query) },
-      });
-      await logAccess(ctx, { action: 'export', entity: 'access_log', detail: { count } });
     },
   });
 

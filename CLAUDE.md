@@ -36,6 +36,7 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 | nodemailer, handlebars                                                                          | SMTP mail; auto-escaping templates shared with blueprints                       |
 | multer, file-type                                                                               | Multipart uploads; content sniffing instead of trusting client MIME             |
 | csv-parse, csv-stringify                                                                        | Streaming import/export                                                         |
+| yazl                                                                                            | Streaming ZIP for personal data exports (no native code)                        |
 | sanitize-html                                                                                   | Safe rich text in activity bodies                                               |
 | uuid                                                                                            | UUIDv7 public ids (time-ordered)                                                |
 | dotenv                                                                                          | Load `.env`                                                                     |
@@ -116,6 +117,8 @@ Run test suites one workspace at a time on this machine; running all three in pa
 - **Validation:** Zod on every body, query, and param. Custom fields use the runtime schema from `SchemaBuilder`.
 - **SQL:** parameterized only. Identifiers from user input (custom field keys) must match `^[a-z][a-z0-9_]{0,48}$` **and** be resolved through `custom_field_definitions`. Never interpolate request values into `knex.raw`.
 - **Audit:** every mutation writes an `audit_logs` row in the same transaction. Audit is append-only (DB triggers). The only exceptions are the privileged privacy anonymize path (`@audit_redaction`, then `resealDays()` for sealed days) and the retention job (`@audit_purge`, only on sealed days).
+- **Personal data in modules:** a module that stores data about contacts or leads returns `privacy: PrivacyHandler` from its `ApiModule` (export + erase); core erasure (`core/privacy/privacy.service.ts`) also clears email copies, webhook payloads, jobs, automation logs and notifications. A new core table that copies personal data must be added there.
+- **Restriction and opt-out:** automations, webhooks and CRM email skip records with `processing_restricted`; automated email to a contact/lead checks `marketing_opt_out` and adds the unsubscribe link. New outbound channels must do the same.
 - **Access log:** reads of personal data call `logAccess(ctx, …)` (`core/audit/access-log.ts`); it is a no-op unless `accessLogging` is on and never throws. New record detail, download or export paths must call it.
 - **Errors:** throw `AppError(code, message, details?)`. Response shape is `{ error: { code, message, details? } }`. Codes are in `packages/shared/src/errors.ts` and are stable once released.
 - **Lists:** `{ data, meta: { page, pageSize, total } }`. `pageSize` max is 100. Filters use the shared filter AST with a per-resource field whitelist.

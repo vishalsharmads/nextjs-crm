@@ -32,6 +32,7 @@ import {
   type Db,
   type Knex,
   type RequestContext,
+  documentPrivacyHandler,
 } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_contracts';
 
@@ -583,6 +584,14 @@ registerModuleWidget('contracts.renewals', async (_params, user) => {
 });
 
 export const contracts: ApiModule = {
+  privacy: documentPrivacyHandler('contracts', 'm_contracts_contracts', [
+    'number',
+    'title',
+    'currency',
+    'value',
+    'description',
+    'created_at',
+  ]),
   routes: () => [routes],
   migrations: { '0001_contracts': m0001 },
   start: () => every(60 * 60_000, 'contracts.renewals', runRenewals),
