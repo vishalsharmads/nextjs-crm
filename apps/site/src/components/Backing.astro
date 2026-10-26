@@ -1,0 +1,92 @@
+---
+import { companyFacts, site } from '../data/site';
+---
+
+<section class="section on-mat backing" aria-labelledby="backing-title">
+  <div class="wrap grid">
+    <div class="intro">
+      <p class="eyebrow">Backed by</p>
+      <h2 class="visually-hidden" id="backing-title">Backed by {site.company.name}</h2>
+      <a href={site.company.url} target="_blank" rel="noopener" class="logo-link">
+        <img src={site.company.logo} alt={site.company.name} width="220" height="34" />
+      </a>
+      <p class="muted">
+        Bespoq is built and supported by {site.company.name}, a CMMI Level 3 software company that has delivered custom business software since
+        2002. Your CRM comes with a team that has been doing this for over two decades.
+      </p>
+    </div>
+    <ul class="facts">
+      {
+        companyFacts.map((f) => (
+          <li>
+            <span class="value">{f.value}</span>
+            <span class="muted">{f.label}</span>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: clamp(40px, 6vw, 96px);
+    align-items: center;
+  }
+  .intro {
+    display: grid;
+    gap: 20px;
+    max-width: 46ch;
+  }
+  .eyebrow {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--tape);
+    margin: 0;
+  }
+  .logo-link {
+    justify-self: start;
+  }
+  .logo-link img {
+    display: block;
+    width: clamp(180px, 20vw, 240px);
+    height: auto;
+  }
+  .facts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--line-on-mat);
+    border: 1px solid var(--line-on-mat);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .facts li {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    padding: clamp(20px, 2.4vw, 32px);
+    background: var(--mat);
+  }
+  .value {
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-size: clamp(32px, 3.6vw, 48px);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--chalk);
+  }
+  .facts .muted {
+    font-size: 15px;
+  }
+  @media (max-width: 860px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

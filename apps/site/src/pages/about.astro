@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import PageHero from '../components/PageHero.astro';
 import CtaBand from '../components/CtaBand.astro';
-import { site } from '../data/site';
+import Backing from '../components/Backing.astro';
 ---
 
 <Base title="About Bespoq | The CRM, tailored" description="Bespoq builds CRMs that fit service businesses: configured per industry, owned by the business, and live in weeks.">
@@ -16,14 +16,10 @@ import { site } from '../data/site';
       <p>A CRM should use your words. Your team should never have to translate between how they work and how the software works.</p>
       <p>Your data is yours. Every Bespoq customer gets their own instance and database, and can take everything with them at any time.</p>
       <p>Good software is quiet. It does the admin so your team can do the work clients pay for.</p>
-      <h2 class="h2">Who builds it</h2>
-      <p>
-        Bespoq is built and supported by <a href={site.company.url} target="_blank" rel="noopener">{site.company.name}</a>, the team behind
-        the custom CRMs it grew out of.
-      </p>
       <p class="flag">Team, office locations and company details are placeholders until published.</p>
     </div>
   </section>
+  <Backing />
   <CtaBand />
 </Base>
 

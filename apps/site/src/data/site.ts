@@ -7,7 +7,12 @@ export const site = {
   url: import.meta.env.SITE ?? 'https://bespoq.example',
   email: 'hello@bespoq.example',
   /** The company that builds and supports Bespoq. Credited on the site only, never in the product. */
-  company: { name: 'Dotsquares', url: 'https://www.dotsquares.com/' },
+  company: {
+    name: 'Dotsquares',
+    url: 'https://www.dotsquares.com/',
+    /** Official logo (white wordmark, for dark backgrounds), copied from dotsquares.com. */
+    logo: '/brand/dotsquares.svg',
+  },
   /** The demo app's sign-in page. Served at /app when the site and app share one server. */
   signInUrl: import.meta.env.PUBLIC_APP_URL ?? '/app',
   /** Where lead forms post. Set PUBLIC_LEAD_ENDPOINT to the CRM web form submit URL. */
@@ -117,4 +122,15 @@ export const homeFaq = [
     q: 'What does it cost?',
     a: 'Pricing depends on hosting, the modules you need and how much setup help you want. There are no per-seat fees. Book a call and we will give you a fixed quote.',
   },
+];
+
+/**
+ * Facts about the company behind Bespoq, as published on dotsquares.com (October 2026). Only figures the
+ * company states consistently are used; re-check them against dotsquares.com before changing.
+ */
+export const companyFacts = [
+  { value: '24+', label: 'years building business software' },
+  { value: '1,000+', label: 'technology professionals' },
+  { value: '5', label: 'countries: UK, US, Australia, UAE and India' },
+  { value: '4.8/5', label: 'client rating on Clutch' },
 ];
