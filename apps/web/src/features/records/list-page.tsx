@@ -287,6 +287,8 @@ export function RecordListPage({
           selected={selected}
           onSelectedChange={setSelected}
           onRowOpen={(r) => state.set({ peek: r.uuid as string, page: String(state.page) })}
+          rowHref={(r) => `/${config.route}/${r.uuid as string}`}
+          linkColumnId={config.defaultColumns[0]}
           activeKey={state.peek}
           page={state.page}
           pageSize={PAGE_SIZE}

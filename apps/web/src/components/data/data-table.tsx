@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link } from 'react-router';
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,6 +25,10 @@ export interface DataTableProps<T> {
   selected?: Set<string>;
   onSelectedChange?: (s: Set<string>) => void;
   onRowOpen?: (row: T) => void;
+  /** Gives each row a real link, so Tab, Enter and open-in-new-tab work. A plain click still calls onRowOpen. */
+  rowHref?: (row: T) => string;
+  /** The column that carries the link; the first column when unset or hidden. */
+  linkColumnId?: string;
   activeKey?: string | null;
   page: number;
   pageSize: number;
@@ -44,6 +49,8 @@ export function DataTable<T>({
   selected,
   onSelectedChange,
   onRowOpen,
+  rowHref,
+  linkColumnId,
   activeKey,
   page,
   pageSize,
@@ -61,6 +68,10 @@ export function DataTable<T>({
   const sortDir = sort?.startsWith('-') ? 'desc' : 'asc';
   const selectable = !!onSelectedChange && !!selected;
   const keys = useMemo(() => (rows ?? []).map(rowKey), [rows, rowKey]);
+  const linkIndex = Math.max(
+    0,
+    columns.findIndex((c) => c.id === linkColumnId),
+  );
 
   useEffect(() => setCursor(0), [rows]);
 
@@ -236,7 +247,24 @@ export function DataTable<T>({
                             isCursor && ci === 0 && 'shadow-[inset_2px_0_0_var(--primary)]',
                           )}
                         >
-                          {c.cell(row)}
+                          {rowHref && ci === linkIndex ? (
+                            <Link
+                              to={rowHref(row)}
+                              className="hover:underline"
+                              onClick={(e) => {
+                                // Modified clicks open the page; a plain click is the row's own (peek).
+                                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+                                  e.stopPropagation();
+                                  return;
+                                }
+                                e.preventDefault();
+                              }}
+                            >
+                              {c.cell(row)}
+                            </Link>
+                          ) : (
+                            c.cell(row)
+                          )}
                         </td>
                       ))}
                     </tr>
