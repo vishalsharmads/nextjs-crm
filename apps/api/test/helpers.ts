@@ -1,3 +1,4 @@
+import { afterEach, beforeEach } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
 import { bootstrap } from '../src/boot';
@@ -6,6 +7,7 @@ import { hashPassword } from '../src/core/auth/auth.service';
 import { newUuid } from '../src/lib/ids';
 import { clearAccessCache } from '../src/core/rbac/access';
 import { mailbox } from '../src/lib/mailer';
+import { clearSettingsCache } from '../src/core/settings/settings.service';
 
 let appPromise: Promise<Express> | null = null;
 export function getApp(): Promise<Express> {
@@ -124,4 +126,30 @@ export function takeMail() {
   const mails = [...(mailbox.capture ?? [])];
   if (mailbox.capture) mailbox.capture.length = 0;
   return mails;
+}
+
+/**
+ * Settings are shared by every test file: snapshot the given groups before each test and put
+ * them back after it.
+ */
+export function restoreSettingsAfterEach(keys: string[]) {
+  let saved: { key: string; value: unknown }[] = [];
+  beforeEach(async () => {
+    saved = await db('settings').whereIn('key', keys).select('key', 'value');
+  });
+  afterEach(async () => {
+    await db('settings').whereIn('key', keys).delete();
+    for (const row of saved)
+      await db('settings').insert({ key: row.key, group: row.key, value: JSON.stringify(row.value) });
+    clearSettingsCache();
+  });
+}
+
+/** Replace a settings group directly (bypasses the API's admin and floor checks). */
+export async function setSettingsGroup(key: string, value: object) {
+  await db('settings')
+    .insert({ key, group: key, value: JSON.stringify(value) })
+    .onConflict('key')
+    .merge();
+  clearSettingsCache();
 }

@@ -9,6 +9,7 @@ import { hashPassword, validatePassword } from '../core/auth/auth.service';
 import { randomToken } from '../lib/crypto';
 import { newUuid } from '../lib/ids';
 import { clearSettingsCache } from '../core/settings/settings.service';
+import { sealPendingDays, verifyIntegrity } from '../core/audit/integrity';
 
 type Command = (args: string[]) => Promise<void>;
 
@@ -326,6 +327,23 @@ const commands: Record<string, Command> = {
     out(
       `Inserted ${orgCount} organizations, ${total} contacts and ${dealCount} deals in ${((Date.now() - started) / 1000).toFixed(1)} s.`,
     );
+  },
+
+  async 'audit:seal'() {
+    for (const source of ['audit', 'access'] as const)
+      out(`${source}: sealed ${await sealPendingDays(source)} day(s)`);
+  },
+
+  async 'audit:verify'(args) {
+    const { values } = parseArgs({ args, options: { from: { type: 'string' }, to: { type: 'string' } } });
+    const day = /^\d{4}-\d{2}-\d{2}$/;
+    for (const v of [values.from, values.to])
+      if (v !== undefined && !day.test(v)) throw new Error('Dates must look like 2026-01-31');
+    const result = await verifyIntegrity({ from: values.from, to: values.to });
+    out(`Checked ${result.daysChecked} sealed day(s), sealed through ${result.sealedThrough ?? 'none'}.`);
+    for (const p of result.problems) out(`MISMATCH ${p.source} ${p.day}: ${p.problem.replace('_', ' ')}`);
+    if (result.problems.length) process.exitCode = 2;
+    else out('No problems found.');
   },
 
   async 'user:reset-password'(args) {

@@ -5,6 +5,7 @@ import { AppError, notFound } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { audit, diffRecords } from '../audit/audit.service';
+import { logAccess } from '../audit/access-log';
 import { applyScope, assertCan, scopeAllows } from '../rbac/access';
 import { fieldAccessMap, getDefinitions } from '../custom-fields/definitions';
 import { applySearch, applySort, compileFilter, type FilterContext } from './filters';
@@ -111,9 +112,17 @@ export async function getRecord<Dto>(
   def: ResourceDef<Record<string, unknown>, Dto>,
   user: AuthUser,
   uuid: string,
+  ctx?: RequestContext,
 ): Promise<Dto> {
   assertCan(user, perm(def, 'view'));
   const row = await getRow(def, user, uuid);
+  if (ctx)
+    await logAccess(ctx, {
+      action: 'view',
+      entity: def.entity,
+      entityId: row.id as number,
+      entityUuid: uuid,
+    });
   const [dto] = await def.toDtos([row], { user, conn: db });
   return dto!;
 }

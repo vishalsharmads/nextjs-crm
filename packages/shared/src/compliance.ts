@@ -23,6 +23,10 @@ export const complianceSettingsSchema = z.object({
     .default([]),
   /** API keys stop working this many days after creation, and new keys must expire within it. 0 = no limit. */
   apiKeyMaxDays: z.number().int().min(0).max(3650).default(0),
+  /** Record who viewed records, downloaded files, exported data and read the audit log. */
+  accessLogging: z.boolean().default(false),
+  /** Delete audit and access log entries older than this many days. 0 = keep forever. */
+  auditRetentionDays: z.number().int().min(0).max(36500).default(0),
   /** Shown on the sign-in screen (for example an authorized-use warning). */
   loginNotice: z.string().trim().max(2000).default(''),
 });
@@ -32,7 +36,9 @@ export type FloorRule =
   | { kind: 'on' }
   | { kind: 'atLeast'; value: number }
   /** 0 means "unlimited" for these settings, so it counts as above the limit. */
-  | { kind: 'atMost'; value: number };
+  | { kind: 'atMost'; value: number }
+  /** Retention: 0 means "keep forever", which is always allowed. */
+  | { kind: 'keepAtLeast'; value: number };
 
 interface ProfileFloors {
   security: Partial<Record<keyof SecuritySettings, FloorRule>>;
@@ -41,7 +47,10 @@ interface ProfileFloors {
 
 export const PROFILE_FLOORS: Record<ComplianceProfile, ProfileFloors> = {
   standard: { security: {}, compliance: {} },
-  privacy: { security: {}, compliance: {} },
+  privacy: {
+    security: {},
+    compliance: { auditRetentionDays: { kind: 'keepAtLeast', value: 365 } },
+  },
   hipaa: {
     security: {
       passwordMinLength: { kind: 'atLeast', value: 12 },
@@ -54,6 +63,9 @@ export const PROFILE_FLOORS: Record<ComplianceProfile, ProfileFloors> = {
       idleTimeoutMinutes: { kind: 'atMost', value: 15 },
       sessionMaxHours: { kind: 'atMost', value: 12 },
       apiKeyMaxDays: { kind: 'atMost', value: 365 },
+      accessLogging: { kind: 'on' },
+      // HIPAA keeps required documentation for six years.
+      auditRetentionDays: { kind: 'keepAtLeast', value: 2190 },
     },
   },
 };
@@ -68,6 +80,8 @@ function enforce(value: unknown, rule: FloorRule): unknown {
       return typeof value === 'number' && value >= rule.value ? value : rule.value;
     case 'atMost':
       return typeof value === 'number' && value > 0 && value <= rule.value ? value : rule.value;
+    case 'keepAtLeast':
+      return typeof value === 'number' && (value === 0 || value >= rule.value) ? value : rule.value;
   }
 }
 
@@ -88,6 +102,8 @@ export function floorMessage(rule: FloorRule): string {
       return `The compliance profile requires at least ${rule.value}`;
     case 'atMost':
       return `The compliance profile requires a value from 1 to ${rule.value}`;
+    case 'keepAtLeast':
+      return `The compliance profile requires at least ${rule.value} days, or 0 to keep forever`;
   }
 }
 

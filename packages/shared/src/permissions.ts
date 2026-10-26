@@ -55,6 +55,7 @@ export const CORE_PERMISSIONS: PermissionDef[] = [
   { key: 'core.pipelines.manage', description: 'Manage pipelines and stages' },
   { key: 'core.labels.manage', description: 'Manage vocabulary' },
   { key: 'core.audit.view', description: 'View the audit log' },
+  { key: 'core.audit.export', description: 'Export the audit and access logs' },
   { key: 'core.blueprints.manage', description: 'Apply and export blueprints' },
   { key: 'core.modules.manage', description: 'Enable and disable modules' },
   { key: 'core.privacy.manage', description: 'Anonymize and hard-delete records' },

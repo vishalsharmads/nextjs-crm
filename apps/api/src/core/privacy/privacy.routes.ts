@@ -6,6 +6,7 @@ import { hmac } from '../../lib/crypto';
 import { env } from '../../config/env';
 import { storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
+import { daysOf, resealDays } from '../audit/integrity';
 import { getRow } from '../records/service';
 import { recordDefs } from '../records/registry';
 
@@ -48,6 +49,7 @@ async function redactAudit(
   entity: string,
   id: number,
 ) {
+  const days = await daysOf(trx, 'audit', { entity, entity_id: id });
   await trx.raw('SET @audit_redaction = 1');
   try {
     await trx('audit_logs')
@@ -56,6 +58,8 @@ async function redactAudit(
   } finally {
     await trx.raw('SET @audit_redaction = 0');
   }
+  // Sealed days changed on purpose: record new digests so verification still passes.
+  await resealDays(trx, 'audit', days);
 }
 
 export const privacyRoutes = defineRoutes('/privacy', ['privacy'])

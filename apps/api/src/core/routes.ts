@@ -14,7 +14,8 @@ import { pipelinesRoutes } from './pipelines/pipelines.routes';
 import { notificationsRoutes } from './notifications/notifications.routes';
 import { savedViewsRoutes } from './saved-views/saved-views.routes';
 import { entityCollectionRoutes, importsRoutes } from './imports/imports.routes';
-import { auditRoutes, dashboardRoutes } from './dashboard/dashboard.routes';
+import { dashboardRoutes } from './dashboard/dashboard.routes';
+import { accessLogRoutes, auditRoutes } from './audit/audit.routes';
 import { blueprintsRoutes, modulesRoutes } from './platform/platform.routes';
 import { privacyRoutes } from './privacy/privacy.routes';
 import { docsRoutes } from './platform/docs.routes';
@@ -51,6 +52,7 @@ export function coreRouteGroups(): RouteGroup[] {
     importsRoutes,
     dashboardRoutes,
     auditRoutes,
+    accessLogRoutes,
     blueprintsRoutes,
     modulesRoutes,
     privacyRoutes,
