@@ -22,7 +22,13 @@
         "Event",
         "Other"
       ],
-      "lifecycleStatuses": ["New candidate", "Active candidate", "Placed", "Not looking", "Client contact"]
+      "lifecycleStatuses": [
+        "New candidate",
+        "Active candidate",
+        "Placed",
+        "Not looking",
+        "Client representative"
+      ]
     },
     "deals": {
       "lostReasons": [
@@ -486,7 +492,7 @@
         "phone": "+1 512 555 0101",
         "job_title": "VP of engineering",
         "organization": "tidewater",
-        "lifecycle_status": "Client contact",
+        "lifecycle_status": "Client representative",
         "source": "Referral",
         "custom": {},
         "days": -248,
@@ -500,7 +506,7 @@
         "phone": "+1 312 555 0102",
         "job_title": "Director of operations",
         "organization": "harborline",
-        "lifecycle_status": "Client contact",
+        "lifecycle_status": "Client representative",
         "source": "Event",
         "custom": {},
         "days": -228,
@@ -514,7 +520,7 @@
         "phone": "+1 614 555 0103",
         "job_title": "Director of nursing",
         "organization": "brightpath",
-        "lifecycle_status": "Client contact",
+        "lifecycle_status": "Client representative",
         "source": "Website",
         "custom": {},
         "days": -198,
@@ -528,7 +534,7 @@
         "phone": "+1 704 555 0104",
         "job_title": "Chief financial officer",
         "organization": "copperleaf",
-        "lifecycle_status": "Client contact",
+        "lifecycle_status": "Client representative",
         "source": "Referral",
         "custom": {},
         "days": -158,
@@ -542,7 +548,7 @@
         "phone": "+1 414 555 0105",
         "job_title": "Plant manager",
         "organization": "summit",
-        "lifecycle_status": "Client contact",
+        "lifecycle_status": "Client representative",
         "source": "Event",
         "custom": {},
         "days": -138,
@@ -556,7 +562,7 @@
         "phone": "+1 303 555 0106",
         "job_title": "Head of people",
         "organization": "meridian",
-        "lifecycle_status": "Client contact",
+        "lifecycle_status": "Client representative",
         "source": "Website",
         "custom": {},
         "days": -108,

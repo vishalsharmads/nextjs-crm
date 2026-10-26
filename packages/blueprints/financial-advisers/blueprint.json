@@ -5,8 +5,12 @@
   "version": "1.0.0",
   "description": "Clients, lenders and applications for financial advisers and mortgage brokers, from discovery and fact find to settlement and annual review.",
   "settings": {
-    "features": { "leads": true },
-    "general": { "currency": "AUD" },
+    "features": {
+      "leads": true
+    },
+    "general": {
+      "currency": "AUD"
+    },
     "contacts": {
       "sources": [
         "Referral",
@@ -18,7 +22,13 @@
         "Social",
         "Other"
       ],
-      "lifecycleStatuses": ["Prospect", "Active client", "Settled client", "Former client", "Lender contact"]
+      "lifecycleStatuses": [
+        "Prospect",
+        "Active client",
+        "Settled client",
+        "Former client",
+        "Lender representative"
+      ]
     },
     "deals": {
       "lostReasons": [
@@ -32,14 +42,33 @@
     }
   },
   "vocabulary": {
-    "contact": { "singular": "Client", "plural": "Clients" },
-    "organization": { "singular": "Lender", "plural": "Lenders" },
-    "deal": { "singular": "Application", "plural": "Applications" }
+    "contact": {
+      "singular": "Client",
+      "plural": "Clients"
+    },
+    "organization": {
+      "singular": "Lender",
+      "plural": "Lenders"
+    },
+    "deal": {
+      "singular": "Application",
+      "plural": "Applications"
+    }
   },
   "modules": ["documents", "portal", "quotes", "invoices", "contracts"],
   "custom_field_groups": {
-    "contact": [{ "key": "client_profile", "label": "Client profile" }],
-    "deal": [{ "key": "loan", "label": "Loan details" }]
+    "contact": [
+      {
+        "key": "client_profile",
+        "label": "Client profile"
+      }
+    ],
+    "deal": [
+      {
+        "key": "loan",
+        "label": "Loan details"
+      }
+    ]
   },
   "custom_fields": {
     "contact": [
@@ -51,12 +80,30 @@
         "filterable": true,
         "show_in_list": true,
         "options": [
-          { "key": "first_home_buyer", "label": "First home buyer" },
-          { "key": "upgrader", "label": "Upgrader" },
-          { "key": "refinancer", "label": "Refinancer" },
-          { "key": "investor", "label": "Investor" },
-          { "key": "smsf_trustee", "label": "SMSF trustee" },
-          { "key": "retiree", "label": "Pre-retiree or retiree" }
+          {
+            "key": "first_home_buyer",
+            "label": "First home buyer"
+          },
+          {
+            "key": "upgrader",
+            "label": "Upgrader"
+          },
+          {
+            "key": "refinancer",
+            "label": "Refinancer"
+          },
+          {
+            "key": "investor",
+            "label": "Investor"
+          },
+          {
+            "key": "smsf_trustee",
+            "label": "SMSF trustee"
+          },
+          {
+            "key": "retiree",
+            "label": "Pre-retiree or retiree"
+          }
         ]
       },
       {
@@ -86,12 +133,30 @@
         "filterable": true,
         "show_in_list": true,
         "options": [
-          { "key": "purchase", "label": "Home purchase" },
-          { "key": "refinance", "label": "Refinance" },
-          { "key": "investment", "label": "Investment loan" },
-          { "key": "construction", "label": "Construction loan" },
-          { "key": "smsf", "label": "SMSF loan" },
-          { "key": "advice", "label": "Financial advice" }
+          {
+            "key": "purchase",
+            "label": "Home purchase"
+          },
+          {
+            "key": "refinance",
+            "label": "Refinance"
+          },
+          {
+            "key": "investment",
+            "label": "Investment loan"
+          },
+          {
+            "key": "construction",
+            "label": "Construction loan"
+          },
+          {
+            "key": "smsf",
+            "label": "SMSF loan"
+          },
+          {
+            "key": "advice",
+            "label": "Financial advice"
+          }
         ]
       },
       {
@@ -100,14 +165,22 @@
         "type": "decimal",
         "group": "loan",
         "filterable": true,
-        "validation": { "min": 0, "max": 100, "scale": 1 }
+        "validation": {
+          "min": 0,
+          "max": 100,
+          "scale": 1
+        }
       },
       {
         "key": "interest_rate",
         "label": "Interest rate (%)",
         "type": "decimal",
         "group": "loan",
-        "validation": { "min": 0, "max": 25, "scale": 2 }
+        "validation": {
+          "min": 0,
+          "max": 25,
+          "scale": 2
+        }
       },
       {
         "key": "lodged_on",
@@ -133,12 +206,42 @@
       "entity": "deal",
       "is_default": true,
       "stages": [
-        { "key": "discovery", "name": "Discovery", "probability": 10, "rotting_days": 7 },
-        { "key": "fact_find", "name": "Fact find", "probability": 30, "rotting_days": 14 },
-        { "key": "recommendation", "name": "Recommendation", "probability": 50, "rotting_days": 10 },
-        { "key": "lodged", "name": "Lodged", "probability": 80, "rotting_days": 21 },
-        { "key": "settled", "name": "Settled", "probability": 100, "is_won": true },
-        { "key": "lost", "name": "Lost", "probability": 0, "is_lost": true }
+        {
+          "key": "discovery",
+          "name": "Discovery",
+          "probability": 10,
+          "rotting_days": 7
+        },
+        {
+          "key": "fact_find",
+          "name": "Fact find",
+          "probability": 30,
+          "rotting_days": 14
+        },
+        {
+          "key": "recommendation",
+          "name": "Recommendation",
+          "probability": 50,
+          "rotting_days": 10
+        },
+        {
+          "key": "lodged",
+          "name": "Lodged",
+          "probability": 80,
+          "rotting_days": 21
+        },
+        {
+          "key": "settled",
+          "name": "Settled",
+          "probability": 100,
+          "is_won": true
+        },
+        {
+          "key": "lost",
+          "name": "Lost",
+          "probability": 0,
+          "is_lost": true
+        }
       ]
     }
   ],
@@ -195,7 +298,9 @@
         "contracts.contracts.view",
         "portal.accounts.manage"
       ],
-      "scopes": { "*": "all" }
+      "scopes": {
+        "*": "all"
+      }
     }
   ],
   "layouts": [
@@ -236,7 +341,9 @@
         "type": "pipeline_value",
         "title": "Applications by stage",
         "size": "lg",
-        "params": { "pipeline": "applications" }
+        "params": {
+          "pipeline": "applications"
+        }
       },
       {
         "key": "documents",
@@ -249,14 +356,23 @@
         "type": "date_window",
         "title": "Settlements in the next 30 days",
         "size": "md",
-        "params": { "entity": "deal", "field": "cf.expected_settlement", "days": 30, "status": "open" }
+        "params": {
+          "entity": "deal",
+          "field": "cf.expected_settlement",
+          "days": 30,
+          "status": "open"
+        }
       },
       {
         "key": "reviews",
         "type": "date_window",
         "title": "Annual reviews due in the next 60 days",
         "size": "md",
-        "params": { "entity": "contact", "field": "cf.review_due", "days": 60 }
+        "params": {
+          "entity": "contact",
+          "field": "cf.review_due",
+          "days": 60
+        }
       },
       {
         "key": "renewals",
@@ -270,7 +386,12 @@
         "title": "Outstanding fees",
         "size": "sm"
       },
-      { "key": "tasks_due", "type": "tasks_due", "title": "My tasks due", "size": "md" }
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      }
     ]
   },
   "templates": [
@@ -344,10 +465,13 @@
         "first_name": "Marco",
         "last_name": "Rossi",
         "email": "marco.rossi@example.test",
-        "phone": "+61 491 570 110",
+        "phone": "+61 2 5550 0100",
         "lifecycle_status": "Prospect",
         "source": "Real estate agent",
-        "custom": { "client_type": "first_home_buyer", "fact_find_complete": false },
+        "custom": {
+          "client_type": "first_home_buyer",
+          "fact_find_complete": false
+        },
         "days": -4,
         "owner": "adviser"
       },
@@ -356,10 +480,13 @@
         "first_name": "Linh",
         "last_name": "Nguyen",
         "email": "linh.nguyen@example.test",
-        "phone": "+61 491 570 111",
+        "phone": "+61 2 5550 0101",
         "lifecycle_status": "Prospect",
         "source": "Website",
-        "custom": { "client_type": "first_home_buyer", "fact_find_complete": false },
+        "custom": {
+          "client_type": "first_home_buyer",
+          "fact_find_complete": false
+        },
         "days": -2,
         "owner": "client_services"
       },
@@ -368,10 +495,13 @@
         "first_name": "Jiwoo",
         "last_name": "Kim",
         "email": "jiwoo.kim@example.test",
-        "phone": "+61 491 570 112",
+        "phone": "+61 2 5550 0102",
         "lifecycle_status": "Active client",
         "source": "Referral",
-        "custom": { "client_type": "upgrader", "fact_find_complete": false },
+        "custom": {
+          "client_type": "upgrader",
+          "fact_find_complete": false
+        },
         "days": -16,
         "owner": "adviser"
       },
@@ -380,10 +510,14 @@
         "first_name": "Connor",
         "last_name": "Walsh",
         "email": "connor.walsh@example.test",
-        "phone": "+61 491 570 113",
+        "phone": "+61 2 5550 0103",
         "lifecycle_status": "Active client",
         "source": "Existing client",
-        "custom": { "client_type": "refinancer", "fact_find_complete": false, "review_due": "{{date:-20}}" },
+        "custom": {
+          "client_type": "refinancer",
+          "fact_find_complete": false,
+          "review_due": "{{date:-20}}"
+        },
         "days": -380
       },
       {
@@ -391,10 +525,13 @@
         "first_name": "Petra",
         "last_name": "Novak",
         "email": "petra.novak@example.test",
-        "phone": "+61 491 570 114",
+        "phone": "+61 2 5550 0104",
         "lifecycle_status": "Active client",
         "source": "Website",
-        "custom": { "client_type": "refinancer", "fact_find_complete": true },
+        "custom": {
+          "client_type": "refinancer",
+          "fact_find_complete": true
+        },
         "days": -35,
         "owner": "adviser"
       },
@@ -403,10 +540,13 @@
         "first_name": "Harpreet",
         "last_name": "Singh",
         "email": "harpreet.singh@example.test",
-        "phone": "+61 491 570 115",
+        "phone": "+61 2 5550 0105",
         "lifecycle_status": "Active client",
         "source": "Accountant",
-        "custom": { "client_type": "investor", "fact_find_complete": true },
+        "custom": {
+          "client_type": "investor",
+          "fact_find_complete": true
+        },
         "days": -28,
         "owner": "adviser"
       },
@@ -415,10 +555,13 @@
         "first_name": "Eleni",
         "last_name": "Papadopoulos",
         "email": "eleni.p@example.test",
-        "phone": "+61 491 570 116",
+        "phone": "+61 2 5550 0106",
         "lifecycle_status": "Active client",
         "source": "Seminar",
-        "custom": { "client_type": "retiree", "fact_find_complete": true },
+        "custom": {
+          "client_type": "retiree",
+          "fact_find_complete": true
+        },
         "days": -42,
         "owner": "admin"
       },
@@ -427,10 +570,13 @@
         "first_name": "Sami",
         "last_name": "Haddad",
         "email": "sami.haddad@example.test",
-        "phone": "+61 491 570 117",
+        "phone": "+61 2 5550 0107",
         "lifecycle_status": "Active client",
         "source": "Accountant",
-        "custom": { "client_type": "smsf_trustee", "fact_find_complete": true },
+        "custom": {
+          "client_type": "smsf_trustee",
+          "fact_find_complete": true
+        },
         "days": -70,
         "owner": "adviser"
       },
@@ -439,10 +585,13 @@
         "first_name": "Emma",
         "last_name": "Taylor",
         "email": "emma.taylor@example.test",
-        "phone": "+61 491 570 118",
+        "phone": "+61 2 5550 0108",
         "lifecycle_status": "Active client",
         "source": "Referral",
-        "custom": { "client_type": "upgrader", "fact_find_complete": true },
+        "custom": {
+          "client_type": "upgrader",
+          "fact_find_complete": true
+        },
         "days": -64
       },
       {
@@ -450,10 +599,13 @@
         "first_name": "Liam",
         "last_name": "O’Brien",
         "email": "liam.obrien@example.test",
-        "phone": "+61 491 570 119",
+        "phone": "+61 2 5550 0109",
         "lifecycle_status": "Active client",
         "source": "Real estate agent",
-        "custom": { "client_type": "first_home_buyer", "fact_find_complete": true },
+        "custom": {
+          "client_type": "first_home_buyer",
+          "fact_find_complete": true
+        },
         "days": -48,
         "owner": "adviser"
       },
@@ -462,10 +614,14 @@
         "first_name": "Olivia",
         "last_name": "Brown",
         "email": "olivia.brown@example.test",
-        "phone": "+61 491 570 120",
+        "phone": "+61 2 5550 0110",
         "lifecycle_status": "Settled client",
         "source": "Existing client",
-        "custom": { "client_type": "investor", "fact_find_complete": true, "review_due": "{{date:+140}}" },
+        "custom": {
+          "client_type": "investor",
+          "fact_find_complete": true,
+          "review_due": "{{date:+140}}"
+        },
         "days": -260,
         "owner": "adviser"
       },
@@ -474,10 +630,14 @@
         "first_name": "Isabel",
         "last_name": "Costa",
         "email": "isabel.costa@example.test",
-        "phone": "+61 491 570 121",
+        "phone": "+61 2 5550 0111",
         "lifecycle_status": "Settled client",
         "source": "Website",
-        "custom": { "client_type": "refinancer", "fact_find_complete": true, "review_due": "{{date:+270}}" },
+        "custom": {
+          "client_type": "refinancer",
+          "fact_find_complete": true,
+          "review_due": "{{date:+270}}"
+        },
         "days": -150,
         "owner": "client_services"
       },
@@ -486,10 +646,14 @@
         "first_name": "Jack",
         "last_name": "Murray",
         "email": "jack.murray@example.test",
-        "phone": "+61 491 570 122",
+        "phone": "+61 2 5550 0112",
         "lifecycle_status": "Settled client",
         "source": "Referral",
-        "custom": { "client_type": "retiree", "fact_find_complete": true, "review_due": "{{date:+215}}" },
+        "custom": {
+          "client_type": "retiree",
+          "fact_find_complete": true,
+          "review_due": "{{date:+215}}"
+        },
         "days": -200,
         "owner": "admin"
       },
@@ -498,10 +662,14 @@
         "first_name": "Noah",
         "last_name": "White",
         "email": "noah.white@example.test",
-        "phone": "+61 491 570 123",
+        "phone": "+61 2 5550 0113",
         "lifecycle_status": "Settled client",
         "source": "Referral",
-        "custom": { "client_type": "upgrader", "fact_find_complete": true, "review_due": "{{date:+18}}" },
+        "custom": {
+          "client_type": "upgrader",
+          "fact_find_complete": true,
+          "review_due": "{{date:+18}}"
+        },
         "days": -350,
         "owner": "adviser"
       },
@@ -512,7 +680,10 @@
         "email": "ruby.fraser@example.test",
         "lifecycle_status": "Former client",
         "source": "Social",
-        "custom": { "client_type": "first_home_buyer", "fact_find_complete": true },
+        "custom": {
+          "client_type": "first_home_buyer",
+          "fact_find_complete": true
+        },
         "days": -120,
         "owner": "client_services"
       },
@@ -521,10 +692,13 @@
         "first_name": "Arjun",
         "last_name": "Chandra",
         "email": "arjun.chandra@example.test",
-        "phone": "+61 491 570 124",
+        "phone": "+61 2 5550 0114",
         "lifecycle_status": "Former client",
         "source": "Website",
-        "custom": { "client_type": "investor", "fact_find_complete": false },
+        "custom": {
+          "client_type": "investor",
+          "fact_find_complete": false
+        },
         "days": -95
       },
       {
@@ -532,10 +706,10 @@
         "first_name": "Tessa",
         "last_name": "Kiely",
         "email": "tessa.kiely@harbourline-bank.test",
-        "phone": "+61 491 570 140",
+        "phone": "+61 2 5550 0115",
         "job_title": "Business development manager",
         "organization": "harbourline",
-        "lifecycle_status": "Lender contact",
+        "lifecycle_status": "Lender representative",
         "source": "Other",
         "days": -270,
         "owner": "admin"
@@ -545,10 +719,10 @@
         "first_name": "Raj",
         "last_name": "Mehta",
         "email": "raj.mehta@kestrelhomeloans.test",
-        "phone": "+61 491 570 141",
+        "phone": "+61 2 5550 0116",
         "job_title": "Broker relationship manager",
         "organization": "kestrel",
-        "lifecycle_status": "Lender contact",
+        "lifecycle_status": "Lender representative",
         "source": "Other",
         "days": -180,
         "owner": "adviser"
@@ -558,10 +732,10 @@
         "first_name": "Sophie",
         "last_name": "Lachlan",
         "email": "sophie.l@ironbarklending.test",
-        "phone": "+61 491 570 142",
+        "phone": "+61 2 5550 0117",
         "job_title": "SMSF lending specialist",
         "organization": "ironbark",
-        "lifecycle_status": "Lender contact",
+        "lifecycle_status": "Lender representative",
         "source": "Other",
         "days": -140,
         "owner": "adviser"
@@ -571,10 +745,10 @@
         "first_name": "Dylan",
         "last_name": "Webb",
         "email": "dylan.webb@bluegumcu.test",
-        "phone": "+61 491 570 143",
+        "phone": "+61 2 5550 0118",
         "job_title": "Credit assessor",
         "organization": "bluegum",
-        "lifecycle_status": "Lender contact",
+        "lifecycle_status": "Lender representative",
         "source": "Other",
         "days": -210,
         "owner": "client_services"
@@ -586,7 +760,7 @@
         "first_name": "Chloe",
         "last_name": "Bennett",
         "email": "chloe.bennett@example.test",
-        "phone": "+61 491 570 150",
+        "phone": "+61 2 5550 0119",
         "source": "Website",
         "status": "new",
         "days": 0,
@@ -597,7 +771,7 @@
         "first_name": "Tim",
         "last_name": "Archer",
         "email": "tim.archer@example.test",
-        "phone": "+61 491 570 151",
+        "phone": "+61 2 5550 0120",
         "source": "Seminar",
         "status": "contacted",
         "days": -6,
@@ -608,7 +782,7 @@
         "first_name": "Mia",
         "last_name": "Russo",
         "email": "mia.russo@example.test",
-        "phone": "+61 491 570 152",
+        "phone": "+61 2 5550 0121",
         "source": "Real estate agent",
         "status": "qualified",
         "days": -3,
@@ -645,7 +819,10 @@
         "value": 780000,
         "days": -4,
         "owner": "adviser",
-        "custom": { "application_type": "purchase", "lvr": 90 }
+        "custom": {
+          "application_type": "purchase",
+          "lvr": 90
+        }
       },
       {
         "ref": "nguyen",
@@ -655,7 +832,9 @@
         "value": 620000,
         "days": -2,
         "owner": "client_services",
-        "custom": { "application_type": "purchase" }
+        "custom": {
+          "application_type": "purchase"
+        }
       },
       {
         "ref": "kim",
@@ -666,7 +845,10 @@
         "days": -16,
         "stage_days": -9,
         "owner": "adviser",
-        "custom": { "application_type": "purchase", "lvr": 75 }
+        "custom": {
+          "application_type": "purchase",
+          "lvr": 75
+        }
       },
       {
         "ref": "walsh",
@@ -676,7 +858,10 @@
         "value": 540000,
         "days": -25,
         "stage_days": -18,
-        "custom": { "application_type": "refinance", "lvr": 62 }
+        "custom": {
+          "application_type": "refinance",
+          "lvr": 62
+        }
       },
       {
         "ref": "novak",
@@ -689,7 +874,11 @@
         "stage_days": -6,
         "expected_close": "{{date:+10}}",
         "owner": "adviser",
-        "custom": { "application_type": "refinance", "lvr": 68, "interest_rate": 5.89 }
+        "custom": {
+          "application_type": "refinance",
+          "lvr": 68,
+          "interest_rate": 5.89
+        }
       },
       {
         "ref": "singh",
@@ -702,7 +891,11 @@
         "stage_days": -12,
         "expected_close": "{{date:+14}}",
         "owner": "adviser",
-        "custom": { "application_type": "investment", "lvr": 80, "interest_rate": 6.24 }
+        "custom": {
+          "application_type": "investment",
+          "lvr": 80,
+          "interest_rate": 6.24
+        }
       },
       {
         "ref": "papadopoulos",
@@ -714,7 +907,9 @@
         "stage_days": -8,
         "expected_close": "{{date:+7}}",
         "owner": "admin",
-        "custom": { "application_type": "advice" }
+        "custom": {
+          "application_type": "advice"
+        }
       },
       {
         "ref": "haddad",
@@ -817,7 +1012,9 @@
         "days": -200,
         "stage_days": -150,
         "owner": "admin",
-        "custom": { "application_type": "advice" }
+        "custom": {
+          "application_type": "advice"
+        }
       },
       {
         "ref": "fraser",
@@ -829,7 +1026,10 @@
         "stage_days": -80,
         "lost_reason": "Went direct to lender",
         "owner": "client_services",
-        "custom": { "application_type": "purchase", "lvr": 90 }
+        "custom": {
+          "application_type": "purchase",
+          "lvr": 90
+        }
       },
       {
         "ref": "chandra",
@@ -841,7 +1041,10 @@
         "days": -95,
         "stage_days": -40,
         "lost_reason": "Deferred purchase",
-        "custom": { "application_type": "investment", "lvr": 80 }
+        "custom": {
+          "application_type": "investment",
+          "lvr": 80
+        }
       }
     ],
     "activities": [
@@ -1164,7 +1367,11 @@
         },
         "ref": "q_papa"
       },
-      { "method": "post", "path": "/m/quotes/quotes/{{req:q_papa}}/send", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_papa}}/send",
+        "body": {}
+      },
       {
         "method": "post",
         "path": "/m/quotes/quotes",
@@ -1187,11 +1394,17 @@
         },
         "ref": "q_haddad"
       },
-      { "method": "post", "path": "/m/quotes/quotes/{{req:q_haddad}}/send", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/quotes/quotes/{{req:q_haddad}}/send",
+        "body": {}
+      },
       {
         "method": "post",
         "path": "/m/quotes/quotes/{{req:q_haddad}}/accept",
-        "body": { "acceptedByName": "Sami Haddad" }
+        "body": {
+          "acceptedByName": "Sami Haddad"
+        }
       },
       {
         "method": "post",
@@ -1214,7 +1427,11 @@
         },
         "ref": "inv_murray"
       },
-      { "method": "post", "path": "/m/invoices/invoices/{{req:inv_murray}}/issue", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_murray}}/issue",
+        "body": {}
+      },
       {
         "method": "post",
         "path": "/m/invoices/invoices/{{req:inv_murray}}/payments",
@@ -1247,7 +1464,11 @@
         },
         "ref": "inv_haddad"
       },
-      { "method": "post", "path": "/m/invoices/invoices/{{req:inv_haddad}}/issue", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/invoices/invoices/{{req:inv_haddad}}/issue",
+        "body": {}
+      },
       {
         "method": "post",
         "path": "/m/invoices/invoices",
@@ -1286,7 +1507,11 @@
         },
         "ref": "c_murray"
       },
-      { "method": "post", "path": "/m/contracts/contracts/{{req:c_murray}}/activate", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts/{{req:c_murray}}/activate",
+        "body": {}
+      },
       {
         "method": "post",
         "path": "/m/contracts/contracts",
@@ -1304,7 +1529,11 @@
         },
         "ref": "c_white"
       },
-      { "method": "post", "path": "/m/contracts/contracts/{{req:c_white}}/activate", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/contracts/contracts/{{req:c_white}}/activate",
+        "body": {}
+      },
       {
         "method": "post",
         "path": "/m/contracts/contracts",
@@ -1352,7 +1581,11 @@
         },
         "ref": "doc_kim"
       },
-      { "method": "post", "path": "/m/documents/documents/{{req:doc_kim}}/share", "body": {} },
+      {
+        "method": "post",
+        "path": "/m/documents/documents/{{req:doc_kim}}/share",
+        "body": {}
+      },
       {
         "method": "post",
         "path": "/m/documents/requests",

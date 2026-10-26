@@ -5,7 +5,9 @@
   "version": "1.1.0",
   "description": "Applicants, cases through an application pipeline, document checklists collected in the client portal, quotes and invoices for fees.",
   "settings": {
-    "features": { "leads": true },
+    "features": {
+      "leads": true
+    },
     "contacts": {
       "sources": ["Website", "Referral", "Walk-in", "Agent", "Event", "Social", "Other"],
       "lifecycleStatuses": ["Enquiry", "Applicant", "Visa granted", "Former applicant"]
@@ -22,17 +24,37 @@
     }
   },
   "vocabulary": {
-    "contact": { "singular": "Applicant", "plural": "Applicants" },
-    "deal": { "singular": "Case", "plural": "Cases" },
-    "lead": { "singular": "Enquiry", "plural": "Enquiries" }
+    "contact": {
+      "singular": "Applicant",
+      "plural": "Applicants"
+    },
+    "deal": {
+      "singular": "Case",
+      "plural": "Cases"
+    },
+    "lead": {
+      "singular": "Enquiry",
+      "plural": "Enquiries"
+    }
   },
   "modules": ["documents", "portal", "quotes", "invoices", "tickets"],
   "custom_field_groups": {
     "contact": [
-      { "key": "passport", "label": "Passport" },
-      { "key": "background", "label": "Background" }
+      {
+        "key": "passport",
+        "label": "Passport"
+      },
+      {
+        "key": "background",
+        "label": "Background"
+      }
     ],
-    "deal": [{ "key": "application", "label": "Application" }]
+    "deal": [
+      {
+        "key": "application",
+        "label": "Application"
+      }
+    ]
   },
   "custom_fields": {
     "contact": [
@@ -44,7 +66,12 @@
         "filterable": true,
         "show_in_list": true
       },
-      { "key": "passport_number", "label": "Passport number", "type": "text", "group": "passport" },
+      {
+        "key": "passport_number",
+        "label": "Passport number",
+        "type": "text",
+        "group": "passport"
+      },
       {
         "key": "passport_expiry",
         "label": "Passport expiry",
@@ -52,21 +79,46 @@
         "group": "passport",
         "filterable": true
       },
-      { "key": "date_of_birth", "label": "Date of birth", "type": "date", "group": "background" },
+      {
+        "key": "date_of_birth",
+        "label": "Date of birth",
+        "type": "date",
+        "group": "background"
+      },
       {
         "key": "marital_status",
         "label": "Marital status",
         "type": "select",
         "group": "background",
         "options": [
-          { "key": "single", "label": "Single" },
-          { "key": "married", "label": "Married" },
-          { "key": "partner", "label": "Civil partner" },
-          { "key": "divorced", "label": "Divorced" },
-          { "key": "widowed", "label": "Widowed" }
+          {
+            "key": "single",
+            "label": "Single"
+          },
+          {
+            "key": "married",
+            "label": "Married"
+          },
+          {
+            "key": "partner",
+            "label": "Civil partner"
+          },
+          {
+            "key": "divorced",
+            "label": "Divorced"
+          },
+          {
+            "key": "widowed",
+            "label": "Widowed"
+          }
         ]
       },
-      { "key": "dependants", "label": "Dependants", "type": "number", "group": "background" }
+      {
+        "key": "dependants",
+        "label": "Dependants",
+        "type": "number",
+        "group": "background"
+      }
     ],
     "deal": [
       {
@@ -78,13 +130,34 @@
         "filterable": true,
         "show_in_list": true,
         "options": [
-          { "key": "visitor", "label": "Visitor" },
-          { "key": "student", "label": "Student" },
-          { "key": "work", "label": "Work" },
-          { "key": "family", "label": "Family" },
-          { "key": "business", "label": "Business or investor" },
-          { "key": "settlement", "label": "Settlement" },
-          { "key": "citizenship", "label": "Citizenship" }
+          {
+            "key": "visitor",
+            "label": "Visitor"
+          },
+          {
+            "key": "student",
+            "label": "Student"
+          },
+          {
+            "key": "work",
+            "label": "Work"
+          },
+          {
+            "key": "family",
+            "label": "Family"
+          },
+          {
+            "key": "business",
+            "label": "Business or investor"
+          },
+          {
+            "key": "settlement",
+            "label": "Settlement"
+          },
+          {
+            "key": "citizenship",
+            "label": "Citizenship"
+          }
         ]
       },
       {
@@ -124,7 +197,12 @@
         "group": "application",
         "filterable": true
       },
-      { "key": "government_fee", "label": "Government fee", "type": "currency", "group": "application" }
+      {
+        "key": "government_fee",
+        "label": "Government fee",
+        "type": "currency",
+        "group": "application"
+      }
     ]
   },
   "pipelines": [
@@ -134,13 +212,43 @@
       "entity": "deal",
       "is_default": true,
       "stages": [
-        { "key": "consultation", "name": "Consultation", "probability": 10 },
-        { "key": "engaged", "name": "Engaged", "probability": 25 },
-        { "key": "documents", "name": "Collecting documents", "probability": 40 },
-        { "key": "review", "name": "Final review", "probability": 55 },
-        { "key": "submitted", "name": "Submitted", "probability": 70 },
-        { "key": "approved", "name": "Approved", "probability": 100, "is_won": true },
-        { "key": "refused", "name": "Refused", "probability": 0, "is_lost": true }
+        {
+          "key": "consultation",
+          "name": "Consultation",
+          "probability": 10
+        },
+        {
+          "key": "engaged",
+          "name": "Engaged",
+          "probability": 25
+        },
+        {
+          "key": "documents",
+          "name": "Collecting documents",
+          "probability": 40
+        },
+        {
+          "key": "review",
+          "name": "Final review",
+          "probability": 55
+        },
+        {
+          "key": "submitted",
+          "name": "Submitted",
+          "probability": 70
+        },
+        {
+          "key": "approved",
+          "name": "Approved",
+          "probability": 100,
+          "is_won": true
+        },
+        {
+          "key": "refused",
+          "name": "Refused",
+          "probability": 0,
+          "is_lost": true
+        }
       ]
     }
   ],
@@ -163,7 +271,9 @@
         "invoices.invoices.view",
         "tickets.tickets.*"
       ],
-      "scopes": { "*": "own" }
+      "scopes": {
+        "*": "own"
+      }
     },
     {
       "key": "case_manager",
@@ -185,7 +295,9 @@
         "tickets.tickets.*",
         "portal.accounts.manage"
       ],
-      "scopes": { "*": "all" }
+      "scopes": {
+        "*": "all"
+      }
     }
   ],
   "layouts": [
@@ -208,7 +320,9 @@
         "type": "pipeline_value",
         "title": "Cases by stage",
         "size": "lg",
-        "params": { "pipeline": "applications" }
+        "params": {
+          "pipeline": "applications"
+        }
       },
       {
         "key": "documents",
@@ -221,7 +335,12 @@
         "type": "date_window",
         "title": "Decisions expected in the next 30 days",
         "size": "md",
-        "params": { "entity": "deal", "field": "cf.decision_due", "days": 30, "status": "open" }
+        "params": {
+          "entity": "deal",
+          "field": "cf.decision_due",
+          "days": 30,
+          "status": "open"
+        }
       },
       {
         "key": "receivables",
@@ -229,7 +348,12 @@
         "title": "Outstanding fees",
         "size": "sm"
       },
-      { "key": "tasks_due", "type": "tasks_due", "title": "My tasks due", "size": "md" }
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      }
     ]
   },
   "templates": [],
@@ -346,7 +470,7 @@
         "first_name": "Chloe",
         "last_name": "Dubois",
         "email": "chloe.dubois@example.test",
-        "phone": "0491 570 010",
+        "phone": "02 5550 0100",
         "lifecycle_status": "Applicant",
         "source": "Website",
         "days": -18,
@@ -423,7 +547,7 @@
         "first_name": "Mei",
         "last_name": "Tanaka",
         "email": "mei.tanaka@example.test",
-        "phone": "0491 570 011",
+        "phone": "02 5550 0101",
         "job_title": "Civil engineer",
         "organization": "coastline",
         "lifecycle_status": "Applicant",
@@ -444,7 +568,7 @@
         "first_name": "Daniel",
         "last_name": "Okonkwo",
         "email": "daniel.okonkwo@example.test",
-        "phone": "0491 570 012",
+        "phone": "02 5550 0102",
         "job_title": "Registered nurse",
         "organization": "redgum",
         "lifecycle_status": "Applicant",
@@ -525,7 +649,7 @@
         "first_name": "Priya",
         "last_name": "Rao",
         "email": "priya.rao@example.test",
-        "phone": "0491 570 013",
+        "phone": "02 5550 0103",
         "job_title": "Registered nurse",
         "organization": "redgum",
         "lifecycle_status": "Visa granted",
@@ -546,7 +670,7 @@
         "first_name": "Kenji",
         "last_name": "Watanabe",
         "email": "kenji.watanabe@example.test",
-        "phone": "0491 570 014",
+        "phone": "02 5550 0104",
         "job_title": "Head chef",
         "organization": "harvest",
         "lifecycle_status": "Visa granted",
@@ -586,7 +710,7 @@
         "first_name": "Emma",
         "last_name": "Clarke",
         "email": "emma.clarke@example.test",
-        "phone": "0491 570 015",
+        "phone": "02 5550 0105",
         "lifecycle_status": "Former applicant",
         "source": "Website",
         "days": -130,
@@ -620,7 +744,7 @@
         "first_name": "Tomas",
         "last_name": "Silva",
         "email": "tomas.silva@example.test",
-        "phone": "0491 570 016",
+        "phone": "02 5550 0106",
         "lifecycle_status": "Former applicant",
         "source": "Referral",
         "days": -270,
@@ -641,7 +765,7 @@
         "first_name": "Hiroshi",
         "last_name": "Mori",
         "email": "hiroshi.mori@example.test",
-        "phone": "0491 570 017",
+        "phone": "02 5550 0107",
         "source": "Website",
         "status": "new",
         "days": -1,
@@ -663,7 +787,7 @@
         "first_name": "Leah",
         "last_name": "Sutton",
         "email": "leah.sutton@harvest-table.test",
-        "phone": "0491 570 018",
+        "phone": "02 5550 0108",
         "company_name": "Harvest Table Hospitality",
         "job_title": "HR manager",
         "source": "Referral",
