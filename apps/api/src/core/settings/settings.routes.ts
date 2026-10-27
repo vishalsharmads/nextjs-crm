@@ -20,6 +20,9 @@ import { storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
 import { storeFile } from '../files/files.service';
 import { getLabels, clearLabelCache } from '../labels/labels.service';
+import { industryForBlueprint, listBlueprintKeys, loadBlueprint } from '@app/blueprints';
+import { verifyLimiter } from '../../middleware/rate-limit';
+import { DemoResetRefused, assertDemoResetAllowed, demoSwitchStatus, startDemoSwitch } from '../../cli/demo';
 import {
   clearSettingsCache,
   getBranding,
@@ -89,6 +92,17 @@ export const publicRoutes = defineRoutes('/public', ['public'])
   })
   .add({
     method: 'get',
+    path: '/demo/switch',
+    permission: 'public',
+    summary: 'Progress of a demo industry switch (public: the switch signs everyone out)',
+    handler: async ({ res }) => {
+      if (!env.DEMO_MODE) throw notFound('Demo');
+      res.set('Cache-Control', 'no-store');
+      return demoSwitchStatus();
+    },
+  })
+  .add({
+    method: 'get',
     path: '/branding/assets/:slot',
     permission: 'public',
     params: slotParam,
@@ -139,6 +153,59 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
       await db('settings').where({ key: 'demo_login' }).delete();
       clearSettingsCache();
       await audit(db, ctx, { action: 'settings.demo_login_removed', entity: 'settings' });
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/demo',
+    permission: 'core.settings.manage',
+    summary: 'Industries a demo instance can switch to (404 unless DEMO_MODE=true)',
+    handler: async ({ user }) => {
+      if (!env.DEMO_MODE) throw notFound('Demo');
+      if (!user.isAdmin) throw new AppError('FORBIDDEN', 'Only admins can switch the demo industry');
+      const current = await getDemoIndustry();
+      let reason: string | null = null;
+      try {
+        await assertDemoResetAllowed(env.DATABASE_URL, current ?? 'generic');
+      } catch (err) {
+        if (!(err instanceof DemoResetRefused)) throw err;
+        reason = err.message;
+      }
+      return {
+        current,
+        industries: listBlueprintKeys().map((key) => ({
+          slug: industryForBlueprint(key),
+          name: loadBlueprint(key).name,
+        })),
+        allowed: reason === null,
+        reason,
+      };
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/demo/switch',
+    permission: 'core.settings.manage',
+    summary: 'Wipe the demo and install another industry with sample data (demo instances only)',
+    before: [verifyLimiter],
+    body: z
+      .object({ industry: z.string().min(1).max(64), confirm: z.string() })
+      .refine((b) => b.confirm === b.industry, {
+        path: ['confirm'],
+        message: 'Type the industry to confirm',
+      }),
+    status: 202,
+    handler: async ({ user, body }) => {
+      if (!env.DEMO_MODE) throw notFound('Demo');
+      if (!user.isAdmin) throw new AppError('FORBIDDEN', 'Only admins can switch the demo industry');
+      // No audit row: the switch empties the audit log along with everything else. It is logged instead.
+      try {
+        await startDemoSwitch(body.industry);
+      } catch (err) {
+        if (err instanceof DemoResetRefused) throw new AppError('CONFLICT', err.message);
+        throw err;
+      }
+      return demoSwitchStatus();
     },
   })
   .add({
