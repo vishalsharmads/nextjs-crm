@@ -152,10 +152,13 @@ export function checkSampleData(bp: Blueprint, moduleDeps: Record<string, string
   return problems;
 }
 
-/** A date placeholder's argument is valid: `{{date:-3}}`, `{{datetime:+2@14:30}}` (hours 0–23, minutes 0–59). */
+/**
+ * A date placeholder's argument is valid: `{{date:-3}}`, `{{datetime:+2@14:30}}` or `{{datetime:+2w@14:30}}`
+ * (working days; hours 0–23, minutes 0–59).
+ */
 function timingProblem(type: string, arg: string): string | null {
   if (type === 'date') return /^[+-]?\d+$/.test(arg) ? null : `bad date "${arg}"`;
   if (type !== 'datetime') return null;
-  const m = /^[+-]?\d+(?:@(\d{1,2})(?::(\d{2}))?)?$/.exec(arg);
+  const m = /^[+-]?\d+w?(?:@(\d{1,2})(?::(\d{2}))?)?$/.exec(arg);
   return m && Number(m[1] ?? 0) <= 23 && Number(m[2] ?? 0) <= 59 ? null : `bad datetime "${arg}"`;
 }
