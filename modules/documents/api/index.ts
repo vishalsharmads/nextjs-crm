@@ -15,6 +15,7 @@ import {
   getRow,
   getSettingsGroup,
   iso,
+  logAccess,
   mergeFieldGroups,
   newUuid,
   nextDocNumber,
@@ -298,10 +299,16 @@ const templateRoutes = defineRoutes('/m/documents/templates', ['documents'], 'do
     path: '/preview',
     permission: 'documents.templates.manage',
     body: z.object({ body: z.string().min(1).max(500_000), contactUuid: z.uuid() }),
-    summary: 'Render unsaved template content for a contact, to preview it while editing.',
-    handler: async ({ user, body }) => {
+    summary: 'Render unsaved template content for a record, to preview it while editing.',
+    handler: async ({ ctx, user, body }) => {
       compileCheck(body.body);
       const contact = await visibleContact(user, body.contactUuid);
+      await logAccess(ctx, {
+        action: 'view',
+        entity: 'contact',
+        entityId: contact.id as number,
+        entityUuid: body.contactUuid,
+      });
       return { html: render(body.body, await mergeVars(user, contact, null)) };
     },
   })

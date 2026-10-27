@@ -64,7 +64,11 @@ export async function mergeFieldGroups(
       key: entity,
       label: labels[entity]?.singular ?? entity,
       fields: [
-        ...CORE_FIELDS[entity].map(([path, label]) => ({ path: `${entity}.${path}`, label })),
+        ...CORE_FIELDS[entity].map(([path, label]) => ({
+          path: `${entity}.${path}`,
+          // A lead's company is an organization in the workspace's own words.
+          label: path === 'companyName' ? (labels.organization?.singular ?? label) : label,
+        })),
         ...defs
           .filter((d) => d.sensitivity !== 'special' && fieldLevel(d, user) !== 'hidden')
           .map((d) => ({ path: `${entity}.custom.${d.key}`, label: d.label })),

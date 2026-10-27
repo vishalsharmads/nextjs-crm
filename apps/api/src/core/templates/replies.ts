@@ -3,7 +3,7 @@ import { SAVED_REPLY_PREFIX, type RelatedType, type SavedReply } from '@app/shar
 import { db } from '../../db/knex';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { escapeLike } from '../records/filters';
-import { notFound } from '../../lib/errors';
+import { AppError, notFound } from '../../lib/errors';
 import { assertCan, can } from '../rbac/access';
 import { logAccess } from '../audit/access-log';
 import { getRow } from '../records/service';
@@ -25,7 +25,10 @@ export async function listReplies(): Promise<SavedReply[]> {
     .where({ channel: 'email' })
     .where('key', 'like', `${escapeLike(SAVED_REPLY_PREFIX)}%`)
     .orderBy('name');
-  return rows.map((r) => ({ uuid: r.uuid, key: r.key, name: r.name, subject: r.subject }));
+  // One entry per key: the English row wins when a reply is saved in several locales.
+  const byKey = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) if (!byKey.has(r.key) || r.locale === 'en') byKey.set(r.key, r);
+  return [...byKey.values()].map((r) => ({ uuid: r.uuid, key: r.key, name: r.name, subject: r.subject }));
 }
 
 /** A record as a template sees it: the user's own view (scope, hidden fields, masked values). */
@@ -92,6 +95,23 @@ export async function renderReply(
     },
     today: todayIn(general.timezone),
   });
-  const render = (src: string) => Handlebars.compile(src, { strict: false })(vars);
-  return { subject: render(t.subject as string), html: sanitizeBody(render(t.body as string)) ?? '' };
+  const render = (src: string, escape: boolean) => {
+    try {
+      return Handlebars.compile(src, { strict: false, noEscape: !escape })(vars);
+    } catch (err) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        `This saved reply has an error: ${(err as Error).message.split('\n')[0]}`,
+      );
+    }
+  };
+  // The subject is plain text: no HTML escaping, no line breaks, within the subject limit.
+  const subject = render(t.subject as string, false)
+    .replace(/[\r\n\t]+/g, ' ')
+    .split('')
+    .filter((ch) => ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) !== 127)
+    .join('')
+    .trim()
+    .slice(0, 255);
+  return { subject, html: sanitizeBody(render(t.body as string, true)) ?? '' };
 }

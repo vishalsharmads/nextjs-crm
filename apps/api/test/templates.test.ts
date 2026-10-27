@@ -25,9 +25,35 @@ describe('saved replies', () => {
     const out = await admin
       .post(`/templates/replies/${uuid}/render`, { related: { type: 'contact', uuid: c.body.uuid } })
       .expect(200);
-    expect(out.body.subject).toBe('Hello Ann &lt;b&gt;');
+    expect(out.body.subject).toBe('Hello Ann <b>');
     expect(out.body.html).toContain('Hi Ann &lt;b&gt;, from');
     expect(out.body.html).not.toMatch(/script|onerror|<img/);
+  });
+
+  it('masks special fields and answers 422 for a reply that fails at render time', async () => {
+    const { client: admin } = await clientWithRoles(['admin']);
+    const key = unique('mf_med_').replace(/[^a-z0-9_]/g, '_');
+    await admin
+      .post('/custom-fields', {
+        entity: 'contact',
+        key,
+        label: 'Medical',
+        type: 'text',
+        sensitivity: 'special',
+      })
+      .expect(201);
+    const c = await admin
+      .post('/contacts', { firstName: "O'Brien", custom: { [key]: 'asthma' } })
+      .expect(201);
+    const { uuid } = await savedReply(`<p>{{contact.custom.${key}}}</p>`, 'Re: {{contact.firstName}}');
+    const out = await admin
+      .post(`/templates/replies/${uuid}/render`, { related: { type: 'contact', uuid: c.body.uuid } })
+      .expect(200);
+    expect(out.body.subject).toBe("Re: O'Brien");
+    expect(out.body.html).not.toContain('asthma');
+
+    const broken = await savedReply('<p>{{> missing}}</p>');
+    await broken.admin.post(`/templates/replies/${broken.uuid}/render`, {}).expect(422);
   });
 
   it('renders without a record, leaving record placeholders empty', async () => {
