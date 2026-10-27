@@ -8,7 +8,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 
 - Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
 - **Phases 1–5 complete.** Phase 5 is compliance readiness (profiles, access logging, data subject rights, retention, encryption; see `docs/compliance/`). New work goes through the roadmap's Future list.
-- **Phase 6** follows [docs/plan/phase-6.md](docs/plan/phase-6.md): 6a (quick wins) and 6a2 (UI polish) are done; 6b (records engine) is next.
+- **Phase 6** follows [docs/plan/phase-6.md](docs/plan/phase-6.md): 6a (quick wins), 6a2 (UI polish) and 6a3 (rich text) are done; 6b (records engine) is next.
 
 ## Non-negotiables
 
@@ -166,6 +166,7 @@ Run test suites one workspace at a time on this machine; running all three in pa
 - **Module pages** link with absolute paths, and buttons inside forms that are not submits need `type="button"`. Restart `npm run dev` after adding a module folder (Vite globs module entries at startup). Module web entries live outside `apps/web`, so `styles.css` declares `@source '../../../modules'`; without it, Tailwind classes used only in modules are never generated.
 - **The app may run under a sub-path** (`/app` in the single-server setup, `APP_BASE_PATH`). Navigate with the router; links that leave it (new tabs, copyable URLs) use `appUrl()`/`basePath` from `lib/app-url.ts`, never a bare `/path` or `window.location.origin`.
 - **Shared-clock screens** (bookings board, front desk) show the workspace time zone via `lib/zoned.ts`, never the browser's, because the server validates in the workspace zone.
+- **Rich text** goes through `RichTextEditor` (`components/editor`), never a raw `Textarea`. It emits HTML; the server sanitizes it again (`sanitizeBody` for notes and email, `sanitizeDocumentHtml` for documents), and `basic` mode only produces tags `sanitizeBody` keeps. Placeholders are stored as plain `{{path}}` text. Pass `mergeFields` for templates and `replies` (`useSavedReplies`) where people write to a record. Show stored HTML inside `.rte-prose`. Notes are never compiled as Handlebars; only templates are.
 - **Copy:** sentence case, active verbs. A button and its resulting toast use the same verb ("Archive" → "Archived").
 
 ## Testing
