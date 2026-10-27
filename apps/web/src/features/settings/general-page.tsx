@@ -12,12 +12,14 @@ import type {
   SecuritySettings,
   ComplianceProfile,
 } from '@app/shared';
-import { apiDelete, apiGet, apiPatch } from '@/lib/api';
+import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { appUrl } from '@/lib/app-url';
 import { useBranding } from '@/app/branding';
 import { bootstrapKey, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
 import { Pane, Skeleton } from '@/components/ui/misc';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
 import { SettingsPage } from './layout';
 import { floorHint } from './compliance-floors';
@@ -257,6 +259,7 @@ export function SecuritySettingsPage() {
       ) : (
         <Skeleton className="h-80" />
       )}
+      <DemoIndustryPane />
       <DemoLoginPane />
     </SettingsPage>
   );
@@ -330,6 +333,102 @@ function SecurityForm({ initial, profile }: { initial: SecuritySettings; profile
         </Button>
       </div>
     </form>
+  );
+}
+
+interface DemoInfo {
+  current: string | null;
+  industries: { slug: string; name: string }[];
+  allowed: boolean;
+  reason: string | null;
+}
+
+/**
+ * Lets an admin wipe the demo and install another industry with sample data. The server answers 404
+ * unless DEMO_MODE=true, so the pane only appears on demo instances. Progress shows on the sign-in screen,
+ * since the switch signs everyone out.
+ */
+export function DemoIndustryPane() {
+  const q = useQuery({
+    queryKey: ['settings', 'demo'],
+    queryFn: () => apiGet<DemoInfo>('/settings/demo'),
+    retry: false,
+  });
+  const [industry, setIndustry] = useState('');
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState('');
+  const target = industry || q.data?.industries.find((i) => i.slug !== q.data?.current)?.slug || '';
+  const name = (slug: string | null) => q.data?.industries.find((i) => i.slug === slug)?.name ?? slug;
+  const doSwitch = useMutation({
+    mutationFn: () => apiPost('/settings/demo/switch', { industry: target, confirm }),
+    onSuccess: async () => {
+      // The switch drops every session; sign out now so the sign-in screen can show its progress.
+      await apiPost('/auth/logout').catch(() => undefined);
+      window.location.assign(appUrl('/login?demoSwitch=1'));
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Could not switch the demo'),
+  });
+  if (!q.data) return null;
+  return (
+    <Pane title="Demo industry">
+      <p className="text-sm text-muted">
+        This demo shows {name(q.data.current) ?? 'no industry yet'}. Switching erases all records, users and
+        uploaded files, then installs the chosen industry with sample data and demo accounts.
+      </p>
+      {q.data.allowed ? null : (
+        <p role="status" className="mt-3 rounded-sm bg-subtle px-3 py-2 text-sm">
+          {q.data.reason}
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <Field label="Industry" className="min-w-56 flex-1">
+          {(p) => (
+            <NativeSelect {...p} value={target} onChange={(e) => setIndustry(e.target.value)}>
+              {q.data.industries.map((i) => (
+                <option key={i.slug} value={i.slug}>
+                  {i.name}
+                </option>
+              ))}
+            </NativeSelect>
+          )}
+        </Field>
+        <Button
+          variant="danger"
+          disabled={!q.data.allowed || !target}
+          onClick={() => {
+            setConfirm('');
+            setOpen(true);
+          }}
+        >
+          Switch industry
+        </Button>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          title={`Switch the demo to ${name(target)}`}
+          description="Everything in this workspace is erased and everyone is signed out. This cannot be undone."
+          footer={
+            <>
+              <Button onClick={() => setOpen(false)}>Cancel</Button>
+              <Button
+                variant="danger"
+                disabled={confirm !== target}
+                loading={doSwitch.isPending}
+                onClick={() => doSwitch.mutate()}
+              >
+                Switch industry
+              </Button>
+            </>
+          }
+        >
+          <Field label={`Type ${target} to confirm`}>
+            {(p) => (
+              <Input {...p} autoComplete="off" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            )}
+          </Field>
+        </DialogContent>
+      </Dialog>
+    </Pane>
   );
 }
 
