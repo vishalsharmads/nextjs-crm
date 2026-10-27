@@ -150,5 +150,49 @@
     "lead": "New {{lead}}",
     "deal": "New {{deal}}",
     "activity": "New {{activity}}"
+  },
+  "editor": {
+    "formatting": "Formatting",
+    "view": "Editor view",
+    "views": {
+      "visual": "Visual",
+      "markdown": "Markdown",
+      "html": "HTML"
+    },
+    "markdownHint": "Write in Markdown: **bold**, _italic_, # heading, - list, > quote.",
+    "htmlHint": "Edit the HTML. Scripts, styles and unknown tags are removed when it is saved.",
+    "sourceOnly": "This uses markup the visual editor would change, such as conditional sections or styled buttons, so it opens as HTML.",
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "strike": "Strikethrough",
+    "heading": "Heading",
+    "bulletList": "Bulleted list",
+    "orderedList": "Numbered list",
+    "quote": "Quote",
+    "code": "Code",
+    "link": "Link",
+    "linkAddress": "Link address",
+    "linkHelp": "Starts with https://, mailto: or tel:",
+    "applyLink": "Apply link",
+    "removeLink": "Remove link",
+    "rule": "Divider",
+    "pageBreak": "Page break",
+    "table": {
+      "insert": "Insert table",
+      "edit": "Table",
+      "addRow": "Add row",
+      "addColumn": "Add column",
+      "deleteRow": "Delete row",
+      "deleteColumn": "Delete column",
+      "toggleHeader": "Toggle header row",
+      "delete": "Delete table"
+    },
+    "insertField": "Insert field",
+    "noFields": "No fields match",
+    "insertReply": "Insert saved reply",
+    "noReplies": "No saved replies match",
+    "undo": "Undo",
+    "redo": "Redo"
   }
 }

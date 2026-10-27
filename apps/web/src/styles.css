@@ -252,3 +252,138 @@ html.dark {
   --fc-button-active-border-color: var(--primary);
   font-size: 0.8125rem;
 }
+
+/* Rich text: the editor and anything that shows its HTML (notes, emails, documents). */
+.rte-content {
+  min-height: inherit;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.rte-content > * + *,
+.rte-prose > * + * {
+  margin-top: 0.6em;
+}
+.rte-content :is(h1, h2, h3, h4),
+.rte-prose :is(h1, h2, h3, h4) {
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.rte-content h1,
+.rte-prose h1 {
+  font-size: 1.5rem;
+}
+.rte-content h2,
+.rte-prose h2 {
+  font-size: 1.25rem;
+}
+.rte-content h3,
+.rte-prose h3 {
+  font-size: 1.0625rem;
+}
+.rte-content :is(ul, ol),
+.rte-prose :is(ul, ol) {
+  padding-inline-start: 1.4em;
+}
+.rte-content ul,
+.rte-prose ul {
+  list-style: disc;
+}
+.rte-content ol,
+.rte-prose ol {
+  list-style: decimal;
+}
+.rte-content blockquote,
+.rte-prose blockquote {
+  border-inline-start: 3px solid var(--line-strong);
+  padding-inline-start: 0.75em;
+  color: var(--muted);
+}
+.rte-content a,
+.rte-prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rte-content code,
+.rte-prose code {
+  border-radius: 4px;
+  background: var(--subtle);
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+}
+.rte-content pre,
+.rte-prose pre {
+  border-radius: 6px;
+  background: var(--subtle);
+  padding: 0.6em 0.8em;
+  overflow-x: auto;
+}
+.rte-content pre code,
+.rte-prose pre code {
+  background: none;
+  padding: 0;
+}
+.rte-content hr,
+.rte-prose hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin-block: 1em;
+}
+.rte-content hr[data-page-break] {
+  border-top: 1px dashed var(--line-strong);
+}
+.rte-prose hr[data-page-break] {
+  border-top: 0;
+  margin: 0;
+}
+@media print {
+  .rte-prose hr[data-page-break] {
+    break-after: page;
+  }
+}
+.rte-content table,
+.rte-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.rte-content :is(th, td),
+.rte-prose :is(th, td) {
+  border: 1px solid var(--line);
+  padding: 0.35em 0.6em;
+  vertical-align: top;
+  text-align: start;
+}
+.rte-content th,
+.rte-prose th {
+  background: var(--subtle);
+  font-weight: 600;
+}
+.rte-content .selectedCell {
+  background: var(--primary-soft);
+}
+.rte-content .rte-merge {
+  border-radius: 4px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  padding: 0.05em 0.35em;
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+.rte-content .rte-merge.ProseMirror-selectednode {
+  outline: 2px solid var(--primary);
+}
+.rte-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: inline-start;
+  height: 0;
+  pointer-events: none;
+  color: var(--faint);
+}
+.rte-content [data-type='suggestion'],
+.rte-content .suggestion {
+  color: var(--primary);
+}

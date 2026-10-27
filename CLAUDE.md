@@ -50,6 +50,7 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 | @dnd-kit/*                                                                                      | Accessible drag and drop (Kanban, column order)                                 |
 | @fullcalendar/*                                                                                 | Calendar view (MIT standard views)                                              |
 | recharts                                                                                        | Dashboard charts                                                                |
+| @tiptap/* (MIT core only, no Pro or cloud extensions)                                           | Rich text editor: headless, so it takes theme tokens; Markdown, tables, menus   |
 | i18next, react-i18next                                                                          | Locale files + vocabulary interpolation                                         |
 | qrcode                                                                                          | 2FA setup QR code                                                               |
 | @fontsource/*                                                                                   | Self-hosted fonts selectable from branding (no external font CDN)               |
