@@ -15,6 +15,7 @@ import {
   getRow,
   getSettingsGroup,
   iso,
+  mergeFieldGroups,
   newUuid,
   nextDocNumber,
   notFound,
@@ -122,7 +123,12 @@ async function mergeVars(
     organization,
     deal,
     business: { name: commerce.legalName || branding.appName, ...commerce },
-    user: { name: `${user.firstName} ${user.lastName}`.trim(), email: user.email },
+    user: {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      name: `${user.firstName} ${user.lastName}`.trim(),
+      email: user.email,
+    },
     today: todayIn(general.timezone),
   };
 }
@@ -262,6 +268,43 @@ const templateBody = z.object({
 const uuidParam = z.object({ uuid: z.uuid() });
 
 const templateRoutes = defineRoutes('/m/documents/templates', ['documents'], 'documents')
+  .add({
+    method: 'get',
+    path: '/fields',
+    permission: 'documents.templates.manage',
+    summary: 'Placeholders a document template can use, as the current user may see them',
+    handler: async ({ user }) => {
+      const groups = await mergeFieldGroups(user, ['contact', 'organization', 'deal']);
+      const business = {
+        key: 'business',
+        label: 'Your business',
+        fields: [
+          { path: 'business.name', label: 'Business name' },
+          { path: 'business.legalName', label: 'Legal name' },
+          { path: 'business.address', label: 'Address' },
+          { path: 'business.taxId', label: 'Tax ID' },
+          { path: 'business.email', label: 'Email' },
+          { path: 'business.phone', label: 'Phone' },
+        ],
+      };
+      // Documents have no workspace-name placeholder, only the date from the general group.
+      const general = groups.at(-1)!;
+      const today = { ...general, fields: general.fields.filter((f) => f.path === 'today') };
+      return { data: [...groups.slice(0, -1), business, today] };
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/preview',
+    permission: 'documents.templates.manage',
+    body: z.object({ body: z.string().min(1).max(500_000), contactUuid: z.uuid() }),
+    summary: 'Render unsaved template content for a contact, to preview it while editing.',
+    handler: async ({ user, body }) => {
+      compileCheck(body.body);
+      const contact = await visibleContact(user, body.contactUuid);
+      return { html: render(body.body, await mergeVars(user, contact, null)) };
+    },
+  })
   .add({
     method: 'get',
     path: '/',

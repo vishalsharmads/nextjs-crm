@@ -56,6 +56,31 @@ describe('documents', () => {
     expect(edited.body.bodyHtml).toBe('<p>Edited</p>');
   });
 
+  it('lists placeholders, previews unsaved content and keeps page breaks', async () => {
+    const fields = await admin.get(`${D}/templates/fields`).expect(200);
+    const paths = (fields.body.data as { fields: { path: string }[] }[]).flatMap((g) =>
+      g.fields.map((f) => f.path),
+    );
+    expect(paths).toEqual(expect.arrayContaining(['contact.firstName', 'business.legalName', 'today']));
+    expect(paths).not.toContain('branding.appName');
+    expect(paths.some((p) => p.startsWith('lead.'))).toBe(false);
+
+    const c = await admin.post('/contacts', { firstName: 'Pia', lastName: 'Preview' }).expect(201);
+    const preview = await admin
+      .post(`${D}/templates/preview`, {
+        body: '<p>Dear {{contact.firstName}}</p><hr data-page-break=""><p onclick="x()">Two</p>',
+        contactUuid: c.body.uuid,
+      })
+      .expect(200);
+    expect(preview.body.html).toBe('<p>Dear Pia</p><hr data-page-break /><p>Two</p>');
+    await admin.post(`${D}/templates/preview`, { body: '{{#if}}', contactUuid: c.body.uuid }).expect(422);
+
+    const role = await createRole(['documents.documents.view']);
+    const { client } = await clientWithRoles([role]);
+    await client.get(`${D}/templates/fields`).expect(403);
+    await client.post(`${D}/templates/preview`, { body: '<p>x</p>', contactUuid: c.body.uuid }).expect(403);
+  });
+
   it('shares a document to the portal, where the customer signs it once', async () => {
     const c = await admin.post('/contacts', { firstName: 'Sam', email: 'sam.docs@example.test' }).expect(201);
     const t = await admin
