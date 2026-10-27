@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { SAVED_REPLY_PREFIX } from '@app/shared';
 import { Copy, KeyRound, Plus, RefreshCw, Send, Trash2, Webhook } from 'lucide-react';
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { formatDateTime, formatRelative } from '@/lib/format';
 import { useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
-import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { Field, Input, NativeSelect } from '@/components/ui/input';
 import { Badge, EmptyState, Pane, Skeleton } from '@/components/ui/misc';
 import { Dialog, DialogContent, Sheet } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
 import { Combobox } from '@/components/fields/combobox';
 import { SettingsPage } from './layout';
+import { RichTextEditor } from '@/components/editor/rich-text-editor';
+import { useMergeFields } from '@/components/editor/use-templates';
 
 function copy(text: string) {
   void navigator.clipboard?.writeText(text).then(() => toast.success('Copied'));
@@ -445,7 +448,26 @@ export function TemplatesPage() {
   return (
     <SettingsPage
       title={t('settings.templates')}
-      description="The wording of emails people receive. Variables like {{branding.appName}} and {{labels.contact.singular}} are filled in when sent."
+      description="The wording of emails people receive, and saved replies your team inserts into emails and notes by typing /. Fields like {{contact.firstName}} are filled in when used."
+      actions={
+        <Button
+          variant="primary"
+          onClick={() =>
+            setEditing({
+              uuid: null,
+              key: '',
+              channel: 'email',
+              locale: 'en',
+              name: '',
+              subject: '',
+              body: '',
+              builtIn: false,
+            })
+          }
+        >
+          <Plus /> New saved reply
+        </Button>
+      }
     >
       <Pane padded={false}>
         {list.isPending ? (
@@ -463,8 +485,14 @@ export function TemplatesPage() {
                     <p className="font-medium">{tpl.name}</p>
                     <p className="truncate text-xs text-muted">{tpl.subject}</p>
                   </div>
-                  <Badge tone="outline">{tpl.channel}</Badge>
-                  {tpl.builtIn ? <Badge>Default</Badge> : <Badge tone="primary">Customized</Badge>}
+                  {tpl.key.startsWith(SAVED_REPLY_PREFIX) ? (
+                    <Badge tone="primary">Saved reply</Badge>
+                  ) : (
+                    <>
+                      <Badge tone="outline">{tpl.channel}</Badge>
+                      {tpl.builtIn ? <Badge>Default</Badge> : <Badge tone="primary">Customized</Badge>}
+                    </>
+                  )}
                 </button>
               </li>
             ))}
@@ -482,6 +510,16 @@ export function TemplatesPage() {
   );
 }
 
+/** A unique key for a new saved reply, from its name. */
+function replyKey(name: string) {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
+  return `${SAVED_REPLY_PREFIX}${slug || 'reply'}_${Date.now().toString(36)}`;
+}
+
 function TemplateEditor({
   template,
   onClose,
@@ -491,8 +529,12 @@ function TemplateEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const isNew = !template.uuid && !template.builtIn;
+  const isReply = isNew || template.key.startsWith(SAVED_REPLY_PREFIX);
+  const [name, setName] = useState(template.name);
   const [subject, setSubject] = useState(template.subject);
   const [body, setBody] = useState(template.body);
+  const fields = useMergeFields();
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
   useEffect(() => {
@@ -508,10 +550,10 @@ function TemplateEditor({
       template.uuid
         ? apiPatch(`/templates/${template.uuid}`, { subject, body })
         : apiPost('/templates', {
-            key: template.key,
+            key: isNew ? replyKey(name) : template.key,
             channel: template.channel,
             locale: template.locale,
-            name: template.name,
+            name: isNew ? name.trim() : template.name,
             subject,
             body,
           }),
@@ -524,7 +566,7 @@ function TemplateEditor({
   const reset = useMutation({
     mutationFn: () => apiDelete(`/templates/${template.uuid}`),
     onSuccess: () => {
-      toast.success('Back to the default wording');
+      toast.success(isReply ? 'Saved reply deleted' : 'Back to the default wording');
       onSaved();
       onClose();
     },
@@ -533,18 +575,23 @@ function TemplateEditor({
     <Sheet
       open
       onOpenChange={(o) => !o && onClose()}
-      title={template.name}
-      description={template.key}
+      title={isNew ? 'New saved reply' : template.name}
+      description={isNew ? 'Insert it into an email or note by typing /.' : template.key}
       width="max-w-5xl"
       footer={
         <>
           {template.uuid ? (
             <Button variant="ghost" className="me-auto" onClick={() => reset.mutate()}>
-              Reset to default
+              {isReply ? 'Delete saved reply' : 'Reset to default'}
             </Button>
           ) : null}
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={() => save.mutate()} loading={save.isPending} disabled={!!error}>
+          <Button
+            variant="primary"
+            onClick={() => save.mutate()}
+            loading={save.isPending}
+            disabled={!!error || (isNew && !name.trim()) || !body}
+          >
             Save template
           </Button>
         </>
@@ -552,16 +599,26 @@ function TemplateEditor({
     >
       <div className="grid gap-4 p-5 lg:grid-cols-2">
         <div className="flex flex-col gap-3">
-          <Field label="Subject">
+          {isNew ? (
+            <Field label="Name" required help="Shown in the / menu.">
+              {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus />}
+            </Field>
+          ) : null}
+          <Field
+            label="Subject"
+            help={isReply ? 'Used as the email subject when it is still empty.' : undefined}
+          >
             {(p) => <Input {...p} value={subject} onChange={(e) => setSubject(e.target.value)} />}
           </Field>
-          <Field label="Body (HTML)" error={error ?? undefined}>
+          <Field label="Body" error={error ?? undefined} help="Type {{ to insert a field.">
             {(p) => (
-              <Textarea
+              <RichTextEditor
                 {...p}
+                aria-label="Body"
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
-                className="min-h-96 font-mono text-xs"
+                onChange={setBody}
+                mergeFields={fields ?? []}
+                className="min-h-96"
               />
             )}
           </Field>
