@@ -192,7 +192,7 @@
     "noFields": "No fields match",
     "insertReply": "Insert saved reply",
     "noReplies": "No saved replies match",
-    "undo": "Undo",
-    "redo": "Redo"
+    "undo": "Undo edit",
+    "redo": "Redo edit"
   }
 }

@@ -76,6 +76,8 @@ const SuggestionList = forwardRef<ListHandle, ListProps>(function SuggestionList
 export interface SuggestionSource {
   /** What the user types to open the menu: `/` or `{{`. */
   char: string;
+  /** Keep the menu open across spaces (field labels have them; slash commands do not). */
+  allowSpaces?: boolean;
   label: string;
   empty: string;
   items: (query: string) => MenuItem[] | Promise<MenuItem[]>;
@@ -94,6 +96,7 @@ export function suggestionExtension(name: string, source: () => SuggestionSource
           editor: this.editor,
           pluginKey: new PluginKey(name),
           char: initial.char,
+          allowSpaces: initial.allowSpaces ?? false,
           items: ({ query }) => source()?.items(query) ?? [],
           command: ({ editor, range, props }) => source()?.select(editor, range, props),
           render: () => {

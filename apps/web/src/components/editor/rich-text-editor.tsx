@@ -96,6 +96,7 @@ export function RichTextEditor({
       if (!groups) return null;
       return {
         char: '{{',
+        allowSpaces: true,
         label: tr('editor.insertField'),
         empty: tr('editor.noFields'),
         items: (q) =>
