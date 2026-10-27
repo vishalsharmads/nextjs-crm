@@ -19,7 +19,9 @@ import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative, fromLocalInput, toLocalInput } from '@/lib/format';
 import { useBoot, useCan, useLabel } from '@/app/session';
 import { Button } from '@/components/ui/button';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
+import { RichTextEditor } from '@/components/editor/rich-text-editor';
+import { useSavedReplies } from '@/components/editor/use-templates';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge, EmptyState, Skeleton } from '@/components/ui/misc';
 import { UserPicker } from '@/components/fields/pickers';
@@ -137,10 +139,7 @@ export function ActivityItem({ a, showRelated }: { a: ActivityDto; showRelated?:
           {showRelated && a.related ? <RelatedLink related={a.related} /> : null}
         </div>
         {a.body ? (
-          <div
-            className="prose-sm mt-1 text-sm text-ink [&_a]:text-primary [&_a]:underline [&_ul]:list-disc [&_ul]:ps-5"
-            dangerouslySetInnerHTML={{ __html: a.body }}
-          />
+          <div className="rte-prose mt-1 text-sm text-ink" dangerouslySetInnerHTML={{ __html: a.body }} />
         ) : null}
         <p className="mt-0.5 text-xs text-faint">
           {TYPE_LABEL[a.type]}
@@ -172,14 +171,13 @@ export function ActivityComposer({
     setBody('');
     setWhen('');
   };
+  const replies = useSavedReplies(related);
   const create = useMutation({
     mutationFn: () =>
       apiPost<ActivityDto>('/activities', {
         type,
         subject,
-        body: body
-          ? `<p>${body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>')}</p>`
-          : null,
+        body: body || null,
         dueAt: type === 'task' || type === 'call' ? fromLocalInput(when) : null,
         startAt: type === 'meeting' ? fromLocalInput(when) : null,
         endAt:
@@ -196,7 +194,7 @@ export function ActivityComposer({
       onCreated?.();
     },
   });
-  const valid = type === 'note' ? !!body.trim() : !!subject.trim();
+  const valid = type === 'note' ? !!body : !!subject.trim();
   return (
     <div className="rounded-md border border-line bg-surface">
       <div role="tablist" aria-label="Activity type" className="flex gap-1 border-b border-line px-2 pt-1.5">
@@ -242,14 +240,15 @@ export function ActivityComposer({
             aria-label="Subject"
           />
         ) : null}
-        <Textarea
+        <RichTextEditor
           value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder={type === 'note' ? 'Write a note…' : 'Details (optional)'}
+          onChange={setBody}
+          placeholder={type === 'note' ? 'Write a note… Type / for a saved reply.' : 'Details (optional)'}
           aria-label="Details"
+          replies={replies}
           className="min-h-16"
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && valid) create.mutate();
+          onSubmitShortcut={() => {
+            if (valid) create.mutate();
           }}
         />
         {type !== 'note' ? (
