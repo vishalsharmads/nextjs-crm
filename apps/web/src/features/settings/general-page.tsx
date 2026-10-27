@@ -357,7 +357,7 @@ export function DemoIndustryPane() {
   const [industry, setIndustry] = useState('');
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState('');
-  const target = industry || q.data?.industries.find((i) => i.slug !== q.data?.current)?.slug || '';
+  const target = industry || q.data?.current || q.data?.industries[0]?.slug || '';
   const name = (slug: string | null) => q.data?.industries.find((i) => i.slug === slug)?.name ?? slug;
   const doSwitch = useMutation({
     mutationFn: () => apiPost('/settings/demo/switch', { industry: target, confirm }),
@@ -394,7 +394,7 @@ export function DemoIndustryPane() {
         </Field>
         <Button
           variant="danger"
-          disabled={!q.data.allowed || !target}
+          disabled={!q.data.allowed || !target || target === q.data.current}
           onClick={() => {
             setConfirm('');
             setOpen(true);

@@ -56,11 +56,15 @@ describe('DemoIndustryPane', () => {
     expect(screen.getByRole('button', { name: 'Switch industry' })).toBeDisabled();
   });
 
-  it('needs the industry typed before switching', async () => {
+  it('starts on the current industry and needs the new one typed before switching', async () => {
     apiGet.mockResolvedValue(info);
     apiPost.mockReturnValue(new Promise(() => undefined));
     renderPane();
-    await userEvent.click(await screen.findByRole('button', { name: 'Switch industry' }));
+    const select = (await screen.findByLabelText('Industry')) as HTMLSelectElement;
+    expect(select.value).toBe('coworking');
+    expect(screen.getByRole('button', { name: 'Switch industry' })).toBeDisabled();
+    await userEvent.selectOptions(select, 'law-firms');
+    await userEvent.click(screen.getByRole('button', { name: 'Switch industry' }));
     const dialog = await screen.findByRole('dialog', { name: /switch the demo to law firm/i });
     const switchButton = within(dialog).getByRole('button', { name: 'Switch industry' }) as HTMLButtonElement;
     expect(switchButton.disabled).toBe(true);
