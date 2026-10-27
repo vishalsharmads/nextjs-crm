@@ -29,6 +29,7 @@ export default defineConfig({
           if (/[\\/](zod|react-hook-form|@hookform)[\\/]/.test(id)) return 'forms';
           if (/[\\/](@tanstack)[\\/]/.test(id)) return 'tanstack';
           if (/[\\/](i18next|react-i18next)[\\/]/.test(id)) return 'i18n';
+          if (/[\\/](@tiptap|prosemirror-[a-z-]+|linkifyjs|marked)[\\/]/.test(id)) return 'editor';
           return undefined;
         },
       },
