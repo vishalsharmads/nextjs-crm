@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "recruitment-staffing",
   "name": "Recruitment and staffing",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Candidates, client companies and placements from sourcing to start date, with right-to-work file requests, placement-fee quotes and invoices, and temp and contract assignments.",
   "settings": {
     "features": {
@@ -1372,6 +1372,27 @@
         "owner": "account_manager"
       }
     ],
+    "branding": {
+      "appName": "Talentbridge Recruitment",
+      "tagline": "The right people, placed fast",
+      "loginTitle": "Welcome to Talentbridge Recruitment",
+      "loginTagline": "The right people, placed fast",
+      "footerText": "Talentbridge Recruitment · Demo data",
+      "pdfHeader": "Talentbridge Recruitment",
+      "emailFromName": "Talentbridge Recruitment",
+      "fontFamily": "IBM Plex Sans",
+      "radius": 8,
+      "colors": {
+        "light": {
+          "primary": "#0F766E",
+          "accent": "#C2410C"
+        },
+        "dark": {
+          "primary": "#4FD1C5",
+          "accent": "#F08A5D"
+        }
+      }
+    },
     "requests": [
       {
         "method": "post",

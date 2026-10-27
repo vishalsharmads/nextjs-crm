@@ -68,7 +68,8 @@ Industries: `real-estate`, `healthcare-clinics`, `law-firms`, `financial-adviser
 It empties the demo database and its upload folder, installs that industry's template, creates one demo
 user per role (password `DemoAccess2026!`, or `--password`), then adds sample data dated around today:
 companies, contacts, deals in every stage, notes, tasks, meetings, and module records (quotes, invoices,
-bookings, tickets, contracts) created through the app itself. Then restart the app (on Passenger,
+bookings, tickets, contracts) created through the app itself. The workspace is branded as a fictional
+business of that industry (name, colors, font and sign-in copy from the blueprint's `sample_data.branding`). Then restart the app (on Passenger,
 `--restart-file` touches `tmp/restart.txt` for you). The website marks that industry's demo as live.
 
 **From the app:** an admin can do the same under Settings → Security → Demo industry, without shell

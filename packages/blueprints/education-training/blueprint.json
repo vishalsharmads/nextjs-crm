@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "education-training",
   "name": "Education and training",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Students, agents and enrolments for colleges, training providers and tutoring businesses: enquiry to application, offer, enrolment and completion, with document collection, fee invoices and a student support desk.",
   "settings": {
     "features": {
@@ -1167,6 +1167,27 @@
         "days": -3
       }
     ],
+    "branding": {
+      "appName": "Meridian Learning Academy",
+      "tagline": "Your path to study abroad",
+      "loginTitle": "Welcome to Meridian Learning Academy",
+      "loginTagline": "Your path to study abroad",
+      "footerText": "Meridian Learning Academy · Demo data",
+      "pdfHeader": "Meridian Learning Academy",
+      "emailFromName": "Meridian Learning Academy",
+      "fontFamily": "Source Sans 3",
+      "radius": 10,
+      "colors": {
+        "light": {
+          "primary": "#5B21B6",
+          "accent": "#B45309"
+        },
+        "dark": {
+          "primary": "#B79CF7",
+          "accent": "#F2A65A"
+        }
+      }
+    },
     "requests": [
       {
         "ref": "p_web",

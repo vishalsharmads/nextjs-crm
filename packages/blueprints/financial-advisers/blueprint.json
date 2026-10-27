@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "financial-advisers",
   "name": "Financial advisers and mortgage brokers",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Clients, lenders and applications for financial advisers and mortgage brokers, from discovery and fact find to settlement and annual review.",
   "settings": {
     "features": {
@@ -1295,6 +1295,27 @@
         "owner": "admin"
       }
     ],
+    "branding": {
+      "appName": "Northstar Wealth Partners",
+      "tagline": "Plans that outlast the market",
+      "loginTitle": "Welcome to Northstar Wealth Partners",
+      "loginTagline": "Plans that outlast the market",
+      "footerText": "Northstar Wealth Partners · Demo data",
+      "pdfHeader": "Northstar Wealth Partners",
+      "emailFromName": "Northstar Wealth Partners",
+      "fontFamily": "Public Sans",
+      "radius": 6,
+      "colors": {
+        "light": {
+          "primary": "#14532D",
+          "accent": "#1D4ED8"
+        },
+        "dark": {
+          "primary": "#6FCF97",
+          "accent": "#8AB4FF"
+        }
+      }
+    },
     "requests": [
       {
         "method": "post",

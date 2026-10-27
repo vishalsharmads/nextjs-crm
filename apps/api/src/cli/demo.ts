@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { Knex } from 'knex';
 import {
   blueprintForIndustry,
+  demoBranding,
   industryForBlueprint,
   listBlueprintKeys,
   loadBlueprint,
@@ -262,6 +263,16 @@ export async function resetDemo(
   const requests = bp.sample_data?.requests ?? [];
   const created = admin ? await runSampleRequests(requests, refs, admin) : 0;
   out(`     ${count} records and ${created} module records`);
+  // The demo shows a fictional business of that industry: its name, colors and sign-in copy.
+  const branding = demoBranding(bp);
+  if (branding) {
+    await db('settings')
+      .insert({ key: 'branding', group: 'branding', value: JSON.stringify(branding), is_public: true })
+      .onConflict('key')
+      .merge();
+    clearSettingsCache();
+    out(`     Branded as "${branding.appName}"`);
+  }
 
   await db('settings')
     .where({ key: DEMO_KEY })

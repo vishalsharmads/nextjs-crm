@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_BRANDING, brandingSchema, type Branding } from '@app/shared';
 import { blueprintSchema, type Blueprint } from './schema';
 
 export * from './schema';
@@ -79,3 +80,18 @@ export function industryForBlueprint(key: string): string {
   return Object.entries(INDUSTRY_ALIASES).find(([, k]) => k === key)?.[0] ?? key;
 }
 export * from './check-sample';
+
+/** A blueprint's demo brand over the factory theme, or null when it has none (see `sample_data.branding`). */
+export function demoBranding(bp: Blueprint): Branding | null {
+  const b = bp.sample_data?.branding;
+  if (!b) return null;
+  const { colors, ...rest } = b;
+  return brandingSchema.parse({
+    ...DEFAULT_BRANDING,
+    ...rest,
+    colors: {
+      light: { ...DEFAULT_BRANDING.colors.light, ...colors?.light },
+      dark: { ...DEFAULT_BRANDING.colors.dark, ...colors?.dark },
+    },
+  });
+}
