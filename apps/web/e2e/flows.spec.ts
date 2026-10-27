@@ -36,7 +36,11 @@ test('creates a custom field and uses it on a new contact', async ({ page }) => 
   await expect(page.getByText('cf.preferred_language')).toBeVisible();
 
   await page.goto('/contacts');
-  await page.getByRole('button', { name: /New Contact/ }).click();
+  // An empty list shows a second New button in its empty state.
+  await page
+    .getByRole('button', { name: /New Contact/ })
+    .first()
+    .click();
   await page.getByLabel('First name').fill('Lucia');
   await page.getByLabel('Last name').fill('Playwright');
   await page.getByLabel('Email').fill('lucia@e2e.test');
@@ -95,6 +99,6 @@ test('moves a deal with the stage track on its page, and undoes it', async ({ pa
   ).toHaveText('Meeting scheduled');
 
   await track.getByRole('button', { name: 'Qualified' }).click();
-  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(track.locator('button[aria-current="step"]')).toHaveText('Meeting scheduled');
 });
