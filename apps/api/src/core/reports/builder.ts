@@ -192,6 +192,34 @@ const toDto = (r: Record<string, unknown>, user: AuthUser): SavedReportDto => ({
   updatedAt: iso(r.updated_at)!,
 });
 
+/** Custom fields a definition names (group, metric, filter). */
+function customKeys(d: ReportDefinition): string[] {
+  const keys = [d.groupBy, d.metricField ?? ''].filter((k) => k.startsWith('cf.'));
+  const walk = (n: unknown) => {
+    if (!n || typeof n !== 'object') return;
+    const node = n as { field?: unknown; and?: unknown[]; or?: unknown[] };
+    if (typeof node.field === 'string' && node.field.startsWith('cf.')) keys.push(node.field);
+    for (const c of [...(node.and ?? []), ...(node.or ?? [])]) walk(c);
+  };
+  walk(d.filter);
+  return keys.map((k) => k.slice(3));
+}
+
+/** A shared report the viewer may see: it names no custom field hidden from them (not even its key). */
+async function viewable(d: ReportDefinition, user: AuthUser): Promise<boolean> {
+  let def: ResourceDef;
+  try {
+    def = getRecordDef(d.entity);
+  } catch {
+    return false;
+  }
+  if (!can(user, `${def.resource}.view`)) return false;
+  const keys = customKeys(d);
+  if (!keys.length) return true;
+  const fc = await filterContext(def, user);
+  return keys.every((k) => fc.fieldLevels[k] !== 'hidden' && fc.customDefs.some((x) => x.key === k));
+}
+
 /** A saved report the user may open: their own, or shared, for a record type they may view. */
 export async function visibleReport(uuid: string, user: AuthUser) {
   const row = await db('saved_reports')
@@ -199,6 +227,10 @@ export async function visibleReport(uuid: string, user: AuthUser) {
     .where((w) => w.where({ owner_id: user.id }).orWhere({ shared: true }))
     .first();
   if (!row) throw notFound('Report');
+  const definition = (
+    typeof row.definition === 'string' ? JSON.parse(row.definition) : row.definition
+  ) as ReportDefinition;
+  if (row.owner_id !== user.id && !(await viewable(definition, user))) throw notFound('Report');
   return row as Record<string, unknown>;
 }
 
@@ -213,17 +245,12 @@ export const reportBuilderRoutes = defineRoutes('/reports/custom', ['reports'])
       const rows = await db('saved_reports')
         .where((w) => w.where({ owner_id: user.id }).orWhere({ shared: true }))
         .orderBy('name');
-      return {
-        data: rows
-          .map((r) => toDto(r, user))
-          .filter((r) => {
-            try {
-              return can(user, `${getRecordDef(r.definition.entity).resource}.view`);
-            } catch {
-              return false;
-            }
-          }),
-      };
+      const out: SavedReportDto[] = [];
+      for (const r of rows) {
+        const dto = toDto(r, user);
+        if (dto.mine || (await viewable(dto.definition, user))) out.push(dto);
+      }
+      return { data: out };
     },
   })
   .add({
@@ -273,7 +300,8 @@ export const reportBuilderRoutes = defineRoutes('/reports/custom', ['reports'])
     handler: async ({ ctx, user, params, body }) => {
       const row = await db('saved_reports').where({ uuid: params.uuid, owner_id: user.id }).first();
       if (!row) throw notFound('Report');
-      if (body.shared) assertCan(user, 'core.saved_views.share');
+      // Changing a report everyone sees needs the right to share, like sharing it does.
+      if (body.shared || row.shared) assertCan(user, 'core.saved_views.share');
       if (body.definition) await runReport(body.definition, user);
       const patch: Record<string, unknown> = { updated_at: new Date() };
       if (body.name !== undefined) patch.name = body.name;

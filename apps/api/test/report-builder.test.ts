@@ -109,6 +109,37 @@ describe('report builder', () => {
     expect(hidden.body).toMatchObject({ unavailable: true });
   });
 
+  it('hides shared reports that name a field hidden from the viewer', async () => {
+    const key = `secret_${Date.now().toString(36)}`;
+    const field = await admin
+      .post('/custom-fields', {
+        entity: 'deal',
+        key,
+        label: 'Secret',
+        type: 'select',
+        filterable: true,
+        options: [{ key: 'a', label: 'A' }],
+        visibility: { default: 'hidden' },
+      })
+      .expect(201);
+    const definition = {
+      entity: 'deal',
+      groupBy: 'status',
+      filter: { field: `cf.${key}`, op: 'eq', value: 'a' },
+    };
+    const shared = await admin
+      .post('/reports/custom', { name: 'Hidden', definition, shared: true })
+      .expect(201);
+    const rep = await loginAs(
+      await createUser({ roleKeys: [await createRole(['core.deals.view', 'core.reports.view'])] }),
+    );
+    const list = await rep.get('/reports/custom').expect(200);
+    expect(JSON.stringify(list.body)).not.toContain(key);
+    await rep.get(`/reports/custom/${shared.body.uuid}/run`).expect(404);
+    await rep.post('/reports/custom/preview', { entity: 'deal', groupBy: `cf.${key}` }).expect(422);
+    await admin.post(`/custom-fields/${field.body.uuid}/archive`).expect(200);
+  });
+
   it('saves a personal dashboard and resets it to the shared one', async () => {
     const { client } = await clientWithRoles(['admin']);
     const widgets = [{ key: 'w1', type: 'tasks_due', title: 'Tasks', size: 'sm', params: {} }];

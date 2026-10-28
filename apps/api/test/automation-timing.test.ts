@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { clientWithRoles, createUser, unique, type Client } from './helpers';
+import { clientWithRoles, createRole, createUser, loginAs, unique, type Client } from './helpers';
 import { db } from '../src/db/knex';
 import { nextRun, runDueAutomations } from '../src/core/automations/automations';
 
@@ -121,6 +121,21 @@ describe('delayed and scheduled automations', () => {
     );
     expect(names).toContain('keep');
     expect(names).not.toContain('temp');
+  });
+
+  it('makes whoever changes a rule its owner, so nobody borrows wider access', async () => {
+    const r = await rule({
+      triggerEvent: 'deal.created',
+      conditions: { field: 'title', op: 'eq', value: unique('Never') },
+      actions: [{ type: 'add_note', body: 'x' }],
+    });
+    const role = await createRole(['core.automations.manage', 'core.deals.view'], { 'core.deals': 'own' });
+    const mgrUser = await createUser({ roleKeys: [role] });
+    const mgr = await loginAs(mgrUser);
+    await mgr.patch(`/automations/${r.uuid}`, { actions: [{ type: 'add_note', body: 'y' }] }).expect(200);
+    const row = await db('automations').where({ uuid: r.uuid }).first('created_by');
+    expect(row.created_by).toBe(mgrUser.id);
+    await mgr.patch(`/automations/${r.uuid}`, { active: false }).expect(200);
   });
 
   it('validates schedules', async () => {

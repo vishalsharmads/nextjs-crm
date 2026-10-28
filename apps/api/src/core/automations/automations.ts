@@ -315,20 +315,21 @@ async function runAction(
     }
     case 'assign': {
       if (!def) return 'skipped: not a record';
-      // Take turns: the n-th run of this rule goes to the n-th person in the list.
-      const n = Number(
-        (
-          await db('automations')
-            .where({ id: automationId.getStore() ?? 0 })
-            .first('run_count')
-        )?.run_count ?? 0,
-      );
-      const pick = action.users[n % action.users.length]!;
-      const active = await db('users')
-        .where({ uuid: pick, status: 'active' })
-        .whereNull('deleted_at')
-        .first('id');
-      if (!active) return 'skipped: person not active';
+      // Take turns, skipping people who are no longer active. The cursor moves in one statement,
+      // so parallel runs never pick the same position.
+      const id = automationId.getStore() ?? 0;
+      let pick: string | null = null;
+      for (let tries = 0; tries < action.users.length && !pick; tries++) {
+        await db('automations').where({ id }).increment('assign_cursor', 1);
+        const row = await db('automations').where({ id }).first('assign_cursor');
+        const candidate = action.users[(Number(row?.assign_cursor ?? 1) - 1) % action.users.length]!;
+        const active = await db('users')
+          .where({ uuid: candidate, status: 'active' })
+          .whereNull('deleted_at')
+          .first('id');
+        if (active) pick = candidate;
+      }
+      if (!pick) return 'skipped: nobody in the list is active';
       await updateRecord(
         def,
         ctx,
@@ -387,7 +388,7 @@ registerJob('automation.run', async (job) => {
   try {
     // A delayed run judges the record as it is now, read as the rule's owner.
     let gone = false;
-    if (job.payload.recheck) {
+    if (job.payload.recheck && !event.type.endsWith('.deleted')) {
       const def = findRecordDef(event.entity);
       const owner = await runAs(automation.created_by);
       const fresh = def ? await getRecord(def, owner, event.uuid).catch(() => null) : null;
@@ -513,6 +514,14 @@ export async function runDueAutomations(now = new Date()) {
       }
     } catch (err) {
       logger.warn({ err, automation: rule.uuid }, 'Scheduled automation failed');
+      // Visible to admins in the rule's run log.
+      await db('automation_runs').insert({
+        automation_id: rule.id,
+        event: `${schedule.entity}.scheduled`,
+        record_uuid: null,
+        status: 'failed',
+        log: JSON.stringify([(err as Error).message]),
+      });
     }
   }
 }
@@ -590,9 +599,10 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
     permission: 'core.automations.manage',
     params: z.object({ uuid: z.uuid() }),
     body: automationPatch,
-    handler: async ({ ctx, params, body }) => {
+    handler: async ({ ctx, user, params, body }) => {
       const a = await db('automations').where({ uuid: params.uuid }).first();
       if (!a) throw notFound('Automation');
+      if (user.apiKeyId) throw new AppError('FORBIDDEN', 'Automations must belong to a person');
       const schedule =
         body.schedule !== undefined ? body.schedule : (a.schedule as AutomationSchedule | null);
       const trigger = body.triggerEvent ?? (a.trigger_event as string);
@@ -609,7 +619,20 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
       if (body.actions !== undefined) patch.actions = JSON.stringify(body.actions);
       if (body.active !== undefined) patch.active = body.active;
       if (body.delayMinutes !== undefined) patch.delay_minutes = body.delayMinutes;
-      if (body.schedule !== undefined || body.triggerEvent !== undefined) {
+      // A rule runs with its owner's access. Whoever changes what it does or when becomes the owner,
+      // so nobody can borrow someone else's wider scope by editing their rule.
+      const substantive = [
+        'triggerEvent',
+        'conditions',
+        'actions',
+        'schedule',
+        'delayMinutes',
+        'active',
+      ].some((k) => (body as Record<string, unknown>)[k] !== undefined);
+      if (substantive && a.created_by !== user.id) patch.created_by = user.id;
+      // Turning a scheduled rule back on starts from the next slot, not from a backlog.
+      const reactivated = body.active === true && !a.active;
+      if (body.schedule !== undefined || body.triggerEvent !== undefined || reactivated) {
         const sched = typeof schedule === 'string' ? (JSON.parse(schedule) as AutomationSchedule) : schedule;
         patch.schedule = sched ? JSON.stringify(sched) : null;
         patch.next_run_at = sched ? nextRun(sched, (await getGroup('general')).timezone) : null;
@@ -621,7 +644,7 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
           entity: 'automation',
           entityId: a.id,
           entityUuid: params.uuid,
-          diff: body,
+          diff: { ...body, ...(patch.created_by ? { owner: { from: a.created_by, to: user.id } } : {}) },
         });
       });
       return dto(await db('automations').where({ id: a.id }).first());
