@@ -6,8 +6,10 @@ import type { ForecastDto, QuotaRowDto, VelocityDto } from '@app/shared';
 import { ApiError, apiGet, apiPut } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
 import { ReportBuilder } from './report-builder';
+import { MissingRates } from './report-chart';
 import { useBoot, useCan, useT } from '@/app/session';
 import { Input, NativeSelect } from '@/components/ui/input';
+import { Switch } from '@/components/ui/checkbox';
 import {
   EmptyState,
   ErrorState,
@@ -40,26 +42,33 @@ export function ReportsPage() {
   const { pipelines } = useBoot();
   const dealPipelines = pipelines.filter((p) => p.entity === 'deal');
   const [pipelineUuid, setPipelineUuid] = useState('');
+  const [convert, setConvert] = useState(false);
   return (
     <div className="flex flex-col">
       <PageHeader
         title="Reports"
         description={t('reports.description')}
         actions={
-          dealPipelines.length > 1 ? (
-            <NativeSelect
-              value={pipelineUuid}
-              onChange={(e) => setPipelineUuid(e.target.value)}
-              aria-label="Pipeline"
-            >
-              <option value="">All pipelines</option>
-              {dealPipelines.map((p) => (
-                <option key={p.uuid} value={p.uuid}>
-                  {p.name}
-                </option>
-              ))}
-            </NativeSelect>
-          ) : null
+          <>
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <Switch checked={convert} onCheckedChange={setConvert} aria-label="Convert currencies" />
+              All currencies
+            </label>
+            {dealPipelines.length > 1 ? (
+              <NativeSelect
+                value={pipelineUuid}
+                onChange={(e) => setPipelineUuid(e.target.value)}
+                aria-label="Pipeline"
+              >
+                <option value="">All pipelines</option>
+                {dealPipelines.map((p) => (
+                  <option key={p.uuid} value={p.uuid}>
+                    {p.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            ) : null}
+          </>
         }
       />
       <div className="p-4 md:p-6">
@@ -71,13 +80,13 @@ export function ReportsPage() {
             <TabsTrigger value="custom">Custom</TabsTrigger>
           </TabsList>
           <TabsContent value="forecast" className="mt-4">
-            <Forecast pipelineUuid={pipelineUuid} />
+            <Forecast pipelineUuid={pipelineUuid} convert={convert} />
           </TabsContent>
           <TabsContent value="quotas" className="mt-4">
-            <Quotas />
+            <Quotas convert={convert} />
           </TabsContent>
           <TabsContent value="velocity" className="mt-4">
-            <Velocity pipelineUuid={pipelineUuid} />
+            <Velocity pipelineUuid={pipelineUuid} convert={convert} />
           </TabsContent>
           <TabsContent value="custom" className="mt-4">
             <ReportBuilder />
@@ -98,20 +107,26 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   );
 }
 
-function Forecast({ pipelineUuid }: { pipelineUuid: string }) {
+function Forecast({ pipelineUuid, convert }: { pipelineUuid: string; convert: boolean }) {
   const q = useQuery({
-    queryKey: ['reports', 'forecast', pipelineUuid],
+    queryKey: ['reports', 'forecast', pipelineUuid, convert],
     queryFn: () =>
-      apiGet<ForecastDto>('/reports/forecast', { months: 6, ...(pipelineUuid ? { pipelineUuid } : {}) }),
+      apiGet<ForecastDto>('/reports/forecast', {
+        months: 6,
+        ...(pipelineUuid ? { pipelineUuid } : {}),
+        ...(convert ? { convert: true } : {}),
+      }),
   });
   if (q.isPending) return <Skeleton className="h-72" />;
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
   const d = q.data;
   const money = (v: number) => formatMoney(v, d.currency);
   const total = d.months.reduce((s, m) => s + m.value, 0);
+  const missing = <MissingRates currencies={d.missingRates} />;
   const weighted = d.months.reduce((s, m) => s + m.weighted, 0);
   return (
     <div className="flex flex-col gap-4">
+      {missing}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Open, next 6 months" value={money(total)} />
         <Stat label="Weighted by stage" value={money(weighted)} />
@@ -175,13 +190,17 @@ function Forecast({ pipelineUuid }: { pipelineUuid: string }) {
   );
 }
 
-function Quotas() {
+function Quotas({ convert }: { convert: boolean }) {
   const can = useCan();
   const qc = useQueryClient();
   const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
   const q = useQuery({
-    queryKey: ['reports', 'quotas', period],
-    queryFn: () => apiGet<{ currency: string; data: QuotaRowDto[] }>('/reports/quotas', { period }),
+    queryKey: ['reports', 'quotas', period, convert],
+    queryFn: () =>
+      apiGet<{ currency: string; data: QuotaRowDto[] }>('/reports/quotas', {
+        period,
+        ...(convert ? { convert: true } : {}),
+      }),
   });
   const save = useMutation({
     mutationFn: (v: { userUuid: string; amount: number | null }) =>
@@ -306,12 +325,16 @@ function QuotaInput({
   );
 }
 
-function Velocity({ pipelineUuid }: { pipelineUuid: string }) {
+function Velocity({ pipelineUuid, convert }: { pipelineUuid: string; convert: boolean }) {
   const [days, setDays] = useState(90);
   const q = useQuery({
-    queryKey: ['reports', 'velocity', pipelineUuid, days],
+    queryKey: ['reports', 'velocity', pipelineUuid, days, convert],
     queryFn: () =>
-      apiGet<VelocityDto>('/reports/velocity', { days, ...(pipelineUuid ? { pipelineUuid } : {}) }),
+      apiGet<VelocityDto>('/reports/velocity', {
+        days,
+        ...(pipelineUuid ? { pipelineUuid } : {}),
+        ...(convert ? { convert: true } : {}),
+      }),
   });
   if (q.isPending) return <Skeleton className="h-72" />;
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
@@ -334,6 +357,7 @@ function Velocity({ pipelineUuid }: { pipelineUuid: string }) {
           ))}
         </NativeSelect>
       </div>
+      <MissingRates currencies={d.missingRates} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Win rate"

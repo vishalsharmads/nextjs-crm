@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/checkbox';
 import { EmptyState, ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { FilterBar } from '@/components/data/filter-bar';
 import { buildConfig, type FieldConfig } from '@/features/records/entities';
-import { ReportChart } from './report-chart';
+import { MissingRates, ReportChart } from './report-chart';
 
 const savedKey = ['reports', 'custom'] as const;
 const GROUP_KINDS = new Set(['select', 'date', 'datetime', 'user']);
@@ -43,6 +43,8 @@ function reportFields(fields: FieldConfig[]) {
 const blank = (entity: string): ReportDefinition => ({
   entity,
   groupBy: entity === 'deal' ? 'stage' : 'owner',
+  groupBy2: null,
+  convert: false,
   dateBucket: 'month',
   metric: 'count',
   metricField: null,
@@ -201,6 +203,24 @@ export function ReportBuilder() {
                 )}
               </Field>
             ) : null}
+            <Field label="Break down by">
+              {(p) => (
+                <NativeSelect
+                  {...p}
+                  value={def.groupBy2 ?? ''}
+                  onChange={(e) => set({ groupBy2: e.target.value || null })}
+                >
+                  <option value="">Nothing</option>
+                  {group
+                    .filter((f) => f.key !== def.groupBy)
+                    .map((f) => (
+                      <option key={f.key} value={f.key}>
+                        {f.label}
+                      </option>
+                    ))}
+                </NativeSelect>
+              )}
+            </Field>
             <Field label="Measure">
               {(p) => (
                 <NativeSelect
@@ -241,6 +261,12 @@ export function ReportBuilder() {
               )}
             </Field>
           </div>
+          {def.metric !== 'count' && config.fields.some((f) => f.key === 'currency') ? (
+            <label className="mt-3 flex items-center gap-2 text-sm">
+              <Switch checked={!!def.convert} onCheckedChange={(convert) => set({ convert })} />
+              Convert all currencies into {boot.settings.general.currency}
+            </label>
+          ) : null}
           <div className="mt-3">
             <FilterBar
               fields={config.fields as FieldConfig[]}
@@ -255,7 +281,10 @@ export function ReportBuilder() {
           ) : preview.isError ? (
             <ErrorState error={preview.error} />
           ) : preview.data ? (
-            <ReportChart result={preview.data} definition={definition} currency={currency} />
+            <>
+              <MissingRates currencies={preview.data.missingRates} />
+              <ReportChart result={preview.data} definition={definition} currency={currency} />
+            </>
           ) : (
             <EmptyState title="Choose what to measure" />
           )}

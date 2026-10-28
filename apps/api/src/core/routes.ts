@@ -28,7 +28,7 @@ import { emailRoutes } from './email/email';
 import { objectRecordRoutes, objectsRoutes } from './objects/objects.routes';
 import { tokensRoutes } from './tokens/tokens';
 import { mcpRoutes } from './mcp/mcp.routes';
-import { reportsRoutes } from './reports/reports.routes';
+import { exchangeRatesRoutes, reportsRoutes } from './reports/reports.routes';
 import { reportBuilderRoutes } from './reports/builder';
 import { toolsRoutes } from './tools/tools.routes';
 
@@ -75,6 +75,7 @@ export function coreRouteGroups(): RouteGroup[] {
     mcpRoutes,
     reportBuilderRoutes,
     reportsRoutes,
+    exchangeRatesRoutes,
     toolsRoutes,
     objectRecordRoutes,
     ...entityCollectionRoutes(),
