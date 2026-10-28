@@ -5,6 +5,9 @@ import { db, ensureDatabase } from '../db/knex';
 import { migrateCore, rollbackCore } from '../db/migrate';
 import { installCore, markInstalled } from './install';
 import { runDoctor } from './doctor';
+import { writeScaffold } from './scaffold';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { hashPassword, validatePassword } from '../core/auth/auth.service';
 import { randomToken } from '../lib/crypto';
 import { newUuid } from '../lib/ids';
@@ -19,6 +22,33 @@ type Command = (args: string[]) => Promise<void>;
 const out = (msg: string) => process.stdout.write(`${msg}\n`);
 
 const commands: Record<string, Command> = {
+  async 'module:new'(args) {
+    const { values } = parseArgs({
+      args,
+      options: {
+        key: { type: 'string' },
+        entity: { type: 'string' },
+        plural: { type: 'string' },
+        singular: { type: 'string' },
+        personal: { type: 'boolean', default: false },
+      },
+    });
+    if (!values.key || !values.entity || !values.plural)
+      throw new Error(
+        'Usage: module:new --key=<module> --entity=<entity> --plural=<Plural> [--singular=..] [--personal]',
+      );
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+    const written = writeScaffold(root, {
+      key: values.key,
+      entity: values.entity,
+      plural: values.plural,
+      singular: values.singular,
+      personal: values.personal,
+    });
+    for (const f of written) out(`  wrote ${f}`);
+    out('Restart `npm run dev`, then enable the module in Settings → Modules.');
+  },
+
   async 'db:migrate'() {
     await ensureDatabase(env.DATABASE_URL);
     const applied = await migrateCore(db);
