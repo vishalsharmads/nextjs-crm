@@ -17,9 +17,21 @@ const relativeTime = (days: number, hour = 10) => {
   return d;
 };
 
+/** Calendar days to the `n`th working day (Monday to Friday, UTC) from today; negative counts back. */
+export const workingDays = (n: number, from = new Date()) => {
+  const step = Math.sign(n);
+  let days = 0;
+  for (let left = Math.abs(n); left > 0;) {
+    days += step;
+    const dow = new Date(from.getTime() + days * DAY).getUTCDay();
+    if (dow !== 0 && dow !== 6) left--;
+  }
+  return days;
+};
+
 /**
  * Replace `{{date:+7}}` / `{{date:-30}}` with a date relative to today, `{{datetime:+2@14:30}}` with an
- * ISO moment, and `{{<type>:<ref>}}` with the
+ * ISO moment (`+2w@14:30`: two working days ahead, for resources closed at weekends), and `{{<type>:<ref>}}` with the
  * value `lookup` returns (a record uuid). Walks objects and arrays; a string that is exactly one
  * placeholder becomes that value.
  */
@@ -35,11 +47,12 @@ export function fillPlaceholders(
       }
       if (type === 'datetime') {
         // `+2@14:30`: two days from now at 14:30 UTC.
-        const m = /^([+-]?\d+)(?:@(\d{1,2})(?::(\d{2}))?)?$/.exec(arg);
-        if (!m || Number(m[2] ?? 0) > 23 || Number(m[3] ?? 0) > 59)
+        const m = /^([+-]?\d+)(w?)(?:@(\d{1,2})(?::(\d{2}))?)?$/.exec(arg);
+        if (!m || Number(m[3] ?? 0) > 23 || Number(m[4] ?? 0) > 59)
           throw new Error(`Sample data: bad datetime ${whole}`);
-        const d = relativeTime(Number(m[1]), Number(m[2] ?? 10));
-        d.setUTCMinutes(Number(m[3] ?? 0));
+        const days = m[2] ? workingDays(Number(m[1])) : Number(m[1]);
+        const d = relativeTime(days, Number(m[3] ?? 10));
+        d.setUTCMinutes(Number(m[4] ?? 0));
         return d.toISOString();
       }
       const found = lookup(type, arg);

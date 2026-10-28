@@ -94,7 +94,12 @@ it; `install --sample-data` seeds everything except `requests`.
 - **Requests**: module records created through the app's own API as the demo admin, so numbering, totals
   and statuses follow the module's rules: `{ "ref": "q1", "method": "post", "path": "/m/quotes/quotes",
 "body": {…} }`.
+- **Branding**: `branding` names the fictional business the demo shows: `appName`, optional `tagline`,
+  `loginTitle`, `loginTagline`, `footerText`, `pdfHeader`, `emailFromName`, `fontFamily`, `radius`, and
+  `colors.light` / `colors.dark` overrides (usually `primary` and `accent`) over the factory theme. Only demo
+  resets apply it, so a client install keeps its own brand. The catalog test checks it for AA contrast.
 - **Placeholders** anywhere in values: `{{date:+7}}` (date relative to today), `{{datetime:+2@14:30}}`,
+  `{{datetime:+2w@14:30}}` (two working days ahead: use it for resources closed at weekends),
   and in requests `{{contact:<ref>}}`, `{{organization:<ref>}}`, `{{deal:<ref>}}`, `{{lead:<ref>}}`,
   `{{req:<ref>}}` (an earlier request's result) and `{{user:<role key>}}`. Never hard-code dates.
 - Fictional data only: `*.test` emails and fictional phone ranges.

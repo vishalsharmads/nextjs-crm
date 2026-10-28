@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkSampleData,
+  demoBranding,
   industryForBlueprint,
   listBlueprintKeys,
   loadBlueprint,
   parseBlueprint,
 } from '@app/blueprints';
-import { fillPlaceholders } from '../src/blueprints/sample-data';
+import { checkPaletteContrast } from '@app/shared';
+import { fillPlaceholders, workingDays } from '../src/blueprints/sample-data';
 import { loadModules } from '../src/modules/registry';
 
 /** Every shipped blueprint must parse, name only installed modules, and have consistent sample data. */
@@ -19,6 +21,11 @@ describe('blueprint catalog', () => {
       const bp = loadBlueprint(key);
       for (const m of bp.modules) expect(deps, `module "${m}"`).toHaveProperty(m);
       expect(checkSampleData(bp, deps)).toEqual([]);
+    });
+
+    it(`${key} demo brand is readable in light and dark mode`, () => {
+      const branding = demoBranding(loadBlueprint(key));
+      if (branding) expect(checkPaletteContrast(branding.colors)).toEqual([]);
     });
   }
 
@@ -62,5 +69,14 @@ describe('sample data rules', () => {
     expect(() => fillPlaceholders('{{datetime:+1@24}}', () => undefined)).toThrow('bad datetime');
     expect(() => fillPlaceholders('{{date:soon}}', () => undefined)).toThrow('bad date');
     expect(() => fillPlaceholders('{{contact:nobody}}', () => undefined)).toThrow('unknown reference');
+  });
+
+  it('counts working days past weekends, so weekday-only rooms can always be booked', () => {
+    const friday = new Date('2026-10-30T12:00:00Z');
+    expect(workingDays(1, friday)).toBe(3); // Monday
+    expect(workingDays(4, new Date('2026-10-27T12:00:00Z'))).toBe(6); // Tuesday + 4 → Monday
+    expect(workingDays(-1, new Date('2026-11-02T12:00:00Z'))).toBe(-3); // Monday − 1 → Friday
+    const day = new Date(fillPlaceholders('{{datetime:+4w@10}}', () => undefined) as string).getUTCDay();
+    expect([0, 6]).not.toContain(day);
   });
 });

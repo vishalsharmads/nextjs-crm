@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ApiError, api } from '@/lib/api';
 import { useBranding } from '@/app/branding';
@@ -92,6 +92,7 @@ export function LoginPage() {
   if (!branding.installed) {
     return (
       <AuthLayout title={branding.appName}>
+        <DemoSwitchStatus />
         <p className="text-sm text-muted">{t('auth.notInstalled')}</p>
       </AuthLayout>
     );
@@ -178,6 +179,7 @@ export function LoginPage() {
       title={t('auth.signInTo', { app: branding.appName })}
       description={branding.tagline || undefined}
     >
+      <DemoSwitchStatus />
       {params.get('reason') === 'idle' && !error ? (
         <p role="status" className="mb-4 rounded-sm bg-primary-soft px-3 py-2 text-sm">
           {t('auth.signedOutIdle')}
@@ -359,6 +361,51 @@ export function AcceptInvitePage() {
       title={t('auth.inviteTitle')}
       description={t('auth.inviteHelp')}
     />
+  );
+}
+
+interface DemoSwitch {
+  state: 'idle' | 'running' | 'done' | 'failed';
+  industry: string | null;
+  name: string | null;
+  step: string | null;
+  error: string | null;
+}
+
+/**
+ * Progress of a demo industry switch (started from settings, which lands here with `?demoSwitch=1`).
+ * The endpoint 404s unless DEMO_MODE=true, so other instances show nothing.
+ */
+function DemoSwitchStatus() {
+  const t = useT();
+  const qc = useQueryClient();
+  const [params] = useSearchParams();
+  const q = useQuery({
+    queryKey: ['public', 'demo-switch'],
+    queryFn: () => api<DemoSwitch>('/public/demo/switch', { noRetry: true }),
+    retry: false,
+    refetchInterval: (query) => (query.state.data?.state === 'running' ? 2000 : false),
+  });
+  const state = q.data?.state;
+  useEffect(() => {
+    // Branding carries the new app name and demo accounts once the switch is over.
+    if (state === 'done' || state === 'failed')
+      void qc.invalidateQueries({ queryKey: ['public', 'branding'] });
+  }, [state, qc]);
+  if (!q.data || state === 'idle') return null;
+  if (state !== 'running' && !params.has('demoSwitch')) return null;
+  const industry = q.data.name ?? q.data.industry ?? '';
+  return (
+    <p role="status" className="mb-4 rounded-sm bg-primary-soft px-3 py-2 text-sm">
+      {state === 'running'
+        ? t('auth.demoSwitching', { industry })
+        : state === 'done'
+          ? t('auth.demoSwitched', { industry })
+          : t('auth.demoSwitchFailed', { error: q.data.error ?? '' })}
+      {state === 'running' && q.data.step ? (
+        <span className="mt-1 block text-xs text-muted">{q.data.step}</span>
+      ) : null}
+    </p>
   );
 }
 

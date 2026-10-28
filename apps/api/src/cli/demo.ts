@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { Knex } from 'knex';
 import {
   blueprintForIndustry,
+  demoBranding,
   industryForBlueprint,
   listBlueprintKeys,
   loadBlueprint,
@@ -15,7 +16,12 @@ import { createKnex, databaseExists, db, ensureDatabase } from '../db/knex';
 import { migrateCore } from '../db/migrate';
 import { hashPassword, validatePassword } from '../core/auth/auth.service';
 import { clearSettingsCache } from '../core/settings/settings.service';
+import { clearAccessCache } from '../core/rbac/access';
+import { clearLabelCache } from '../core/labels/labels.service';
+import { bumpDefinitionsVersion } from '../core/custom-fields/definitions';
+import { refreshModuleStates } from '../modules/registry';
 import { newUuid } from '../lib/ids';
+import { logger } from '../lib/logger';
 import { installCore, markInstalled } from './install';
 
 export const DEMO_PASSWORD = 'DemoAccess2026!';
@@ -257,6 +263,16 @@ export async function resetDemo(
   const requests = bp.sample_data?.requests ?? [];
   const created = admin ? await runSampleRequests(requests, refs, admin) : 0;
   out(`     ${count} records and ${created} module records`);
+  // The demo shows a fictional business of that industry: its name, colors and sign-in copy.
+  const branding = demoBranding(bp);
+  if (branding) {
+    await db('settings')
+      .insert({ key: 'branding', group: 'branding', value: JSON.stringify(branding), is_public: true })
+      .onConflict('key')
+      .merge();
+    clearSettingsCache();
+    out(`     Branded as "${branding.appName}"`);
+  }
 
   await db('settings')
     .where({ key: DEMO_KEY })
@@ -268,4 +284,60 @@ export async function resetDemo(
       }),
     });
   return accounts;
+}
+
+export interface DemoSwitchStatus {
+  state: 'idle' | 'running' | 'done' | 'failed';
+  industry: string | null;
+  /** The industry's display name (its blueprint name). */
+  name: string | null;
+  step: string | null;
+  error: string | null;
+}
+
+/** Progress of the one industry switch this process may run (public: the switch signs everyone out). */
+let switchStatus: DemoSwitchStatus = {
+  state: 'idle',
+  industry: null,
+  name: null,
+  step: null,
+  error: null,
+};
+
+export const demoSwitchStatus = (): DemoSwitchStatus => switchStatus;
+
+/**
+ * Switch a running demo instance to another industry: `resetDemo` in the background, then drop every
+ * in-process cache that still describes the old database. Guards are checked before it starts, so a
+ * refusal reaches the caller; the reset itself reports through `demoSwitchStatus()`.
+ */
+export async function startDemoSwitch(industry: string): Promise<void> {
+  if (switchStatus.state === 'running') throw new DemoResetRefused('A switch is already running.');
+  // Claim the slot before awaiting the guards, so two requests cannot both start a reset.
+  const previous = switchStatus;
+  switchStatus = { state: 'running', industry, name: null, step: null, error: null };
+  try {
+    const { blueprint } = await assertDemoResetAllowed(env.DATABASE_URL, industry);
+    switchStatus = { ...switchStatus, name: loadBlueprint(blueprint).name };
+  } catch (err) {
+    switchStatus = previous;
+    throw err;
+  }
+  void (async () => {
+    try {
+      await resetDemo({ url: env.DATABASE_URL, industry }, (msg) => {
+        logger.info({ industry }, `demo switch: ${msg.trim()}`);
+        if (/^\d\/\d/.test(msg)) switchStatus = { ...switchStatus, step: msg.trim() };
+      });
+      clearSettingsCache();
+      clearAccessCache();
+      clearLabelCache();
+      bumpDefinitionsVersion();
+      await refreshModuleStates();
+      switchStatus = { ...switchStatus, state: 'done', step: null };
+    } catch (err) {
+      logger.error({ err, industry }, 'demo switch failed');
+      switchStatus = { ...switchStatus, state: 'failed', error: (err as Error).message };
+    }
+  })();
 }

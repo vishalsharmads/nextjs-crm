@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "healthcare-clinics",
   "name": "Healthcare clinic",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Patients, referrers and treatment plans for private dental, physio and skin clinics, from first enquiry to completed treatment and recall.",
   "settings": {
     "features": { "leads": true },
@@ -1126,6 +1126,27 @@
         "owner": "front_desk"
       }
     ],
+    "branding": {
+      "appName": "Riverbend Family Clinic",
+      "tagline": "Caring for families in every season",
+      "loginTitle": "Welcome to Riverbend Family Clinic",
+      "loginTagline": "Caring for families in every season",
+      "footerText": "Riverbend Family Clinic · Demo data",
+      "pdfHeader": "Riverbend Family Clinic",
+      "emailFromName": "Riverbend Family Clinic",
+      "fontFamily": "Atkinson Hyperlegible",
+      "radius": 10,
+      "colors": {
+        "light": {
+          "primary": "#0E7490",
+          "accent": "#BE185D"
+        },
+        "dark": {
+          "primary": "#5EC4DA",
+          "accent": "#F07BAE"
+        }
+      }
+    },
     "requests": [
       {
         "method": "post",

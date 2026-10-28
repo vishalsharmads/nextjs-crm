@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "law-firms",
   "name": "Law firm",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Clients and matters from intake and conflict check to engagement and close, with engagement letters, client file requests, fee estimates, invoices and client questions.",
   "settings": {
     "features": {
@@ -1255,6 +1255,27 @@
         "owner": "admin"
       }
     ],
+    "branding": {
+      "appName": "Ashford & Lane Solicitors",
+      "tagline": "Clear advice, carefully given",
+      "loginTitle": "Welcome to Ashford & Lane Solicitors",
+      "loginTagline": "Clear advice, carefully given",
+      "footerText": "Ashford & Lane Solicitors · Demo data",
+      "pdfHeader": "Ashford & Lane Solicitors",
+      "emailFromName": "Ashford & Lane Solicitors",
+      "fontFamily": "Source Sans 3",
+      "radius": 4,
+      "colors": {
+        "light": {
+          "primary": "#7A1F2B",
+          "accent": "#8A6D1F"
+        },
+        "dark": {
+          "primary": "#E48A95",
+          "accent": "#D9B95E"
+        }
+      }
+    },
     "requests": [
       {
         "method": "post",

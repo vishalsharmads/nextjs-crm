@@ -107,12 +107,16 @@ describe('demo:reset', () => {
       expect((await demo('contacts').count('* as n').first())?.n).toBeGreaterThan(0);
       const marker = (await demo('settings').where({ key: 'demo' }).first('value'))?.value;
       expect(marker).toMatchObject({ blueprint: 'coworking', industry: 'coworking' });
+      const brand = (await demo('settings').where({ key: 'branding' }).first('value'))?.value;
+      expect(brand).toMatchObject({ appName: 'The Foundry Workspace' });
 
       const second = await reset('immigration-visa');
       expect(second.ok, second.out).toBe(true);
       expect(await demo('blueprint_applications').pluck('blueprint_key')).toEqual(['visa-consultancy']);
       const switched = (await demo('settings').where({ key: 'demo' }).first('value'))?.value;
       expect(switched).toMatchObject({ blueprint: 'visa-consultancy', industry: 'immigration-visa' });
+      const rebranded = (await demo('settings').where({ key: 'branding' }).first('value'))?.value;
+      expect(rebranded).toMatchObject({ appName: 'Compass Migration Advisers' });
       expect(await demo('roles').where({ key: 'community_manager' }).first()).toBeUndefined();
     } finally {
       await demo.destroy();

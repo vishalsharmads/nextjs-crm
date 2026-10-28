@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "construction-trades",
   "name": "Construction and trades",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Customers, builders and jobs for builders, renovators and trade businesses: enquiry to site visit, quote, schedule and invoice, with crews, equipment and tools.",
   "settings": {
     "features": {
@@ -1123,6 +1123,27 @@
         "days": -7
       }
     ],
+    "branding": {
+      "appName": "Granite Peak Builders",
+      "tagline": "Built right, handed over on time",
+      "loginTitle": "Welcome to Granite Peak Builders",
+      "loginTagline": "Built right, handed over on time",
+      "footerText": "Granite Peak Builders · Demo data",
+      "pdfHeader": "Granite Peak Builders",
+      "emailFromName": "Granite Peak Builders",
+      "fontFamily": "Public Sans",
+      "radius": 4,
+      "colors": {
+        "light": {
+          "primary": "#9A3412",
+          "accent": "#1E3A5F"
+        },
+        "dark": {
+          "primary": "#F59E6B",
+          "accent": "#8FB3DE"
+        }
+      }
+    },
     "requests": [
       {
         "ref": "p_carpenter",

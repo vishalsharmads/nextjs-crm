@@ -3,6 +3,8 @@ import {
   SENSITIVITY_LEVELS,
   SENSITIVE_TYPES,
   CUSTOMIZABLE_ENTITIES,
+  FONT_FAMILIES,
+  paletteSchema,
   FIELD_TYPES,
   PERMISSION_PATTERN_RE,
   SCOPES,
@@ -147,6 +149,26 @@ export const blueprintSchema = z.object({
        * totals and status rules apply. `{{contact:<ref>}}`-style placeholders become record uuids,
        * `{{date:+7}}` a date relative to today. Runs only for demo resets.
        */
+      /**
+       * The fictional business a demo shows: name, colors and sign-in copy. Applied only by demo resets,
+       * over the factory theme, so a client install never takes on a sample brand.
+       */
+      branding: z
+        .object({
+          appName: z.string().trim().min(1).max(60),
+          tagline: z.string().trim().max(140).optional(),
+          loginTitle: z.string().trim().max(80).optional(),
+          loginTagline: z.string().trim().max(200).optional(),
+          footerText: z.string().trim().max(200).optional(),
+          pdfHeader: z.string().trim().max(200).optional(),
+          emailFromName: z.string().trim().max(80).optional(),
+          fontFamily: z.enum(FONT_FAMILIES).optional(),
+          radius: z.number().int().min(0).max(16).optional(),
+          colors: z
+            .object({ light: paletteSchema.partial().optional(), dark: paletteSchema.partial().optional() })
+            .optional(),
+        })
+        .optional(),
       requests: z
         .array(
           z.object({

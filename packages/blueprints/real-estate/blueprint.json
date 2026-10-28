@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "real-estate",
   "name": "Real estate agency",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Buyers, vendors and listings from appraisal to settlement, with open homes, agency agreements, vendor portal access and commission invoices.",
   "settings": {
     "features": {
@@ -1266,6 +1266,27 @@
         "owner": "admin"
       }
     ],
+    "branding": {
+      "appName": "Harbourview Realty",
+      "tagline": "Homes sold with care since 2004",
+      "loginTitle": "Welcome to Harbourview Realty",
+      "loginTagline": "Homes sold with care since 2004",
+      "footerText": "Harbourview Realty · Demo data",
+      "pdfHeader": "Harbourview Realty",
+      "emailFromName": "Harbourview Realty",
+      "fontFamily": "IBM Plex Sans",
+      "radius": 6,
+      "colors": {
+        "light": {
+          "primary": "#1D4E89",
+          "accent": "#B45309"
+        },
+        "dark": {
+          "primary": "#7FB0E8",
+          "accent": "#F2A65A"
+        }
+      }
+    },
     "requests": [
       {
         "method": "post",

@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "visa-consultancy",
   "name": "Visa consultancy",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Applicants, cases through an application pipeline, document checklists collected in the client portal, quotes and invoices for fees.",
   "settings": {
     "features": {
@@ -1346,6 +1346,27 @@
         "owner": "case_manager"
       }
     ],
+    "branding": {
+      "appName": "Compass Migration Advisers",
+      "tagline": "Your move, handled properly",
+      "loginTitle": "Welcome to Compass Migration Advisers",
+      "loginTagline": "Your move, handled properly",
+      "footerText": "Compass Migration Advisers · Demo data",
+      "pdfHeader": "Compass Migration Advisers",
+      "emailFromName": "Compass Migration Advisers",
+      "fontFamily": "IBM Plex Sans",
+      "radius": 8,
+      "colors": {
+        "light": {
+          "primary": "#1E40AF",
+          "accent": "#B91C1C"
+        },
+        "dark": {
+          "primary": "#93B4FF",
+          "accent": "#F28B8B"
+        }
+      }
+    },
     "requests": [
       {
         "method": "post",
