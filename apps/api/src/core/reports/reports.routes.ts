@@ -4,6 +4,8 @@ import {
   quotaInputSchema,
   quotaQuerySchema,
   velocityQuerySchema,
+  exchangeRatesInputSchema,
+  type ExchangeRatesDto,
   type ForecastDto,
   type QuotaRowDto,
   type VelocityDto,
@@ -28,29 +30,45 @@ const monthOf = (d: Date) => d.toISOString().slice(0, 7);
  */
 async function deals(
   user: AuthUser,
-  q: { pipelineUuid?: string | undefined; currency?: string | undefined },
+  q: { pipelineUuid?: string | undefined; currency?: string | undefined; convert?: boolean | undefined },
 ) {
   assertCan(user, 'core.reports.view');
   assertCan(user, `${recordDefs.deal.resource}.view`);
-  const currency = q.currency ?? (await getGroup('general')).currency;
+  const base = (await getGroup('general')).currency;
+  const currency = q.convert ? base : (q.currency ?? base);
   const { qb } = await scopedQuery(recordDefs.deal, user, db);
-  qb.where('deals.currency', currency);
+  // Converted reports count every currency that has a rate (the workspace currency is 1:1).
+  const rate = db.raw('COALESCE(er.rate, CASE WHEN deals.currency = ? THEN 1 END)', [base]);
+  let missingRates: string[] | undefined;
+  if (q.convert) {
+    qb.leftJoin('exchange_rates as er', 'er.currency', 'deals.currency');
+    missingRates = (
+      await qb.clone().whereRaw('? IS NULL', [rate]).distinct('deals.currency').pluck('deals.currency')
+    ).map(String);
+    qb.whereRaw('? IS NOT NULL', [rate]);
+  } else qb.where('deals.currency', currency);
+  /** The deal value in the report currency, as a select expression aliased `value`. */
+  const value = q.convert ? db.raw('deals.value * ? AS value', [rate]) : 'deals.value';
+  const sum = q.convert ? db.raw('SUM(deals.value * ?) AS v', [rate]) : db.raw('SUM(deals.value) AS v');
   if (q.pipelineUuid) {
     const p = await db('pipelines').where({ uuid: q.pipelineUuid }).first('id');
     if (!p) throw notFound('Pipeline');
     qb.where('deals.pipeline_id', p.id);
   }
-  return { qb, currency };
+  return { qb, currency, value, sum, missingRates };
 }
 
-async function forecast(user: AuthUser, q: { months: number; pipelineUuid?: string; currency?: string }) {
+async function forecast(
+  user: AuthUser,
+  q: { months: number; pipelineUuid?: string; currency?: string; convert?: boolean },
+) {
   const open = await deals(user, q);
   const today = new Date().toISOString().slice(0, 10);
   const rows = (await open.qb
     .clone()
     .join('pipeline_stages as s', 's.id', 'deals.stage_id')
     .where('deals.status', 'open')
-    .select('deals.value', 'deals.expected_close', 's.probability')) as {
+    .select(open.value, 'deals.expected_close', 's.probability')) as {
     value: string;
     expected_close: string | null;
     probability: number;
@@ -64,6 +82,7 @@ async function forecast(user: AuthUser, q: { months: number; pipelineUuid?: stri
   }
   const out: ForecastDto = {
     currency: open.currency,
+    ...(open.missingRates ? { missingRates: open.missingRates } : {}),
     overdue: { count: 0, value: 0, weighted: 0 },
     months,
     undated: { count: 0, value: 0 },
@@ -88,12 +107,11 @@ async function forecast(user: AuthUser, q: { months: number; pipelineUuid?: stri
     bucket.value += value;
     bucket.weighted += weighted;
   }
-  const won = (await (
-    await deals(user, q)
-  ).qb
+  const wonBase = await deals(user, q);
+  const won = (await wonBase.qb
     .where('deals.status', 'won')
     .where('deals.won_at', '>=', new Date(`${months[0]!.month}-01T00:00:00Z`))
-    .select('deals.value', 'deals.won_at')) as { value: string; won_at: Date }[];
+    .select(wonBase.value, 'deals.won_at')) as { value: string; won_at: Date }[];
   for (const w of won) {
     const bucket = months.find((m) => m.month === monthOf(new Date(w.won_at)));
     if (bucket) bucket.won += Number(w.value);
@@ -105,7 +123,10 @@ async function forecast(user: AuthUser, q: { months: number; pipelineUuid?: stri
   return out;
 }
 
-async function velocity(user: AuthUser, q: { days: number; pipelineUuid?: string; currency?: string }) {
+async function velocity(
+  user: AuthUser,
+  q: { days: number; pipelineUuid?: string; currency?: string; convert?: boolean },
+) {
   const since = new Date(Date.now() - q.days * DAY);
   const base = await deals(user, q);
   const closed = (await base.qb
@@ -115,7 +136,7 @@ async function velocity(user: AuthUser, q: { days: number; pipelineUuid?: string
         .where((x) => x.where('deals.status', 'won').where('deals.won_at', '>=', since))
         .orWhere((x) => x.where('deals.status', 'lost').where('deals.lost_at', '>=', since)),
     )
-    .select('deals.status', 'deals.value', 'deals.created_at', 'deals.won_at')) as {
+    .select('deals.status', base.value, 'deals.created_at', 'deals.won_at')) as {
     status: 'won' | 'lost';
     value: string;
     created_at: Date;
@@ -172,6 +193,7 @@ async function velocity(user: AuthUser, q: { days: number; pipelineUuid?: string
   const round = (v: number | null, d = 1) => (v === null ? null : Math.round(v * 10 ** d) / 10 ** d);
   return {
     currency: base.currency,
+    ...(base.missingRates ? { missingRates: base.missingRates } : {}),
     days: q.days,
     won: won.length,
     lost,
@@ -211,9 +233,9 @@ async function visibleUsers(user: AuthUser) {
 
 async function quotas(
   user: AuthUser,
-  q: { period: string; currency?: string },
+  q: { period: string; currency?: string; convert?: boolean },
 ): Promise<{ currency: string; data: QuotaRowDto[] }> {
-  const { qb, currency } = await deals(user, q);
+  const { qb, currency, sum } = await deals(user, q);
   const people = await visibleUsers(user);
   const ids = people.map((p) => p.id);
   const start = new Date(`${q.period}-01T00:00:00Z`);
@@ -225,15 +247,13 @@ async function quotas(
     .where('deals.won_at', '>=', start)
     .where('deals.won_at', '<', end)
     .groupBy('deals.owner_id')
-    .select('deals.owner_id')
-    .sum({ v: 'deals.value' })) as { owner_id: number; v: string }[];
+    .select('deals.owner_id', sum)) as { owner_id: number; v: string }[];
   const open = (await qb
     .clone()
     .whereIn('deals.owner_id', ids)
     .where('deals.status', 'open')
     .groupBy('deals.owner_id')
-    .select('deals.owner_id')
-    .sum({ v: 'deals.value' })) as { owner_id: number; v: string }[];
+    .select('deals.owner_id', sum)) as { owner_id: number; v: string }[];
   const targets = (await db('sales_quotas')
     .whereIn('user_id', ids)
     .where({ period: q.period, currency })
@@ -316,6 +336,50 @@ export const reportsRoutes = defineRoutes('/reports', ['reports'])
             period: body.period,
             from: before ? { amount: money(before.amount), currency: before.currency } : null,
             to: body.amount === null ? null : { amount: body.amount, currency },
+          },
+        });
+      });
+    },
+  });
+
+/** Settings → Currencies: rates reports use to convert deal values into the workspace currency. */
+export const exchangeRatesRoutes = defineRoutes('/exchange-rates', ['reports'])
+  .add({
+    method: 'get',
+    path: '/',
+    permission: 'authenticated',
+    handler: async (): Promise<ExchangeRatesDto> => {
+      const rows = await db('exchange_rates').orderBy('currency');
+      const last = rows.reduce<Date | null>((m, r) => (!m || r.updated_at > m ? r.updated_at : m), null);
+      return {
+        base: (await getGroup('general')).currency,
+        rates: Object.fromEntries(rows.map((r) => [r.currency, Number(r.rate)])),
+        updatedAt: last ? new Date(last).toISOString() : null,
+      };
+    },
+  })
+  .add({
+    method: 'put',
+    path: '/',
+    permission: 'core.settings.manage',
+    body: exchangeRatesInputSchema,
+    handler: async ({ ctx, user, body }) => {
+      const { currency: base } = await getGroup('general');
+      // The workspace currency is always 1:1 and never stored.
+      const entries = Object.entries(body.rates).filter(([c]) => c !== base);
+      await db.transaction(async (trx) => {
+        const before = await trx('exchange_rates').select('currency', 'rate');
+        await trx('exchange_rates').delete();
+        if (entries.length)
+          await trx('exchange_rates').insert(
+            entries.map(([currency, rate]) => ({ currency, rate, updated_by: user.id })),
+          );
+        await audit(trx, ctx, {
+          action: 'exchange_rates.updated',
+          entity: 'exchange_rates',
+          diff: {
+            from: Object.fromEntries(before.map((r) => [r.currency, Number(r.rate)])),
+            to: Object.fromEntries(entries),
           },
         });
       });

@@ -22,6 +22,7 @@ export function useSettingsSections() {
         { to: 'general', label: t('settings.general'), permission: 'core.settings.manage' },
         { to: 'branding', label: t('settings.branding'), permission: 'core.branding.manage' },
         { to: 'vocabulary', label: t('settings.vocabulary'), permission: 'core.labels.manage' },
+        { to: 'currencies', label: t('settings.currencies'), permission: 'core.settings.manage' },
         { to: 'security', label: t('settings.security'), adminOnly: true },
         { to: 'compliance', label: t('settings.compliance'), adminOnly: true },
         ...(commerceOn

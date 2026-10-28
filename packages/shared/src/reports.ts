@@ -6,7 +6,20 @@ export const reportQuerySchema = z.object({
   pipelineUuid: z.uuid().optional(),
   /** Deal currency to report on; deals in other currencies are left out. Defaults to the workspace currency. */
   currency: z.string().length(3).optional(),
+  /** Convert every currency into the workspace currency with the saved exchange rates. */
+  convert: z.coerce.boolean().optional(),
 });
+
+export const exchangeRatesInputSchema = z.object({
+  /** Units of the workspace currency per one unit of each currency. Missing currencies are removed. */
+  rates: z.record(z.string().regex(/^[A-Z]{3}$/), z.number().positive().max(1e9)),
+});
+
+export interface ExchangeRatesDto {
+  base: string;
+  rates: Record<string, number>;
+  updatedAt: string | null;
+}
 
 export const forecastQuerySchema = reportQuerySchema.extend({
   months: z.coerce.number().int().min(1).max(12).default(6),
@@ -16,7 +29,11 @@ export const velocityQuerySchema = reportQuerySchema.extend({
   days: z.coerce.number().int().min(7).max(730).default(90),
 });
 
-export const quotaQuerySchema = z.object({ period, currency: z.string().length(3).optional() });
+export const quotaQuerySchema = z.object({
+  period,
+  currency: z.string().length(3).optional(),
+  convert: z.coerce.boolean().optional(),
+});
 export const quotaInputSchema = z.object({
   userUuid: z.uuid(),
   period,
@@ -26,6 +43,8 @@ export const quotaInputSchema = z.object({
 
 export interface ForecastDto {
   currency: string;
+  /** Currencies left out of a converted report because they have no exchange rate. */
+  missingRates?: string[];
   /** Open deals whose expected close date has passed. */
   overdue: { count: number; value: number; weighted: number };
   months: { month: string; count: number; value: number; weighted: number; won: number }[];
@@ -44,6 +63,8 @@ export interface QuotaRowDto {
 
 export interface VelocityDto {
   currency: string;
+  /** Currencies left out of a converted report because they have no exchange rate. */
+  missingRates?: string[];
   days: number;
   won: number;
   lost: number;

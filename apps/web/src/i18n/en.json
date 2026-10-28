@@ -144,7 +144,8 @@
     "vocabularyHelp": "Use the words your team already uses. Names change everywhere: menus, titles, buttons, empty states and emails.",
     "layouts": "Layouts",
     "compliance": "Compliance",
-    "dataMap": "Data map"
+    "dataMap": "Data map",
+    "currencies": "Currencies"
   },
   "idle": {
     "title": "Are you still there?",

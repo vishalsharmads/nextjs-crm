@@ -42,6 +42,16 @@ describe('sales reports', () => {
     expect(res.body.months[0].won).toBe(300);
   });
 
+  it('converts every currency into the workspace currency when asked', async () => {
+    const plain = await admin.get('/reports/forecast?convert=true&months=3').expect(200);
+    expect(plain.body.missingRates).toContain(CUR);
+    await admin.put('/exchange-rates', { rates: { [CUR]: 3 } }).expect(204);
+    const converted = await admin.get('/reports/forecast?convert=true&months=3').expect(200);
+    expect(converted.body.missingRates).not.toContain(CUR);
+    expect(converted.body.undated.value).toBeGreaterThanOrEqual(200 * 3);
+    await admin.put('/exchange-rates', { rates: {} }).expect(204);
+  });
+
   it('reports velocity and time in stage', async () => {
     const res = await admin.get(`/reports/velocity?currency=${CUR}&days=30`).expect(200);
     expect(res.body).toMatchObject({ currency: CUR, won: 1, lost: 0, winRate: 1, avgWonValue: 300 });

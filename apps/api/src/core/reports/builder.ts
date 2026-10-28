@@ -18,9 +18,12 @@ import { getRecordDef } from '../records/registry';
 import { applyListCriteria, filterContext, scopedQuery } from '../records/service';
 import type { CoreFieldSpec, ResourceDef } from '../records/types';
 import { iso } from '../records/hydrate';
+import { getGroup } from '../settings/settings.service';
 
 /** Groups returned per report; the rest are summed into "Other". */
 const MAX_GROUPS = 50;
+/** Columns of a second grouping; the rest are summed into "Other". */
+const MAX_SERIES = 8;
 
 /** Relation targets a report may group by: configuration, never people's records (no name leaks). */
 const GROUP_TABLES = new Set(['pipeline_stages', 'pipelines']);
@@ -146,22 +149,38 @@ export async function runReport(raw: unknown, user: AuthUser): Promise<ReportRes
   const metric = await metricColumn(def, d, user);
   const { qb } = await scopedQuery(def, user, db);
   if (d.filter) await applyListCriteria(qb, def, user, { filter: d.filter });
-  const value =
-    metric === null
-      ? db.raw('COUNT(*) AS v')
-      : db.raw(`${d.metric === 'sum' ? 'SUM' : 'AVG'}(??) AS v`, [metric.column]);
+  // Money in several currencies: convert with the saved rates; rows without a rate are left out.
+  const currencyColumn = def.fields.currency?.column;
+  let measure = metric ? db.raw('??', [metric.column]) : null;
+  let missingRates: string[] | undefined;
+  if (d.convert && metric && currencyColumn) {
+    const { currency: base } = await getGroup('general');
+    qb.leftJoin('exchange_rates as er', 'er.currency', currencyColumn);
+    const rate = db.raw('COALESCE(er.rate, CASE WHEN ?? = ? THEN 1 END)', [currencyColumn, base]);
+    missingRates = (
+      await qb.clone().whereRaw('? IS NULL', [rate]).distinct(currencyColumn).pluck(currencyColumn)
+    ).map(String);
+    qb.whereRaw('? IS NOT NULL', [rate]);
+    measure = db.raw('?? * ?', [metric.column, rate]);
+  }
+  const aggregate = (alias: string) =>
+    measure === null
+      ? db.raw(`COUNT(*) AS ${alias}`)
+      : db.raw(`${d.metric === 'sum' ? 'SUM' : 'AVG'}(?) AS ${alias}`, [measure]);
   const rows = (await qb
-    .select(db.raw(`${group.sql} AS k`, group.bindings), value)
+    .clone()
+    .select(db.raw(`${group.sql} AS k`, group.bindings), aggregate('v'))
     .groupByRaw(group.sql, group.bindings)
     .orderBy('v', 'desc')) as { k: string | number | null; v: string | number | null }[];
   const divisor = metric?.divisor ?? 1;
+  const round = (v: unknown) => Math.round((Number(v ?? 0) / divisor) * 100) / 100;
   const keys = rows.map((r) => (r.k === null ? null : String(r.k)));
   const labels = await group.label(keys);
   const isDate = group.sql !== '??';
-  let out = rows.map((r, i) => ({
+  let out: ReportResultDto['rows'] = rows.map((r, i) => ({
     key: keys[i]!,
     label: keys[i] === null ? 'None' : (labels.get(keys[i]!) ?? keys[i]!),
-    value: Math.round((Number(r.v ?? 0) / divisor) * 100) / 100,
+    value: round(r.v),
   }));
   // Dates read best in time order; categories by size.
   if (isDate) out.sort((a, b) => (a.key ?? '').localeCompare(b.key ?? ''));
@@ -172,13 +191,60 @@ export async function runReport(raw: unknown, user: AuthUser): Promise<ReportRes
       { key: '__other', label: 'Other', value: rest.reduce((s, r) => s + r.value, 0) },
     ];
   }
+
+  // A second grouping breaks each row down: the largest series, the rest as "Other".
+  let series: ReportResultDto['series'];
+  if (d.groupBy2) {
+    if (d.groupBy2 === d.groupBy) throw invalid('groupBy2', 'Choose a different field');
+    const g2 = await grouping(def, { ...d, groupBy: d.groupBy2 }, user);
+    const cells = (await qb
+      .clone()
+      .select(
+        db.raw(`${group.sql} AS k`, group.bindings),
+        db.raw(`${g2.sql} AS k2`, g2.bindings),
+        aggregate('v'),
+      )
+      .groupByRaw(`${group.sql}, ${g2.sql}`, [...group.bindings, ...g2.bindings])) as {
+      k: string | number | null;
+      k2: string | number | null;
+      v: string | number | null;
+    }[];
+    const str = (v: string | number | null) => (v === null ? '__none' : String(v));
+    const totals = new Map<string, number>();
+    for (const c of cells) totals.set(str(c.k2), (totals.get(str(c.k2)) ?? 0) + Number(c.v ?? 0));
+    const top = [...totals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, MAX_SERIES)
+      .map(([k]) => k);
+    const l2 = await g2.label(top.filter((k) => k !== '__none'));
+    series = top.map((k) => ({ key: k, label: k === '__none' ? 'None' : (l2.get(k) ?? k) }));
+    if (totals.size > MAX_SERIES) series.push({ key: '__other', label: 'Other' });
+    const byRow = new Map(out.map((r) => [r.key ?? '__none', r]));
+    for (const c of cells) {
+      const row = byRow.get(str(c.k)) ?? byRow.get('__other');
+      if (!row) continue;
+      const col = top.includes(str(c.k2)) ? str(c.k2) : '__other';
+      row.breakdown ??= {};
+      // Averages are not additive: the "Other" cell of an average report shows the largest part.
+      row.breakdown[col] =
+        d.metric === 'avg'
+          ? Math.max(row.breakdown[col] ?? 0, round(c.v))
+          : (row.breakdown[col] ?? 0) + round(c.v);
+    }
+  }
   const total =
     d.metric === 'avg'
       ? out.length
         ? Math.round((out.reduce((s, r) => s + r.value, 0) / out.length) * 100) / 100
         : 0
       : Math.round(out.reduce((s, r) => s + r.value, 0) * 100) / 100;
-  return { entity: d.entity, rows: out, total };
+  return {
+    entity: d.entity,
+    rows: out,
+    total,
+    ...(series ? { series } : {}),
+    ...(missingRates ? { missingRates } : {}),
+  };
 }
 
 const toDto = (r: Record<string, unknown>, user: AuthUser): SavedReportDto => ({
@@ -194,7 +260,7 @@ const toDto = (r: Record<string, unknown>, user: AuthUser): SavedReportDto => ({
 
 /** Custom fields a definition names (group, metric, filter). */
 function customKeys(d: ReportDefinition): string[] {
-  const keys = [d.groupBy, d.metricField ?? ''].filter((k) => k.startsWith('cf.'));
+  const keys = [d.groupBy, d.groupBy2 ?? '', d.metricField ?? ''].filter((k) => k.startsWith('cf.'));
   const walk = (n: unknown) => {
     if (!n || typeof n !== 'object') return;
     const node = n as { field?: unknown; and?: unknown[]; or?: unknown[] };

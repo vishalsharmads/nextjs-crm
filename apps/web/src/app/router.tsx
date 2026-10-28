@@ -33,6 +33,7 @@ const RolesPage = lazyPage(() => import('@/features/settings/people-pages'), 'Ro
 const FieldsPage = lazyPage(() => import('@/features/settings/fields-page'), 'FieldsPage');
 const AiClientsPage = lazyPage(() => import('@/features/settings/ai-clients'), 'AiClientsPage');
 const ReportsPage = lazyPage(() => import('@/features/reports/reports-page'), 'ReportsPage');
+const CurrenciesPage = lazyPage(() => import('@/features/settings/currencies-page'), 'CurrenciesPage');
 const ObjectsPage = lazyPage(() => import('@/features/settings/objects-page'), 'ObjectsPage');
 const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'), 'PipelinesPage');
 const DealsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'DealsPage');
@@ -92,6 +93,7 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'profile', element: <ProfilePage /> },
   { path: 'general', element: <GeneralSettingsPage /> },
   { path: 'branding', element: <BrandingPage /> },
+  { path: 'currencies', element: <CurrenciesPage /> },
   { path: 'vocabulary', element: <VocabularyPage /> },
   { path: 'security', element: <SecuritySettingsPage /> },
   { path: 'compliance', element: <ComplianceSettingsPage /> },

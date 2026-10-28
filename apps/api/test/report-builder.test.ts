@@ -57,6 +57,57 @@ describe('report builder', () => {
     expect(theirs.body.rows).toEqual([]);
   });
 
+  it('breaks groups down by a second field, and converts currencies', async () => {
+    const pivot = await admin
+      .post('/reports/custom/preview', {
+        entity: 'deal',
+        groupBy: 'status',
+        groupBy2: 'owner',
+        metric: 'sum',
+        metricField: 'value',
+        filter,
+      })
+      .expect(200);
+    expect(pivot.body.series).toHaveLength(1);
+    const key = pivot.body.series[0].key;
+    expect(pivot.body.rows[0].breakdown[key]).toBe(600);
+    await admin
+      .post('/reports/custom/preview', { entity: 'deal', groupBy: 'status', groupBy2: 'status' })
+      .expect(422);
+
+    const both = { field: 'currency', op: 'in', value: [CUR, 'XAU'] };
+    await admin.post('/deals', { title: unique('G'), value: 1, currency: 'XAU' }).expect(201);
+    const missing = await admin
+      .post('/reports/custom/preview', {
+        entity: 'deal',
+        groupBy: 'status',
+        metric: 'sum',
+        metricField: 'value',
+        filter: both,
+        convert: true,
+      })
+      .expect(200);
+    expect(missing.body.missingRates).toEqual(expect.arrayContaining([CUR, 'XAU']));
+    await admin.put('/exchange-rates', { rates: { [CUR]: 2, XAU: 1000 } }).expect(204);
+    const converted = await admin
+      .post('/reports/custom/preview', {
+        entity: 'deal',
+        groupBy: 'status',
+        metric: 'sum',
+        metricField: 'value',
+        filter: both,
+        convert: true,
+      })
+      .expect(200);
+    expect(converted.body.total).toBe(600 * 2 + 1000);
+    expect(converted.body.missingRates).toEqual([]);
+    const rates = await admin.get('/exchange-rates').expect(200);
+    expect(rates.body.rates).toMatchObject({ [CUR]: 2, XAU: 1000 });
+    const rep = await loginAs(await createUser({ roleKeys: [await createRole(['core.deals.view'])] }));
+    await rep.put('/exchange-rates', { rates: {} }).expect(403);
+    await admin.put('/exchange-rates', { rates: {} }).expect(204);
+  });
+
   it('refuses fields that could leak or cannot be grouped', async () => {
     await admin.post('/reports/custom/preview', { entity: 'deal', groupBy: 'contact' }).expect(422);
     await admin.post('/reports/custom/preview', { entity: 'deal', groupBy: 'title' }).expect(422);
