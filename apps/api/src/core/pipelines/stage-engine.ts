@@ -87,8 +87,12 @@ export async function positionBetween(
 ): Promise<number> {
   const neighbour = async (uuid: string | null | undefined) =>
     uuid
-      ? ((await conn(STAGED[entity].table).where({ uuid, stage_id: stageId }).first('position'))?.position as
-          number | undefined)
+      ? ((
+          await conn(STAGED[entity].table)
+            .where({ uuid, stage_id: stageId })
+            .whereNull('deleted_at')
+            .first('position')
+        )?.position as number | undefined)
       : undefined;
   const before = await neighbour(beforeUuid);
   const after = await neighbour(afterUuid);

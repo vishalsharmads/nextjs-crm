@@ -8,6 +8,7 @@ import { audit } from '../audit/audit.service';
 import { assertCan } from '../rbac/access';
 import { createRecord, emitDealStage, emitLeadStage, emitRecordEvent, getRow } from '../records/service';
 import { boardQuerySchema, loadBoard, moveToStage } from '../pipelines/board';
+import { endOfStage, recordStageHistory } from '../pipelines/stage-engine';
 import { recordRoutes } from '../records/routes';
 import { dealsDef, statusForStage } from './deals.def';
 import { leadsDef } from '../leads/leads.def';
@@ -199,6 +200,29 @@ export const leadsRoutes = [
                 converted_deal_id: await ids('deals', dealUuid),
                 updated_by: user.id,
               });
+            // On the lead pipeline, a converted lead lands on its won stage, like the backfill places it.
+            if (lead.pipeline_id) {
+              const won = await trx('pipeline_stages')
+                .where({ pipeline_id: lead.pipeline_id, active: true, is_won: true })
+                .first('id');
+              if (won && won.id !== lead.stage_id) {
+                await trx('leads')
+                  .where({ id: lead.id })
+                  .update({
+                    stage_id: won.id,
+                    stage_entered_at: new Date(),
+                    position: await endOfStage(trx, 'lead', won.id),
+                  });
+                await recordStageHistory(
+                  trx,
+                  'lead',
+                  [lead.id as number],
+                  (lead.stage_id as number | null) ?? null,
+                  won.id,
+                  user.id,
+                );
+              }
+            }
             // Activities logged on the lead follow the new contact.
             await trx('activities')
               .where({ related_type: 'lead', related_id: lead.id })

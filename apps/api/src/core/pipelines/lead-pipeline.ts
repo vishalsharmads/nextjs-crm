@@ -1,7 +1,9 @@
 import type { Db } from '../../db/knex';
 import type { RequestContext } from '../../http/context';
+import { AppError } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
 import { audit } from '../audit/audit.service';
+import { getLabels } from '../labels/labels.service';
 import { defaultPipeline } from './stage-engine';
 
 const STARTER_STAGES = [
@@ -22,7 +24,8 @@ export async function enableLeadPipeline(conn: Db, ctx: RequestContext) {
     const uuid = newUuid();
     const [id] = await conn('pipelines').insert({
       uuid,
-      name: 'Leads',
+      // Named after the workspace's own label for leads (vocabulary), never a fixed word.
+      name: (await getLabels('en', conn)).lead?.plural ?? 'Pipeline',
       entity: 'lead',
       is_default: true,
       sort_order: 10,
@@ -53,15 +56,37 @@ export async function enableLeadPipeline(conn: Db, ctx: RequestContext) {
   const open = stages.find((s) => !s.is_won && !s.is_lost);
   const won = stages.find((s) => s.is_won) ?? open;
   const lost = stages.find((s) => s.is_lost) ?? open;
-  if (!open) return;
+  // Rolls the toggle back: an on switch with nowhere to put leads would leave the board empty.
+  if (!open) throw new AppError('VALIDATION_FAILED', 'Add an open stage to the default lead pipeline first');
   const now = new Date();
-  const place = (stageId: number, statuses: string[] | null) => {
+  const userId = ctx.user?.id ?? null;
+  const place = async (stageId: number, statuses: string[] | null) => {
     const qb = conn('leads').whereNull('stage_id');
     if (statuses) qb.whereIn('status', statuses);
+    const ids = (await qb.clone().pluck('id')) as number[];
+    if (!ids.length) return 0;
     // Positions follow creation order; the board sorts by position then id.
-    return qb.update({ pipeline_id: pipeline.id, stage_id: stageId, stage_entered_at: now, position: 1000 });
+    await conn('leads')
+      .whereIn('id', ids)
+      .update({ pipeline_id: pipeline.id, stage_id: stageId, stage_entered_at: now, position: 1000 });
+    for (let i = 0; i < ids.length; i += 500)
+      await conn('lead_stage_history').insert(
+        ids
+          .slice(i, i + 500)
+          .map((lead_id) => ({ lead_id, from_stage_id: null, to_stage_id: stageId, changed_by: userId })),
+      );
+    return ids.length;
   };
-  await place(won.id, ['converted']);
-  await place(lost.id, ['unqualified']);
-  await place(open.id, null);
+  const placed = {
+    won: await place(won.id, ['converted']),
+    lost: await place(lost.id, ['unqualified']),
+    open: await place(open.id, null),
+  };
+  await audit(conn, ctx, {
+    action: 'lead.pipeline_backfilled',
+    entity: 'pipeline',
+    entityId: pipeline.id,
+    entityUuid: pipeline.uuid,
+    diff: placed,
+  });
 }

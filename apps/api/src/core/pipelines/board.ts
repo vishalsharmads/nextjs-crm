@@ -4,7 +4,7 @@ import { db } from '../../db/knex';
 import { notFound, AppError } from '../../lib/errors';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { audit } from '../audit/audit.service';
-import { applyScope } from '../rbac/access';
+import { applyScope, assertCan } from '../rbac/access';
 import { applyListCriteria, getRow } from '../records/service';
 import type { ResourceDef } from '../records/types';
 import {
@@ -41,7 +41,7 @@ export async function loadBoard<D extends { stage: { uuid?: string } | null }>(
 ) {
   const { table } = STAGED[entity];
   const pipeline = query.pipeline
-    ? await db('pipelines').where({ uuid: query.pipeline, entity }).first()
+    ? await db('pipelines').where({ uuid: query.pipeline, entity, active: true }).first()
     : await defaultPipeline(db, entity);
   if (!pipeline) throw notFound('Pipeline');
   const stages = (await db('pipeline_stages')
@@ -87,6 +87,7 @@ export async function moveToStage(
   body: z.infer<typeof dealMoveSchema>,
   onStageChange?: (stage: StageRow, trx: typeof db) => Promise<Record<string, unknown>>,
 ) {
+  assertCan(user, `${def.resource}.update`);
   const { table } = STAGED[entity];
   return db.transaction(async (trx) => {
     const record = await getRow(def, user, uuid, trx, { forUpdate: true });

@@ -36,6 +36,7 @@ import {
   setRaw,
 } from './settings.service';
 import { enableLeadPipeline } from '../pipelines/lead-pipeline';
+import { assertCan } from '../rbac/access';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
 const assetUpload = multer({
@@ -349,6 +350,12 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
           if (issues.length) throw new AppError('VALIDATION_FAILED', issues[0]!.message, issues);
         }
       }
+      // Turning the lead pipeline on creates a pipeline and moves every lead onto it.
+      const enablingLeadPipeline =
+        params.group === 'features' &&
+        (next as FeatureSettings).leadPipeline &&
+        !(current as Partial<FeatureSettings>).leadPipeline;
+      if (enablingLeadPipeline) assertCan(user, 'core.pipelines.manage');
       await db.transaction(async (trx) => {
         await setRaw(params.group, params.group, next, { userId: user.id, conn: trx });
         if (raisedSecurity) {
@@ -364,13 +371,10 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
           entity: 'settings',
           diff: { group: params.group, before: current, after: next },
         });
-        if (
-          params.group === 'features' &&
-          (next as FeatureSettings).leadPipeline &&
-          !(current as Partial<FeatureSettings>).leadPipeline
-        )
-          await enableLeadPipeline(trx, ctx);
+        if (enablingLeadPipeline) await enableLeadPipeline(trx, ctx);
       });
+      // A request during the transaction may have re-cached the old flag; new leads must see the new one.
+      if (enablingLeadPipeline) clearSettingsCache();
       return next;
     },
   });

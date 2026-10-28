@@ -52,6 +52,11 @@ describe('lead pipeline', () => {
       },
     );
 
+    const backfill = await db('audit_logs').where({ action: 'lead.pipeline_backfilled' }).first();
+    expect(backfill).toBeTruthy();
+    const unqId = (await db('leads').where({ uuid: unq.body.uuid }).first('id')).id;
+    expect(await db('lead_stage_history').where({ lead_id: unqId }).first()).toBeTruthy();
+
     const fresh = await client.post('/leads', { firstName: 'Fresh', lastName: 'Lead' }).expect(201);
     expect(fresh.body.stage.name).toBe('New');
     expect(fresh.body.stageEnteredAt).toBeTruthy();
@@ -132,5 +137,28 @@ describe('lead pipeline', () => {
       .delete(`/pipelines/${pipeline.body.uuid}/stages/${first.uuid}?moveTo=${second.uuid}`)
       .expect(200);
     expect((await client.get(`/leads/${lead.body.uuid}`)).body.stage.uuid).toBe(second.uuid);
+  });
+
+  it('converting a lead puts it on the won stage', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const lead = await client.post('/leads', { firstName: 'Ready', lastName: 'Convert' }).expect(201);
+    await client.post(`/leads/${lead.body.uuid}/convert`, { createDeal: false }).expect(200);
+    expect((await client.get(`/leads/${lead.body.uuid}`)).body.stage.isWon).toBe(true);
+  });
+
+  it('own scope cannot bulk-move other people’s leads', async () => {
+    const { client: rep1 } = await clientWithRoles(['sales_rep']);
+    const { client: rep2 } = await clientWithRoles(['sales_rep']);
+    const mine = await rep1.post('/leads', { firstName: 'Rep', lastName: 'BulkGuard' }).expect(201);
+    const columns = (await rep1.get('/leads/board').expect(200)).body.columns as Column[];
+    // Refused outright (no bulk permission) or skipped as out of scope: either way the lead stays put.
+    const res = await rep2.post('/leads/bulk', {
+      action: 'move_stage',
+      uuids: [mine.body.uuid],
+      stageUuid: columns[1]!.stage.uuid,
+    });
+    if (res.status === 200) expect(res.body.affected).toBe(0);
+    else expect(res.status).toBe(403);
+    expect((await rep1.get(`/leads/${mine.body.uuid}`)).body.stage.uuid).toBe(columns[0]!.stage.uuid);
   });
 });
