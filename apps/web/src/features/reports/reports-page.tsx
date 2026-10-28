@@ -6,7 +6,7 @@ import type { ForecastDto, QuotaRowDto, VelocityDto } from '@app/shared';
 import { ApiError, apiGet, apiPut } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
 import { ReportBuilder } from './report-builder';
-import { useBoot, useCan } from '@/app/session';
+import { useBoot, useCan, useT } from '@/app/session';
 import { Input, NativeSelect } from '@/components/ui/input';
 import {
   EmptyState,
@@ -36,14 +36,15 @@ const monthLabel = (m: string) =>
   });
 
 export function ReportsPage() {
-  const { labels, pipelines } = useBoot();
+  const t = useT();
+  const { pipelines } = useBoot();
   const dealPipelines = pipelines.filter((p) => p.entity === 'deal');
   const [pipelineUuid, setPipelineUuid] = useState('');
   return (
     <div className="flex flex-col">
       <PageHeader
         title="Reports"
-        description={`Forecast, quotas and velocity for the ${labels.deal?.plural.toLowerCase() ?? 'deals'} you can see.`}
+        description={t('reports.description')}
         actions={
           dealPipelines.length > 1 ? (
             <NativeSelect
