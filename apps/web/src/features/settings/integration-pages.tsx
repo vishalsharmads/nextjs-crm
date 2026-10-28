@@ -21,7 +21,7 @@ function copy(text: string) {
 }
 
 /** A secret shown exactly once, with a copy button. */
-function OnceSecret({ label, secret, onDone }: { label: string; secret: string; onDone: () => void }) {
+export function OnceSecret({ label, secret, onDone }: { label: string; secret: string; onDone: () => void }) {
   return (
     <Dialog open onOpenChange={(o) => !o && onDone()}>
       <DialogContent

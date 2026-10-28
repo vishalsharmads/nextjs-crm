@@ -115,6 +115,7 @@
     "teams": "Teams",
     "security": "Security",
     "objects": "Objects",
+    "aiClients": "AI clients",
     "fields": "Custom fields",
     "pipelines": "Pipelines",
     "modules": "Modules",

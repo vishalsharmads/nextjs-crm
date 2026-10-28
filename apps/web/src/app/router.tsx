@@ -31,6 +31,7 @@ const UsersPage = lazyPage(() => import('@/features/settings/people-pages'), 'Us
 const TeamsPage = lazyPage(() => import('@/features/settings/people-pages'), 'TeamsPage');
 const RolesPage = lazyPage(() => import('@/features/settings/people-pages'), 'RolesPage');
 const FieldsPage = lazyPage(() => import('@/features/settings/fields-page'), 'FieldsPage');
+const AiClientsPage = lazyPage(() => import('@/features/settings/ai-clients'), 'AiClientsPage');
 const ObjectsPage = lazyPage(() => import('@/features/settings/objects-page'), 'ObjectsPage');
 const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'), 'PipelinesPage');
 const DealsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'DealsPage');
@@ -105,6 +106,7 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'privacy', element: <PrivacyPage /> },
   { path: 'data-map', element: <DataMapPage /> },
   { path: 'api-keys', element: <ApiKeysPage /> },
+  { path: 'ai-clients', element: <AiClientsPage /> },
   { path: 'webhooks', element: <WebhooksPage /> },
   { path: 'templates', element: <TemplatesPage /> },
   { path: 'email', element: <EmailSettingsPage /> },
