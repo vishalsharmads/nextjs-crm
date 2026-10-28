@@ -8,7 +8,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 
 - Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
 - **Phases 1–5 complete.** Phase 5 is compliance readiness (profiles, access logging, data subject rights, retention, encryption; see `docs/compliance/`). New work goes through the roadmap's Future list.
-- **Phase 6** follows [docs/plan/phase-6.md](docs/plan/phase-6.md): 6a (quick wins), 6a2 (UI polish), 6a3 (rich text), 6b (records engine for modules) and 6c (admin-defined objects), 6d (tool layer, personal access tokens, MCP) 6e (assistant module) and 6f (sales reports) are done; 6g (automation and reports) is next.
+- **Phase 6** follows [docs/plan/phase-6.md](docs/plan/phase-6.md): 6a (quick wins), 6a2 (UI polish), 6a3 (rich text), 6b (records engine for modules), 6c (admin-defined objects), 6d (tool layer, personal access tokens, MCP), 6e (assistant module) and 6f (sales reports) are done; 6g (automation and reports) is next.
 
 ## Non-negotiables
 
