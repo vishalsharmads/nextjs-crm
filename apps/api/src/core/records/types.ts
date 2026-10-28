@@ -15,6 +15,8 @@ export interface CoreFieldSpec {
   filterable?: boolean;
   /** Raw SQL expression used for sorting when it differs from the column. */
   sortExpr?: string;
+  /** Relation column and the table it points at (report grouping). */
+  relation?: { column: string; table: string };
   /** Custom filter compiler (relations, tags, owner by uuid). */
   filter?: (qb: Knex.QueryBuilder, cond: FilterCondition, user: AuthUser) => void;
 }
