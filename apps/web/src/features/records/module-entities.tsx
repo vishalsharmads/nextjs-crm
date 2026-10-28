@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import {
   ENTITY_ROUTE,
   recordTypePath,
+  isCoreEntity,
+  objectRoute,
   type CustomFieldDef,
   type RecordColumnMeta,
   type RecordTypeMeta,
@@ -81,7 +83,13 @@ function columnField(c: RecordColumnMeta, title: boolean, vocab: Vocabulary): Fi
     sortable: c.sortable,
     filterable: c.filterable,
     options: c.kind === 'boolean' ? YES_NO : c.options,
-    relationRoute: relation && c.relation ? ENTITY_ROUTE[c.relation] : undefined,
+    // Core targets use their routes; anything else is an admin-defined object (`o/<route>`).
+    relationRoute:
+      relation && c.relation
+        ? isCoreEntity(c.relation)
+          ? ENTITY_ROUTE[c.relation]
+          : `o/${objectRoute(c.relation)}`
+        : undefined,
     input: relation ? `${c.key}Uuid` : c.key,
     required: c.required,
     width: title ? 220 : c.kind === 'textarea' ? 240 : 150,
