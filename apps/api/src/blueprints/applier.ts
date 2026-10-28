@@ -25,7 +25,7 @@ import { clearLabelCache } from '../core/labels/labels.service';
 import { bumpDefinitionsVersion } from '../core/custom-fields/definitions';
 import { ensureCustomFieldIndexes } from '../core/custom-fields/ddl.service';
 import { loadModules, enableModule, getModule } from '../modules/registry';
-import { loadCustomObjects, objectKeyProblem } from '../core/objects/objects';
+import { linkProblem, loadCustomObjects, objectKeyProblem } from '../core/objects/objects';
 import { seedSampleData } from './sample-data';
 import { audit } from '../core/audit/audit.service';
 import { systemContext, type RequestContext } from '../http/context';
@@ -247,6 +247,9 @@ class Applier {
   async object(o: BlueprintObject, i: number) {
     const problem = await objectKeyProblem(o.key, this.trx, { allowExistingObject: true });
     if (problem) throw new BlueprintError(`Object ${problem}`);
+    // Links go to core records, objects that exist, or objects this blueprint seeds.
+    const bad = await linkProblem(o.links, this.trx, { alsoObjects: this.bp.objects.map((x) => x.key) });
+    if (bad) throw new BlueprintError(`Object "${o.key}": ${bad}`);
     const exists = await this.trx('custom_objects').where({ entity: o.key }).first();
     if (!exists) {
       const { n } = (await this.trx('custom_objects').count({ n: '*' }).first()) as { n: number };

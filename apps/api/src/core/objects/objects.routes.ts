@@ -87,7 +87,7 @@ export const objectsRoutes = defineRoutes('/objects', ['objects'])
           plural: body.plural,
           icon: body.icon,
           description: body.description ?? null,
-          links: JSON.stringify(body.links),
+          links: JSON.stringify([...new Set(body.links)]),
           sort_order: Number(n) * 10,
           customized: true,
           created_by: user.id,

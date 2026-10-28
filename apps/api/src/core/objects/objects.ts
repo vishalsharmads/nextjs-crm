@@ -39,6 +39,10 @@ const RESERVED_KEYS = new Set([
   'custom_field',
   'custom_field_group',
   'custom_object',
+  'owner',
+  'name',
+  'custom',
+  'uuid',
   'dashboard',
   'document',
   'document_request',
@@ -140,6 +144,9 @@ export function toObjectDto(row: ObjectRow): CustomObjectDto {
   };
 }
 
+/** Column key of a link: `service_visit` → `serviceVisit` (stored as `service_visit_id`). */
+export const linkKey = (target: string) => target.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+
 /** The records-engine definition of an object: a required name plus one column per link. */
 export function objectDef(row: ObjectRow): ResourceDef {
   return defineRecordType({
@@ -162,7 +169,7 @@ export function objectDef(row: ObjectRow): ResourceDef {
       },
       ...linksOf(row).map((target) => ({
         // Column keys are camelCase: `service_visit` → `serviceVisit` (stored as `service_visit_id`).
-        key: target.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase()),
+        key: linkKey(target),
         label: target,
         kind: 'relation' as const,
         relation: target as string,
@@ -170,7 +177,7 @@ export function objectDef(row: ObjectRow): ResourceDef {
       })),
     ],
     titleColumn: 'name',
-    defaultColumns: ['name', ...linksOf(row), 'owner', 'updated_at'],
+    defaultColumns: ['name', ...linksOf(row).map(linkKey), 'owner', 'updated_at'],
   });
 }
 
@@ -225,9 +232,17 @@ const CORE_TABLES: Record<string, string> = {
 };
 
 /** Why the links of an object are not valid, or null: core targets or other live objects only. */
-export async function linkProblem(links: string[], conn: Db = db): Promise<string | null> {
+export async function linkProblem(
+  links: string[],
+  conn: Db = db,
+  opts: { alsoObjects?: string[] } = {},
+): Promise<string | null> {
+  if (new Set(links).size !== links.length) return 'Each link can be added once';
   for (const target of links) {
     if (CORE_TABLES[target]) continue;
+    // Column keys are camelCase of the target key; these shapes would not map back to the column.
+    if (/_[0-9_]/.test(target)) return `"${target}" cannot be linked to`;
+    if (opts.alsoObjects?.includes(target)) continue;
     const obj = await conn('custom_objects').where({ entity: target }).whereNull('archived_at').first('id');
     if (!obj) return `"${target}" is not a record type you can link to`;
   }
@@ -273,7 +288,10 @@ export async function loadCustomObjects(conn: Db = db) {
   if (!(await conn.schema.hasTable('custom_objects'))) return;
   const rows = (await conn('custom_objects').orderBy('sort_order').orderBy('id')) as ObjectRow[];
   // Tables first, then links, so an object can link to one created after it.
-  for (const row of rows) await ensureObjectTable(row, conn, { links: false }).catch(() => undefined);
+  for (const row of rows)
+    await ensureObjectTable(row, conn, { links: false }).catch((err: unknown) =>
+      logger.error({ err, object: row.entity }, 'Object table could not be created'),
+    );
   for (const row of rows) {
     // One bad object (a key a newer module now uses, a failed DDL) must not stop the app.
     try {
