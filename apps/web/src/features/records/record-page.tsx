@@ -4,7 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ArrowLeft, GitMerge, Mail, MoreHorizontal, Pencil, Trash2, UserCheck } from 'lucide-react';
 import { ComposeEmail } from '@/features/email/compose-email';
-import type { ContactDto, CoreEntity, DealDto, DuplicateCandidate, LeadDto, RelatedType } from '@app/shared';
+import type {
+  ContactDto,
+  DealDto,
+  RecordEntity,
+  DuplicateCandidate,
+  LeadDto,
+  RelatedType,
+} from '@app/shared';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
 import { useBranding } from '@/app/branding';
@@ -42,7 +49,7 @@ type Rec = Record<string, unknown> & {
   deletedAt: string | null;
 };
 
-export function RecordPage({ entity }: { entity: CoreEntity }) {
+export function RecordPage({ entity }: { entity: RecordEntity }) {
   const { uuid = '' } = useParams();
   const config = useEntityConfig(entity);
   const q = useRecord<Rec>(config.route, uuid);
@@ -143,7 +150,7 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
           <FieldsPanel config={config} record={rec} />
         </aside>
         <main className="min-w-0 p-4 md:p-6">
-          {entity !== 'activity' ? (
+          {entity !== 'activity' && !config.moduleKey ? (
             <div className="mb-5">
               <ActivityComposer related={{ type: related, uuid: rec.uuid }} />
             </div>
@@ -151,8 +158,12 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
           <Tabs defaultValue="timeline">
             <TabsList>
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="activities">Activities</TabsTrigger>
-              <TabsTrigger value="files">Files</TabsTrigger>
+              {!config.moduleKey ? (
+                <>
+                  <TabsTrigger value="activities">Activities</TabsTrigger>
+                  <TabsTrigger value="files">Files</TabsTrigger>
+                </>
+              ) : null}
               {entity === 'contact' || entity === 'organization' ? (
                 <TabsTrigger value="related">Related</TabsTrigger>
               ) : null}
@@ -174,7 +185,11 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
             </TabsContent>
             {entity === 'contact' || entity === 'lead' ? (
               <TabsContent value="privacy" className="pt-3">
-                <ConsentPanel entity={entity} uuid={rec.uuid} resource={config.resource} />
+                <ConsentPanel
+                  entity={entity as 'contact' | 'lead'}
+                  uuid={rec.uuid}
+                  resource={config.resource}
+                />
               </TabsContent>
             ) : null}
           </Tabs>
@@ -196,7 +211,7 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
   );
 }
 
-function RecordSubheader({ entity, rec, config }: { entity: CoreEntity; rec: Rec; config: EntityConfig }) {
+function RecordSubheader({ entity, rec, config }: { entity: RecordEntity; rec: Rec; config: EntityConfig }) {
   if (entity === 'deal') {
     const d = rec as unknown as DealDto;
     return (
@@ -231,7 +246,7 @@ function RecordSubheader({ entity, rec, config }: { entity: CoreEntity; rec: Rec
   return sub ? <p className="mt-1 text-sm text-muted">{sub}</p> : null;
 }
 
-function RelatedRecords({ entity, rec }: { entity: CoreEntity; rec: Rec }) {
+function RelatedRecords({ entity, rec }: { entity: RecordEntity; rec: Rec }) {
   const dealConfig = useEntityConfig<DealDto>('deal');
   const filterField = entity === 'contact' ? 'contact' : 'organization';
   const deals = useQuery({

@@ -5,8 +5,10 @@ import {
   ENTITY_ROUTE,
   ENTITY_RESOURCE,
   LEAD_STATUSES,
+  isCoreEntity,
   type ContactDto,
   type CoreEntity,
+  type RecordEntity,
   type CustomFieldDef,
   type DealDto,
   type LeadDto,
@@ -21,6 +23,7 @@ import { formatDate, formatMoney, formatRelative } from '@/lib/format';
 import { Avatar, Badge } from '@/components/ui/misc';
 import { CustomFieldDisplay } from '@/components/fields/custom-field';
 import { SensitiveValue } from '@/components/fields/sensitive-value';
+import { buildModuleConfig } from './module-entities';
 
 export type FieldKind =
   | 'text'
@@ -61,8 +64,11 @@ export interface FieldConfig<T = Record<string, unknown>> {
 }
 
 export interface EntityConfig<T = Record<string, unknown>> {
-  entity: CoreEntity;
+  entity: RecordEntity;
+  /** API and app path without the leading slash: `contacts`, or `m/<module>/<route>`. */
   route: string;
+  /** Set for record types a module registers. */
+  moduleKey?: string;
   resource: string;
   singular: string;
   plural: string;
@@ -174,12 +180,22 @@ const common = <T extends { owner: UserRef | null; tags: TagDto[]; createdAt: st
 const opts = (list: string[]) => list.map((v) => ({ value: v, label: v }));
 
 /** Entity configs built from the live bootstrap (vocabulary, settings, custom fields). */
-export function useEntityConfig<T = Record<string, unknown>>(entity: CoreEntity): EntityConfig<T> {
+export function useEntityConfig<T = Record<string, unknown>>(entity: RecordEntity): EntityConfig<T> {
   const boot = useBoot();
   return useMemo(() => buildConfig(entity, boot), [entity, boot]) as unknown as EntityConfig<T>;
 }
 
-export function buildConfig(entity: CoreEntity, boot: ReturnType<typeof useBoot>): EntityConfig {
+export function buildConfig(entity: RecordEntity, boot: ReturnType<typeof useBoot>): EntityConfig {
+  if (!isCoreEntity(entity)) {
+    const meta = boot.recordTypes.find((t) => t.entity === entity);
+    if (!meta) throw new Error(`Unknown record type "${entity}"`);
+    const labels = boot.labels[entity] ?? { singular: entity, plural: entity };
+    return buildModuleConfig(meta, labels, boot.customFields, boot.me);
+  }
+  return buildCoreConfig(entity, boot);
+}
+
+function buildCoreConfig(entity: CoreEntity, boot: ReturnType<typeof useBoot>): EntityConfig {
   const L = labelVars(boot.labels);
   const defs = boot.customFields.filter((f) => f.entity === entity);
   const { contacts: cs, deals: ds } = boot.settings;

@@ -3,6 +3,8 @@ import { Navigate, useParams, useRoutes } from 'react-router';
 import type { WebModule } from '@app/module-sdk';
 import { useBoot } from '@/app/session';
 import { Spinner } from '@/components/ui/spinner';
+import { RecordListPage } from '@/features/records/list-page';
+import { RecordPage } from '@/features/records/record-page';
 import { EmptyState, ErrorState } from '@/components/ui/misc';
 
 type Mod = WebModule<ReactElement>;
@@ -27,8 +29,22 @@ export const loadModule = (key: string) => {
   return cache.get(key)!;
 };
 
+/** Record type pages come first, then the module's own routes. */
 function ModuleRoutes({ mod }: { mod: Mod }) {
-  return useRoutes(mod.routes.map((r) => ({ path: r.path ? `${r.path}/*` : '*', element: r.element })));
+  const boot = useBoot();
+  const types = boot.recordTypes.filter((t) => t.moduleKey === mod.key);
+  const own = mod.routes.map((r) => ({ path: r.path ? `${r.path}/*` : '*', element: r.element }));
+  return useRoutes([
+    ...types.flatMap((t) => [
+      { path: t.route, element: <RecordListPage key={t.entity} entity={t.entity} /> },
+      { path: `${t.route}/:uuid`, element: <RecordPage key={t.entity} entity={t.entity} /> },
+    ]),
+    // A module with only record types opens on the first one.
+    ...(types.length && !mod.routes.some((r) => !r.path)
+      ? [{ index: true, element: <Navigate to={types[0]!.route} replace /> }]
+      : []),
+    ...own,
+  ]);
 }
 
 export function ModuleOutlet() {

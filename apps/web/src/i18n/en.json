@@ -152,7 +152,8 @@
     "organization": "New {{organization}}",
     "lead": "New {{lead}}",
     "deal": "New {{deal}}",
-    "activity": "New {{activity}}"
+    "activity": "New {{activity}}",
+    "record": "New {{name}}"
   },
   "editor": {
     "formatting": "Formatting",

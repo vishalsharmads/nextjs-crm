@@ -13,6 +13,7 @@ import { ErrorState, PageHeader, Pane } from '@/components/ui/misc';
 import { Combobox } from '@/components/fields/combobox';
 import { TagsInput, UserPicker } from '@/components/fields/pickers';
 import { useEntityConfig } from '@/features/records/entities';
+import { useBoot } from '@/app/session';
 
 const ROUTE_ENTITY: Record<string, Exclude<CoreEntity, 'activity'>> = {
   contacts: 'contact',
@@ -40,7 +41,9 @@ interface JobStatus {
 
 export function ImportPage() {
   const { route = 'contacts' } = useParams();
-  const entity = ROUTE_ENTITY[route] ?? 'contact';
+  const boot = useBoot();
+  const entity =
+    ROUTE_ENTITY[route] ?? (boot.recordTypes.some((t) => t.entity === route) ? route : 'contact');
   const config = useEntityConfig(entity);
   const { branding } = useBranding();
   const [upload, setUpload] = useState<Upload | null>(null);

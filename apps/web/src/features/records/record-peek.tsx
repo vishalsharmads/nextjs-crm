@@ -26,7 +26,7 @@ export function RecordPeek({
 }) {
   const q = useRecord<Rec>(config.route, uuid);
   useHotkeys({ Enter: onOpenFull, o: onOpenFull });
-  const related = config.entity !== 'activity' ? (config.entity as RelatedType) : null;
+  const related = config.entity !== 'activity' && !config.moduleKey ? (config.entity as RelatedType) : null;
   return (
     <Sheet
       open
