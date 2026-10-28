@@ -10,6 +10,7 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 | 3     | Commercial: products, quotes, invoices, payments, contracts and renewals, client portal                                                                                                   | Done                           |
 | 4     | Operational and industry modules: bookings, tickets, documents, inventory/assets, vertical modules                                                                                        | Done                           |
 | 5     | Compliance readiness: profiles with enforced floors, access logging, data subject rights and consent, retention, encryption of sensitive data ([overview](compliance/overview.md))        | Done                           |
+| 6     | Gap closing ([plan](plan/phase-6.md)): quick wins, UI polish, rich text, records engine for modules (`module:new`); next: custom objects, MCP server, assistant, sales depth, reports     | In progress (6a–6b done)       |
 
 ## Future
 
