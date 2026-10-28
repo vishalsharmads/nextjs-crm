@@ -1,5 +1,6 @@
 import { defineRecordType, type ApiModule } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_items';
+import * as m0002 from './migrations/0002_optional_status';
 
 /**
  * Items: a record type on the shared records engine. It gets list, detail, create, edit,
@@ -35,6 +36,6 @@ export const demoItemType = defineRecordType({
 });
 
 export const recordsDemo: ApiModule = {
-  migrations: { '0001_items': m0001 },
+  migrations: { '0001_items': m0001, '0002_optional_status': m0002 },
   recordTypes: [demoItemType],
 };

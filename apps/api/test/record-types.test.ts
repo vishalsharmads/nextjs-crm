@@ -60,6 +60,11 @@ describe('module record types', () => {
     // Forms send '' for empty optional inputs and 'true'/'false' from yes/no selects.
     const blank = await admin.post(BASE, { name: 'Blank', notes: '', dueOn: '', value: '' }).expect(201);
     expect(blank.body).toMatchObject({ notes: null, dueOn: null, value: null });
+    // An empty select on create falls back to the column default; clearing it later stores null.
+    const defaulted = await admin.post(BASE, { name: 'Defaulted', status: null }).expect(201);
+    expect(defaulted.body.status).toBe('active');
+    const cleared = await admin.patch(`${BASE}/${defaulted.body.uuid}`, { status: '' }).expect(200);
+    expect(cleared.body.status).toBeNull();
     await admin.post(BASE, { name: 'X', status: 'nope' }).expect(422);
     await admin.post(BASE, { name: 'X', custom: { grade: 'z' } }).expect(422);
 

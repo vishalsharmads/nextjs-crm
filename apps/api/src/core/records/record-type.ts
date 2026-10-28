@@ -225,7 +225,7 @@ export function defineRecordType(spec: RecordTypeSpec): ResourceDef {
         required: !!c.required,
         kind: c.kind,
       })),
-    async toRow(input, { user, conn }) {
+    async toRow(input, { user, conn, existing }) {
       const row: Record<string, unknown> = {
         owner_id: await userIdFromRef(input.ownerUuid as string | null | undefined, user, conn),
       };
@@ -246,7 +246,11 @@ export function defineRecordType(spec: RecordTypeSpec): ResourceDef {
         if (v !== undefined && c.kind === 'money' && v !== null) v = Math.round(Number(v) * 100);
         row[snake(c.key)] = v;
       }
-      return compact(row);
+      // On create, an empty value means "not set": leave it out so a column default applies.
+      const kept = existing
+        ? row
+        : Object.fromEntries(Object.entries(row).filter(([k, v]) => v !== null || k === 'owner_id'));
+      return compact(kept);
     },
     async toDtos(rows, { user, conn }) {
       const [owners, cf] = await Promise.all([
