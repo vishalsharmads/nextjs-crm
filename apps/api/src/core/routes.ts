@@ -25,6 +25,7 @@ import { automationsRoutes } from './automations/automations';
 import { formsRoutes, publicFormsRoutes } from './forms/forms';
 import { templatesRoutes } from './templates/templates';
 import { emailRoutes } from './email/email';
+import { objectRecordRoutes, objectsRoutes } from './objects/objects.routes';
 
 /** All core route groups. Specific paths (e.g. /deals/board) are registered before /:uuid. */
 export function coreRouteGroups(): RouteGroup[] {
@@ -64,6 +65,8 @@ export function coreRouteGroups(): RouteGroup[] {
     formsRoutes,
     templatesRoutes,
     emailRoutes,
+    objectsRoutes,
+    objectRecordRoutes,
     ...entityCollectionRoutes(),
     ...contactsRoutes,
     ...organizationsRoutes,

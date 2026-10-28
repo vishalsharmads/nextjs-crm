@@ -10,6 +10,7 @@ import { listPipelines } from '../pipelines/pipelines.repository';
 import { enabledModuleKeys, moduleMenu } from '../../modules/registry';
 import { can } from '../rbac/access';
 import { customizableEntities, moduleRecordDefs } from '../records/registry';
+import { objectMenu } from '../objects/objects';
 
 export async function accessFor(user: AuthUser): Promise<AccessDto> {
   const fields: AccessDto['fields'] = {};
@@ -43,10 +44,11 @@ export const metaRoutes = defineRoutes('/meta', ['meta']).add({
       }
     }
     const groups = await db('custom_field_groups').orderBy('sort_order');
+    const labels = await getLabels('en');
     return {
       me: await getMe(user.id),
       access: await accessFor(user),
-      labels: await getLabels('en'),
+      labels,
       settings: {
         general: await getGroup('general'),
         features: await getGroup('features'),
@@ -71,7 +73,7 @@ export const metaRoutes = defineRoutes('/meta', ['meta']).add({
       pipelines: await listPipelines(),
       modules: {
         enabled: enabledModuleKeys(),
-        menu: moduleMenu().filter((m) => can(user, m.permission)),
+        menu: [...moduleMenu(), ...(await objectMenu(labels))].filter((m) => can(user, m.permission)),
       },
       recordTypes: moduleRecordDefs()
         .filter((d) => d.meta && can(user, `${d.resource}.view`))

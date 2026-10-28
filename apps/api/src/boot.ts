@@ -13,6 +13,7 @@ import { startMailSync } from './core/email/email';
 import { maintainAuditLogs } from './core/audit/integrity';
 import { remindDueRequests } from './core/privacy/requests.service';
 import { runRetention } from './core/privacy/retention.service';
+import { loadCustomObjects } from './core/objects/objects';
 import { installModuleGate, loadModules, moduleRouteGroups, refreshModuleStates } from './modules/registry';
 
 export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promise<void> }> {
@@ -21,6 +22,7 @@ export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promi
   if (await isInstalled()) {
     await syncPermissions();
     await refreshModuleStates();
+    await loadCustomObjects();
   } else {
     logger.warn('This instance is not installed yet. Run: npm run install:instance -- --blueprint=<key>');
   }
