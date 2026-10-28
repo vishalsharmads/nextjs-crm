@@ -12,7 +12,7 @@ import { Field, Input } from '@/components/ui/input';
 import { Badge, Pane, Skeleton } from '@/components/ui/misc';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { SettingsPage } from './layout';
-import { AccessTokens } from './ai-clients';
+import { AccessTokens, ConnectedApps } from './ai-clients';
 
 export function ProfilePage() {
   const t = useT();
@@ -23,6 +23,7 @@ export function ProfilePage() {
       <TwoFactor />
       <Sessions />
       <AccessTokens />
+      <ConnectedApps />
     </SettingsPage>
   );
 }

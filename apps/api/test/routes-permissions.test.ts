@@ -32,7 +32,8 @@ describe('route permissions', () => {
     const app = await getApp();
     // Infrastructure probes live outside the API router and need no session.
     const mounted = collectRoutes(app).filter(
-      (r) => !['/api/v1/health', '/api/v1/health/ready'].includes(r.path),
+      (r) =>
+        !['/api/v1/health', '/api/v1/health/ready'].includes(r.path) && !r.path.startsWith('/.well-known/'),
     );
     expect(mounted.length).toBeGreaterThan(20);
     const missing = mounted.filter(
@@ -48,7 +49,14 @@ describe('route permissions', () => {
     const publicRoutes = routeRegistry
       .filter((r) => r.permission === 'public')
       .map((r) => `${r.method} ${r.path}`);
-    const allowed = [/^\S+ \/public\//, /^\S+ \/auth\//, /^post \/forms\/[^/]+\/submit$/];
+    const allowed = [
+      /^\S+ \/public\//,
+      /^\S+ \/auth\//,
+      /^post \/forms\/[^/]+\/submit$/,
+      // OAuth client endpoints (PKCE, rate limited) and MCP, which authenticates callers itself.
+      /^post \/oauth\/(register|token|revoke)$/,
+      /^post \/mcp$/,
+    ];
     const unexpected = publicRoutes.filter((r) => !allowed.some((re) => re.test(r)));
     expect(unexpected).toEqual([]);
   });

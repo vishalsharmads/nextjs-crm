@@ -12,6 +12,7 @@ import { apiLimiter } from '../middleware/rate-limit';
 import { errorHandler, notFoundHandler } from '../middleware/error-handler';
 import { createApiRouter, mountGroups, routeRegistry, type RouteGroup } from './routes';
 import { coreRouteGroups } from '../core/routes';
+import { oauthWellKnownRouter } from '../core/oauth/oauth';
 import { mountStatic, type StaticOptions } from './static';
 
 export interface AppOptions {
@@ -39,6 +40,8 @@ export function createApp(opts: AppOptions = {}): Express {
   if (origins.length) app.use(cors({ origin: origins, credentials: true }));
   app.use(cookieParser());
   app.use(express.json({ limit: '1mb' }));
+  // OAuth token requests are form-encoded (RFC 6749).
+  app.use(express.urlencoded({ extended: false, limit: '16kb' }));
   app.use(contextMiddleware);
   if (!isTest) {
     app.use(
@@ -72,6 +75,9 @@ export function createApp(opts: AppOptions = {}): Express {
       res.status(503).json({ status: 'unavailable', database: 'unreachable' });
     }
   });
+
+  // OAuth discovery for MCP clients lives at the site root (RFC 8414, RFC 9728).
+  app.use(oauthWellKnownRouter());
 
   app.use('/api', authenticate, csrfProtection, apiLimiter);
 

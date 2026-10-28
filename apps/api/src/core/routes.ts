@@ -27,6 +27,7 @@ import { templatesRoutes } from './templates/templates';
 import { emailRoutes } from './email/email';
 import { objectRecordRoutes, objectsRoutes } from './objects/objects.routes';
 import { tokensRoutes } from './tokens/tokens';
+import { connectedAppsRoutes, oauthRoutes } from './oauth/oauth';
 import { mcpRoutes } from './mcp/mcp.routes';
 import { exchangeRatesRoutes, reportsRoutes } from './reports/reports.routes';
 import { reportBuilderRoutes } from './reports/builder';
@@ -39,6 +40,8 @@ export function coreRouteGroups(): RouteGroup[] {
     publicFormsRoutes,
     authRoutes,
     tokensRoutes,
+    connectedAppsRoutes,
+    oauthRoutes,
     meRoutes,
     usersRoutes,
     rolesRoutes,

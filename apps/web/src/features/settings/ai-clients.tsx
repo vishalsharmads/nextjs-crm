@@ -19,6 +19,54 @@ const tokensKey = ['me', 'tokens'] as const;
 /** The MCP endpoint is served by the API, at the site root next to the app. */
 const mcpUrl = () => new URL('/api/v1/mcp', window.location.href).href;
 
+interface ConnectedApp {
+  uuid: string;
+  name: string;
+  access: 'read' | 'full';
+  lastUsedAt: string | null;
+  connectedAt: string;
+}
+
+/** Profile → Connected apps: AI clients this person approved through sign-in (OAuth). */
+export function ConnectedApps() {
+  const qc = useQueryClient();
+  const apps = useQuery({
+    queryKey: ['me', 'connected-apps'],
+    queryFn: () => apiGet<{ data: ConnectedApp[] }>('/me/connected-apps').then((r) => r.data),
+  });
+  const revoke = useMutation({
+    mutationFn: (uuid: string) => apiPost(`/me/connected-apps/${uuid}/revoke`),
+    onSuccess: () => {
+      toast.success('Disconnected');
+      void qc.invalidateQueries({ queryKey: ['me', 'connected-apps'] });
+    },
+  });
+  if (!apps.data?.length) return null;
+  return (
+    <Pane title="Connected apps" padded={false}>
+      <ul className="divide-y divide-line">
+        {apps.data.map((a) => (
+          <li key={a.uuid} className="flex items-center gap-3 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-2 text-sm font-medium">
+                {a.name}
+                <Badge tone="outline">{a.access === 'read' ? 'Read only' : 'Read and write'}</Badge>
+              </p>
+              <p className="text-xs text-muted">
+                Connected {formatDateTime(a.connectedAt)} ·{' '}
+                {a.lastUsedAt ? `last used ${formatRelative(a.lastUsedAt)}` : 'never used'}
+              </p>
+            </div>
+            <Button size="sm" variant="ghost" onClick={() => revoke.mutate(a.uuid)}>
+              Disconnect
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </Pane>
+  );
+}
+
 /** Profile → Access tokens: personal tokens for AI clients, acting as the signed-in person. */
 export function AccessTokens() {
   const qc = useQueryClient();

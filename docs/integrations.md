@@ -23,7 +23,8 @@ AI assistants that support the Model Context Protocol can work with the workspac
 
 1. An admin turns it on in **Settings → AI clients**, chooses which tools clients may call, and sets a per-token rate limit (default 60 calls a minute).
 2. Each person creates a token in **Profile → Access tokens**: read only, or read and write, expiring within a year (or sooner under the compliance profile's key limit). The secret is shown once.
-3. The client connects to `POST https://<host>/api/v1/mcp` (Streamable HTTP, JSON responses) with `Authorization: Bearer pat_…`. Clients that only launch local commands use the stdio bridge:
+3. Clients that support OAuth need no token: point them at `https://<host>/api/v1/mcp`. They register themselves, send the person to an approval page in the app (sign in, choose read only or read and write, Allow), and receive short-lived access tokens with rotating refresh tokens (PKCE S256; discovery at `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource`, which nginx must pass to the API, see `deploy/nginx.conf.example`). Approved clients are listed under **Profile → Connected apps**, where they can be disconnected; changing the password or signing out everywhere disconnects them too.
+4. Other clients connect to `POST https://<host>/api/v1/mcp` (Streamable HTTP, JSON responses) with `Authorization: Bearer pat_…`. Clients that only launch local commands use the stdio bridge:
 
    ```
    MCP_URL=https://<host>/api/v1/mcp MCP_TOKEN=pat_… npx tsx apps/api/src/cli/mcp-stdio.ts
