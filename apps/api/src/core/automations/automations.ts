@@ -1,22 +1,30 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import Handlebars from 'handlebars';
 import { z } from 'zod';
-import { filterSchema, isGroup, type FilterCondition, type FilterNode, toPatch } from '@app/shared';
+import {
+  entityKeySchema,
+  filterSchema,
+  isGroup,
+  type FilterCondition,
+  type FilterNode,
+  toPatch,
+} from '@app/shared';
 import { defineRoutes } from '../../http/routes';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { db } from '../../db/knex';
 import { AppError, notFound } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
 import { logger } from '../../lib/logger';
-import { enqueue, registerJob } from '../../lib/jobs';
+import { enqueue, every, registerJob } from '../../lib/jobs';
 import { audit } from '../audit/audit.service';
 import { loadAccess } from '../rbac/access';
 import { eventDepth, eventTypeSchema, eventTypes, onEvent, type DomainEvent } from '../events/events';
 import { notify } from '../notifications/notifications.service';
 import { findRecordDef, recordDefs } from '../records/registry';
-import { createRecord, updateRecord } from '../records/service';
+import { createRecord, getRecord, listRecords, updateRecord } from '../records/service';
 import { ensureTags } from '../records/hydrate';
 import { sendMail } from '../../lib/mailer';
-import { getBranding } from '../settings/settings.service';
+import { getBranding, getGroup } from '../settings/settings.service';
 import { eventTouchesRestricted, restrictedRecipients } from '../privacy/privacy.service';
 import { unsubscribeToken } from '../privacy/unsubscribe';
 import { env } from '../../config/env';
@@ -50,17 +58,69 @@ export const actionSchema = z.discriminatedUnion('type', [
     body: z.string().min(1).max(20000),
   }),
   z.object({ type: z.literal('add_tags'), tags: z.array(z.string().min(1).max(64)).min(1).max(20) }),
+  z.object({ type: z.literal('remove_tags'), tags: z.array(z.string().min(1).max(64)).min(1).max(20) }),
+  /** Assign the record (its owner, or a task's assignee) to one of these people, taking turns. */
+  z.object({ type: z.literal('assign'), users: z.array(z.uuid()).min(1).max(50) }),
+  z.object({ type: z.literal('add_note'), body: z.string().min(1).max(20000) }),
 ]);
 export type AutomationAction = z.infer<typeof actionSchema>;
 
-const automationBody = z.object({
+/** Trigger of time-based rules: run over the records that match the conditions. */
+export const SCHEDULE_TRIGGER = 'schedule';
+
+const scheduleSchema = z.object({
+  entity: entityKeySchema,
+  frequency: z.enum(['daily', 'weekly']),
+  /** 0 = Sunday, for weekly rules. */
+  weekday: z.number().int().min(0).max(6).default(1),
+  /** Local time in the workspace time zone. */
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM'),
+});
+export type AutomationSchedule = z.infer<typeof scheduleSchema>;
+
+const automationShape = z.object({
   name: z.string().trim().min(1).max(150),
   description: z.string().max(500).default(''),
-  triggerEvent: eventTypeSchema,
+  triggerEvent: z.union([z.literal(SCHEDULE_TRIGGER), eventTypeSchema]),
+  /** Wait this long after the event, then re-check the conditions against the record as it is then. */
+  delayMinutes: z.number().int().min(0).max(43_200).default(0),
+  schedule: scheduleSchema.nullish(),
   conditions: filterSchema.nullish(),
   actions: z.array(actionSchema).min(1).max(10),
   active: z.boolean().default(true),
 });
+
+const scheduleRule = (b: { triggerEvent?: string; schedule?: AutomationSchedule | null }) =>
+  b.triggerEvent === undefined || (b.triggerEvent === SCHEDULE_TRIGGER) === !!b.schedule;
+const scheduleMessage = {
+  message: 'A schedule is needed for scheduled rules, and only for them',
+  path: ['schedule'],
+};
+const automationBody = automationShape.refine(scheduleRule, scheduleMessage);
+const automationPatch = toPatch(automationShape);
+
+/** The UTC instant of a wall-clock time in a time zone (handles daylight saving). */
+function zonedInstant(date: string, time: string, timeZone: string): Date {
+  const guess = new Date(`${date}T${time}:00Z`);
+  const local = new Date(guess.toLocaleString('en-US', { timeZone }));
+  const utc = new Date(guess.toLocaleString('en-US', { timeZone: 'UTC' }));
+  return new Date(guess.getTime() - (local.getTime() - utc.getTime()));
+}
+
+/** Next run of a schedule strictly after `after`, in the workspace time zone. */
+export function nextRun(schedule: AutomationSchedule, timeZone: string, after = new Date()): Date {
+  const day = (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+      d,
+    );
+  for (let i = 0; i < 8; i++) {
+    const date = day(new Date(after.getTime() + i * 86_400_000));
+    const at = zonedInstant(date, schedule.time, timeZone);
+    const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+    if (at > after && (schedule.frequency === 'daily' || weekday === schedule.weekday)) return at;
+  }
+  return new Date(after.getTime() + 7 * 86_400_000);
+}
 
 // ---------- Condition evaluation (in memory, against the event's record) ----------
 
@@ -167,6 +227,9 @@ async function userIdFor(to: string, e: DomainEvent): Promise<number | null> {
   return ((await db('users').where({ uuid: to }).first('id'))?.id as number | undefined) ?? null;
 }
 
+/** The automation a job is running, for actions that keep state per rule (assign). */
+const automationId = new AsyncLocalStorage<number>();
+
 async function runAction(
   action: AutomationAction,
   e: DomainEvent,
@@ -250,6 +313,54 @@ async function runAction(
       });
       return `emailed ${address}`;
     }
+    case 'assign': {
+      if (!def) return 'skipped: not a record';
+      // Take turns: the n-th run of this rule goes to the n-th person in the list.
+      const n = Number(
+        (
+          await db('automations')
+            .where({ id: automationId.getStore() ?? 0 })
+            .first('run_count')
+        )?.run_count ?? 0,
+      );
+      const pick = action.users[n % action.users.length]!;
+      const active = await db('users')
+        .where({ uuid: pick, status: 'active' })
+        .whereNull('deleted_at')
+        .first('id');
+      if (!active) return 'skipped: person not active';
+      await updateRecord(
+        def,
+        ctx,
+        user,
+        e.uuid,
+        e.entity === 'activity' ? { assigneeUuid: pick } : { ownerUuid: pick },
+      );
+      return `assigned to ${pick}`;
+    }
+    case 'add_note': {
+      if (!['contact', 'organization', 'deal', 'lead'].includes(e.entity))
+        return 'skipped: cannot add a note here';
+      await createRecord(recordDefs.activity, ctx, user, {
+        type: 'note',
+        body: render(action.body, vars),
+        related: { type: e.entity, uuid: e.uuid },
+      });
+      return 'note added';
+    }
+    case 'remove_tags': {
+      if (!def || e.entity === 'activity' || def.moduleKey) return 'skipped: cannot tag';
+      const row = await db(def.table).where({ uuid: e.uuid }).first('id');
+      if (!row) return 'skipped: record gone';
+      const ids = await db('tags').whereIn('name', action.tags).pluck('id');
+      const n = ids.length
+        ? await db('taggables')
+            .whereIn('tag_id', ids)
+            .where({ taggable_type: e.entity, taggable_id: row.id })
+            .delete()
+        : 0;
+      return `removed ${n} tag(s)`;
+    }
     case 'add_tags': {
       if (!def || e.entity === 'activity' || def.moduleKey) return 'skipped: cannot tag';
       const row = await db(def.table).where({ uuid: e.uuid }).first('id');
@@ -270,12 +381,23 @@ registerJob('automation.run', async (job) => {
     .where({ id: job.payload.automationId as number, active: true })
     .first();
   if (!automation) return null;
-  const event = job.payload.event as DomainEvent;
+  let event = job.payload.event as DomainEvent;
   const log: string[] = [];
   let status: 'succeeded' | 'skipped' | 'failed' = 'succeeded';
   try {
-    // Re-checked here: a restriction may have been set after the job was queued.
-    if (await eventTouchesRestricted(event)) {
+    // A delayed run judges the record as it is now, read as the rule's owner.
+    let gone = false;
+    if (job.payload.recheck) {
+      const def = findRecordDef(event.entity);
+      const owner = await runAs(automation.created_by);
+      const fresh = def ? await getRecord(def, owner, event.uuid).catch(() => null) : null;
+      if (fresh) event = { ...event, record: fresh as Record<string, unknown> };
+      else gone = true;
+    }
+    if (gone) {
+      status = 'skipped';
+      log.push('record gone or out of reach');
+    } else if (await eventTouchesRestricted(event)) {
       status = 'skipped';
       log.push('processing restricted');
     } else if (!matches(automation.conditions as FilterNode | null, event)) {
@@ -290,10 +412,12 @@ registerJob('automation.run', async (job) => {
         user,
       };
       // Events emitted by these actions carry depth + 1, so chains stop at MAX_DEPTH.
-      await eventDepth.run(event.depth + 1, async () => {
-        for (const action of automation.actions as AutomationAction[])
-          log.push(await runAction(action, event, user, ctx));
-      });
+      await automationId.run(automation.id as number, () =>
+        eventDepth.run(event.depth + 1, async () => {
+          for (const action of automation.actions as AutomationAction[])
+            log.push(await runAction(action, event, user, ctx));
+        }),
+      );
     }
   } catch (err) {
     status = 'failed';
@@ -318,10 +442,85 @@ onEvent(async (e) => {
   if (e.depth >= MAX_DEPTH) return;
   // GDPR Art. 18: a restricted record is stored, not processed.
   if (await eventTouchesRestricted(e)) return;
-  const rules = await db('automations').where({ trigger_event: e.type, active: true }).select('id');
-  for (const r of rules)
-    await enqueue('automation.run', { automationId: r.id, event: e as unknown as Record<string, unknown> });
+  const rules = await db('automations')
+    .where({ trigger_event: e.type, active: true })
+    .select('id', 'delay_minutes');
+  for (const r of rules) {
+    if (r.delay_minutes > 0)
+      await db('automation_queue').insert({
+        automation_id: r.id,
+        record_uuid: e.uuid,
+        event: JSON.stringify(e),
+        run_at: new Date(Date.now() + Number(r.delay_minutes) * 60_000),
+      });
+    else
+      await enqueue('automation.run', { automationId: r.id, event: e as unknown as Record<string, unknown> });
+  }
 });
+
+/** Records a scheduled rule visits per run. */
+const SCHEDULE_LIMIT = 500;
+
+/**
+ * Release delayed runs that are due, and run scheduled rules whose time has come. Called every
+ * minute by the job scheduler (one process at a time with Redis); tests call it directly.
+ */
+export async function runDueAutomations(now = new Date()) {
+  const due = await db('automation_queue').where('run_at', '<=', now).orderBy('run_at').limit(200);
+  for (const row of due) {
+    // Claim the row first, so two processes never release the same run.
+    if (!(await db('automation_queue').where({ id: row.id }).delete())) continue;
+    const event = typeof row.event === 'string' ? JSON.parse(row.event) : row.event;
+    await enqueue('automation.run', { automationId: row.automation_id, event, recheck: true });
+  }
+  const { timezone } = await getGroup('general');
+  const rules = await db('automations')
+    .where({ trigger_event: SCHEDULE_TRIGGER, active: true })
+    .where('next_run_at', '<=', now);
+  for (const rule of rules) {
+    const schedule = (
+      typeof rule.schedule === 'string' ? JSON.parse(rule.schedule) : rule.schedule
+    ) as AutomationSchedule;
+    const claimed = await db('automations')
+      .where({ id: rule.id, next_run_at: rule.next_run_at })
+      .update({ next_run_at: nextRun(schedule, timezone, now) });
+    if (!claimed) continue;
+    const def = findRecordDef(schedule.entity);
+    if (!def) continue;
+    try {
+      // Records are those the rule's owner may see, filtered by the rule's conditions.
+      const owner = await runAs(rule.created_by);
+      const filter = rule.conditions ? JSON.stringify(rule.conditions) : undefined;
+      for (let page = 1; page <= SCHEDULE_LIMIT / 100; page++) {
+        const list = await listRecords(def, owner, {
+          page,
+          pageSize: 100,
+          ...(filter ? { filter: JSON.parse(filter) } : {}),
+        });
+        for (const record of list.data as { uuid: string }[]) {
+          const event = {
+            type: `${schedule.entity}.scheduled`,
+            entity: schedule.entity,
+            uuid: record.uuid,
+            record,
+            actorId: null,
+            depth: 0,
+            at: now.toISOString(),
+          };
+          await enqueue('automation.run', { automationId: rule.id, event });
+        }
+        if (page * 100 >= list.meta.total) break;
+      }
+    } catch (err) {
+      logger.warn({ err, automation: rule.uuid }, 'Scheduled automation failed');
+    }
+  }
+}
+
+/** Started at boot (outside tests). */
+export function startAutomationScheduler() {
+  every(60_000, 'automations.due', () => runDueAutomations());
+}
 
 // ---------- Admin API ----------
 
@@ -332,6 +531,9 @@ const dto = (a: Record<string, unknown>) => ({
   triggerEvent: a.trigger_event,
   conditions: a.conditions ?? null,
   actions: a.actions,
+  delayMinutes: a.delay_minutes ?? 0,
+  schedule: a.schedule ?? null,
+  nextRunAt: a.next_run_at ? new Date(a.next_run_at as string).toISOString() : null,
   active: !!a.active,
   runCount: a.run_count,
   lastRunAt: a.last_run_at ? new Date(a.last_run_at as string).toISOString() : null,
@@ -344,7 +546,7 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
     permission: 'core.automations.manage',
     handler: async () => ({
       data: (await db('automations').orderBy('id', 'desc')).map(dto),
-      events: eventTypes(),
+      events: [SCHEDULE_TRIGGER, ...eventTypes()],
     }),
   })
   .add({
@@ -365,6 +567,9 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
           conditions: body.conditions ? JSON.stringify(body.conditions) : null,
           actions: JSON.stringify(body.actions),
           active: body.active,
+          delay_minutes: body.delayMinutes,
+          schedule: body.schedule ? JSON.stringify(body.schedule) : null,
+          next_run_at: body.schedule ? nextRun(body.schedule, (await getGroup('general')).timezone) : null,
           created_by: user.id,
           customized: true,
         });
@@ -384,10 +589,17 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
     path: '/:uuid',
     permission: 'core.automations.manage',
     params: z.object({ uuid: z.uuid() }),
-    body: toPatch(automationBody),
+    body: automationPatch,
     handler: async ({ ctx, params, body }) => {
       const a = await db('automations').where({ uuid: params.uuid }).first();
       if (!a) throw notFound('Automation');
+      const schedule =
+        body.schedule !== undefined ? body.schedule : (a.schedule as AutomationSchedule | null);
+      const trigger = body.triggerEvent ?? (a.trigger_event as string);
+      if (!scheduleRule({ triggerEvent: trigger, schedule }))
+        throw new AppError('VALIDATION_FAILED', scheduleMessage.message, [
+          { path: 'schedule', message: scheduleMessage.message },
+        ]);
       const patch: Record<string, unknown> = { customized: true };
       if (body.name !== undefined) patch.name = body.name;
       if (body.description !== undefined) patch.description = body.description;
@@ -396,6 +608,12 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
         patch.conditions = body.conditions ? JSON.stringify(body.conditions) : null;
       if (body.actions !== undefined) patch.actions = JSON.stringify(body.actions);
       if (body.active !== undefined) patch.active = body.active;
+      if (body.delayMinutes !== undefined) patch.delay_minutes = body.delayMinutes;
+      if (body.schedule !== undefined || body.triggerEvent !== undefined) {
+        const sched = typeof schedule === 'string' ? (JSON.parse(schedule) as AutomationSchedule) : schedule;
+        patch.schedule = sched ? JSON.stringify(sched) : null;
+        patch.next_run_at = sched ? nextRun(sched, (await getGroup('general')).timezone) : null;
+      }
       await db.transaction(async (trx) => {
         await trx('automations').where({ id: a.id }).update(patch);
         await audit(trx, ctx, {
