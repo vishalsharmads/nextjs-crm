@@ -1,7 +1,8 @@
 import type { Knex } from 'knex';
 import { blueprintSchema, type BlueprintInput } from '@app/blueprints';
-import { CUSTOMIZABLE_ENTITIES, SETTINGS_GROUPS } from '@app/shared';
+import { SETTINGS_GROUPS, STAGE_COLORS, type StageColor } from '@app/shared';
 import { rowToDef } from '../core/custom-fields/definitions';
+import { allCustomEntities } from '../core/custom-fields/definitions';
 
 /** Serialize the current configuration (no records) as a blueprint, so a configured install can become a preset. */
 export async function exportBlueprint(knex: Knex, opts: { key?: string; version?: string } = {}) {
@@ -21,7 +22,7 @@ export async function exportBlueprint(knex: Knex, opts: { key?: string; version?
 
   const custom_field_groups: Record<string, unknown[]> = {};
   const custom_fields: Record<string, unknown[]> = {};
-  for (const entity of CUSTOMIZABLE_ENTITIES) {
+  for (const entity of allCustomEntities()) {
     const groups = await knex('custom_field_groups').where({ entity }).orderBy('sort_order');
     if (groups.length)
       custom_field_groups[entity] = groups.map((g) => ({
@@ -66,7 +67,8 @@ export async function exportBlueprint(knex: Knex, opts: { key?: string; version?
         key: s.key,
         name: s.name,
         probability: s.probability,
-        ...(s.color ? { color: s.color } : {}),
+        // Colors stored before stage colors became named keys are left out rather than failing the export.
+        ...(STAGE_COLORS.includes(s.color) ? { color: s.color as StageColor } : {}),
         is_won: !!s.is_won,
         is_lost: !!s.is_lost,
         ...(s.rotting_days ? { rotting_days: s.rotting_days } : {}),

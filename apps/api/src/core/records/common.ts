@@ -2,7 +2,7 @@ import { normalizePhone } from '@app/shared';
 import { db } from '../../db/knex';
 import { getDefinitions, fieldAccessMap } from '../custom-fields/definitions';
 import type { AuthUser } from '../../http/context';
-import type { CoreEntity } from '@app/shared';
+import type { RecordEntity } from '@app/shared';
 import { applyOp, userIdSubquery } from './filters';
 import type { CoreFieldSpec } from './types';
 
@@ -75,7 +75,7 @@ export const relationField = (
 export const phoneE164 = (phone: string | null | undefined) =>
   phone ? normalizePhone(phone) || null : phone === null ? null : undefined;
 
-export async function customContext(entity: CoreEntity, user: AuthUser) {
+export async function customContext(entity: RecordEntity, user: AuthUser) {
   const defs = await getDefinitions(entity);
   return { defs, levels: fieldAccessMap(defs, user) };
 }

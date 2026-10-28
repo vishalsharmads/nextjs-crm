@@ -23,6 +23,8 @@ export type SecuritySettings = z.infer<typeof securitySettingsSchema>;
 
 export const featureSettingsSchema = z.object({
   leads: z.boolean().default(true),
+  /** Leads move through stages on a board, like deals. Needs `leads`. */
+  leadPipeline: z.boolean().default(false),
 });
 export type FeatureSettings = z.infer<typeof featureSettingsSchema>;
 

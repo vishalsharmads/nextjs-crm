@@ -121,12 +121,30 @@
       "entity": "deal",
       "is_default": true,
       "stages": [
-        { "key": "enquiry", "name": "Enquiry", "probability": 10, "rotting_days": 2 },
-        { "key": "consult_booked", "name": "Consult booked", "probability": 30, "rotting_days": 10 },
-        { "key": "plan_proposed", "name": "Plan proposed", "probability": 55, "rotting_days": 7 },
-        { "key": "in_treatment", "name": "In treatment", "probability": 90, "rotting_days": 45 },
-        { "key": "completed", "name": "Completed", "probability": 100, "is_won": true },
-        { "key": "lost", "name": "Lost", "probability": 0, "is_lost": true }
+        { "key": "enquiry", "name": "Enquiry", "color": "blue", "probability": 10, "rotting_days": 2 },
+        {
+          "key": "consult_booked",
+          "name": "Consult booked",
+          "color": "teal",
+          "probability": 30,
+          "rotting_days": 10
+        },
+        {
+          "key": "plan_proposed",
+          "name": "Plan proposed",
+          "color": "violet",
+          "probability": 55,
+          "rotting_days": 7
+        },
+        {
+          "key": "in_treatment",
+          "name": "In treatment",
+          "color": "amber",
+          "probability": 90,
+          "rotting_days": 45
+        },
+        { "key": "completed", "name": "Completed", "color": "green", "probability": 100, "is_won": true },
+        { "key": "lost", "name": "Lost", "color": "red", "probability": 0, "is_lost": true }
       ]
     }
   ],

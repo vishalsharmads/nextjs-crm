@@ -9,6 +9,8 @@ import { migrateModule } from '../db/migrate';
 import { AppError } from '../lib/errors';
 import { registerModulePermissions } from '../core/rbac/catalog';
 import { setModuleGate, type RouteGroup } from '../http/routes';
+import { registerRecordType, setRecordTypeGate } from '../core/records/registry';
+import { recordTypeRouteGroups } from '../core/records/record-type-routes';
 import { installedModuleSources } from './installed';
 import type { ApiModule } from './types';
 
@@ -28,7 +30,22 @@ export function loadModules(): LoadedModule[] {
   }));
   const order = sortByDependencies(parsed.map((m) => m.manifest)).map((m) => m.key);
   modules = order.map((key) => parsed.find((m) => m.manifest.key === key)!);
-  for (const m of modules) registerModulePermissions(m.manifest.key, m.manifest.permissions);
+  for (const m of modules) {
+    registerModulePermissions(m.manifest.key, m.manifest.permissions);
+    for (const def of m.api?.recordTypes ?? []) {
+      if (def.moduleKey !== m.manifest.key)
+        throw new Error(`Record type "${def.entity}" belongs to module "${def.moduleKey}"`);
+      // Records that link to or contact a person must reach data subject export and erasure.
+      const personal = def.meta?.columns.some(
+        (c) => c.kind === 'email' || c.kind === 'phone' || c.relation === 'contact' || c.relation === 'lead',
+      );
+      if (personal && !m.api?.privacy)
+        throw new Error(
+          `Module "${m.manifest.key}" stores personal data in "${def.entity}": add a privacy handler`,
+        );
+      registerRecordType(def);
+    }
+  }
   return modules;
 }
 
@@ -53,6 +70,7 @@ export function isModuleEnabled(key: string): boolean {
 
 export function installModuleGate() {
   setModuleGate(isModuleEnabled);
+  setRecordTypeGate(isModuleEnabled);
 }
 
 export async function enableModule(key: string, conn: Db = db): Promise<{ migrations: string[] }> {
@@ -95,7 +113,12 @@ export async function disableModule(key: string, conn: Db = db) {
 
 /** Route groups of every module with an API (gated per request by enabled state). */
 export function moduleRouteGroups(): RouteGroup[] {
-  return loadModules().flatMap((m) => m.api?.routes?.() ?? []);
+  return loadModules().flatMap((m) => [
+    // Collection routes (/bulk, /export) and the module's own routes come before /:uuid.
+    ...recordTypeRouteGroups(m.api?.recordTypes ?? [], 'collection'),
+    ...(m.api?.routes?.() ?? []),
+    ...recordTypeRouteGroups(m.api?.recordTypes ?? [], 'records'),
+  ]);
 }
 
 export function moduleMenu(): ModuleMenuItem[] {

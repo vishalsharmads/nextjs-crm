@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ArrowLeft, GitMerge, Mail, MoreHorizontal, Pencil, Trash2, UserCheck } from 'lucide-react';
 import { ComposeEmail } from '@/features/email/compose-email';
-import type { ContactDto, CoreEntity, DealDto, DuplicateCandidate, LeadDto, RelatedType } from '@app/shared';
+import type {
+  ContactDto,
+  DealDto,
+  RecordEntity,
+  DuplicateCandidate,
+  LeadDto,
+  RelatedType,
+} from '@app/shared';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
 import { useBranding } from '@/app/branding';
@@ -35,6 +42,7 @@ import { Timeline } from './timeline';
 import { FilesPanel } from './files-panel';
 import { ConsentPanel } from '@/features/privacy/consent-panel';
 import { StageTrack } from '@/features/deals/stage-track';
+import { StageBadge } from '@/components/data/stage-color';
 
 type Rec = Record<string, unknown> & {
   uuid: string;
@@ -42,7 +50,7 @@ type Rec = Record<string, unknown> & {
   deletedAt: string | null;
 };
 
-export function RecordPage({ entity }: { entity: CoreEntity }) {
+export function RecordPage({ entity }: { entity: RecordEntity }) {
   const { uuid = '' } = useParams();
   const config = useEntityConfig(entity);
   const q = useRecord<Rec>(config.route, uuid);
@@ -52,7 +60,20 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
   const { remove, restore } = useRecordMutations<Rec>(config.route);
   const [editing, setEditing] = useState(false);
   const [merging, setMerging] = useState(false);
-  const [converting, setConverting] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // `?convert=1` (from the lead board's Convert action) opens the convert dialog once.
+  const [converting, setConverting] = useState(() => searchParams.get('convert') === '1');
+  useEffect(() => {
+    if (searchParams.get('convert'))
+      setSearchParams(
+        (p) => {
+          const n = new URLSearchParams(p);
+          n.delete('convert');
+          return n;
+        },
+        { replace: true },
+      );
+  }, [searchParams, setSearchParams]);
   const [emailing, setEmailing] = useState(false);
   const title = q.data ? config.title(q.data as never) : '';
   useEffect(
@@ -95,7 +116,12 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-xl font-semibold tracking-tight md:text-title">{title}</h1>
-            <RecordSubheader entity={entity} rec={rec} config={config} />
+            <RecordSubheader
+              entity={entity}
+              rec={rec}
+              config={config}
+              onConvert={() => setConverting(true)}
+            />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {entity === 'lead' && !(rec as unknown as LeadDto).convertedAt && can('core.leads.update') ? (
@@ -143,7 +169,7 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
           <FieldsPanel config={config} record={rec} />
         </aside>
         <main className="min-w-0 p-4 md:p-6">
-          {entity !== 'activity' ? (
+          {entity !== 'activity' && !config.moduleKey ? (
             <div className="mb-5">
               <ActivityComposer related={{ type: related, uuid: rec.uuid }} />
             </div>
@@ -151,8 +177,12 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
           <Tabs defaultValue="timeline">
             <TabsList>
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="activities">Activities</TabsTrigger>
-              <TabsTrigger value="files">Files</TabsTrigger>
+              {!config.moduleKey ? (
+                <>
+                  <TabsTrigger value="activities">Activities</TabsTrigger>
+                  <TabsTrigger value="files">Files</TabsTrigger>
+                </>
+              ) : null}
               {entity === 'contact' || entity === 'organization' ? (
                 <TabsTrigger value="related">Related</TabsTrigger>
               ) : null}
@@ -174,7 +204,11 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
             </TabsContent>
             {entity === 'contact' || entity === 'lead' ? (
               <TabsContent value="privacy" className="pt-3">
-                <ConsentPanel entity={entity} uuid={rec.uuid} resource={config.resource} />
+                <ConsentPanel
+                  entity={entity as 'contact' | 'lead'}
+                  uuid={rec.uuid}
+                  resource={config.resource}
+                />
               </TabsContent>
             ) : null}
           </Tabs>
@@ -196,7 +230,18 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
   );
 }
 
-function RecordSubheader({ entity, rec, config }: { entity: CoreEntity; rec: Rec; config: EntityConfig }) {
+function RecordSubheader({
+  entity,
+  rec,
+  config,
+  onConvert,
+}: {
+  entity: RecordEntity;
+  rec: Rec;
+  config: EntityConfig;
+  onConvert: () => void;
+}) {
+  const leadPipeline = useBoot().settings.features.leadPipeline;
   if (entity === 'deal') {
     const d = rec as unknown as DealDto;
     return (
@@ -214,7 +259,7 @@ function RecordSubheader({ entity, rec, config }: { entity: CoreEntity; rec: Rec
   }
   if (entity === 'lead') {
     const l = rec as unknown as LeadDto;
-    return l.converted ? (
+    const line = l.converted ? (
       <p className="mt-1 text-sm text-muted">
         Converted.{' '}
         {l.converted.contactUuid ? (
@@ -226,12 +271,22 @@ function RecordSubheader({ entity, rec, config }: { entity: CoreEntity; rec: Rec
     ) : (
       <p className="mt-1 text-sm text-muted">{config.subtitle?.(rec as never)}</p>
     );
+    return (
+      <div className="mt-1">
+        {line}
+        {l.stage && leadPipeline ? (
+          <div className="mt-2">
+            <StageTrack lead={l} onConvert={l.convertedAt ? undefined : onConvert} />
+          </div>
+        ) : null}
+      </div>
+    );
   }
   const sub = config.subtitle?.(rec as never);
   return sub ? <p className="mt-1 text-sm text-muted">{sub}</p> : null;
 }
 
-function RelatedRecords({ entity, rec }: { entity: CoreEntity; rec: Rec }) {
+function RelatedRecords({ entity, rec }: { entity: RecordEntity; rec: Rec }) {
   const dealConfig = useEntityConfig<DealDto>('deal');
   const filterField = entity === 'contact' ? 'contact' : 'organization';
   const deals = useQuery({
@@ -281,9 +336,7 @@ function RelatedRecords({ entity, rec }: { entity: CoreEntity; rec: Rec }) {
                   {d.title}
                 </Link>
                 <span className="flex items-center gap-2">
-                  <Badge tone={d.stage.isWon ? 'primary' : d.stage.isLost ? 'accent' : 'neutral'}>
-                    {d.stage.name}
-                  </Badge>
+                  <StageBadge name={d.stage.name} color={d.stage.color} />
                   <span className="tabular">{formatMoney(d.value, d.currency)}</span>
                 </span>
               </li>

@@ -1,6 +1,6 @@
 import { dealInputSchema, dealPatchSchema, type DealDto } from '@app/shared';
 import type { Db } from '../../db/knex';
-import { AppError } from '../../lib/errors';
+import { endOfStage, recordStageHistory, resolveStage } from '../pipelines/stage-engine';
 import type { ResourceDef } from '../records/types';
 import { serializeCustom } from '../records/custom';
 import {
@@ -28,48 +28,13 @@ export async function nextReference(conn: Db, key = 'deal'): Promise<string> {
   return `${numberPrefix || seq.prefix || ''}${String(seq.next_value).padStart(seq.padding, '0')}`;
 }
 
-/** Resolve pipeline + stage for a write; stage must belong to the pipeline. */
-export async function resolveStage(conn: Db, pipelineUuid?: string, stageUuid?: string, existing?: Row) {
-  let pipelineId = existing?.pipeline_id as number | undefined;
-  if (pipelineUuid) {
-    const p = await conn('pipelines').where({ uuid: pipelineUuid, entity: 'deal', active: true }).first('id');
-    if (!p)
-      throw new AppError('VALIDATION_FAILED', 'Unknown pipeline', [
-        { path: 'pipelineUuid', message: 'Unknown pipeline' },
-      ]);
-    pipelineId = p.id;
-  }
-  if (!pipelineId) {
-    const p =
-      (await conn('pipelines').where({ entity: 'deal', active: true, is_default: true }).first('id')) ??
-      (await conn('pipelines').where({ entity: 'deal', active: true }).orderBy('sort_order').first('id'));
-    if (!p) throw new AppError('VALIDATION_FAILED', 'Create a pipeline first');
-    pipelineId = p.id;
-  }
-  let stage;
-  if (stageUuid) {
-    stage = await conn('pipeline_stages')
-      .where({ uuid: stageUuid, pipeline_id: pipelineId, active: true })
-      .first();
-    if (!stage) throw new AppError('STAGE_INVALID', 'That stage is not part of this pipeline');
-  } else if (existing && existing.pipeline_id === pipelineId) {
-    stage = await conn('pipeline_stages').where({ id: existing.stage_id }).first();
-  } else {
-    stage = await conn('pipeline_stages')
-      .where({ pipeline_id: pipelineId, active: true, is_won: false, is_lost: false })
-      .orderBy('sort_order')
-      .first();
-    if (!stage) throw new AppError('STAGE_INVALID', 'This pipeline has no open stages');
-  }
-  return { pipelineId: pipelineId!, stage };
-}
-
 export function statusForStage(stage: { is_won: number | boolean; is_lost: number | boolean }) {
   return stage.is_won ? 'won' : stage.is_lost ? 'lost' : 'open';
 }
 
 export const dealsDef: ResourceDef<Row, DealDto> = {
   entity: 'deal',
+  route: 'deals',
   table: 'deals',
   resource: 'core.deals',
   ownerColumns: ['deals.owner_id'],
@@ -120,12 +85,13 @@ export const dealsDef: ResourceDef<Row, DealDto> = {
       ),
     });
     if (!existing || input.pipelineUuid || input.stageUuid) {
-      const { pipelineId, stage } = await resolveStage(
+      const { pipelineId, stage } = (await resolveStage(
         conn,
+        'deal',
         input.pipelineUuid as string | undefined,
         input.stageUuid as string | undefined,
-        existing as Row | undefined,
-      );
+        existing,
+      ))!;
       row.pipeline_id = pipelineId;
       if (!existing || existing.stage_id !== stage.id) {
         const status = statusForStage(stage);
@@ -135,12 +101,7 @@ export const dealsDef: ResourceDef<Row, DealDto> = {
         row.won_at = status === 'won' ? new Date() : null;
         row.lost_at = status === 'lost' ? new Date() : null;
         if (status !== 'lost' && input.lostReason === undefined) row.lost_reason = null;
-        const max = await conn('deals')
-          .where({ stage_id: stage.id })
-          .whereNull('deleted_at')
-          .max({ m: 'position' })
-          .first();
-        row.position = Number((max as { m: number | null } | undefined)?.m ?? 0) + 1000;
+        row.position = await endOfStage(conn, 'deal', stage.id);
       }
     }
     if (!existing && !row.currency) row.currency = (await getGroup('general', conn)).currency;
@@ -153,12 +114,14 @@ export const dealsDef: ResourceDef<Row, DealDto> = {
     if (input.tags) await setTags('deal', id, input.tags as string[], user, conn);
     const now = await conn('deals').where({ id }).first('stage_id');
     if (!existing || existing.stage_id !== now.stage_id) {
-      await conn('deal_stage_history').insert({
-        deal_id: id,
-        from_stage_id: existing?.stage_id ?? null,
-        to_stage_id: now.stage_id,
-        changed_by: user.id,
-      });
+      await recordStageHistory(
+        conn,
+        'deal',
+        [id],
+        (existing?.stage_id as number | undefined) ?? null,
+        now.stage_id,
+        user.id,
+      );
     }
   },
   async toDtos(rows, { user, conn }) {

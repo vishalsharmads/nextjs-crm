@@ -127,6 +127,42 @@ Severity: **B** blocker · **I** important · **N** nice-to-have. Effort: **S / 
 - Add a scaffolding CLI, `npm run cli -- module:new --key=properties --entity=property`. It generates a code-reviewed module: an `m_properties_*` migration, a resource definition, a manifest and permissions.
 - This complies with #5. A developer still makes each new entity.
 
+**6b detailed design**
+
+- **Entity keys.**
+  - A record type is either a core entity or a module record type.
+  - A module record type has a globally unique key matching `^[a-z][a-z0-9_]{1,31}$` (for example `property`). It must not collide with a core entity or label key.
+  - Shared Zod schemas accept any well-formed key (`entityKeySchema`). The API then checks the key against the registry and the module's enabled state (`assertRecordEntity`), so a disabled module's types answer 404.
+- **Registry.**
+  - `core/records/registry.ts` keeps the five core defs.
+  - It adds `registerRecordType(def)`, `getRecordDef(entity)`, `recordTypes()` and `customizableEntities()`.
+  - `ResourceDef` gains `route` (URL segment), `moduleKey?`, `labels` (default singular/plural), `titleColumn`, and `display` (core column metadata the web needs to render lists and forms).
+  - `ENTITY_ROUTE` is used only for core links.
+- **Module API.**
+  - `defineRecordType({...})` in `module-api.ts` builds a `ResourceDef` from a column spec.
+  - Column types are text, number, money, date, datetime, select, boolean, user and relation-to-core.
+  - Standard columns (uuid, owner, team, custom, timestamps, soft delete) are added for the module.
+  - The module returns it from `ApiModule.recordTypes`. Its REST routes come from `recordRoutes()` and are mounted under `/m/<key>/<route>` behind the module gate.
+- **Engine consumers generalised:**
+  - custom fields: definitions, DDL reconcile and routes
+  - saved views and layouts
+  - bootstrap (`recordTypes` metadata)
+  - search, through a provider list that includes registered types
+  - import/export and bulk actions
+  - trash, timeline, audit field redaction
+  - automations: `<entity>.created/updated/deleted` triggers and `update_field`
+  - access log and labels (vocabulary)
+- **Web.**
+  - `buildEntityConfig(meta)` turns bootstrap metadata into the same `EntityConfig` core pages use.
+  - The module loader adds `/m/<key>/<route>` list, detail and trash routes automatically.
+  - The fields, layout and view settings list registered types.
+- **Privacy.** Module record types that hold personal data still return a `PrivacyHandler`. The scaffold generates one only when `--personal` is passed.
+- **Scaffold.**
+  - `npm run cli -w @app/api -- module:new --key=<key> --entity=<entity> --plural=<Plural> [--personal]` writes `modules/<key>/` (manifest, migration, `api/index.ts`, `web/index.tsx`, a test).
+  - It also adds the module to `installed.ts`.
+  - It refuses to overwrite an existing folder.
+- **Proof.** A test-only fixture module (`apps/api/test/fixtures/`) exercises the whole path: custom field, view, search, import, bulk, trash, automation trigger, and scope (`own` can't read others).
+
 **6c: admin-defined entities (#5 amended, approved).**
 - Admins create entities in Settings → Objects. Storage is a fixed set of tables, `custom_objects` (definitions) and `custom_records` (core columns, owner, team, `custom` JSON, `object_id`), with generated columns from the existing DDL service.
 - Guardrails:
@@ -191,7 +227,7 @@ Severity: **B** blocker · **I** important · **N** nice-to-have. Effort: **S / 
 | `phase-6a-quick-wins` | Trash screen; record transfer on disable; ⌘K create commands. **Done.** Table virtualization dropped (see §1: pages are capped at 100 rows) | Cheap, visible fixes |
 | `phase-6a2-ui-polish` | Premium UI refresh: motion, elevation and type tokens, text contrast, linked list rows, touch targets, pipeline-first dashboard, stage track on the deal page, settle motion on the board. **Done.** | Later milestones (custom objects, the assistant panel) build on the refreshed components instead of restyling them |
 | `phase-6a3-rich-text` | Rich text editor (Visual / Markdown / HTML) for notes, emails, templates, automation emails and document templates; saved replies inserted with `/`; merge fields picked with `{{`; document tables, dividers, page breaks and live preview. **Done.** | Notes, emails and documents were plain textareas; templates were raw HTML |
-| `phase-6b-records-engine` | ResourceDef for modules; module scaffolding CLI; search provider registry | Prerequisite for 6c and for good MCP coverage |
+| `phase-6b-records-engine` | ResourceDef for modules; module scaffolding CLI; search provider registry. **Done.** Reference module `records-demo`. Tags, activities, files, merge and boards on module types are deferred | Prerequisite for 6c and for good MCP coverage |
 | `phase-6c-custom-objects` | Admin-defined entities (#5 amended) | Builds on 6b |
 | `phase-6d-tool-layer-mcp` | `defineTool` registry; personal access tokens; MCP endpoint and stdio wrapper | Shared foundation for AI |
 | `phase-6e-assistant` | AI settings, provider interface, chat panel, confirmed writes, usage caps | Needs 6d |

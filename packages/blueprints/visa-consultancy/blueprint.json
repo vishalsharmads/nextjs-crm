@@ -215,37 +215,44 @@
         {
           "key": "consultation",
           "name": "Consultation",
+          "color": "blue",
           "probability": 10
         },
         {
           "key": "engaged",
           "name": "Engaged",
+          "color": "teal",
           "probability": 25
         },
         {
           "key": "documents",
           "name": "Collecting documents",
+          "color": "violet",
           "probability": 40
         },
         {
           "key": "review",
           "name": "Final review",
+          "color": "amber",
           "probability": 55
         },
         {
           "key": "submitted",
           "name": "Submitted",
+          "color": "orange",
           "probability": 70
         },
         {
           "key": "approved",
           "name": "Approved",
+          "color": "pink",
           "probability": 100,
           "is_won": true
         },
         {
           "key": "refused",
           "name": "Refused",
+          "color": "blue",
           "probability": 0,
           "is_lost": true
         }

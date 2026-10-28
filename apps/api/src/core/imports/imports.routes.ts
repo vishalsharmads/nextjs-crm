@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import multer from 'multer';
 import { stringify } from 'csv-stringify/sync';
-import { ENTITY_ROUTE } from '@app/shared';
+import { entityKeySchema } from '@app/shared';
 import { defineRoutes, type RouteGroup } from '../../http/routes';
 import { db } from '../../db/knex';
 import { env } from '../../config/env';
@@ -9,12 +9,15 @@ import { AppError, notFound } from '../../lib/errors';
 import { assertCan } from '../rbac/access';
 import { storeFile } from '../files/files.service';
 import { recordDefs } from '../records/registry';
+import { recordBasePath } from '../records/paths';
+import type { ResourceDef } from '../records/types';
 import { runBulk } from '../bulk/bulk.service';
 import {
   exportCsv,
   exportQuerySchema,
   importStartSchema,
   importTargets,
+  ioDef,
   parseCsv,
   startImport,
   suggestMapping,
@@ -24,7 +27,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: env.UPLOAD_MAX_MB * 1024 * 1024, files: 1 },
 });
-const IMPORTABLE = ['contact', 'organization', 'lead', 'deal'] as const;
 
 export const importsRoutes = defineRoutes('/imports', ['import-export'])
   .add({
@@ -35,8 +37,8 @@ export const importsRoutes = defineRoutes('/imports', ['import-export'])
     summary: 'Upload a CSV and get headers, a sample and suggested column mapping',
     status: 201,
     handler: async ({ req, ctx, user }) => {
-      const entity = z.enum(IMPORTABLE).parse(req.body?.entity);
-      const def = recordDefs[entity];
+      const entity = entityKeySchema.parse(req.body?.entity);
+      const def = ioDef(entity);
       assertCan(user, `${def.resource}.import`);
       if (!req.file) throw new AppError('VALIDATION_FAILED', 'Choose a CSV file');
       const { headers, rows } = parseCsv(req.file.buffer);
@@ -47,7 +49,7 @@ export const importsRoutes = defineRoutes('/imports', ['import-export'])
           entity: 'import',
         }),
       );
-      const targets = await importTargets(entity, user);
+      const targets = await importTargets(def, user);
       return {
         fileUuid: stored.uuid,
         entity,
@@ -124,26 +126,28 @@ export const importsRoutes = defineRoutes('/imports', ['import-export'])
     },
   });
 
-/** /<entity>/export and /<entity>/bulk — registered before /<entity>/:uuid so they are not read as ids. */
-export function entityCollectionRoutes(): RouteGroup[] {
-  return (['contact', 'organization', 'lead', 'deal', 'activity'] as const).map((entity) => {
-    const def = recordDefs[entity];
-    const group = defineRoutes(`/${ENTITY_ROUTE[entity]}`, ['import-export']).add({
-      method: 'post',
-      path: '/bulk',
-      permission: `${def.resource}.bulk`,
-      body: z.record(z.string(), z.unknown()),
-      handler: ({ ctx, user, body }) => runBulk(def, ctx, user, body),
-    });
-    if (entity !== 'activity') {
-      group.add({
-        method: 'get',
-        path: '/export',
-        permission: `${def.resource}.export`,
-        query: exportQuerySchema,
-        handler: ({ res, ctx, user, query }) => exportCsv(entity, ctx, user, query, res),
-      });
-    }
-    return group;
+/** /<entity>/bulk and /<entity>/export of one record type, registered before /<entity>/:uuid. */
+export function collectionRoutes(def: ResourceDef): RouteGroup {
+  const group = defineRoutes(recordBasePath(def), ['import-export'], def.moduleKey).add({
+    method: 'post',
+    path: '/bulk',
+    permission: `${def.resource}.bulk`,
+    body: z.record(z.string(), z.unknown()),
+    handler: ({ ctx, user, body }) => runBulk(def, ctx, user, body),
   });
+  if (def.entity !== 'activity') {
+    group.add({
+      method: 'get',
+      path: '/export',
+      permission: `${def.resource}.export`,
+      query: exportQuerySchema,
+      handler: ({ res, ctx, user, query }) => exportCsv(def, ctx, user, query, res),
+    });
+  }
+  return group;
+}
+
+/** Collection routes of the core entities. */
+export function entityCollectionRoutes(): RouteGroup[] {
+  return Object.values(recordDefs).map(collectionRoutes);
 }

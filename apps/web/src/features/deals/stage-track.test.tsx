@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import type { DealDto, StageDto } from '@app/shared';
+import type { DealDto, LeadDto, StageDto } from '@app/shared';
 import { qk } from '@/lib/query-keys';
 
 const stage = (key: string, sortOrder: number, extra: Partial<StageDto> = {}): StageDto => ({
@@ -200,5 +200,32 @@ describe('StageTrack', () => {
     for (const b of screen.getAllByRole('button')) expect(b).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Proposal' }));
     expect(patch).not.toHaveBeenCalled();
+  });
+
+  it('moves a lead and offers conversion on its won stage', async () => {
+    permissions = ['core.leads.update'];
+    const lead = { ...deal, fullName: 'Lee', stageEnteredAt: null } as unknown as LeadDto;
+    patch.mockResolvedValue(lead);
+    const onConvert = vi.fn();
+    const user = userEvent.setup();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    render(
+      <QueryClientProvider client={client}>
+        <StageTrack lead={lead} onConvert={onConvert} />
+      </QueryClientProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Won' }));
+    expect(patch).toHaveBeenCalledWith('/leads/d1/stage', { stageUuid: 's-won' });
+    const action = (toastSuccess.mock.calls[0]![1] as { action: { label: string; onClick: () => void } })
+      .action;
+    expect(action.label).toBe('Convert');
+    action.onClick();
+    expect(onConvert).toHaveBeenCalled();
+  });
+
+  it('colors each stage from its theme token', () => {
+    setup();
+    const li = screen.getByRole('button', { name: 'Tour' }).closest('li')!;
+    expect(li.style.getPropertyValue('--sc')).toBe('var(--stage-gray)');
   });
 });

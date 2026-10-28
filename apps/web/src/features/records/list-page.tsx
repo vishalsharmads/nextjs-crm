@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { useNavigate, useSearchParams } from 'react-router';
 import { Columns3, Download, MoreHorizontal, Plus, Rows3, Rows4, Search, Inbox, Upload } from 'lucide-react';
 import { buildUrl } from '@/lib/api';
-import type { CoreEntity, FilterCondition } from '@app/shared';
+import type { FilterCondition, RecordEntity } from '@app/shared';
 import { useBranding } from '@/app/branding';
 import { useBoot, useCan, useT } from '@/app/session';
 import { setDocumentTitle } from '@/theme/apply';
@@ -94,7 +94,7 @@ export function RecordListPage({
   headerExtra,
   toolbarExtra,
 }: {
-  entity: CoreEntity;
+  entity: RecordEntity;
   headerExtra?: ReactNode;
   toolbarExtra?: ReactNode;
 }) {
@@ -102,6 +102,9 @@ export function RecordListPage({
   const boot = useBoot();
   const can = useCan();
   const tr = useT();
+  const createLabel = config.moduleKey
+    ? tr('create.record', { name: config.singular })
+    : tr(`create.${entity}`);
   const navigate = useNavigate();
   const { branding } = useBranding();
   const state = useListState();
@@ -176,7 +179,7 @@ export function RecordListPage({
           ? [
               {
                 id: `create:${entity}`,
-                label: tr(`create.${entity}`),
+                label: createLabel,
                 group: 'Create',
                 icon: Plus,
                 shortcut: 'c',
@@ -184,11 +187,13 @@ export function RecordListPage({
               },
             ]
           : [],
-      [canCreate, entity, tr],
+      [canCreate, entity, createLabel],
     ),
   );
 
   const filtered = state.q || state.conditions.length || state.view;
+  // Module record types import by entity key (their route has slashes).
+  const importKey = config.moduleKey ? config.entity : config.route;
   const canImport = entity !== 'activity' && can(`${config.resource}.import`);
   const canExport = entity !== 'activity' && can(`${config.resource}.export`);
   const exportHref = buildUrl(`/${config.route}/export`, {
@@ -214,7 +219,7 @@ export function RecordListPage({
             {canCreate ? (
               <Tooltip content="Shortcut: c">
                 <Button variant="primary" onClick={openCreate}>
-                  <Plus /> {tr(`create.${entity}`)}
+                  <Plus /> {createLabel}
                 </Button>
               </Tooltip>
             ) : null}
@@ -249,7 +254,7 @@ export function RecordListPage({
           {/* Wide screens: labelled buttons. Phones: one menu, so the toolbar fits on a row. */}
           <div className="hidden items-center gap-1 md:flex">
             {canImport ? (
-              <Button size="sm" variant="ghost" onClick={() => navigate(`/import/${config.route}`)}>
+              <Button size="sm" variant="ghost" onClick={() => navigate(`/import/${importKey}`)}>
                 <Upload /> {tr('common.import')}
               </Button>
             ) : null}
@@ -271,7 +276,7 @@ export function RecordListPage({
                 </MenuTrigger>
                 <MenuContent>
                   {canImport ? (
-                    <MenuItem onSelect={() => navigate(`/import/${config.route}`)}>
+                    <MenuItem onSelect={() => navigate(`/import/${importKey}`)}>
                       <Upload /> {tr('common.import')}
                     </MenuItem>
                   ) : null}
@@ -356,7 +361,7 @@ export function RecordListPage({
                 action={
                   canCreate ? (
                     <Button variant="primary" onClick={openCreate}>
-                      <Plus /> {tr(`create.${entity}`)}
+                      <Plus /> {createLabel}
                     </Button>
                   ) : undefined
                 }

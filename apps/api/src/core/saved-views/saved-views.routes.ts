@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CUSTOMIZABLE_ENTITIES, filterSchema, toPatch } from '@app/shared';
+import { filterSchema, toPatch } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
 import { AppError, notFound } from '../../lib/errors';
@@ -7,9 +7,10 @@ import { newUuid } from '../../lib/ids';
 import { audit } from '../audit/audit.service';
 import { can } from '../rbac/access';
 import type { AuthUser } from '../../http/context';
+import { recordEntitySchema } from '../records/registry';
 
 const viewBody = z.object({
-  entity: z.enum(CUSTOMIZABLE_ENTITIES),
+  entity: recordEntitySchema,
   name: z.string().trim().min(1).max(100),
   filters: filterSchema.nullish(),
   columns: z.array(z.string().max(80)).max(50).nullish(),
@@ -44,7 +45,7 @@ export const savedViewsRoutes = defineRoutes('/saved-views', ['saved-views'])
     method: 'get',
     path: '/',
     permission: 'authenticated',
-    query: z.object({ entity: z.enum(CUSTOMIZABLE_ENTITIES) }),
+    query: z.object({ entity: recordEntitySchema }),
     handler: async ({ user, query }) => {
       const rows = await db('saved_views')
         .where({ entity: query.entity })

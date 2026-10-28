@@ -19,14 +19,17 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Plus, Star, Trash2 } from 'lucide-react';
-import type { PipelineDto, StageDto } from '@app/shared';
+import { STAGE_COLORS, stageColor, type PipelineDto, type StageDto } from '@app/shared';
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/api';
-import { bootstrapKey, useT } from '@/app/session';
+import { bootstrapKey, useBoot, useT } from '@/app/session';
+import { labelVars } from '@/lib/labels';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
-import { Badge, Pane, Skeleton } from '@/components/ui/misc';
+import { Badge, Pane, Skeleton, Tabs, TabsList, TabsTrigger } from '@/components/ui/misc';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
+import { StageDot } from '@/components/data/stage-color';
 import { SettingsPage } from './layout';
 
 export function PipelinesPage() {
@@ -36,13 +39,19 @@ export function PipelinesPage() {
     queryKey: ['pipelines'],
     queryFn: () => apiGet<{ data: PipelineDto[] }>('/pipelines').then((r) => r.data),
   });
+  const boot = useBoot();
+  const L = labelVars(boot.labels);
+  const leadPipelines = boot.settings.features.leads && boot.settings.features.leadPipeline;
+  const [entity, setEntity] = useState<'deal' | 'lead'>('deal');
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const current = pipelines.data?.find((p) => p.uuid === selected) ?? pipelines.data?.[0];
+  const shown = pipelines.data?.filter((p) => p.entity === (leadPipelines ? entity : 'deal'));
+  const current = shown?.find((p) => p.uuid === selected) ?? shown?.[0];
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['pipelines'] });
     void qc.invalidateQueries({ queryKey: bootstrapKey });
     void qc.invalidateQueries({ queryKey: ['records', 'deals'] });
+    void qc.invalidateQueries({ queryKey: ['records', 'leads'] });
   };
   return (
     <SettingsPage
@@ -54,12 +63,20 @@ export function PipelinesPage() {
         </Button>
       }
     >
+      {leadPipelines ? (
+        <Tabs value={entity} onValueChange={(v) => (setEntity(v as 'deal' | 'lead'), setSelected(null))}>
+          <TabsList>
+            <TabsTrigger value="deal">{L.dealPlural}</TabsTrigger>
+            <TabsTrigger value="lead">{L.leadPlural}</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      ) : null}
       {pipelines.isPending ? (
         <Skeleton className="h-64" />
       ) : (
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
           <nav className="flex flex-col gap-1" aria-label="Pipelines">
-            {pipelines.data?.map((p) => (
+            {shown?.map((p) => (
               <button
                 key={p.uuid}
                 type="button"
@@ -78,6 +95,7 @@ export function PipelinesPage() {
       )}
       {creating ? (
         <NewPipelineDialog
+          entity={leadPipelines ? entity : 'deal'}
           onClose={() => setCreating(false)}
           onCreated={(uuid) => (refresh(), setSelected(uuid))}
         />
@@ -150,8 +168,11 @@ function PipelineEditor({ pipeline, onChanged }: { pipeline: PipelineDto; onChan
       }
       padded={false}
     >
-      <div className="grid grid-cols-[24px_1fr_80px_90px_150px_32px] items-center gap-2 border-b border-line bg-subtle px-3 py-2 text-xs font-medium text-muted">
+      <div className="grid grid-cols-[20px_28px_minmax(7rem,1fr)_60px_80px_112px_28px] items-center gap-2 border-b border-line bg-subtle px-3 py-2 text-xs font-medium text-muted">
         <span />
+        <span>
+          <span className="sr-only">Color</span>
+        </span>
         <span>Stage</span>
         <span>Win %</span>
         <span>Stalls after</span>
@@ -219,7 +240,7 @@ function StageRow({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className="grid grid-cols-[24px_1fr_80px_90px_150px_32px] items-center gap-2 bg-surface px-3 py-2"
+      className="grid grid-cols-[20px_28px_minmax(7rem,1fr)_60px_80px_112px_28px] items-center gap-2 bg-surface px-3 py-2"
     >
       <button
         type="button"
@@ -230,6 +251,7 @@ function StageRow({
       >
         <GripVertical className="size-4" />
       </button>
+      <StageColorPicker stage={stage} onPick={(color) => onUpdate({ color })} />
       <Input
         aria-label="Stage name"
         value={name}
@@ -276,6 +298,33 @@ function StageRow({
         <Trash2 />
       </Button>
     </li>
+  );
+}
+
+const colorName = (c: string) => c.charAt(0).toUpperCase() + c.slice(1);
+
+function StageColorPicker({ stage, onPick }: { stage: StageDto; onPick: (color: string) => void }) {
+  const current = stageColor(stage.color);
+  return (
+    <Menu>
+      <MenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Color of ${stage.name}: ${colorName(current)}`}
+          className="flex size-7 items-center justify-center rounded-sm hover:bg-hover"
+        >
+          <StageDot color={current} className="size-3.5" />
+        </button>
+      </MenuTrigger>
+      <MenuContent align="start" className="min-w-36">
+        {STAGE_COLORS.map((c) => (
+          <MenuItem key={c} onSelect={() => c !== current && onPick(c)}>
+            <StageDot color={c} className="size-3" />
+            <span className={c === current ? 'font-medium' : undefined}>{colorName(c)}</span>
+          </MenuItem>
+        ))}
+      </MenuContent>
+    </Menu>
   );
 }
 
@@ -336,16 +385,18 @@ function RemoveStageDialog({
 }
 
 function NewPipelineDialog({
+  entity,
   onClose,
   onCreated,
 }: {
+  entity: 'deal' | 'lead';
   onClose: () => void;
   onCreated: (uuid: string) => void;
 }) {
   const [name, setName] = useState('');
   const [isDefault, setIsDefault] = useState(false);
   const create = useMutation({
-    mutationFn: () => apiPost<PipelineDto>('/pipelines', { name, isDefault }),
+    mutationFn: () => apiPost<PipelineDto>('/pipelines', { name, isDefault, entity }),
     onSuccess: (p) => {
       toast.success('Pipeline created');
       onCreated(p.uuid);

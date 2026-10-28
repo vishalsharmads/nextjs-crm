@@ -12,8 +12,9 @@ import { applySearch, applySort, compileFilter, type FilterContext } from './fil
 import { maskEncrypted, prepareCustom, redactDiff } from './custom';
 import { notify } from '../notifications/notifications.service';
 import { emit, type EventType } from '../events/events';
-import { ENTITY_ROUTE } from '@app/shared';
+import { publicStageChanges } from '../pipelines/stage-engine';
 import type { ResourceDef } from './types';
+import { recordBasePath } from './paths';
 
 export async function filterContext(def: ResourceDef, user: AuthUser): Promise<FilterContext> {
   const customDefs = await getDefinitions(def.entity);
@@ -237,15 +238,18 @@ export async function updateRecord<Dto>(
   await notifyAssignment(def, user, updated.after, updated.existing);
   const [dto] = await def.toDtos([updated.after], { user, conn: db });
   // Same visibility as the record snapshot the event carries: no hidden fields, no sensitive values.
-  const changes = maskEncrypted(
+  const masked = maskEncrypted(
     redactDiff(diffRecords(updated.existing, updated.after), fc.fieldLevels) as ReturnType<
       typeof diffRecords
     >,
   );
+  const staged = (def.entity === 'deal' || def.entity === 'lead') && !!masked.stage_id;
+  const changes =
+    def.entity === 'deal' || def.entity === 'lead' ? await publicStageChanges(db, masked) : masked;
   if (Object.keys(changes).length) {
     await emitRecordEvent(def, 'updated', dto as Record<string, unknown>, user, changes);
-    if (def.entity === 'deal' && changes.stage_id)
-      await emitDealStage(dto as Record<string, unknown>, user, changes);
+    if (def.entity === 'deal' && staged) await emitDealStage(dto as Record<string, unknown>, user, changes);
+    if (def.entity === 'lead' && staged) await emitLeadStage(dto as Record<string, unknown>, user, changes);
     if (def.entity === 'activity' && changes.completed_at && updated.after.completed_at) {
       await emitRecordEvent(def, 'completed', dto as Record<string, unknown>, user, changes);
     }
@@ -309,7 +313,7 @@ export async function notifyAssignment(
     {
       type: `${def.entity}.assigned`,
       title: `${who} assigned you ${title ? `“${title}”` : 'a record'}`,
-      link: def.entity === 'activity' ? '/tasks' : `/${ENTITY_ROUTE[def.entity]}/${row.uuid as string}`,
+      link: def.entity === 'activity' ? '/tasks' : `${recordBasePath(def)}/${row.uuid as string}`,
       data: { entity: def.entity, uuid: row.uuid },
       email: true,
     },
@@ -358,4 +362,20 @@ export async function emitDealStage(
       changes,
       actorId: user.id,
     });
+}
+
+/** Lead stage moves (lead pipeline feature). Conversion stays its own `lead.converted` event. */
+export async function emitLeadStage(
+  record: Record<string, unknown>,
+  user: AuthUser,
+  changes: Record<string, { from: unknown; to: unknown }>,
+) {
+  await emit({
+    type: 'lead.stage_changed',
+    entity: 'lead',
+    uuid: record.uuid as string,
+    record,
+    changes,
+    actorId: user.id,
+  });
 }

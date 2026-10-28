@@ -134,7 +134,10 @@ export function FieldsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs value={entity} onValueChange={(v) => setEntity(v as CustomizableEntity)}>
           <TabsList>
-            {CUSTOMIZABLE_ENTITIES.filter((e) => e !== 'lead' || boot.settings.features.leads).map((e) => (
+            {[
+              ...CUSTOMIZABLE_ENTITIES.filter((e) => e !== 'lead' || boot.settings.features.leads),
+              ...boot.recordTypes.map((r) => r.entity),
+            ].map((e) => (
               <TabsTrigger key={e} value={e}>
                 {L[`${e}Plural`]}
               </TabsTrigger>

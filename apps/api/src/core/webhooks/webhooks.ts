@@ -13,7 +13,7 @@ import { enqueue, every, registerJob } from '../../lib/jobs';
 import { audit } from '../audit/audit.service';
 import { eventTouchesRestricted } from '../privacy/privacy.service';
 import { effectiveCompliance } from '../settings/settings.service';
-import { EVENT_TYPES, onEvent, type DomainEvent } from '../events/events';
+import { eventTypeSchema, eventTypes, onEvent, type DomainEvent } from '../events/events';
 
 const MAX_ATTEMPTS = 6;
 const BACKOFF_MIN = [0, 1, 5, 30, 120, 720];
@@ -188,7 +188,7 @@ export const startWebhookRetries = () => every(60_000, 'webhook-retries', retryD
 const body = z.object({
   name: z.string().trim().min(1).max(100),
   url: z.url().max(2000),
-  events: z.array(z.union([z.enum(EVENT_TYPES), z.literal('*')])).min(1),
+  events: z.array(z.union([eventTypeSchema, z.literal('*')])).min(1),
   active: z.boolean().default(true),
 });
 
@@ -209,7 +209,7 @@ export const webhooksRoutes = defineRoutes('/webhooks', ['webhooks'])
     permission: 'core.webhooks.manage',
     handler: async () => ({
       data: (await db('webhooks').orderBy('id', 'desc')).map(dto),
-      events: EVENT_TYPES,
+      events: eventTypes(),
     }),
   })
   .add({

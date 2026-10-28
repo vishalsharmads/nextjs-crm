@@ -298,10 +298,14 @@ export function RecordFormSheet<T extends { uuid: string }>({
   const form = useForm<Values>({ defaultValues: defaults });
   const { create, update } = useRecordMutations<T>(config.route);
   const navigate = useNavigate();
-  const [labels, setLabels] = useState<Record<string, string | undefined>>({
-    contactUuid: defaults._contactLabel as string | undefined,
-    organizationUuid: defaults._organizationLabel as string | undefined,
-  });
+  // `_<name>Label` defaults seed the picker label of the `<name>Uuid` input.
+  const [labels, setLabels] = useState<Record<string, string | undefined>>(() =>
+    Object.fromEntries(
+      Object.entries(defaults)
+        .filter(([k]) => /^_\w+Label$/.test(k))
+        .map(([k, v]) => [`${k.slice(1, -'Label'.length)}Uuid`, v as string | undefined]),
+    ),
+  );
 
   useEffect(() => {
     if (open) form.reset(defaults);

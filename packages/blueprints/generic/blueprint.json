@@ -56,12 +56,30 @@
       "entity": "deal",
       "is_default": true,
       "stages": [
-        { "key": "qualified", "name": "Qualified", "probability": 10, "rotting_days": 14 },
-        { "key": "meeting", "name": "Meeting scheduled", "probability": 30, "rotting_days": 14 },
-        { "key": "proposal", "name": "Proposal sent", "probability": 60, "rotting_days": 21 },
-        { "key": "negotiation", "name": "Negotiation", "probability": 80, "rotting_days": 21 },
-        { "key": "won", "name": "Won", "probability": 100, "is_won": true },
-        { "key": "lost", "name": "Lost", "probability": 0, "is_lost": true }
+        { "key": "qualified", "name": "Qualified", "color": "blue", "probability": 10, "rotting_days": 14 },
+        {
+          "key": "meeting",
+          "name": "Meeting scheduled",
+          "color": "teal",
+          "probability": 30,
+          "rotting_days": 14
+        },
+        {
+          "key": "proposal",
+          "name": "Proposal sent",
+          "color": "violet",
+          "probability": 60,
+          "rotting_days": 21
+        },
+        {
+          "key": "negotiation",
+          "name": "Negotiation",
+          "color": "amber",
+          "probability": 80,
+          "rotting_days": 21
+        },
+        { "key": "won", "name": "Won", "color": "green", "probability": 100, "is_won": true },
+        { "key": "lost", "name": "Lost", "color": "red", "probability": 0, "is_lost": true }
       ]
     }
   ],

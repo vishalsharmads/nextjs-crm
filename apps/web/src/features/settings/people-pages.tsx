@@ -559,6 +559,11 @@ const RESOURCE_ENTITY: Record<string, string> = {
 
 function RoleEditor({ role, onClose }: { role: RoleDto | null; onClose: () => void }) {
   const boot = useBoot();
+  // Record scope applies to core and commercial resources and to module record types.
+  const scoped = useMemo(
+    () => new Set<string>([...SCOPED_RESOURCES, ...boot.recordTypes.map((t) => t.resource)]),
+    [boot.recordTypes],
+  );
   const qc = useQueryClient();
   const catalog = useQuery({
     queryKey: ['permissions'],
@@ -748,7 +753,7 @@ function RoleEditor({ role, onClose }: { role: RoleDto | null; onClose: () => vo
                           );
                         })}
                         <td className="px-3 py-2">
-                          {(SCOPED_RESOURCES as readonly string[]).includes(g.resource) ? (
+                          {scoped.has(g.resource) ? (
                             <NativeSelect
                               aria-label={`Scope for ${g.resource}`}
                               value={readOnly ? 'all' : (scopes[g.resource] ?? scopes['*'] ?? 'own')}

@@ -8,22 +8,30 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { KanbanSquare, List, Plus, Search } from 'lucide-react';
 import type { FilterCondition } from '@app/shared';
-import { useCan, usePipelines } from '@/app/session';
+import { useBoot, useCan, usePipelines } from '@/app/session';
 import { cn } from '@/lib/cn';
 import { Combobox } from '@/components/fields/combobox';
 import { RecordListPage } from '@/features/records/list-page';
 import { RecordPeek } from '@/features/records/record-peek';
 import { useEntityConfig, type EntityConfig } from '@/features/records/entities';
-import { DealBoard } from './deal-board';
+import { PipelineBoard, type BoardEntity } from './pipeline-board';
 
-/** Deals as a list (shared list page) or a Kanban board per pipeline. */
-export function DealsPage() {
+export const DealsPage = () => <PipelinePage entity="deal" />;
+
+/** Leads get a board only while the lead pipeline feature is on; otherwise they are a plain list. */
+export function LeadsPage() {
+  const { settings } = useBoot();
+  return settings.features.leadPipeline ? <PipelinePage entity="lead" /> : <RecordListPage entity="lead" />;
+}
+
+/** Deals or leads as a list (shared list page) or a Kanban board per pipeline. */
+function PipelinePage({ entity }: { entity: BoardEntity }) {
   const [params, setParams] = useSearchParams();
   const mode = params.get('mode') === 'list' ? 'list' : 'board';
-  const pipelines = usePipelines('deal');
+  const pipelines = usePipelines(entity);
   const pipeline =
     params.get('pipeline') ?? pipelines.find((p) => p.isDefault)?.uuid ?? pipelines[0]?.uuid ?? null;
-  const config = useEntityConfig('deal');
+  const config = useEntityConfig(entity);
   const navigate = useNavigate();
   const conditions = useMemo<FilterCondition[]>(() => {
     try {
@@ -80,11 +88,12 @@ export function DealsPage() {
       </div>
     ) : null;
 
-  if (mode === 'list') return <RecordListPage entity="deal" headerExtra={toggle} />;
+  if (mode === 'list') return <RecordListPage entity={entity} headerExtra={toggle} />;
 
   return (
     <BoardShell config={config} toggle={toggle} pipelinePicker={pipelinePicker}>
-      <DealBoard
+      <PipelineBoard
+        entity={entity}
         pipelineUuid={pipeline}
         q={params.get('q') ?? ''}
         conditions={conditions}
@@ -95,7 +104,7 @@ export function DealsPage() {
           config={config}
           uuid={params.get('peek')!}
           onClose={() => set('peek', null)}
-          onOpenFull={() => navigate(`/deals/${params.get('peek')}`)}
+          onOpenFull={() => navigate(`/${entity}s/${params.get('peek')}`)}
         />
       ) : null}
     </BoardShell>
@@ -126,7 +135,8 @@ function BoardShell({
       return [];
     }
   }, [params]);
-  useHotkeys({ c: () => can('core.deals.create') && setCreating(true) });
+  const createPermission = `${config.resource}.create`;
+  useHotkeys({ c: () => can(createPermission) && setCreating(true) });
   const update = (k: string, v: string | null) =>
     setParams((p) => {
       const n = new URLSearchParams(p);
@@ -141,7 +151,7 @@ function BoardShell({
         actions={
           <>
             {toggle}
-            {can('core.deals.create') ? (
+            {can(createPermission) ? (
               <Button variant="primary" onClick={() => setCreating(true)}>
                 <Plus /> New {config.singular}
               </Button>

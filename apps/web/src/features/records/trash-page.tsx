@@ -16,27 +16,28 @@ import {
 } from '@/components/ui/misc';
 import { formatRelative } from '@/lib/format';
 import { SettingsPage } from '@/features/settings/layout';
+import { ENTITY_RESOURCE, type RecordEntity } from '@app/shared';
 import { useEntityConfig } from './entities';
 import { useRecordList, useRecordMutations } from './api';
 
 type Trashed = { uuid: string; deletedAt: string | null } & Record<string, unknown>;
 
-type TrashEntity = 'contact' | 'organization' | 'lead' | 'deal';
-export const TRASH_ENTITIES: TrashEntity[] = ['contact', 'organization', 'lead', 'deal'];
+type TrashEntity = RecordEntity;
+export const TRASH_ENTITIES = ['contact', 'organization', 'lead', 'deal'] as const;
 
-/** Entities whose deleted records this user may see: needs the delete permission, and the feature on. */
+/**
+ * Entities whose deleted records this user may see: needs the delete permission, and the feature
+ * on. Module record types follow the core ones.
+ */
 export function useTrashEntities(): TrashEntity[] {
   const boot = useBoot();
   const can = useCan();
-  const config = {
-    contact: useEntityConfig('contact'),
-    organization: useEntityConfig('organization'),
-    lead: useEntityConfig('lead'),
-    deal: useEntityConfig('deal'),
-  };
-  return TRASH_ENTITIES.filter(
-    (e) => (e !== 'lead' || boot.settings.features.leads) && can(`${config[e].resource}.delete`),
-  );
+  return [
+    ...TRASH_ENTITIES.filter(
+      (e) => (e !== 'lead' || boot.settings.features.leads) && can(`${ENTITY_RESOURCE[e]}.delete`),
+    ),
+    ...boot.recordTypes.filter((t) => can(`${t.resource}.delete`)).map((t) => t.entity),
+  ];
 }
 
 function TrashList({ entity }: { entity: TrashEntity }) {

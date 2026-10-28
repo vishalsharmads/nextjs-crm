@@ -10,14 +10,14 @@ import { logger } from '../../lib/logger';
 import { enqueue, registerJob } from '../../lib/jobs';
 import { audit } from '../audit/audit.service';
 import { loadAccess } from '../rbac/access';
-import { EVENT_TYPES, eventDepth, onEvent, type DomainEvent } from '../events/events';
+import { eventDepth, eventTypeSchema, eventTypes, onEvent, type DomainEvent } from '../events/events';
 import { notify } from '../notifications/notifications.service';
-import { recordDefs } from '../records/registry';
+import { findRecordDef, recordDefs } from '../records/registry';
 import { createRecord, updateRecord } from '../records/service';
 import { ensureTags } from '../records/hydrate';
 import { sendMail } from '../../lib/mailer';
 import { getBranding } from '../settings/settings.service';
-import { eventTouchesRestricted } from '../privacy/privacy.service';
+import { eventTouchesRestricted, restrictedRecipients } from '../privacy/privacy.service';
 import { unsubscribeToken } from '../privacy/unsubscribe';
 import { env } from '../../config/env';
 
@@ -56,7 +56,7 @@ export type AutomationAction = z.infer<typeof actionSchema>;
 const automationBody = z.object({
   name: z.string().trim().min(1).max(150),
   description: z.string().max(500).default(''),
-  triggerEvent: z.enum(EVENT_TYPES),
+  triggerEvent: eventTypeSchema,
   conditions: filterSchema.nullish(),
   actions: z.array(actionSchema).min(1).max(10),
   active: z.boolean().default(true),
@@ -173,7 +173,7 @@ async function runAction(
   user: AuthUser,
   ctx: RequestContext,
 ): Promise<string> {
-  const def = recordDefs[e.entity as keyof typeof recordDefs];
+  const def = findRecordDef(e.entity);
   const vars = { record: e.record, event: { type: e.type } };
   switch (action.type) {
     case 'update_field': {
@@ -221,6 +221,9 @@ async function runAction(
         address = id ? ((await db('users').where({ id }).first('email'))?.email as string) : null;
       }
       if (!address) return 'skipped: no email address';
+      // Module records hold no opt-out of their own: never email a restricted person through them.
+      if (action.to === 'record' && def?.moduleKey && (await restrictedRecipients([address])))
+        return 'skipped: processing restricted';
       const branding = await getBranding();
       let html = render(action.body, vars);
       let headers: Record<string, string> | undefined;
@@ -248,7 +251,7 @@ async function runAction(
       return `emailed ${address}`;
     }
     case 'add_tags': {
-      if (!def || e.entity === 'activity') return 'skipped: cannot tag';
+      if (!def || e.entity === 'activity' || def.moduleKey) return 'skipped: cannot tag';
       const row = await db(def.table).where({ uuid: e.uuid }).first('id');
       if (!row) return 'skipped: record gone';
       const ids = await ensureTags(action.tags, user, db);
@@ -341,7 +344,7 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
     permission: 'core.automations.manage',
     handler: async () => ({
       data: (await db('automations').orderBy('id', 'desc')).map(dto),
-      events: EVENT_TYPES,
+      events: eventTypes(),
     }),
   })
   .add({

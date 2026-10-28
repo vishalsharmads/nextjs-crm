@@ -4,7 +4,7 @@ import { logger } from '../../lib/logger';
 import { activeKid, decrypt, decryptBuffer, encrypt, encryptBuffer, isCurrent } from '../../lib/crypto';
 import { newStorageKey, storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
-import { ENTITY_TABLE } from '../custom-fields/definitions';
+import { allCustomEntities, entityTable } from '../custom-fields/definitions';
 import { reencryptValue } from '../records/custom';
 import { totpAad } from '../auth/auth.service';
 import { fileAad } from '../files/files.service';
@@ -80,7 +80,9 @@ export async function rotateKeys(): Promise<RotationReport> {
     }
   }
 
-  for (const [entity, table] of Object.entries(ENTITY_TABLE)) {
+  for (const entity of allCustomEntities()) {
+    const table = entityTable(entity);
+    if (!(await db.schema.hasTable(table))) continue;
     const area = `${table}.custom`;
     for (const { id } of await db(table).where('custom', 'like', `%"${ENC}%`).select('id')) {
       try {

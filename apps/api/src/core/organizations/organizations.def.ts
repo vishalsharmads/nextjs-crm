@@ -25,6 +25,7 @@ export function domainFromWebsite(website: string | null | undefined): string | 
 
 export const organizationsDef: ResourceDef<Row, OrganizationDto> = {
   entity: 'organization',
+  route: 'organizations',
   table: 'organizations',
   resource: 'core.organizations',
   mergeable: true,

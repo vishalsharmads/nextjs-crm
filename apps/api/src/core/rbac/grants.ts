@@ -1,4 +1,5 @@
-import { SCOPE_RANK, SCOPED_RESOURCES, hasPermission, type Scope } from '@app/shared';
+import { SCOPE_RANK, hasPermission, type Scope } from '@app/shared';
+import { scopedResources } from './scoped';
 import { db, type Db } from '../../db/knex';
 import type { AuthUser } from '../../http/context';
 import { AppError } from '../../lib/errors';
@@ -21,7 +22,7 @@ export function callerCoversPattern(caller: AuthUser, pattern: string): boolean 
 export function callerCoversScopes(caller: AuthUser, scopes: Record<string, Scope>): boolean {
   if (caller.isAdmin) return true;
   return Object.entries(scopes).every(([resource, scope]) => {
-    const resources = resource === '*' ? [...SCOPED_RESOURCES] : [resource];
+    const resources = resource === '*' ? scopedResources() : [resource];
     return resources.every((r) => SCOPE_RANK[caller.scopes[r] ?? 'own'] >= SCOPE_RANK[scope]);
   });
 }

@@ -1,4 +1,4 @@
-import { CUSTOMIZABLE_ENTITIES, type AccessDto, type BootstrapDto, type LayoutDto } from '@app/shared';
+import { type AccessDto, type BootstrapDto, type LayoutDto } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
 import type { AuthUser } from '../../http/context';
 import { db } from '../../db/knex';
@@ -9,10 +9,11 @@ import { fieldAccessMap, getDefinitions, fieldLevel } from '../custom-fields/def
 import { listPipelines } from '../pipelines/pipelines.repository';
 import { enabledModuleKeys, moduleMenu } from '../../modules/registry';
 import { can } from '../rbac/access';
+import { customizableEntities, moduleRecordDefs } from '../records/registry';
 
 export async function accessFor(user: AuthUser): Promise<AccessDto> {
   const fields: AccessDto['fields'] = {};
-  for (const entity of CUSTOMIZABLE_ENTITIES)
+  for (const entity of customizableEntities())
     fields[entity] = fieldAccessMap(await getDefinitions(entity), user);
   return {
     isAdmin: user.isAdmin,
@@ -35,7 +36,7 @@ export const metaRoutes = defineRoutes('/meta', ['meta']).add({
   summary: 'Everything the app shell needs after sign-in',
   handler: async ({ user }): Promise<BootstrapDto> => {
     const customFields = [];
-    for (const entity of CUSTOMIZABLE_ENTITIES) {
+    for (const entity of customizableEntities()) {
       for (const def of await getDefinitions(entity)) {
         const level = fieldLevel(def, user);
         if (level !== 'hidden') customFields.push({ ...def, level });
@@ -72,6 +73,9 @@ export const metaRoutes = defineRoutes('/meta', ['meta']).add({
         enabled: enabledModuleKeys(),
         menu: moduleMenu().filter((m) => can(user, m.permission)),
       },
+      recordTypes: moduleRecordDefs()
+        .filter((d) => d.meta && can(user, `${d.resource}.view`))
+        .map((d) => d.meta!),
     };
   },
 });

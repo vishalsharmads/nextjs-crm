@@ -16,7 +16,9 @@ vi.mock('@/app/session', () => ({
       organization: { singular: 'Company', plural: 'Companies' },
       lead: { singular: 'Enquiry', plural: 'Enquiries' },
       deal: { singular: 'Deal', plural: 'Deals' },
+      vehicle: { singular: 'Vehicle', plural: 'Vehicles' },
     },
+    recordTypes: [{ entity: 'vehicle', moduleKey: 'fleet', route: 'vehicles', resource: 'fleet.vehicles' }],
   }),
   useCan: () => (p: string) => permissions.includes(p),
 }));
@@ -64,6 +66,7 @@ describe('TrashPage', () => {
     renderPage();
     expect(await screen.findByRole('tab', { name: 'Members' })).toBeTruthy();
     expect(screen.queryByRole('tab', { name: 'Companies' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Vehicles' })).toBeNull();
   });
 
   it('explains when the user has no delete permission', async () => {
@@ -82,5 +85,10 @@ describe('TrashPage', () => {
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: /restore/i }));
     await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/contacts/a/restore'));
+  });
+  it('includes module record types the user may delete', async () => {
+    permissions = ['core.contacts.delete', 'fleet.vehicles.delete'];
+    renderPage();
+    expect(await screen.findByRole('tab', { name: 'Vehicles' })).toBeTruthy();
   });
 });

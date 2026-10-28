@@ -231,36 +231,42 @@
         {
           "key": "sourced",
           "name": "Sourced",
+          "color": "blue",
           "probability": 10,
           "rotting_days": 7
         },
         {
           "key": "screened",
           "name": "Screened",
+          "color": "teal",
           "probability": 25,
           "rotting_days": 5
         },
         {
           "key": "submitted",
           "name": "Submitted",
+          "color": "violet",
           "probability": 45,
           "rotting_days": 5
         },
         {
           "key": "interview",
           "name": "Interview",
+          "color": "amber",
           "probability": 70,
           "rotting_days": 7
         },
         {
           "key": "placed",
           "name": "Placed",
+          "color": "orange",
           "probability": 100,
           "is_won": true
         },
         {
           "key": "not_placed",
           "name": "Not placed",
+          "color": "pink",
           "probability": 0,
           "is_lost": true
         }

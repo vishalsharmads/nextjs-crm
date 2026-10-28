@@ -2,13 +2,13 @@ import { z } from 'zod';
 import type { Knex } from 'knex';
 import type { Response } from 'express';
 import { stringify } from 'csv-stringify';
-import { CUSTOMIZABLE_ENTITIES, type CustomizableEntity, type VisibilityLevel } from '@app/shared';
+import { type CustomizableEntity, type VisibilityLevel } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
 import type { AuthUser } from '../../http/context';
 import { db } from '../../db/knex';
 import { notFound } from '../../lib/errors';
 import { escapeLike } from '../records/filters';
-import { recordDefs } from '../records/registry';
+import { allModuleRecordDefs, customizableEntities, findRecordDef, recordDefs } from '../records/registry';
 import { scopedQuery } from '../records/service';
 import { can } from '../rbac/access';
 import { fieldAccessMap, getDefinitions } from '../custom-fields/definitions';
@@ -53,7 +53,7 @@ function applyFilters(qb: Knex.QueryBuilder, f: Filters, table: 'a' | 'x') {
  */
 async function viewerRedactor(user: AuthUser) {
   const levels = new Map<string, Record<string, VisibilityLevel>>();
-  for (const e of CUSTOMIZABLE_ENTITIES) levels.set(e, fieldAccessMap(await getDefinitions(e), user));
+  for (const e of customizableEntities()) levels.set(e, fieldAccessMap(await getDefinitions(e), user));
   return (entity: string, diff: unknown) => {
     const l = levels.get(entity as CustomizableEntity);
     return l && diff && typeof diff === 'object' && !Array.isArray(diff)
@@ -141,8 +141,10 @@ async function streamCsv(
 async function applyRecordScope(qb: Knex.QueryBuilder, user: AuthUser, alias: 'a' | 'x') {
   if (user.isAdmin) return;
   const limited: [string, Knex.QueryBuilder | null][] = [];
-  for (const [entity, def] of Object.entries(recordDefs)) {
-    const canView = can(user, `${def.resource}.view`);
+  // Module record types too; a disabled module's history is hidden from non-admins.
+  for (const def of [...Object.values(recordDefs), ...allModuleRecordDefs()]) {
+    const entity = def.entity;
+    const canView = !!findRecordDef(entity) && can(user, `${def.resource}.view`);
     if (canView && user.scopes[def.resource] === 'all') continue;
     let sub: Knex.QueryBuilder | null = null;
     if (canView) {

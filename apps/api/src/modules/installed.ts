@@ -21,6 +21,8 @@ import assets from '../../../../modules/assets/manifest.json' with { type: 'json
 import { assets as assetsApi } from '../../../../modules/assets/api';
 import coworkingCheckins from '../../../../modules/coworking-checkins/manifest.json' with { type: 'json' };
 import { coworkingCheckins as coworkingCheckinsApi } from '../../../../modules/coworking-checkins/api';
+import recordsDemo from '../../../../modules/records-demo/manifest.json' with { type: 'json' };
+import { recordsDemo as recordsDemoApi } from '../../../../modules/records-demo/api';
 
 /**
  * Modules compiled into this build. Adding a module means adding it here (a test checks that
@@ -38,4 +40,5 @@ export const installedModuleSources: InstalledModuleSource[] = [
   { manifest: portal, api: portalApi },
   { manifest: assets, api: assetsApi },
   { manifest: coworkingCheckins, api: coworkingCheckinsApi },
+  { manifest: recordsDemo, api: recordsDemoApi },
 ];

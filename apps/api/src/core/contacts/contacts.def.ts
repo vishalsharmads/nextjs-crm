@@ -19,6 +19,7 @@ type Row = Record<string, unknown> & { id: number };
 
 export const contactsDef: ResourceDef<Row, ContactDto> = {
   entity: 'contact',
+  route: 'contacts',
   table: 'contacts',
   resource: 'core.contacts',
   mergeable: true,

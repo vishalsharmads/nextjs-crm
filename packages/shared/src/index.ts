@@ -13,3 +13,4 @@ export * from './records';
 export * from './commerce';
 export * from './patch';
 export * from './templates';
+export * from './stages';

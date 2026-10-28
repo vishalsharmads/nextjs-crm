@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { z } from 'zod';
 import { logger } from '../../lib/logger';
 
 /**
@@ -16,6 +17,7 @@ export const EVENT_TYPES = [
   'lead.updated',
   'lead.deleted',
   'lead.converted',
+  'lead.stage_changed',
   'deal.created',
   'deal.updated',
   'deal.deleted',
@@ -59,7 +61,29 @@ export const EVENT_TYPES = [
   'asset.returned',
   'stock.low',
 ] as const;
-export type EventType = (typeof EVENT_TYPES)[number];
+/** Core and module events, plus created/updated/deleted of module record types. */
+export type EventType = (typeof EVENT_TYPES)[number] | `${string}.${'created' | 'updated' | 'deleted'}`;
+
+/** Events of module record types, added by `registerRecordType` (whether or not the module is enabled). */
+const recordTypeEvents = new Set<string>();
+
+export function registerRecordTypeEvents(entity: string) {
+  for (const action of ['created', 'updated', 'deleted']) recordTypeEvents.add(`${entity}.${action}`);
+}
+
+/** Set by the module registry: whether a record type's module is enabled (avoids an import cycle). */
+let recordTypeEnabled: (entity: string) => boolean = () => true;
+
+export function setRecordTypeEventGate(fn: (entity: string) => boolean) {
+  recordTypeEnabled = fn;
+}
+
+/** Every event automations and webhooks can subscribe to (record types of enabled modules only). */
+export function eventTypes(): string[] {
+  return [...EVENT_TYPES, ...[...recordTypeEvents].filter((t) => recordTypeEnabled(t.split('.')[0]!))];
+}
+
+export const eventTypeSchema = z.string().refine((t) => eventTypes().includes(t), 'Unknown event');
 
 export interface DomainEvent {
   type: EventType;

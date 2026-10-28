@@ -1,6 +1,7 @@
 import type { Migration } from '../db/migrations';
 import type { RouteGroup } from '../http/routes';
 import type { PrivacyHandler } from '../core/privacy/handlers';
+import type { ResourceDef } from '../core/records/types';
 
 /** What a module's `api_entry` exports. Routes mount under /api/v1/m/<key>. */
 export interface ApiModule {
@@ -10,6 +11,12 @@ export interface ApiModule {
   start?: () => void;
   /** Required when the module stores data about contacts or leads: data subject export and erasure. */
   privacy?: PrivacyHandler;
+  /**
+   * Record types built with `defineRecordType`. Each gets the standard record routes under
+   * `/m/<key>/<route>`, custom fields, saved views, search, import/export, bulk actions, trash,
+   * automations and audit.
+   */
+  recordTypes?: ResourceDef[];
 }
 
 export interface InstalledModuleSource {

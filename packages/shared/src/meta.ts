@@ -62,6 +62,54 @@ export interface ModuleMenuItemDto {
   order: number;
 }
 
+/** Core column of a module record type, enough for the web to render lists, forms and filters. */
+export interface RecordColumnMeta {
+  key: string;
+  label: string;
+  kind: RecordColumnKind;
+  required: boolean;
+  sortable: boolean;
+  filterable: boolean;
+  /** Select choices. */
+  options?: { value: string; label: string }[];
+  /** Core entity a relation column points at. */
+  relation?: 'contact' | 'organization' | 'deal' | 'lead';
+  /** ISO currency for money columns. */
+  currency?: string;
+}
+
+export const RECORD_COLUMN_KINDS = [
+  'text',
+  'textarea',
+  'email',
+  'phone',
+  'url',
+  'number',
+  'money',
+  'date',
+  'datetime',
+  'boolean',
+  'select',
+  'user',
+  'relation',
+] as const;
+export type RecordColumnKind = (typeof RECORD_COLUMN_KINDS)[number];
+
+/** A record type a module registers; core entities keep their hand-written web config. */
+export interface RecordTypeMeta {
+  entity: string;
+  moduleKey: string;
+  /** URL segment under `/m/<moduleKey>/`. */
+  route: string;
+  /** Permission resource, e.g. `properties.properties`. */
+  resource: string;
+  titleColumn: string;
+  columns: RecordColumnMeta[];
+  defaultColumns: string[];
+  defaultSort: string;
+  searchable: boolean;
+}
+
 export interface BootstrapDto {
   me: MeDto;
   access: AccessDto;
@@ -82,4 +130,6 @@ export interface BootstrapDto {
   layouts: LayoutDto[];
   pipelines: PipelineDto[];
   modules: { enabled: string[]; menu: ModuleMenuItemDto[] };
+  /** Record types of enabled modules the user can view. */
+  recordTypes: RecordTypeMeta[];
 }

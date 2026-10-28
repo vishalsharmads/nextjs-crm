@@ -2,7 +2,38 @@
 
 Modules add industry features that need their own tables and screens (bookings, tickets, invoices). They are compiled into the build and turned on or off per instance at runtime. Turning a module off hides it; its data stays.
 
-`modules/notes-demo` is the reference module. Copy it to start.
+There are two reference modules. Use `modules/records-demo` for a record type that behaves like contacts or deals, and `modules/notes-demo` for a module that writes its own routes and screens.
+
+## Record types
+
+A module that keeps a list of records (properties, vehicles, cases) should not write its own CRUD. Generate it instead:
+
+```
+npm run cli -w @app/api -- module:new --key=fleet --entity=vehicle --plural=Vehicles [--singular=Vehicle] [--personal]
+npm install
+```
+
+This writes `modules/fleet/` and adds it to `installed.ts`. The record type is declared with `defineRecordType` in `api/index.ts`. Out of the box it gets:
+
+- REST routes under `/api/v1/m/<key>/<route>`: list, get, create, update, delete, restore, timeline, `/bulk` and `/export`
+- pages under `/m/<key>/<route>`: list, peek, full page and form, built from the record type
+- custom fields, layouts and saved views
+- global search and ⌘K, CSV import and export, and bulk actions (assign, update field, delete)
+- trash, audit and access logging
+- `<entity>.created/updated/deleted` events for automations and webhooks
+- own/team/all record scope in the role editor
+
+Columns are `text`, `textarea`, `email`, `phone`, `url`, `number`, `money` (stored as integer cents), `date`, `datetime`, `boolean`, `select` and `relation` (to a contact, organization, deal or lead; stored as `<key>_id`). Keys are camelCase in the API and snake_case in SQL.
+
+Rules:
+
+- The table must have the standard columns the generated migration creates. Columns that are not `required` must be nullable.
+- The FULLTEXT index lists exactly the `searchable` columns, in order.
+- To add a column, add it to the spec and write a new migration. Committed migrations are immutable.
+- Record keys (`--entity`) are global: they must not reuse a core entity or a vocabulary key.
+- A record type with an `email` or `phone` column, or a relation to a contact or lead, holds personal data. Its module must return a `PrivacyHandler`, or the API refuses to start. Pass `--personal` to generate a stub, then fill it in so access exports and erasure reach these records. Events about a linked restricted person are skipped by automations and webhooks.
+- Relation columns accept only records the user may view. A linked record outside the reader's scope shows as empty.
+- Not yet available on record types: tags, activities, files, merge and Kanban boards. Add your own routes and pages for those.
 
 ## Layout
 

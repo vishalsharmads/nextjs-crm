@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { MoreHorizontal, Plus, Users } from 'lucide-react';
-import type { CoreEntity, FilterCondition, FilterNode } from '@app/shared';
+import type { RecordEntity, FilterCondition, FilterNode } from '@app/shared';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { cn } from '@/lib/cn';
@@ -35,7 +35,7 @@ export function ViewTabs({
   columns,
   onApplyColumns,
 }: {
-  entity: CoreEntity;
+  entity: RecordEntity;
   config: EntityConfig;
   activeView: string | null;
   onSelect: (uuid: string | null) => void;
@@ -181,7 +181,7 @@ function ViewDialog({
   onClose,
   onSaved,
 }: {
-  entity: CoreEntity;
+  entity: RecordEntity;
   mode: 'create' | 'rename';
   view?: SavedView;
   payload: {

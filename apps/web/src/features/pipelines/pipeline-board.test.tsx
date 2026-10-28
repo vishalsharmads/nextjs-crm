@@ -10,7 +10,7 @@ vi.mock('@/app/session', () => ({
 }));
 vi.mock('@/lib/api', () => ({ apiGet: vi.fn(), apiPatch: vi.fn() }));
 
-const { BoardColumn } = await import('./deal-board');
+const { BoardColumn } = await import('./pipeline-board');
 
 const stage = {
   uuid: 's1',
@@ -37,7 +37,7 @@ function renderColumn(props: { deals: DealDto[]; dragging?: boolean; settledId?:
   return render(
     <DndContext>
       <BoardColumn
-        column={{ stage, count: props.deals.length, total: 0, deals: props.deals }}
+        column={{ stage, count: props.deals.length, total: 0, records: props.deals }}
         onOpen={() => undefined}
         disabled={false}
         dragging={props.dragging ?? false}

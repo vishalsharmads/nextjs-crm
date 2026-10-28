@@ -86,6 +86,21 @@ export interface LeadDto extends RecordBase {
   converted: { contactUuid: string | null; organizationUuid: string | null; dealUuid: string | null } | null;
   processingRestricted: boolean;
   marketingOptOut: boolean;
+  /** Set while the lead pipeline feature is on and the lead has been placed on a stage. */
+  pipeline: { uuid: string; name: string } | null;
+  stage: LeadStageRef | null;
+  stageEnteredAt: string | null;
+  rotting: boolean;
+  position: number | null;
+}
+
+export interface LeadStageRef {
+  uuid: string;
+  key: string;
+  name: string;
+  color: string | null;
+  isWon: boolean;
+  isLost: boolean;
 }
 
 export interface DealDto extends RecordBase {
@@ -217,6 +232,8 @@ export const leadInputSchema = z.object({
   jobTitle: optText(150),
   source: optText(100),
   status: z.enum(LEAD_STATUSES).exclude(['converted']).default('new'),
+  pipelineUuid: z.uuid().optional(),
+  stageUuid: z.uuid().optional(),
   ownerUuid: userRef,
   tags: tagsInput,
   custom: customInput,
@@ -259,6 +276,7 @@ export const dealInputSchema = z.object({
 });
 export const dealPatchSchema = toPatch(dealInputSchema);
 
+/** Moving a deal or a lead on its board. Leads ignore `lostReason`. */
 export const dealMoveSchema = z.object({
   stageUuid: z.uuid(),
   /** Neighbours in the target column, for ordering. */

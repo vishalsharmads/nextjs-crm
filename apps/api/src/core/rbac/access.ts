@@ -1,5 +1,6 @@
 import type { Knex } from 'knex';
-import { SCOPE_RANK, SCOPED_RESOURCES, hasPermission, type Scope } from '@app/shared';
+import { SCOPE_RANK, hasPermission, type Scope } from '@app/shared';
+import { scopedResources } from './scoped';
 import { db, type Db } from '../../db/knex';
 import type { AuthUser } from '../../http/context';
 import { AppError } from '../../lib/errors';
@@ -40,7 +41,7 @@ export async function loadAccess(userId: number, conn: Db = db): Promise<UserAcc
     ? await conn('role_scopes').whereIn('role_id', roleIds).select('resource', 'scope')
     : [];
   const scopes: Record<string, Scope> = {};
-  for (const resource of SCOPED_RESOURCES) {
+  for (const resource of scopedResources()) {
     let best: Scope | null = isAdmin ? 'all' : null;
     for (const row of scopeRows) {
       if (row.resource !== resource && row.resource !== '*' && !resource.startsWith(`${row.resource}.`))

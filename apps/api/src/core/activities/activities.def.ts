@@ -67,6 +67,7 @@ async function resolveRelated(conn: Db, related: { type: RelatedType; uuid: stri
 
 export const activitiesDef: ResourceDef<Row, ActivityDto> = {
   entity: 'activity',
+  route: 'activities',
   table: 'activities',
   resource: 'core.activities',
   ownerColumns: ['activities.assignee_id', 'activities.owner_id'],

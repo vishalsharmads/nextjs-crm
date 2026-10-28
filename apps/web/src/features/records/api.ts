@@ -47,7 +47,7 @@ export function useRecordMutations<T extends { uuid: string }>(route: string) {
   const touch = (uuid?: string) => {
     void qc.invalidateQueries({ queryKey: qk.list(route) });
     if (uuid) void qc.invalidateQueries({ queryKey: ['records', route, 'timeline', uuid] });
-    void qc.invalidateQueries({ queryKey: ['records', 'deals', 'board'] });
+    void qc.invalidateQueries({ queryKey: ['records', route, 'board'] });
   };
   return {
     create: useMutation({
