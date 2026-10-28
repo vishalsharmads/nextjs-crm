@@ -11,6 +11,8 @@ import {
   type ApiModule,
 } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_products';
+import * as m0002 from './migrations/0002_deal_lines';
+import { dealLinesRoutes } from './deal-lines';
 
 export const PRODUCTS_TABLE = 'm_products_products';
 
@@ -149,6 +151,6 @@ const routes = defineRoutes('/m/products/products', ['products'], 'products')
   });
 
 export const products: ApiModule = {
-  routes: () => [routes],
-  migrations: { '0001_products': m0001 },
+  routes: () => [dealLinesRoutes, routes],
+  migrations: { '0001_products': m0001, '0002_deal_lines': m0002 },
 };

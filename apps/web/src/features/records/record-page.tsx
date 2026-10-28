@@ -43,6 +43,7 @@ import { FilesPanel } from './files-panel';
 import { ConsentPanel } from '@/features/privacy/consent-panel';
 import { StageTrack } from '@/features/deals/stage-track';
 import { StageBadge } from '@/components/data/stage-color';
+import { ModulePanel } from '@/modules/loader';
 
 type Rec = Record<string, unknown> & {
   uuid: string;
@@ -52,6 +53,9 @@ type Rec = Record<string, unknown> & {
 
 export function RecordPage({ entity }: { entity: RecordEntity }) {
   const { uuid = '' } = useParams();
+  const boot = useBoot();
+  // Tabs enabled modules add to this record type (already filtered by permission).
+  const panels = (boot.modules.panels ?? []).filter((p) => p.entity === entity);
   const config = useEntityConfig(entity);
   const q = useRecord<Rec>(config.route, uuid);
   const { branding } = useBranding();
@@ -189,6 +193,11 @@ export function RecordPage({ entity }: { entity: RecordEntity }) {
               {entity === 'contact' || entity === 'lead' ? (
                 <TabsTrigger value="privacy">Privacy</TabsTrigger>
               ) : null}
+              {panels.map((p) => (
+                <TabsTrigger key={`${p.moduleKey}.${p.key}`} value={`panel:${p.moduleKey}.${p.key}`}>
+                  {p.title}
+                </TabsTrigger>
+              ))}
             </TabsList>
             <TabsContent value="timeline" className="pt-3">
               <Timeline config={config} uuid={rec.uuid} />
@@ -211,6 +220,15 @@ export function RecordPage({ entity }: { entity: RecordEntity }) {
                 />
               </TabsContent>
             ) : null}
+            {panels.map((p) => (
+              <TabsContent
+                key={`${p.moduleKey}.${p.key}`}
+                value={`panel:${p.moduleKey}.${p.key}`}
+                className="pt-3"
+              >
+                <ModulePanel moduleKey={p.moduleKey} panelKey={p.key} entity={entity} uuid={rec.uuid} />
+              </TabsContent>
+            ))}
           </Tabs>
         </main>
       </div>

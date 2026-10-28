@@ -13,9 +13,9 @@ import {
 import { defineRoutes } from '../../http/routes';
 import type { AuthUser } from '../../http/context';
 import { db } from '../../db/knex';
-import { notFound } from '../../lib/errors';
+import { AppError, notFound } from '../../lib/errors';
 import { audit } from '../audit/audit.service';
-import { assertCan, teamUserIds } from '../rbac/access';
+import { assertCan, can, teamUserIds } from '../rbac/access';
 import { scopedQuery } from '../records/service';
 import { recordDefs } from '../records/registry';
 import { getGroup } from '../settings/settings.service';
@@ -38,7 +38,7 @@ async function deals(
   const currency = q.convert ? base : (q.currency ?? base);
   const { qb } = await scopedQuery(recordDefs.deal, user, db);
   // Converted reports count every currency that has a rate (the workspace currency is 1:1).
-  const rate = db.raw('COALESCE(er.rate, CASE WHEN deals.currency = ? THEN 1 END)', [base]);
+  const rate = db.raw('CASE WHEN deals.currency = ? THEN 1 ELSE er.rate END', [base]);
   let missingRates: string[] | undefined;
   if (q.convert) {
     qb.leftJoin('exchange_rates as er', 'er.currency', 'deals.currency');
@@ -348,7 +348,9 @@ export const exchangeRatesRoutes = defineRoutes('/exchange-rates', ['reports'])
     method: 'get',
     path: '/',
     permission: 'authenticated',
-    handler: async (): Promise<ExchangeRatesDto> => {
+    handler: async ({ user }): Promise<ExchangeRatesDto> => {
+      if (!can(user, 'core.reports.view') && !can(user, 'core.settings.manage'))
+        throw new AppError('FORBIDDEN', 'You do not have permission to do that');
       const rows = await db('exchange_rates').orderBy('currency');
       const last = rows.reduce<Date | null>((m, r) => (!m || r.updated_at > m ? r.updated_at : m), null);
       return {

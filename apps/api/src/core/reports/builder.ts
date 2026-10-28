@@ -156,7 +156,7 @@ export async function runReport(raw: unknown, user: AuthUser): Promise<ReportRes
   if (d.convert && metric && currencyColumn) {
     const { currency: base } = await getGroup('general');
     qb.leftJoin('exchange_rates as er', 'er.currency', currencyColumn);
-    const rate = db.raw('COALESCE(er.rate, CASE WHEN ?? = ? THEN 1 END)', [currencyColumn, base]);
+    const rate = db.raw('CASE WHEN ?? = ? THEN 1 ELSE er.rate END', [currencyColumn, base]);
     missingRates = (
       await qb.clone().whereRaw('? IS NULL', [rate]).distinct(currencyColumn).pluck(currencyColumn)
     ).map(String);

@@ -36,6 +36,18 @@ export const moduleManifestSchema = z
         z.object({ singular: z.string().min(1).max(60), plural: z.string().min(1).max(60) }),
       )
       .default({}),
+    /** Tabs a module adds to core record pages (rendered by the web entry's `panels`). */
+    record_panels: z
+      .array(
+        z.object({
+          key: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+          entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/),
+          title: z.string().min(1).max(60),
+          permission: z.string().regex(PERMISSION_KEY_RE),
+          order: z.number().int().default(100),
+        }),
+      )
+      .default([]),
     dashboard_widgets: z
       .array(
         z.object({ type: z.string().regex(/^[a-z][a-z0-9-]*\.[a-z0-9_.-]+$/), title: z.string().max(100) }),
@@ -100,4 +112,6 @@ export interface WebModule<Element = unknown> {
   publicRoutes?: { path: string; element: Element }[];
   /** Renderers for this module's dashboard widgets, keyed by widget type (`<key>.<name>`). */
   widgets?: Record<string, (props: { data: unknown }) => Element>;
+  /** Record-page tabs declared in the manifest's `record_panels`, keyed by panel key. */
+  panels?: Record<string, (props: { entity: string; uuid: string }) => Element>;
 }

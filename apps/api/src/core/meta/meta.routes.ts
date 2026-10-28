@@ -7,7 +7,7 @@ import { getLabels } from '../labels/labels.service';
 import { effectiveCompliance, getGroup } from '../settings/settings.service';
 import { fieldAccessMap, getDefinitions, fieldLevel } from '../custom-fields/definitions';
 import { listPipelines } from '../pipelines/pipelines.repository';
-import { enabledModuleKeys, moduleMenu } from '../../modules/registry';
+import { enabledModuleKeys, moduleMenu, modulePanels } from '../../modules/registry';
 import { can } from '../rbac/access';
 import { customizableEntities, moduleRecordDefs } from '../records/registry';
 import { objectMenu } from '../objects/objects';
@@ -74,6 +74,9 @@ export const metaRoutes = defineRoutes('/meta', ['meta']).add({
       modules: {
         enabled: enabledModuleKeys(),
         menu: [...moduleMenu(), ...(await objectMenu(labels))].filter((m) => can(user, m.permission)),
+        panels: modulePanels()
+          .filter((p) => can(user, p.permission))
+          .map(({ moduleKey, key, entity, title, order }) => ({ moduleKey, key, entity, title, order })),
       },
       recordTypes: moduleRecordDefs()
         .filter((d) => d.meta && can(user, `${d.resource}.view`))

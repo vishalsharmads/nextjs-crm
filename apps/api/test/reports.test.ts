@@ -43,6 +43,8 @@ describe('sales reports', () => {
   });
 
   it('converts every currency into the workspace currency when asked', async () => {
+    const off = await admin.get('/reports/forecast?convert=false&months=3').expect(200);
+    expect(off.body.missingRates).toBeUndefined();
     const plain = await admin.get('/reports/forecast?convert=true&months=3').expect(200);
     expect(plain.body.missingRates).toContain(CUR);
     await admin.put('/exchange-rates', { rates: { [CUR]: 3 } }).expect(204);

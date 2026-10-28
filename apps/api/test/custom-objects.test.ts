@@ -32,6 +32,15 @@ describe('custom objects', () => {
     await admin.post('/objects', { key, singular: 'A', plural: 'As' }).expect(409);
     await admin.post('/objects', { key: 'Bad Key', singular: 'A', plural: 'As' }).expect(422);
     await admin.patch(`/objects/${objectUuid}`, { links: [] }).expect(422);
+    await admin.post('/objects', { key: 'owner', singular: 'A', plural: 'As' }).expect(409);
+    await admin
+      .post('/objects', {
+        key: unique('dup').toLowerCase(),
+        singular: 'A',
+        plural: 'As',
+        links: ['deal', 'deal'],
+      })
+      .expect(422);
   });
 
   it('only admins with fields.manage can manage objects', async () => {

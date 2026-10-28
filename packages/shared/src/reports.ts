@@ -7,12 +7,12 @@ export const reportQuerySchema = z.object({
   /** Deal currency to report on; deals in other currencies are left out. Defaults to the workspace currency. */
   currency: z.string().length(3).optional(),
   /** Convert every currency into the workspace currency with the saved exchange rates. */
-  convert: z.coerce.boolean().optional(),
+  convert: z.stringbool().optional(),
 });
 
 export const exchangeRatesInputSchema = z.object({
   /** Units of the workspace currency per one unit of each currency. Missing currencies are removed. */
-  rates: z.record(z.string().regex(/^[A-Z]{3}$/), z.number().positive().max(1e9)),
+  rates: z.record(z.string().regex(/^[A-Z]{3}$/), z.number().min(1e-8).max(1e9)),
 });
 
 export interface ExchangeRatesDto {
@@ -32,7 +32,7 @@ export const velocityQuerySchema = reportQuerySchema.extend({
 export const quotaQuerySchema = z.object({
   period,
   currency: z.string().length(3).optional(),
-  convert: z.coerce.boolean().optional(),
+  convert: z.stringbool().optional(),
 });
 export const quotaInputSchema = z.object({
   userUuid: z.uuid(),

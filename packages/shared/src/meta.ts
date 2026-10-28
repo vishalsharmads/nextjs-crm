@@ -62,6 +62,15 @@ export interface ModuleMenuItemDto {
   order: number;
 }
 
+/** A tab a module adds to a record page. */
+export interface RecordPanelDto {
+  moduleKey: string;
+  key: string;
+  entity: string;
+  title: string;
+  order: number;
+}
+
 /** Core column of a module record type, enough for the web to render lists, forms and filters. */
 export interface RecordColumnMeta {
   key: string;
@@ -129,7 +138,7 @@ export interface BootstrapDto {
   fieldGroups: FieldGroupDto[];
   layouts: LayoutDto[];
   pipelines: PipelineDto[];
-  modules: { enabled: string[]; menu: ModuleMenuItemDto[] };
+  modules: { enabled: string[]; menu: ModuleMenuItemDto[]; panels: RecordPanelDto[] };
   /** Record types of enabled modules the user can view. */
   recordTypes: RecordTypeMeta[];
 }

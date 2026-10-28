@@ -92,7 +92,7 @@ export const notesDemo: ApiModule = { routes: () => [routes], migrations: { '000
 
 - Routes live under `/api/v1/m/<key>/…`. The third `defineRoutes` argument (the module key) makes the access gate return `MODULE_DISABLED` while the module is off.
 - Every route declares a permission, and mutations write an audit entry in the same transaction, exactly as in core.
-- Tables are prefixed `m_<key_with_underscores>_`. Migrations run when the module is first enabled and are tracked in their own table. Like core migrations, they are never edited once committed.
+- Tables are prefixed `m_<key_with_underscores>_`. Migrations run when the module is enabled, and new ones of enabled modules run on `npm run db:migrate` and at startup. They are tracked in their own table. Like core migrations, they are never edited once committed.
 - Dashboard widgets: `registerModuleWidget('<key>.<name>', async (params, user) => data)`. Apply record scope inside the provider; it runs as the viewing user.
 - Recurring work: return `start: () => every(ms, '<key>.<task>', fn)` from the module. `fn` must return early while `isModuleEnabled('<key>')` is false.
 - Module-to-module calls: import the other module's exported functions directly (for example invoices imports `quoteForConversion` from quotes). Check `isModuleEnabled()` before calling into a module you do not declare in `depends_on`.
@@ -111,6 +111,7 @@ The page renders at `/m/<key>/…`, inside the app shell, as its own lazy-loaded
 
 - Link with absolute paths (`/m/<key>/<uuid>`). Module routes are mounted under a wildcard, so relative links resolve unpredictably.
 - `widgets: { '<key>.<name>': ({ data }) => <Widget data={data} /> }` renders the module's dashboard widgets.
+- `panels: { '<panel>': ({ entity, uuid }) => <Panel uuid={uuid} /> }` adds tabs to core record pages. Declare each in the manifest as `record_panels: [{ "key", "entity", "title", "permission", "order" }]`; the tab shows only for people with the permission, and its API must still check the record (use `getRow`, which applies scope). Example: the products module's **Line items** tab on deals.
 - `publicRoutes` render at `/p/<key>/…` with no app shell and no staff session, for customer-facing pages such as the client portal. Call your API with `noRetry: true`, so a 401 never triggers a staff session refresh.
 - After adding a new module folder, restart `npm run dev`: Vite only picks up new `modules/*/web` entries at startup.
 - Tailwind scans `modules/` through `@source` in `apps/web/src/styles.css`, so any utility class works in module code. Theme tokens only, as in core: elevation is `shadow-raised` or `shadow-overlay`, page titles use `text-title` (`PageHeader` does this for you), and a list table gets linked rows from `DataTable`'s `rowHref`.
