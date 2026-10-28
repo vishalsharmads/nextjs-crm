@@ -13,6 +13,10 @@ import {
   fieldOptionSchema,
   fieldValidationSchema,
   visibilitySchema,
+  ENTITY_KEY_PATTERN,
+  MAX_CUSTOM_OBJECTS,
+  OBJECT_ICONS,
+  OBJECT_LINK_TARGETS,
 } from '@app/shared';
 
 const itemKey = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
@@ -114,6 +118,19 @@ export const blueprintTemplateSchema = z.object({
   body: z.string().max(100_000),
 });
 
+/** An admin-defined object the blueprint seeds (Settings → Objects). Its fields go in `custom_fields`. */
+export const blueprintObjectSchema = z.object({
+  key: z.string().regex(ENTITY_KEY_PATTERN),
+  singular: z.string().min(1).max(60),
+  plural: z.string().min(1).max(60),
+  icon: z.enum(OBJECT_ICONS).default('box'),
+  description: z.string().max(500).optional(),
+  links: z.array(z.enum(OBJECT_LINK_TARGETS)).max(4).default([]),
+});
+
+/** Custom fields and groups are keyed by a core entity, an object or a module record type. */
+const fieldEntityKey = z.string().regex(ENTITY_KEY_PATTERN);
+
 export const blueprintSchema = z.object({
   $schema: z.string().optional(),
   key: z.string().regex(/^[a-z][a-z0-9-]{1,63}$/),
@@ -126,10 +143,9 @@ export const blueprintSchema = z.object({
     .record(z.string(), z.object({ singular: z.string().min(1).max(60), plural: z.string().min(1).max(60) }))
     .default({}),
   modules: z.array(z.string().regex(/^[a-z][a-z0-9-]{1,63}$/)).default([]),
-  custom_field_groups: z
-    .partialRecord(z.enum(CUSTOMIZABLE_ENTITIES), z.array(blueprintGroupSchema))
-    .default({}),
-  custom_fields: z.partialRecord(z.enum(CUSTOMIZABLE_ENTITIES), z.array(blueprintFieldSchema)).default({}),
+  objects: z.array(blueprintObjectSchema).max(MAX_CUSTOM_OBJECTS).default([]),
+  custom_field_groups: z.record(fieldEntityKey, z.array(blueprintGroupSchema)).default({}),
+  custom_fields: z.record(fieldEntityKey, z.array(blueprintFieldSchema)).default({}),
   pipelines: z.array(blueprintPipelineSchema).default([]),
   roles: z.array(blueprintRoleSchema).default([]),
   layouts: z.array(blueprintLayoutSchema).default([]),
@@ -193,6 +209,7 @@ export const blueprintSchema = z.object({
 export type Blueprint = z.output<typeof blueprintSchema>;
 export type BlueprintInput = z.input<typeof blueprintSchema>;
 export type BlueprintField = z.output<typeof blueprintFieldSchema>;
+export type BlueprintObject = z.output<typeof blueprintObjectSchema>;
 export type BlueprintPipeline = z.output<typeof blueprintPipelineSchema>;
 export type BlueprintRole = z.output<typeof blueprintRoleSchema>;
 export type BlueprintLayout = z.output<typeof blueprintLayoutSchema>;

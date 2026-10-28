@@ -53,6 +53,15 @@ export async function exportBlueprint(knex: Knex, opts: { key?: string; version?
     }
   }
 
+  const objects = (await knex('custom_objects').whereNull('archived_at').orderBy('sort_order')).map((o) => ({
+    key: o.entity as string,
+    singular: o.singular as string,
+    plural: o.plural as string,
+    icon: o.icon as string,
+    ...(o.description ? { description: o.description as string } : {}),
+    links: typeof o.links === 'string' ? JSON.parse(o.links) : o.links,
+  }));
+
   const pipelines = [];
   for (const p of await knex('pipelines').where({ active: true }).orderBy('sort_order')) {
     const stages = await knex('pipeline_stages')
@@ -114,6 +123,7 @@ export async function exportBlueprint(knex: Knex, opts: { key?: string; version?
       labels.map((l) => [l.entity_key, { singular: l.singular, plural: l.plural }]),
     ),
     modules,
+    objects,
     custom_field_groups,
     custom_fields,
     pipelines,

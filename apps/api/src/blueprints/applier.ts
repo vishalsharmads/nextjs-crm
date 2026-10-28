@@ -5,10 +5,17 @@ import {
   loadBlueprint,
   type Blueprint,
   type BlueprintField,
+  type BlueprintObject,
   type BlueprintPipeline,
   type BlueprintRole,
 } from '@app/blueprints';
-import { SETTINGS_GROUPS, type SettingsGroup, type CustomizableEntity } from '@app/shared';
+import {
+  CUSTOM_OBJECTS_KEY,
+  SETTINGS_GROUPS,
+  objectRoute,
+  type SettingsGroup,
+  type CustomizableEntity,
+} from '@app/shared';
 import { newUuid } from '../lib/ids';
 import { isKnownPermissionPattern } from '../core/rbac/catalog';
 import { clearAccessCache } from '../core/rbac/access';
@@ -17,6 +24,7 @@ import { clearLabelCache } from '../core/labels/labels.service';
 import { bumpDefinitionsVersion } from '../core/custom-fields/definitions';
 import { ensureCustomFieldIndexes } from '../core/custom-fields/ddl.service';
 import { loadModules, enableModule, getModule } from '../modules/registry';
+import { loadCustomObjects } from '../core/objects/objects';
 import { seedSampleData } from './sample-data';
 import { audit } from '../core/audit/audit.service';
 import { systemContext, type RequestContext } from '../http/context';
@@ -122,7 +130,8 @@ class Applier {
         spec.table === 'pipeline_stages' ||
         spec.table === 'roles' ||
         spec.table === 'templates' ||
-        spec.table === 'dashboards'
+        spec.table === 'dashboards' ||
+        spec.table === 'custom_objects'
           ? { uuid: newUuid(), ...spec.values }
           : spec.values;
       const [id] = await trx(spec.table).insert({
@@ -233,8 +242,29 @@ class Applier {
     }
   }
 
+  /** Objects are seeded as rows; their tables are created after the transaction (DDL). */
+  async object(o: BlueprintObject, i: number) {
+    await this.upsert({
+      table: 'custom_objects',
+      sourceKey: `object.${o.key}`,
+      natural: { entity: o.key },
+      values: {
+        route: objectRoute(o.key),
+        singular: o.singular,
+        plural: o.plural,
+        icon: o.icon,
+        description: o.description ?? null,
+        links: JSON.stringify(o.links),
+        sort_order: i * 10,
+      },
+    });
+  }
+
   async role(role: BlueprintRole) {
-    const unknown = role.permissions.filter((p) => !isKnownPermissionPattern(p));
+    // Permissions of objects this blueprint seeds are registered after the transaction.
+    const objectPerm = (p: string) =>
+      this.bp.objects.some((o) => p.startsWith(`${CUSTOM_OBJECTS_KEY}.${o.key}.`));
+    const unknown = role.permissions.filter((p) => !isKnownPermissionPattern(p) && !objectPerm(p));
     if (unknown.length)
       throw new BlueprintError(`Role "${role.key}" uses unknown permissions: ${unknown.join(', ')}`);
     if (role.key === 'admin') {
@@ -378,6 +408,7 @@ class Applier {
       'roles',
       'custom_field_groups',
       'custom_field_definitions',
+      'custom_objects',
       'pipelines',
       'pipeline_stages',
       'layouts',
@@ -394,6 +425,7 @@ class Applier {
     await this.settings();
     await this.vocabulary();
     await this.modules();
+    for (const [i, o] of this.bp.objects.entries()) await this.object(o, i);
     for (const role of this.bp.roles) await this.role(role);
     await this.fieldGroups();
     for (const [entity, fields] of Object.entries(this.bp.custom_fields)) {
@@ -477,6 +509,8 @@ export async function applyBlueprint(
     await enableModule(key);
   };
   for (const key of bp.modules) await enableWithDeps(key);
+  // Object tables must exist (and be registered) before their custom field indexes are built.
+  await loadCustomObjects(knex);
   report.ddl = await ensureCustomFieldIndexes();
 
   if (opts.sampleData && bp.sample_data && !last) {
