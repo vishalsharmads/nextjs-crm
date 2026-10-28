@@ -2,15 +2,15 @@
 
 Phases come from the product brief. Ideas that come up during a phase but sit outside its scope go under **Future** rather than into the code.
 
-| Phase | Scope                                                                                                                                                                                     | Status                         |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| 0     | Planning: architecture, schema, API, blueprint and module contracts                                                                                                                       | Done ([plan](plan/phase-0.md)) |
-| 1     | Foundation: auth, RBAC, branding, vocabulary, custom fields, contacts, organizations, deals, activities, views, import/export, dashboard, audit, notifications, blueprints, module loader | Done                           |
-| 2     | Configuration and communication: layout builder UI, workflow automation, templates manager, email integration, web forms, webhooks, API keys, BullMQ jobs                                 | Done                           |
-| 3     | Commercial: products, quotes, invoices, payments, contracts and renewals, client portal                                                                                                   | Done                           |
-| 4     | Operational and industry modules: bookings, tickets, documents, inventory/assets, vertical modules                                                                                        | Done                           |
-| 5     | Compliance readiness: profiles with enforced floors, access logging, data subject rights and consent, retention, encryption of sensitive data ([overview](compliance/overview.md))        | Done                           |
-| 6     | Gap closing ([plan](plan/phase-6.md)): quick wins, UI polish, rich text, records engine for modules (`module:new`); next: custom objects, MCP server, assistant, sales depth, reports     | In progress (6a–6b done)       |
+| Phase | Scope                                                                                                                                                                                                                                                 | Status                         |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| 0     | Planning: architecture, schema, API, blueprint and module contracts                                                                                                                                                                                   | Done ([plan](plan/phase-0.md)) |
+| 1     | Foundation: auth, RBAC, branding, vocabulary, custom fields, contacts, organizations, deals, activities, views, import/export, dashboard, audit, notifications, blueprints, module loader                                                             | Done                           |
+| 2     | Configuration and communication: layout builder UI, workflow automation, templates manager, email integration, web forms, webhooks, API keys, BullMQ jobs                                                                                             | Done                           |
+| 3     | Commercial: products, quotes, invoices, payments, contracts and renewals, client portal                                                                                                                                                               | Done                           |
+| 4     | Operational and industry modules: bookings, tickets, documents, inventory/assets, vertical modules                                                                                                                                                    | Done                           |
+| 5     | Compliance readiness: profiles with enforced floors, access logging, data subject rights and consent, retention, encryption of sensitive data ([overview](compliance/overview.md))                                                                    | Done                           |
+| 6     | Gap closing ([plan](plan/phase-6.md)): quick wins, UI polish, rich text, records engine for modules, admin-defined objects, tool layer and MCP, assistant module, sales reports, delayed and scheduled automations, report builder, dashboard editing | Done                           |
 
 ## Future
 
@@ -49,3 +49,8 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - Barcode scanning for asset tags and stock counts.
 - Visitor pre-registration and printed badges for the front desk.
 - Bookings and front desk show linked contact names to anyone with view access (shared calendar by design); add an option to hide names outside the viewer's contact scope.
+- Line items on deals (quotes carry lines today), with record-page panel slots so modules can add panels to core record pages.
+- Links between admin-defined objects (objects link to core records today).
+- Assistant: streamed replies and a side panel available from every page (it is a module page today).
+- OAuth sign-in for MCP clients (personal access tokens today).
+- Report builder: two groupings (pivot) and multi-currency conversion.
