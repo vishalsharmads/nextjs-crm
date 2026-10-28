@@ -21,6 +21,8 @@ type Rec = Record<string, unknown> & {
   updatedAt: string;
 };
 
+type Vocabulary = Record<string, { singular: string; plural: string } | undefined>;
+
 const dash = <span className="text-faint">—</span>;
 
 const KIND: Record<RecordColumnMeta['kind'], FieldKind> = {
@@ -66,11 +68,12 @@ function render(c: RecordColumnMeta, v: unknown): ReactNode {
   }
 }
 
-function columnField(c: RecordColumnMeta, title: boolean): FieldConfig<Rec> {
+function columnField(c: RecordColumnMeta, title: boolean, vocab: Vocabulary): FieldConfig<Rec> {
   const relation = c.kind === 'relation';
   return {
     key: c.key,
-    label: c.label,
+    // A relation names a core entity: use its vocabulary, not the module's literal label.
+    label: relation && c.relation ? (vocab[c.relation]?.singular ?? c.label) : c.label,
     kind: KIND[c.kind],
     get: (r) => (relation ? (r[c.key] as { uuid: string } | null)?.uuid : r[c.key]),
     render: (r) => (title ? <span className="font-medium">{render(c, r[c.key])}</span> : render(c, r[c.key])),
@@ -107,11 +110,12 @@ function customField(def: CustomFieldDef & { level: VisibilityLevel }): FieldCon
 export function buildModuleConfig(
   meta: RecordTypeMeta,
   labels: { singular: string; plural: string },
+  vocab: Vocabulary,
   customFields: (CustomFieldDef & { level: VisibilityLevel })[],
   me: { uuid: string },
 ): EntityConfig {
   const fields: FieldConfig<Rec>[] = [
-    ...meta.columns.map((c) => columnField(c, c.key === meta.titleColumn)),
+    ...meta.columns.map((c) => columnField(c, c.key === meta.titleColumn, vocab)),
     {
       key: 'owner',
       label: 'Owner',

@@ -121,7 +121,7 @@ export const CORE_COLUMNS: Record<Exclude<CoreEntity, 'activity'>, CoreColumn[]>
 export function ioDef(entity: string): ResourceDef {
   const def = getRecordDef(entity);
   if (def.entity === 'activity')
-    throw new AppError('VALIDATION_FAILED', 'Activities cannot be imported or exported');
+    throw new AppError('VALIDATION_FAILED', 'This record type cannot be imported or exported');
   return def;
 }
 

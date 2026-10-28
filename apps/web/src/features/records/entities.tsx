@@ -190,7 +190,7 @@ export function buildConfig(entity: RecordEntity, boot: ReturnType<typeof useBoo
     const meta = boot.recordTypes.find((t) => t.entity === entity);
     if (!meta) throw new Error(`Unknown record type "${entity}"`);
     const labels = boot.labels[entity] ?? { singular: entity, plural: entity };
-    return buildModuleConfig(meta, labels, boot.customFields, boot.me);
+    return buildModuleConfig(meta, labels, boot.labels, boot.customFields, boot.me);
   }
   return buildCoreConfig(entity, boot);
 }
