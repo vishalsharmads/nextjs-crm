@@ -102,3 +102,41 @@ test('moves a deal with the stage track on its page, and undoes it', async ({ pa
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(track.locator('button[aria-current="step"]')).toHaveText('Meeting scheduled');
 });
+
+test('turns on the lead pipeline and moves a lead across stages', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/settings/general');
+  const toggle = page.getByRole('switch', { name: /Lead pipeline/ });
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+
+  await page.goto('/leads');
+  await page.getByRole('button', { name: /New Lead/ }).click();
+  await page.getByLabel('First name').fill('Lead');
+  await page.getByLabel('Last name').fill('Mover');
+  await page.getByRole('button', { name: 'Create Lead' }).click();
+  const card = page.getByRole('article').filter({ hasText: 'Lead Mover' });
+  await expect(page.getByRole('listitem', { name: 'New' }).getByText('Lead Mover')).toBeVisible();
+
+  await card.locator('..').focus();
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(150);
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(250);
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('listitem', { name: 'Contacted' }).getByText('Lead Mover')).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('listitem', { name: 'Contacted' }).getByText('Lead Mover')).toBeVisible();
+
+  // The stage track on the lead's page shows where it is.
+  await card.click();
+  await page.getByRole('button', { name: 'Open full page' }).click();
+  await expect(
+    page.getByRole('list', { name: 'Pipeline stages' }).locator('button[aria-current="step"]'),
+  ).toHaveText('Contacted');
+
+  // Leave the factory default for the other specs.
+  await page.goto('/settings/general');
+  await page.getByRole('switch', { name: /Lead pipeline/ }).click();
+  await expect(page.getByRole('switch', { name: /Lead pipeline/ })).not.toBeChecked();
+});

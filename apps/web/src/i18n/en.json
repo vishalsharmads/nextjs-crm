@@ -130,6 +130,8 @@
     "privacy": "Privacy",
     "leadsToggle": "Use {{leadPluralLower}}",
     "leadsToggleHelp": "Qualify {{leadPluralLower}} separately before they become {{contactPluralLower}}. Turn this off to qualify inside the {{dealLower}} pipeline instead.",
+    "leadPipelineToggle": "{{lead}} pipeline",
+    "leadPipelineToggleHelp": "Move {{leadPluralLower}} through stages on a board, like {{dealPluralLower}}. Turning it on adds a starter pipeline you can edit under Pipelines.",
     "sources": "Sources",
     "sourcesHelp": "Where {{contactPluralLower}} and {{leadPluralLower}} come from. Used for attribution reports.",
     "lifecycle": "Lifecycle statuses",
