@@ -70,7 +70,7 @@ describe('OAuth for MCP clients', () => {
       clientId: reg.body.client_id as string,
       code,
       verifier,
-      token: token.body as Record<string, string>,
+      token: token.body as { access_token: string; refresh_token: string },
     };
   }
 
