@@ -1,7 +1,7 @@
-import { CUSTOMIZABLE_ENTITIES, type CustomizableEntity, type Sensitivity } from '@app/shared';
+import { type CustomizableEntity, type Sensitivity } from '@app/shared';
 import { env } from '../../config/env';
 import { db } from '../../db/knex';
-import { entityTable, getDefinitions } from '../custom-fields/definitions';
+import { allCustomEntities, entityTable, getDefinitions } from '../custom-fields/definitions';
 import { effectiveCompliance } from '../settings/settings.service';
 import { privacyHandlers } from './handlers';
 
@@ -44,7 +44,9 @@ export interface DataMapDto {
 export async function dataMap(): Promise<DataMapDto> {
   const c = await effectiveCompliance();
   const records = [];
-  for (const entity of CUSTOMIZABLE_ENTITIES) {
+  for (const entity of allCustomEntities()) {
+    // Module record types whose module was never enabled have no table yet.
+    if (!(await db.schema.hasTable(entityTable(entity)))) continue;
     const defs = await getDefinitions(entity);
     const rows = Number(
       ((await db(entityTable(entity)).whereNull('deleted_at').count({ n: '*' }).first()) as { n: number }).n,
@@ -52,7 +54,7 @@ export async function dataMap(): Promise<DataMapDto> {
     records.push({
       entity,
       rows,
-      coreFields: CORE_PERSONAL[entity],
+      coreFields: CORE_PERSONAL[entity] ?? [],
       customFields: defs.map((d) => ({ key: d.key, label: d.label, sensitivity: d.sensitivity })),
     });
   }

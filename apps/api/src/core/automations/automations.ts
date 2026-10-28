@@ -17,7 +17,7 @@ import { createRecord, updateRecord } from '../records/service';
 import { ensureTags } from '../records/hydrate';
 import { sendMail } from '../../lib/mailer';
 import { getBranding } from '../settings/settings.service';
-import { eventTouchesRestricted } from '../privacy/privacy.service';
+import { eventTouchesRestricted, restrictedRecipients } from '../privacy/privacy.service';
 import { unsubscribeToken } from '../privacy/unsubscribe';
 import { env } from '../../config/env';
 
@@ -221,6 +221,9 @@ async function runAction(
         address = id ? ((await db('users').where({ id }).first('email'))?.email as string) : null;
       }
       if (!address) return 'skipped: no email address';
+      // Module records hold no opt-out of their own: never email a restricted person through them.
+      if (action.to === 'record' && def?.moduleKey && (await restrictedRecipients([address])))
+        return 'skipped: processing restricted';
       const branding = await getBranding();
       let html = render(action.body, vars);
       let headers: Record<string, string> | undefined;
@@ -248,7 +251,7 @@ async function runAction(
       return `emailed ${address}`;
     }
     case 'add_tags': {
-      if (!def || e.entity === 'activity') return 'skipped: cannot tag';
+      if (!def || e.entity === 'activity' || def.moduleKey) return 'skipped: cannot tag';
       const row = await db(def.table).where({ uuid: e.uuid }).first('id');
       if (!row) return 'skipped: record gone';
       const ids = await ensureTags(action.tags, user, db);

@@ -424,6 +424,7 @@ export const layoutsRoutes = defineRoutes('/layouts', ['custom-fields'])
     handler: async ({ query }) => {
       const q = db('layouts').where({ is_default: true });
       if (query.entity) q.where({ entity: query.entity });
+      else q.whereIn('entity', customizableEntities());
       return {
         data: (await q).map((r) => ({ entity: r.entity, context: r.context, ...(r.config as object) })),
       };

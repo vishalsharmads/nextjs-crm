@@ -9,7 +9,7 @@ import { activitiesDef } from '../activities/activities.def';
 import { AppError, notFound } from '../../lib/errors';
 import { registerEntityTable, unregisterEntityTable } from '../custom-fields/definitions';
 import { registerDefaultLabels } from '../labels/labels.service';
-import { registerRecordTypeEvents } from '../events/events';
+import { registerRecordTypeEvents, setRecordTypeEventGate } from '../events/events';
 import { registerScopedResource } from '../rbac/scoped';
 
 export const recordDefs: Record<CoreEntity, ResourceDef> = {
@@ -28,6 +28,7 @@ let moduleEnabled: (key: string) => boolean = () => false;
 
 export function setRecordTypeGate(fn: (key: string) => boolean) {
   moduleEnabled = fn;
+  setRecordTypeEventGate((entity) => !!findRecordDef(entity));
 }
 
 export function registerRecordType(def: ResourceDef) {

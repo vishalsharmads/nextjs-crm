@@ -35,6 +35,14 @@ export function loadModules(): LoadedModule[] {
     for (const def of m.api?.recordTypes ?? []) {
       if (def.moduleKey !== m.manifest.key)
         throw new Error(`Record type "${def.entity}" belongs to module "${def.moduleKey}"`);
+      // Records that link to or contact a person must reach data subject export and erasure.
+      const personal = def.meta?.columns.some(
+        (c) => c.kind === 'email' || c.kind === 'phone' || c.relation === 'contact' || c.relation === 'lead',
+      );
+      if (personal && !m.api?.privacy)
+        throw new Error(
+          `Module "${m.manifest.key}" stores personal data in "${def.entity}": add a privacy handler`,
+        );
       registerRecordType(def);
     }
   }

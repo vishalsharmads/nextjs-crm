@@ -1,7 +1,8 @@
 import type { Knex } from 'knex';
 import { blueprintSchema, type BlueprintInput } from '@app/blueprints';
-import { CUSTOMIZABLE_ENTITIES, SETTINGS_GROUPS } from '@app/shared';
+import { SETTINGS_GROUPS } from '@app/shared';
 import { rowToDef } from '../core/custom-fields/definitions';
+import { allCustomEntities } from '../core/custom-fields/definitions';
 
 /** Serialize the current configuration (no records) as a blueprint, so a configured install can become a preset. */
 export async function exportBlueprint(knex: Knex, opts: { key?: string; version?: string } = {}) {
@@ -21,7 +22,7 @@ export async function exportBlueprint(knex: Knex, opts: { key?: string; version?
 
   const custom_field_groups: Record<string, unknown[]> = {};
   const custom_fields: Record<string, unknown[]> = {};
-  for (const entity of CUSTOMIZABLE_ENTITIES) {
+  for (const entity of allCustomEntities()) {
     const groups = await knex('custom_field_groups').where({ entity }).orderBy('sort_order');
     if (groups.length)
       custom_field_groups[entity] = groups.map((g) => ({

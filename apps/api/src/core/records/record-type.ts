@@ -8,7 +8,6 @@ import {
   type RecordColumnMeta,
   type RecordTypeMeta,
 } from '@app/shared';
-import { db } from '../../db/knex';
 import { serializeCustom } from './custom';
 import {
   compact,
@@ -21,7 +20,14 @@ import {
   textField,
   timestampsFields,
 } from './common';
-import { iso, idFromUuid, userIdFromRef, userRefs } from './hydrate';
+import { iso, userIdFromRef, userRefs } from './hydrate';
+import { AppError } from '../../lib/errors';
+import type { AuthUser } from '../../http/context';
+import type { Knex } from 'knex';
+import type { Db } from '../../db/knex';
+import { can } from '../rbac/access';
+import { scopedQuery } from './service';
+import { recordDefs } from './registry';
 import type { CoreFieldSpec, ResourceDef } from './types';
 import { moduleTablePrefix } from './paths';
 
@@ -140,6 +146,24 @@ function fieldSpec(table: string, c: RecordColumnSpec): CoreFieldSpec {
   return { ...spec, sortable: c.sortable ?? spec.sortable, filterable: c.filterable ?? spec.filterable };
 }
 
+/** Core records of a relation target the user may view (permission and scope), with their names. */
+async function visibleTargets(
+  relation: NonNullable<RecordColumnMeta['relation']>,
+  user: AuthUser,
+  conn: Db,
+  where: (qb: Knex.QueryBuilder, table: string) => void,
+): Promise<{ id: number; uuid: string; name: string }[]> {
+  const def = recordDefs[relation];
+  if (!can(user, `${def.resource}.view`)) return [];
+  const { qb } = await scopedQuery(def, user, conn);
+  where(qb, def.table);
+  return (await qb.select(
+    `${def.table}.id`,
+    `${def.table}.uuid`,
+    `${def.table}.${RELATION_TABLE[relation].title} as name`,
+  )) as { id: number; uuid: string; name: string }[];
+}
+
 function validateSpec(spec: RecordTypeSpec) {
   if (!ENTITY_KEY_PATTERN.test(spec.entity) || isCoreEntity(spec.entity))
     throw new Error(`Record type key "${spec.entity}" is invalid or reserved`);
@@ -232,12 +256,16 @@ export function defineRecordType(spec: RecordTypeSpec): ResourceDef {
       for (const c of columns) {
         if (c.kind === 'relation') {
           const field = `${c.key}Uuid`;
-          row[`${snake(c.key)}_id`] = await idFromUuid(
-            RELATION_TABLE[c.relation!].table,
-            input[field] as string | null | undefined,
-            field,
-            conn,
-          );
+          const ref = input[field] as string | null | undefined;
+          if (ref === undefined || ref === null) {
+            if (ref === null) row[`${snake(c.key)}_id`] = null;
+            continue;
+          }
+          // Link only to records the user may see, so names cannot be probed or leaked.
+          const [hit] = await visibleTargets(c.relation!, user, conn, (qb, t) => qb.where(`${t}.uuid`, ref));
+          if (!hit)
+            throw new AppError('VALIDATION_FAILED', 'Not found', [{ path: field, message: 'Not found' }]);
+          row[`${snake(c.key)}_id`] = hit.id;
           continue;
         }
         let v = input[c.key];
@@ -262,12 +290,10 @@ export function defineRecordType(spec: RecordTypeSpec): ResourceDef {
       ]);
       const related = new Map<string, Map<number, { uuid: string; name: string }>>();
       for (const c of columns.filter((x) => x.kind === 'relation')) {
-        const rel = RELATION_TABLE[c.relation!];
         const ids = [...new Set(rows.map((r) => r[`${snake(c.key)}_id`]).filter((x) => x != null))];
+        // Linked records outside the reader's scope show as empty.
         const found = ids.length
-          ? await (conn ?? db)(rel.table)
-              .whereIn('id', ids as number[])
-              .select('id', 'uuid', `${rel.title} as name`)
+          ? await visibleTargets(c.relation!, user, conn, (qb, t) => qb.whereIn(`${t}.id`, ids as number[]))
           : [];
         related.set(c.key, new Map(found.map((f) => [f.id as number, { uuid: f.uuid, name: f.name }])));
       }

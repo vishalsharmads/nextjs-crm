@@ -15,7 +15,7 @@ import { storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
 import { logAccess } from '../audit/access-log';
 import { brokenSealedDays, daysOf, resealDays } from '../audit/integrity';
-import { recordDefs } from '../records/registry';
+import { findRecordDef, recordDefs } from '../records/registry';
 import { escapeLike } from '../records/filters';
 import { decryptCustom, isEncryptedValue, redactDiff } from '../records/custom';
 import { customContext } from '../records/common';
@@ -530,6 +530,12 @@ export async function eventTouchesRestricted(e: {
   const related = r.related as { type?: string; uuid?: string } | null | undefined;
   if (e.entity === 'activity' && related?.type && related.uuid)
     return isRestricted(related.type, related.uuid);
+  // Module record types: any contact or lead they link to.
+  for (const c of findRecordDef(e.entity)?.meta?.columns ?? []) {
+    if (c.kind !== 'relation' || (c.relation !== 'contact' && c.relation !== 'lead')) continue;
+    const linked = r[c.key] as { uuid?: string } | null | undefined;
+    if (linked?.uuid && (await isRestricted(c.relation, linked.uuid))) return true;
+  }
   return false;
 }
 

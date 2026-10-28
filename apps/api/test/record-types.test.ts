@@ -2,6 +2,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { clientWithRoles, createRole, createUser, loginAs, unique, type Client } from './helpers';
 import { db } from '../src/db/knex';
 import { scaffoldModule, addToInstalled } from '../src/cli/scaffold';
+import { defineRecordType } from '../src/core/records/record-type';
+import { registerRecordType, unregisterRecordType } from '../src/core/records/registry';
+import { eventTouchesRestricted } from '../src/core/privacy/privacy.service';
+import { newUuid } from '../src/lib/ids';
 
 const BASE = '/m/records-demo/items';
 const csv = (rows: string[][]) => Buffer.from(rows.map((r) => r.join(',')).join('\n'));
@@ -167,7 +171,7 @@ describe('module record types', () => {
       .expect(422);
   });
 
-  it('applies own scope: others cannot see, edit or read the history of a record', async () => {
+  it('applies own scope: others cannot see, change, export or read the history of a record', async () => {
     const role = await createRole(['records-demo.items.*'], { 'records-demo.items': 'own' });
     const rep = await loginAs(await createUser({ roleKeys: [role] }));
     const mine = await rep.post(BASE, { name: 'Rep owned' }).expect(201);
@@ -182,8 +186,112 @@ describe('module record types', () => {
     const search = await rep.get(`/search?q=${encodeURIComponent(theirs.body.name)}`).expect(200);
     expect(search.body.data.map((r: { uuid: string }) => r.uuid)).not.toContain(theirs.body.uuid);
 
+    await rep.delete(`${BASE}/${theirs.body.uuid}`).expect(404);
+    await rep.get(`${BASE}/${theirs.body.uuid}/timeline`).expect(404);
+    const bulk = await rep.post(`${BASE}/bulk`, { action: 'delete', uuids: [theirs.body.uuid] }).expect(200);
+    expect(bulk.body.affected).toBe(0);
+    await admin.delete(`${BASE}/${theirs.body.uuid}`).expect(204);
+    await rep.post(`${BASE}/${theirs.body.uuid}/restore`).expect(404);
+    await admin.post(`${BASE}/${theirs.body.uuid}/restore`).expect(200);
+    const exp = await rep.get(`${BASE}/export`).expect(200);
+    expect(exp.text).toContain('Rep owned');
+    expect(exp.text).not.toContain(theirs.body.name);
+    const auditor = await loginAs(
+      await createUser({
+        roleKeys: [
+          await createRole(['records-demo.items.view', 'core.audit.view'], { 'records-demo.items': 'own' }),
+        ],
+      }),
+    );
+    const history = await auditor.get('/audit-logs?pageSize=100').expect(200);
+    expect(JSON.stringify(history.body)).not.toContain(theirs.body.uuid);
+    const wide = await loginAs(
+      await createUser({
+        roleKeys: [
+          await createRole(['records-demo.items.view', 'core.audit.view'], { 'records-demo.items': 'all' }),
+        ],
+      }),
+    );
+    const all = await wide.get(`/audit-logs?pageSize=100&entity=demo_item`).expect(200);
+    expect(JSON.stringify(all.body)).toContain(theirs.body.uuid);
+
     const noPerm = await loginAs(await createUser({ roleKeys: [await createRole(['core.contacts.view'])] }));
     await noPerm.get(BASE).expect(403);
+  });
+
+  it('links only to records the user may see, and hides names of others', async () => {
+    const role = await createRole(['records-demo.items.*', 'core.organizations.view'], {
+      'records-demo.items': 'all',
+      'core.organizations': 'own',
+    });
+    const rep = await loginAs(await createUser({ roleKeys: [role] }));
+    const hidden = await admin.post('/organizations', { name: unique('Hidden org ') }).expect(201);
+    const res = await rep.post(BASE, { name: 'Probe', organizationUuid: hidden.body.uuid }).expect(422);
+    expect(res.body.error.details[0].path).toBe('organizationUuid');
+
+    const linked = await admin
+      .post(BASE, { name: unique('Linked '), organizationUuid: hidden.body.uuid })
+      .expect(201);
+    expect(linked.body.organization.name).toBe(hidden.body.name);
+    const seen = await rep.get(`${BASE}/${linked.body.uuid}`).expect(200);
+    expect(seen.body.organization).toBeNull();
+  });
+
+  it('keeps hidden custom fields out of a module type export', async () => {
+    const secret = await admin
+      .post('/custom-fields', {
+        entity: 'demo_item',
+        key: 'secret_code',
+        label: 'Secret code',
+        type: 'text',
+        visibility: { default: 'hidden', roles: {} },
+      })
+      .expect(201);
+    try {
+      const role = await createRole(['records-demo.items.*'], { 'records-demo.items': 'all' });
+      const rep = await loginAs(await createUser({ roleKeys: [role] }));
+      const name = unique('Secretive ');
+      await admin.post(BASE, { name, custom: { secret_code: 'XYZZY' } }).expect(201);
+      const exp = await rep.get(`${BASE}/export?q=${encodeURIComponent(name)}`).expect(200);
+      expect(exp.text).toContain(name);
+      expect(exp.text).not.toContain('Secret code');
+      expect(exp.text).not.toContain('XYZZY');
+      const got = await rep.get(`${BASE}?q=${encodeURIComponent(name)}`).expect(200);
+      expect(got.body.data[0].custom).not.toHaveProperty('secret_code');
+    } finally {
+      await admin.post(`/custom-fields/${secret.body.uuid}/archive`);
+    }
+  });
+
+  it('treats events about a linked restricted contact as restricted', async () => {
+    const contact = await admin
+      .post('/contacts', { firstName: 'Restricted', lastName: unique('L') })
+      .expect(201);
+    await admin.post(`/privacy/contact/${contact.body.uuid}/restriction`, { restricted: true }).expect(204);
+    const def = defineRecordType({
+      moduleKey: 'records-demo',
+      entity: 'demo_visit',
+      route: 'visits',
+      table: 'm_records_demo_visits',
+      resource: 'records-demo.visits',
+      labels: { singular: 'Visit', plural: 'Visits' },
+      titleColumn: 'name',
+      columns: [
+        { key: 'name', label: 'Name', kind: 'text' },
+        { key: 'person', label: 'Person', kind: 'relation', relation: 'contact' },
+      ],
+    });
+    registerRecordType(def);
+    try {
+      const touched = await eventTouchesRestricted({
+        entity: 'demo_visit',
+        uuid: newUuid(),
+        record: { person: { uuid: contact.body.uuid, name: 'x' } },
+      });
+      expect(touched).toBe(true);
+    } finally {
+      unregisterRecordType('demo_visit');
+    }
   });
 
   it('offers record type events to automations', async () => {
@@ -206,6 +314,8 @@ describe('module record types', () => {
     try {
       await admin.get(BASE).expect(404);
       await admin.get('/saved-views?entity=demo_item').expect(422);
+      const automations = await admin.get('/automations').expect(200);
+      expect(automations.body.events).not.toContain('demo_item.created');
       const boot = await admin.get('/meta/bootstrap').expect(200);
       expect(boot.body.recordTypes.some((t: { entity: string }) => t.entity === 'demo_item')).toBe(false);
     } finally {
