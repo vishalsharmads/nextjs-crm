@@ -32,7 +32,8 @@ const TeamsPage = lazyPage(() => import('@/features/settings/people-pages'), 'Te
 const RolesPage = lazyPage(() => import('@/features/settings/people-pages'), 'RolesPage');
 const FieldsPage = lazyPage(() => import('@/features/settings/fields-page'), 'FieldsPage');
 const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'), 'PipelinesPage');
-const DealsPage = lazyPage(() => import('@/features/deals/deals-page'), 'DealsPage');
+const DealsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'DealsPage');
+const LeadsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'LeadsPage');
 const TasksPage = lazyPage(() => import('@/features/activities/tasks-page'), 'TasksPage');
 const ImportPage = lazyPage(() => import('@/features/imports/import-page'), 'ImportPage');
 const DashboardPage = lazyPage(() => import('@/features/dashboard/dashboard-page'), 'DashboardPage');
@@ -147,7 +148,7 @@ export const router = createBrowserRouter(
             { path: 'contacts/:uuid', element: <RecordPage entity="contact" /> },
             { path: 'organizations', element: <RecordListPage entity="organization" /> },
             { path: 'organizations/:uuid', element: <RecordPage entity="organization" /> },
-            { path: 'leads', element: <RecordListPage entity="lead" /> },
+            { path: 'leads', element: page(<LeadsPage />) },
             { path: 'leads/:uuid', element: <RecordPage entity="lead" /> },
             { path: 'deals', element: page(<DealsPage />) },
             { path: 'deals/:uuid', element: <RecordPage entity="deal" /> },

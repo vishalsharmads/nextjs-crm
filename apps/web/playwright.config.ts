@@ -25,6 +25,8 @@ export default defineConfig({
         DATABASE_URL: E2E_DB,
         NODE_ENV: 'development',
         LOG_LEVEL: 'warn',
+        // Every flow signs in; the suite outgrows the production per-IP limit.
+        AUTH_RATE_LIMIT_PER_MIN: '200',
         APP_URL: `http://localhost:${WEB_PORT}`,
       },
     },

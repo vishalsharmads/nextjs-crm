@@ -23,6 +23,7 @@ import { formatDate, formatMoney, formatRelative } from '@/lib/format';
 import { Avatar, Badge } from '@/components/ui/misc';
 import { CustomFieldDisplay } from '@/components/fields/custom-field';
 import { SensitiveValue } from '@/components/fields/sensitive-value';
+import { StageBadge } from '@/components/data/stage-color';
 import { buildModuleConfig } from './module-entities';
 
 export type FieldKind =
@@ -511,6 +512,15 @@ function buildCoreConfig(entity: CoreEntity, boot: ReturnType<typeof useBoot>): 
   }
 
   if (entity === 'lead') {
+    // Stages show only while the lead pipeline is on; status stays either way.
+    const leadStages = boot.settings.features.leadPipeline;
+    const leadPipelines = boot.pipelines.filter((p) => p.entity === 'lead');
+    const leadStageOptions = leadPipelines.flatMap((p) =>
+      p.stages.map((s) => ({
+        value: s.uuid,
+        label: leadPipelines.length > 1 ? `${p.name} · ${s.name}` : s.name,
+      })),
+    );
     const statusLabel: Record<string, string> = {
       new: 'New',
       contacted: 'Contacted',
@@ -603,6 +613,23 @@ function buildCoreConfig(entity: CoreEntity, boot: ReturnType<typeof useBoot>): 
         input: 'status',
         width: 120,
       },
+      ...(leadStages
+        ? [
+            {
+              key: 'stage',
+              label: L.stage!,
+              kind: 'select',
+              get: (r) => r.stage?.uuid ?? null,
+              render: (r) =>
+                r.stage ? <StageBadge name={r.stage.name} color={r.stage.color} /> : text(null),
+              sortable: true,
+              filterable: true,
+              options: leadStageOptions,
+              input: 'stageUuid',
+              width: 150,
+            } satisfies FieldConfig<LeadDto>,
+          ]
+        : []),
       {
         key: 'source',
         label: 'Source',
@@ -623,7 +650,15 @@ function buildCoreConfig(entity: CoreEntity, boot: ReturnType<typeof useBoot>): 
       title: (r) => (r as unknown as LeadDto).fullName || 'Unnamed',
       subtitle: (r) => (r as unknown as LeadDto).companyName,
       fields: fields as unknown as FieldConfig[],
-      defaultColumns: ['full_name', 'company_name', 'email', 'status', 'source', 'owner', 'created_at'],
+      defaultColumns: [
+        'full_name',
+        'company_name',
+        'email',
+        ...(leadStages ? ['stage'] : ['status']),
+        'source',
+        'owner',
+        'created_at',
+      ],
       defaultSort: '-created_at',
       formInputs: [
         'firstName',
@@ -707,9 +742,7 @@ function buildCoreConfig(entity: CoreEntity, boot: ReturnType<typeof useBoot>): 
       label: L.stage!,
       kind: 'select',
       get: (r) => r.stage.uuid,
-      render: (r) => (
-        <Badge tone={r.stage.isWon ? 'primary' : r.stage.isLost ? 'accent' : 'neutral'}>{r.stage.name}</Badge>
-      ),
+      render: (r) => <StageBadge name={r.stage.name} color={r.stage.color} />,
       sortable: true,
       filterable: true,
       options: stageOptions,

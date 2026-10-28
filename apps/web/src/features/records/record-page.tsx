@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ArrowLeft, GitMerge, Mail, MoreHorizontal, Pencil, Trash2, UserCheck } from 'lucide-react';
@@ -42,6 +42,7 @@ import { Timeline } from './timeline';
 import { FilesPanel } from './files-panel';
 import { ConsentPanel } from '@/features/privacy/consent-panel';
 import { StageTrack } from '@/features/deals/stage-track';
+import { StageBadge } from '@/components/data/stage-color';
 
 type Rec = Record<string, unknown> & {
   uuid: string;
@@ -59,7 +60,20 @@ export function RecordPage({ entity }: { entity: RecordEntity }) {
   const { remove, restore } = useRecordMutations<Rec>(config.route);
   const [editing, setEditing] = useState(false);
   const [merging, setMerging] = useState(false);
-  const [converting, setConverting] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // `?convert=1` (from the lead board's Convert action) opens the convert dialog once.
+  const [converting, setConverting] = useState(() => searchParams.get('convert') === '1');
+  useEffect(() => {
+    if (searchParams.get('convert'))
+      setSearchParams(
+        (p) => {
+          const n = new URLSearchParams(p);
+          n.delete('convert');
+          return n;
+        },
+        { replace: true },
+      );
+  }, [searchParams, setSearchParams]);
   const [emailing, setEmailing] = useState(false);
   const title = q.data ? config.title(q.data as never) : '';
   useEffect(
@@ -102,7 +116,12 @@ export function RecordPage({ entity }: { entity: RecordEntity }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-xl font-semibold tracking-tight md:text-title">{title}</h1>
-            <RecordSubheader entity={entity} rec={rec} config={config} />
+            <RecordSubheader
+              entity={entity}
+              rec={rec}
+              config={config}
+              onConvert={() => setConverting(true)}
+            />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {entity === 'lead' && !(rec as unknown as LeadDto).convertedAt && can('core.leads.update') ? (
@@ -211,7 +230,18 @@ export function RecordPage({ entity }: { entity: RecordEntity }) {
   );
 }
 
-function RecordSubheader({ entity, rec, config }: { entity: RecordEntity; rec: Rec; config: EntityConfig }) {
+function RecordSubheader({
+  entity,
+  rec,
+  config,
+  onConvert,
+}: {
+  entity: RecordEntity;
+  rec: Rec;
+  config: EntityConfig;
+  onConvert: () => void;
+}) {
+  const leadPipeline = useBoot().settings.features.leadPipeline;
   if (entity === 'deal') {
     const d = rec as unknown as DealDto;
     return (
@@ -229,7 +259,7 @@ function RecordSubheader({ entity, rec, config }: { entity: RecordEntity; rec: R
   }
   if (entity === 'lead') {
     const l = rec as unknown as LeadDto;
-    return l.converted ? (
+    const line = l.converted ? (
       <p className="mt-1 text-sm text-muted">
         Converted.{' '}
         {l.converted.contactUuid ? (
@@ -240,6 +270,16 @@ function RecordSubheader({ entity, rec, config }: { entity: RecordEntity; rec: R
       </p>
     ) : (
       <p className="mt-1 text-sm text-muted">{config.subtitle?.(rec as never)}</p>
+    );
+    return (
+      <div className="mt-1">
+        {line}
+        {l.stage && leadPipeline ? (
+          <div className="mt-2">
+            <StageTrack lead={l} onConvert={l.convertedAt ? undefined : onConvert} />
+          </div>
+        ) : null}
+      </div>
     );
   }
   const sub = config.subtitle?.(rec as never);
@@ -296,9 +336,7 @@ function RelatedRecords({ entity, rec }: { entity: RecordEntity; rec: Rec }) {
                   {d.title}
                 </Link>
                 <span className="flex items-center gap-2">
-                  <Badge tone={d.stage.isWon ? 'primary' : d.stage.isLost ? 'accent' : 'neutral'}>
-                    {d.stage.name}
-                  </Badge>
+                  <StageBadge name={d.stage.name} color={d.stage.color} />
                   <span className="tabular">{formatMoney(d.value, d.currency)}</span>
                 </span>
               </li>

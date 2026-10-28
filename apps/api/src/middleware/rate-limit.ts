@@ -9,7 +9,7 @@ const handler = () => {
 /** Auth endpoints: per-IP limit. Per-account lockout is enforced separately in the auth service. */
 export const authLimiter = rateLimit({
   windowMs: 60_000,
-  limit: isTest ? 1000 : 20,
+  limit: isTest ? 1000 : env.AUTH_RATE_LIMIT_PER_MIN,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   handler,

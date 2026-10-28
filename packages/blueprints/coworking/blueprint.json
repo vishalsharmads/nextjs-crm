@@ -178,36 +178,42 @@
         {
           "key": "enquiry",
           "name": "Enquiry",
+          "color": "blue",
           "probability": 10,
           "rotting_days": 3
         },
         {
           "key": "tour_booked",
           "name": "Tour booked",
+          "color": "teal",
           "probability": 30,
           "rotting_days": 7
         },
         {
           "key": "proposal_sent",
           "name": "Proposal sent",
+          "color": "violet",
           "probability": 60,
           "rotting_days": 7
         },
         {
           "key": "contract_signed",
           "name": "Contract signed",
+          "color": "amber",
           "probability": 90,
           "rotting_days": 14
         },
         {
           "key": "active",
           "name": "Active",
+          "color": "orange",
           "probability": 100,
           "is_won": true
         },
         {
           "key": "lost",
           "name": "Lost",
+          "color": "pink",
           "probability": 0,
           "is_lost": true
         }

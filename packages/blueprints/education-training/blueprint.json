@@ -171,12 +171,18 @@
       "entity": "deal",
       "is_default": true,
       "stages": [
-        { "key": "enquiry", "name": "Enquiry", "probability": 10, "rotting_days": 3 },
-        { "key": "applied", "name": "Applied", "probability": 30, "rotting_days": 7 },
-        { "key": "offer_sent", "name": "Offer sent", "probability": 60, "rotting_days": 14 },
-        { "key": "enrolled", "name": "Enrolled", "probability": 90 },
-        { "key": "completed", "name": "Completed", "probability": 100, "is_won": true },
-        { "key": "withdrawn", "name": "Withdrawn", "probability": 0, "is_lost": true }
+        { "key": "enquiry", "name": "Enquiry", "color": "blue", "probability": 10, "rotting_days": 3 },
+        { "key": "applied", "name": "Applied", "color": "teal", "probability": 30, "rotting_days": 7 },
+        {
+          "key": "offer_sent",
+          "name": "Offer sent",
+          "color": "violet",
+          "probability": 60,
+          "rotting_days": 14
+        },
+        { "key": "enrolled", "name": "Enrolled", "color": "amber", "probability": 90 },
+        { "key": "completed", "name": "Completed", "color": "green", "probability": 100, "is_won": true },
+        { "key": "withdrawn", "name": "Withdrawn", "color": "red", "probability": 0, "is_lost": true }
       ]
     }
   ],

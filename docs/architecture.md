@@ -37,7 +37,7 @@ Every route is declared with `defineRoutes(...).add({ permission, ... })`. Tests
 
 ## Data model
 
-- Core entities are real tables with foreign keys: `contacts`, `organizations` (the client's customers), `contact_organization`, `leads`, `deals`, `deal_stage_history`, `activities`, `tags`/`taggables`, `files`.
+- Core entities are real tables with foreign keys: `contacts`, `organizations` (the client's customers), `contact_organization`, `leads`, `deals`, `deal_stage_history`, `lead_stage_history`, `activities`, `tags`/`taggables`, `files`.
 - Every business row has `id` (internal) and `uuid` (UUIDv7, the only id the API exposes), timestamps, `created_by`/`updated_by` and `deleted_at`.
 - Configuration tables (`custom_field_definitions`, `pipelines`, `pipeline_stages`, `roles`, `layouts`, `labels`, `settings`, `dashboards`, `templates`) carry blueprint provenance: `source_blueprint`, `source_key`, `source_version`, `source_hash`, `customized`.
 - `audit_logs` is append-only. MySQL triggers reject UPDATE and DELETE; the only exception is the privacy redaction path, which sets a session flag and is itself audited.

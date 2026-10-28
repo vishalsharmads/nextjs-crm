@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  stageColorSchema,
   SENSITIVITY_LEVELS,
   SENSITIVE_TYPES,
   CUSTOMIZABLE_ENTITIES,
@@ -57,7 +58,7 @@ export const blueprintStageSchema = z.object({
   key: itemKey,
   name: z.string().min(1).max(100),
   probability: z.number().int().min(0).max(100).default(0),
-  color: z.string().max(32).optional(),
+  color: stageColorSchema.optional(),
   is_won: z.boolean().default(false),
   is_lost: z.boolean().default(false),
   rotting_days: z.number().int().min(1).max(3650).optional(),

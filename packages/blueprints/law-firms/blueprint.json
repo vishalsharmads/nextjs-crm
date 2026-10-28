@@ -193,36 +193,42 @@
         {
           "key": "intake",
           "name": "Intake",
+          "color": "blue",
           "probability": 10,
           "rotting_days": 3
         },
         {
           "key": "conflict_check",
           "name": "Conflict check",
+          "color": "teal",
           "probability": 30,
           "rotting_days": 2
         },
         {
           "key": "engaged",
           "name": "Engaged",
+          "color": "violet",
           "probability": 80,
           "rotting_days": 14
         },
         {
           "key": "in_progress",
           "name": "In progress",
+          "color": "amber",
           "probability": 90,
           "rotting_days": 30
         },
         {
           "key": "closed",
           "name": "Closed",
+          "color": "orange",
           "probability": 100,
           "is_won": true
         },
         {
           "key": "declined",
           "name": "Declined",
+          "color": "pink",
           "probability": 0,
           "is_lost": true
         }

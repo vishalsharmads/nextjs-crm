@@ -156,6 +156,7 @@ function FeaturesForm({ initial }: { initial: FeatureSettings }) {
   const t = useT();
   const save = useSaveGroup('features');
   const [leads, setLeads] = useState(initial.leads);
+  const [leadPipeline, setLeadPipeline] = useState(initial.leadPipeline);
   return (
     <Pane title="Features">
       <label className="flex items-start justify-between gap-4">
@@ -171,6 +172,21 @@ function FeaturesForm({ initial }: { initial: FeatureSettings }) {
           }}
         />
       </label>
+      {leads ? (
+        <label className="mt-4 flex items-start justify-between gap-4 border-t border-line pt-4">
+          <span>
+            <span className="block text-sm font-medium">{t('settings.leadPipelineToggle')}</span>
+            <span className="block text-sm text-muted">{t('settings.leadPipelineToggleHelp')}</span>
+          </span>
+          <Switch
+            checked={leadPipeline}
+            onCheckedChange={(v) => {
+              setLeadPipeline(v);
+              save.mutate({ leadPipeline: v });
+            }}
+          />
+        </label>
+      ) : null}
     </Pane>
   );
 }

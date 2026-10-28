@@ -7,7 +7,7 @@ export const qk = {
   timeline: (route: string, uuid: string) => ['records', route, 'timeline', uuid] as const,
   activitiesFor: (type: string, uuid: string) => ['activities', 'for', type, uuid] as const,
   files: (type: string, uuid: string) => ['files', type, uuid] as const,
-  board: (params: unknown) => ['records', 'deals', 'board', params] as const,
+  board: (route: string, params: unknown) => ['records', route, 'board', params] as const,
   calendar: (params: unknown) => ['activities', 'calendar', params] as const,
   users: (q = '') => ['users', 'picker', q] as const,
   tags: (q = '') => ['tags', q] as const,

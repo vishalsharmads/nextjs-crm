@@ -11,6 +11,7 @@ import { scopedQuery } from '../records/service';
 import type { ResourceDef } from '../records/types';
 import { redactDiff } from '../records/custom';
 import { userRefs } from '../records/hydrate';
+import { STAGED, type StagedEntity } from '../pipelines/stage-engine';
 
 /** Fields that are bookkeeping, or are shown elsewhere (stage moves), not as "changed X". */
 const NOISE = new Set([
@@ -135,15 +136,23 @@ export async function recordTimeline(
     }
   }
 
-  if (entity === 'deal' && want('stage')) {
-    const moves = await db('deal_stage_history as h')
+  if ((entity === 'deal' || entity === 'lead') && want('stage')) {
+    const { history, fk } = STAGED[entity as StagedEntity];
+    const moves = await db(`${history} as h`)
       .leftJoin('pipeline_stages as f', 'f.id', 'h.from_stage_id')
       .join('pipeline_stages as t', 't.id', 'h.to_stage_id')
-      .where('h.deal_id', id)
+      .where(`h.${fk}`, id)
       .where('h.changed_at', '<', before)
       .orderBy('h.changed_at', 'desc')
       .limit(opts.limit)
-      .select('h.id', 'h.changed_at', 'h.changed_by', 'f.name as from_name', 't.name as to_name');
+      .select(
+        'h.id',
+        'h.changed_at',
+        'h.changed_by',
+        'f.name as from_name',
+        't.name as to_name',
+        't.color as to_color',
+      );
     const movers = await userRefs(moves.map((m) => m.changed_by as number | null));
     for (const m of moves) {
       items.push({
@@ -152,7 +161,7 @@ export async function recordTimeline(
         at: new Date(m.changed_at).toISOString(),
         actor: m.changed_by ? (movers.get(m.changed_by) ?? null) : null,
         title: m.from_name ? `moved from ${m.from_name} to ${m.to_name}` : `entered ${m.to_name}`,
-        detail: { from: m.from_name, to: m.to_name },
+        detail: { from: m.from_name, to: m.to_name, color: m.to_color },
       });
     }
   }
