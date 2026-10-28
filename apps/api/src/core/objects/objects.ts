@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   CUSTOM_OBJECTS_KEY,
   LABEL_ENTITY_KEYS,
@@ -160,10 +161,11 @@ export function objectDef(row: ObjectRow): ResourceDef {
         filterable: true,
       },
       ...linksOf(row).map((target) => ({
-        key: target,
+        // Column keys are camelCase: `service_visit` → `serviceVisit` (stored as `service_visit_id`).
+        key: target.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase()),
         label: target,
         kind: 'relation' as const,
-        relation: target,
+        relation: target as string,
         filterable: true,
       })),
     ],
@@ -176,7 +178,11 @@ export function objectDef(row: ObjectRow): ResourceDef {
  * Create the object's table, and any link columns added since. DDL commits implicitly in MySQL,
  * so this runs outside business transactions, and it is idempotent.
  */
-export async function ensureObjectTable(row: Pick<ObjectRow, 'entity' | 'links'>, conn: Db = db) {
+export async function ensureObjectTable(
+  row: Pick<ObjectRow, 'entity' | 'links'>,
+  conn: Db = db,
+  opts: { links?: boolean } = {},
+) {
   const table = objectTable(row.entity);
   if (!(await conn.schema.hasTable(table))) {
     await conn.schema.createTable(table, (t) => {
@@ -208,18 +214,41 @@ export async function ensureObjectTable(row: Pick<ObjectRow, 'entity' | 'links'>
   if (!indexes.length)
     // Must list exactly the searchable columns of the record type (`name`).
     await conn.raw(`ALTER TABLE ?? ADD FULLTEXT INDEX ?? (name)`, [table, `ft_${table}`]);
+  if (opts.links !== false) await ensureObjectLinks(row, conn);
+}
+
+const CORE_TABLES: Record<string, string> = {
+  contact: 'contacts',
+  organization: 'organizations',
+  deal: 'deals',
+  lead: 'leads',
+};
+
+/** Why the links of an object are not valid, or null: core targets or other live objects only. */
+export async function linkProblem(links: string[], conn: Db = db): Promise<string | null> {
+  for (const target of links) {
+    if (CORE_TABLES[target]) continue;
+    const obj = await conn('custom_objects').where({ entity: target }).whereNull('archived_at').first('id');
+    if (!obj) return `"${target}" is not a record type you can link to`;
+  }
+  return null;
+}
+
+/** One nullable column per link, `<target>_id`, with a foreign key to the target's table. */
+export async function ensureObjectLinks(row: Pick<ObjectRow, 'entity' | 'links'>, conn: Db = db) {
+  const table = objectTable(row.entity);
   for (const target of linksOf(row)) {
     const col = `${target}_id`;
     if (await conn.schema.hasColumn(table, col)) continue;
-    const parent = { contact: 'contacts', organization: 'organizations', deal: 'deals', lead: 'leads' }[
-      target
-    ];
+    const parent = CORE_TABLES[target] ?? objectTable(target);
+    if (!(await conn.schema.hasTable(parent))) continue;
+    // Core targets keep their short names; object keys are hashed to stay within 64 characters.
+    const fk = CORE_TABLES[target]
+      ? `fk_${table}_${target.slice(0, 4)}`
+      : `fk_${table}_${createHash('sha1').update(target).digest('hex').slice(0, 8)}`;
     await conn.schema.alterTable(table, (t) => {
       t.bigInteger(col).unsigned().nullable();
-      t.foreign(col, `fk_${table}_${target.slice(0, 4)}`)
-        .references('id')
-        .inTable(parent)
-        .onDelete('SET NULL');
+      t.foreign(col, fk).references('id').inTable(parent).onDelete('SET NULL');
     });
   }
 }
@@ -243,6 +272,8 @@ function objectPermissions(rows: ObjectRow[]): PermissionDef[] {
 export async function loadCustomObjects(conn: Db = db) {
   if (!(await conn.schema.hasTable('custom_objects'))) return;
   const rows = (await conn('custom_objects').orderBy('sort_order').orderBy('id')) as ObjectRow[];
+  // Tables first, then links, so an object can link to one created after it.
+  for (const row of rows) await ensureObjectTable(row, conn, { links: false }).catch(() => undefined);
   for (const row of rows) {
     // One bad object (a key a newer module now uses, a failed DDL) must not stop the app.
     try {

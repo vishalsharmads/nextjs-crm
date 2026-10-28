@@ -27,7 +27,7 @@ import type { Knex } from 'knex';
 import type { Db } from '../../db/knex';
 import { can } from '../rbac/access';
 import { scopedQuery } from './service';
-import { recordDefs } from './registry';
+import { findRecordDef } from './registry';
 import type { CoreFieldSpec, ResourceDef } from './types';
 import { moduleTablePrefix } from './paths';
 
@@ -75,6 +75,16 @@ const RELATION_TABLE = {
   deal: { table: 'deals', title: 'title' },
   lead: { table: 'leads', title: 'full_name' },
 } as const;
+
+/**
+ * Table and title column of a relation target: a core entity, or an admin-defined object (whose
+ * table is `m_custom_<key>` and title `name`). Resolved by key so an object can link to an object
+ * that registers later.
+ */
+function relationTarget(key: string): { table: string; title: string } {
+  if (isCoreEntity(key) && key in RELATION_TABLE) return RELATION_TABLE[key as keyof typeof RELATION_TABLE];
+  return { table: `m_custom_${key}`, title: 'name' };
+}
 
 export const snake = (key: string) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 const COLUMN_KEY = /^[a-z][a-zA-Z0-9]{0,40}$/;
@@ -137,7 +147,7 @@ function fieldSpec(table: string, c: RecordColumnSpec): CoreFieldSpec {
   const col = `${table}.${snake(c.key)}`;
   let spec: CoreFieldSpec;
   if (c.kind === 'relation') {
-    const rel = RELATION_TABLE[c.relation!];
+    const rel = relationTarget(c.relation!);
     spec = relationField(table, `${snake(c.key)}_id`, rel.table, rel.title);
   } else if (c.kind === 'number' || c.kind === 'money') spec = numberField(col);
   else if (c.kind === 'date' || c.kind === 'datetime') spec = dateField(col, c.kind);
@@ -153,14 +163,15 @@ async function visibleTargets(
   conn: Db,
   where: (qb: Knex.QueryBuilder, table: string) => void,
 ): Promise<{ id: number; uuid: string; name: string }[]> {
-  const def = recordDefs[relation];
-  if (!can(user, `${def.resource}.view`)) return [];
+  // An archived object, or a disabled module's type, links to nothing.
+  const def = findRecordDef(relation);
+  if (!def || !can(user, `${def.resource}.view`)) return [];
   const { qb } = await scopedQuery(def, user, conn);
   where(qb, def.table);
   return (await qb.select(
     `${def.table}.id`,
     `${def.table}.uuid`,
-    `${def.table}.${RELATION_TABLE[relation].title} as name`,
+    `${def.table}.${relationTarget(relation).title} as name`,
   )) as { id: number; uuid: string; name: string }[];
 }
 

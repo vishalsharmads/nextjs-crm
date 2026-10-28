@@ -138,4 +138,39 @@ describe('custom objects', () => {
     const rec = await admin.post(base, { name: unique('Car '), organizationUuid: org.body.uuid }).expect(201);
     expect(rec.body.organization).toMatchObject({ uuid: org.body.uuid });
   });
+
+  it('links objects to other objects, within scope', async () => {
+    const parentKey = `site_${Date.now().toString(36)}`;
+    const childKey = `bay_${Date.now().toString(36)}`;
+    const parent = await admin
+      .post('/objects', { key: parentKey, singular: 'Site', plural: 'Sites' })
+      .expect(201);
+    await admin
+      .post('/objects', { key: childKey, singular: 'Bay', plural: 'Bays', links: ['nope_x'] })
+      .expect(422);
+    await admin
+      .post('/objects', { key: childKey, singular: 'Bay', plural: 'Bays', links: [parentKey] })
+      .expect(201);
+    const camel = parentKey.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+    const site = await admin.post(`/o/${parentKey.replace(/_/g, '-')}`, { name: 'North' }).expect(201);
+    const bay = await admin
+      .post(`/o/${childKey.replace(/_/g, '-')}`, { name: 'Bay 1', [`${camel}Uuid`]: site.body.uuid })
+      .expect(201);
+    expect(bay.body[camel]).toMatchObject({ uuid: site.body.uuid, name: 'North' });
+
+    // Someone who cannot see the site cannot link to it.
+    const role = await createRole([`custom.${childKey}.*`, `custom.${parentKey}.view`], {
+      [`custom.${parentKey}`]: 'own',
+    });
+    const rep = await loginAs(await createUser({ roleKeys: [role] }));
+    await rep
+      .post(`/o/${childKey.replace(/_/g, '-')}`, { name: 'Bay 2', [`${camel}Uuid`]: site.body.uuid })
+      .expect(422);
+
+    // An archived target links to nothing.
+    await admin.post(`/objects/${parent.body.uuid}/archive`).expect(200);
+    const after = await admin.get(`/o/${childKey.replace(/_/g, '-')}/${bay.body.uuid}`).expect(200);
+    expect(after.body[camel]).toBeNull();
+    await admin.post(`/objects/${parent.body.uuid}/restore`).expect(200);
+  });
 });

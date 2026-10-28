@@ -72,8 +72,8 @@ export interface RecordColumnMeta {
   filterable: boolean;
   /** Select choices. */
   options?: { value: string; label: string }[];
-  /** Core entity a relation column points at. */
-  relation?: 'contact' | 'organization' | 'deal' | 'lead';
+  /** Record type a relation column points at: a core entity, or an admin-defined object. */
+  relation?: string;
   /** ISO currency for money columns. */
   currency?: string;
 }

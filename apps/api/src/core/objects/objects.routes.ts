@@ -30,6 +30,7 @@ import { assertCan } from '../rbac/access';
 import { clearLabelCache } from '../labels/labels.service';
 import {
   ensureObjectTable,
+  linkProblem,
   loadCustomObjects,
   objectKeyProblem,
   toObjectDto,
@@ -71,6 +72,8 @@ export const objectsRoutes = defineRoutes('/objects', ['objects'])
       const key = body.key;
       const problem = await objectKeyProblem(key);
       if (problem) throw conflict('That key is already in use', [{ path: 'key', message: problem }]);
+      const bad = await linkProblem(body.links.filter((l) => l !== key));
+      if (bad) throw new AppError('VALIDATION_FAILED', bad, [{ path: 'links', message: bad }]);
       const { n } = (await db('custom_objects').count({ n: '*' }).first()) as { n: number };
       if (Number(n) >= MAX_CUSTOM_OBJECTS)
         throw new AppError('VALIDATION_FAILED', `You can have at most ${MAX_CUSTOM_OBJECTS} objects`);
@@ -118,6 +121,10 @@ export const objectsRoutes = defineRoutes('/objects', ['objects'])
         throw new AppError('VALIDATION_FAILED', 'Links can be added but not removed', [
           { path: 'links', message: 'Links can be added but not removed' },
         ]);
+      if (body.links) {
+        const bad = await linkProblem(body.links.filter((l) => l !== row.entity));
+        if (bad) throw new AppError('VALIDATION_FAILED', bad, [{ path: 'links', message: bad }]);
+      }
       const patch: Record<string, unknown> = { customized: true, updated_by: user.id };
       for (const k of ['singular', 'plural', 'icon', 'description'] as const)
         if (body[k] !== undefined) patch[k] = body[k] ?? null;

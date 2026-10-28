@@ -16,7 +16,6 @@ import {
   ENTITY_KEY_PATTERN,
   MAX_CUSTOM_OBJECTS,
   OBJECT_ICONS,
-  OBJECT_LINK_TARGETS,
 } from '@app/shared';
 
 const itemKey = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
@@ -125,7 +124,7 @@ export const blueprintObjectSchema = z.object({
   plural: z.string().min(1).max(60),
   icon: z.enum(OBJECT_ICONS).default('box'),
   description: z.string().max(500).optional(),
-  links: z.array(z.enum(OBJECT_LINK_TARGETS)).max(4).default([]),
+  links: z.array(z.string().regex(ENTITY_KEY_PATTERN)).max(6).default([]),
 });
 
 /** Custom fields and groups are keyed by a core entity, an object or a module record type. */

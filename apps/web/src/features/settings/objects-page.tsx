@@ -116,13 +116,26 @@ export function ObjectsPage() {
         <p className="text-sm text-muted">You have reached the limit of {MAX_CUSTOM_OBJECTS} objects.</p>
       ) : null}
       {editing ? (
-        <ObjectDialog object={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />
+        <ObjectDialog
+          object={editing === 'new' ? null : editing}
+          others={(objects.data ?? []).filter((o) => !o.archived).map((o) => o.key)}
+          onClose={() => setEditing(null)}
+        />
       ) : null}
     </SettingsPage>
   );
 }
 
-function ObjectDialog({ object, onClose }: { object: CustomObjectDto | null; onClose: () => void }) {
+function ObjectDialog({
+  object,
+  others,
+  onClose,
+}: {
+  object: CustomObjectDto | null;
+  /** Keys of other live objects, which records can link to as well. */
+  others: string[];
+  onClose: () => void;
+}) {
   const qc = useQueryClient();
   const { labels } = useBoot();
   const [singular, setSingular] = useState(object?.singular ?? '');
@@ -244,7 +257,7 @@ function ObjectDialog({ object, onClose }: { object: CustomObjectDto | null; onC
           </Field>
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-1 text-xs font-medium text-muted">Link each record to</legend>
-            {OBJECT_LINK_TARGETS.map((target) => {
+            {[...OBJECT_LINK_TARGETS, ...others.filter((o) => o !== object?.key)].map((target) => {
               const locked = !!object?.links.includes(target);
               return (
                 <label key={target} className="flex items-center gap-2 text-sm">
