@@ -17,6 +17,7 @@ export const EVENT_TYPES = [
   'lead.updated',
   'lead.deleted',
   'lead.converted',
+  'lead.stage_changed',
   'deal.created',
   'deal.updated',
   'deal.deleted',

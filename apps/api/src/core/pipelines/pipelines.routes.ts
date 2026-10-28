@@ -6,6 +6,7 @@ import { AppError, conflict, notFound } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
 import { audit } from '../audit/audit.service';
 import { listPipelines } from './pipelines.repository';
+import { STAGED, recordStageHistory, type StagedEntity } from './stage-engine';
 
 const uuidParam = z.object({ uuid: z.uuid() });
 const stageBody = z.object({
@@ -244,7 +245,7 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
     permission: 'core.pipelines.manage',
     params: z.object({ uuid: z.uuid(), stageUuid: z.uuid() }),
     query: z.object({ moveTo: z.uuid().optional() }),
-    summary: 'Remove a stage; deals in it move to another stage first',
+    summary: 'Remove a stage; records in it move to another stage first',
     handler: async ({ ctx, user, params, query }) => {
       const p = await db('pipelines').where({ uuid: params.uuid }).first();
       const s = p
@@ -259,19 +260,21 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
         .count({ c: '*' })
         .first();
       if (Number((remaining as { c: number }).c) < 2) throw conflict('A pipeline needs at least two stages');
-      const dealCount = Number(
+      const entity = p.entity as StagedEntity;
+      const { table } = STAGED[entity];
+      const recordCount = Number(
         (
-          (await db('deals').where({ stage_id: s.id }).whereNull('deleted_at').count({ c: '*' }).first()) as {
+          (await db(table).where({ stage_id: s.id }).whereNull('deleted_at').count({ c: '*' }).first()) as {
             c: number;
           }
         ).c,
       );
       let target = null;
-      if (dealCount) {
+      if (recordCount) {
         if (!query.moveTo)
           throw new AppError(
             'VALIDATION_FAILED',
-            `${dealCount} records are in this stage. Choose where to move them.`,
+            `${recordCount} records are in this stage. Choose where to move them.`,
             [{ path: 'moveTo', message: 'Required' }],
           );
         target = await db('pipeline_stages')
@@ -282,23 +285,17 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
       }
       await db.transaction(async (trx) => {
         if (target) {
-          const ids = (await trx('deals').where({ stage_id: s.id }).pluck('id')) as number[];
-          await trx('deals')
+          const ids = (await trx(table).where({ stage_id: s.id }).pluck('id')) as number[];
+          await trx(table)
             .whereIn('id', ids)
             .update({
               stage_id: target.id,
               stage_entered_at: new Date(),
-              status: target.is_won ? 'won' : target.is_lost ? 'lost' : 'open',
+              ...(entity === 'deal'
+                ? { status: target.is_won ? 'won' : target.is_lost ? 'lost' : 'open' }
+                : {}),
             });
-          if (ids.length)
-            await trx('deal_stage_history').insert(
-              ids.map((deal_id) => ({
-                deal_id,
-                from_stage_id: s.id,
-                to_stage_id: target.id,
-                changed_by: user.id,
-              })),
-            );
+          await recordStageHistory(trx, entity, ids, s.id, target.id, user.id);
         }
         // Stages are deactivated, not deleted: history keeps pointing at them.
         await trx('pipeline_stages').where({ id: s.id }).update({ active: false, customized: true });
@@ -307,7 +304,7 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
           entity: 'pipeline',
           entityId: p.id,
           entityUuid: params.uuid,
-          diff: { stage: params.stageUuid, movedTo: query.moveTo ?? null, deals: dealCount },
+          diff: { stage: params.stageUuid, movedTo: query.moveTo ?? null, records: recordCount },
         });
       });
       return getPipeline(params.uuid);

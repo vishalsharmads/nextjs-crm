@@ -246,6 +246,8 @@ export async function updateRecord<Dto>(
     await emitRecordEvent(def, 'updated', dto as Record<string, unknown>, user, changes);
     if (def.entity === 'deal' && changes.stage_id)
       await emitDealStage(dto as Record<string, unknown>, user, changes);
+    if (def.entity === 'lead' && changes.stage_id)
+      await emitLeadStage(dto as Record<string, unknown>, user, changes);
     if (def.entity === 'activity' && changes.completed_at && updated.after.completed_at) {
       await emitRecordEvent(def, 'completed', dto as Record<string, unknown>, user, changes);
     }
@@ -358,4 +360,20 @@ export async function emitDealStage(
       changes,
       actorId: user.id,
     });
+}
+
+/** Lead stage moves (lead pipeline feature). Conversion stays its own `lead.converted` event. */
+export async function emitLeadStage(
+  record: Record<string, unknown>,
+  user: AuthUser,
+  changes: Record<string, { from: unknown; to: unknown }>,
+) {
+  await emit({
+    type: 'lead.stage_changed',
+    entity: 'lead',
+    uuid: record.uuid as string,
+    record,
+    changes,
+    actorId: user.id,
+  });
 }

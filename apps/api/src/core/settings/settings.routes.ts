@@ -8,6 +8,7 @@ import {
   checkPaletteContrast,
   floorViolations,
   type ComplianceSettings,
+  type FeatureSettings,
   type PublicBranding,
   type SecuritySettings,
   type SettingsGroup,
@@ -34,6 +35,7 @@ import {
   isInstalled,
   setRaw,
 } from './settings.service';
+import { enableLeadPipeline } from '../pipelines/lead-pipeline';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
 const assetUpload = multer({
@@ -362,6 +364,12 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
           entity: 'settings',
           diff: { group: params.group, before: current, after: next },
         });
+        if (
+          params.group === 'features' &&
+          (next as FeatureSettings).leadPipeline &&
+          !(current as Partial<FeatureSettings>).leadPipeline
+        )
+          await enableLeadPipeline(trx, ctx);
       });
       return next;
     },

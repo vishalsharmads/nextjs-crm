@@ -104,7 +104,7 @@ export async function runBulk(def: ResourceDef, ctx: RequestContext, user: AuthU
         patch = { ownerUuid: input.ownerUuid ?? null };
         if (def.entity === 'activity') patch = { assigneeUuid: input.ownerUuid ?? null };
       } else if (input.action === 'move_stage') {
-        if (def.entity !== 'deal' || !input.stageUuid)
+        if ((def.entity !== 'deal' && def.entity !== 'lead') || !input.stageUuid)
           throw new AppError('VALIDATION_FAILED', 'Choose a stage');
         patch = { stageUuid: input.stageUuid };
       } else {
