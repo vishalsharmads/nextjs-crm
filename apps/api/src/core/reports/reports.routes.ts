@@ -11,7 +11,7 @@ import {
 import { defineRoutes } from '../../http/routes';
 import type { AuthUser } from '../../http/context';
 import { db } from '../../db/knex';
-import { AppError, notFound } from '../../lib/errors';
+import { notFound } from '../../lib/errors';
 import { audit } from '../audit/audit.service';
 import { assertCan, teamUserIds } from '../rbac/access';
 import { scopedQuery } from '../records/service';
@@ -286,15 +286,18 @@ export const reportsRoutes = defineRoutes('/reports', ['reports'])
     permission: 'core.quotas.manage',
     body: quotaInputSchema,
     handler: async ({ ctx, user, body }) => {
-      const target = await db('users').where({ uuid: body.userUuid }).whereNull('deleted_at').first('id');
-      if (!target)
-        throw new AppError('VALIDATION_FAILED', 'Unknown user', [{ path: 'userUuid', message: 'Not found' }]);
+      assertCan(user, 'core.reports.view');
+      // Only for people whose numbers the manager can see (their own, their team's, or everyone's).
+      const target = (await visibleUsers(user)).find((p) => p.uuid === body.userUuid);
+      if (!target) throw notFound('Person');
       // Quotas are in the workspace currency, so attainment compares like with like.
       const { currency } = await getGroup('general');
       await db.transaction(async (trx) => {
-        if (body.amount === null)
-          await trx('sales_quotas').where({ user_id: target.id, period: body.period }).delete();
-        else
+        const before = await trx('sales_quotas').where({ user_id: target.id, period: body.period }).first();
+        if (body.amount === null) {
+          if (!before) return;
+          await trx('sales_quotas').where({ id: before.id }).delete();
+        } else
           await trx('sales_quotas')
             .insert({
               user_id: target.id,
@@ -306,9 +309,14 @@ export const reportsRoutes = defineRoutes('/reports', ['reports'])
             .onConflict(['user_id', 'period'])
             .merge({ amount: body.amount, currency, updated_by: user.id, updated_at: new Date() });
         await audit(trx, ctx, {
-          action: 'quota.set',
+          action: body.amount === null ? 'quota.deleted' : 'quota.set',
           entity: 'sales_quota',
-          diff: { user: body.userUuid, period: body.period, amount: body.amount, currency },
+          entityUuid: target.uuid,
+          diff: {
+            period: body.period,
+            from: before ? { amount: money(before.amount), currency: before.currency } : null,
+            to: body.amount === null ? null : { amount: body.amount, currency },
+          },
         });
       });
     },

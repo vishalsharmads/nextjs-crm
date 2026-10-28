@@ -68,7 +68,16 @@ describe('sales reports', () => {
 
     const all = await admin.get(`/reports/quotas?period=${period}`).expect(200);
     expect(all.body.data.length).toBeGreaterThan(1);
-    expect(await db('audit_logs').where({ action: 'quota.set' }).first()).toBeTruthy();
+    expect(
+      await db('audit_logs').where({ action: 'quota.set', entity_uuid: repUser.uuid }).first(),
+    ).toBeTruthy();
+
+    // A manager with own deal scope cannot set a quota for someone they cannot see.
+    const mgrRole = await createRole(['core.deals.view', 'core.reports.view', 'core.quotas.manage'], {
+      'core.deals': 'own',
+    });
+    const mgr = await loginAs(await createUser({ roleKeys: [mgrRole] }));
+    await mgr.put('/reports/quotas', { userUuid: repUser.uuid, period, amount: 5 }).expect(404);
   });
 
   it('never counts deals outside the viewer’s scope', async () => {
