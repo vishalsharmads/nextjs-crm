@@ -95,6 +95,21 @@ export async function enableModule(key: string, conn: Db = db): Promise<{ migrat
   return { migrations };
 }
 
+/**
+ * Run new migrations of modules that are already enabled (a module release can add tables).
+ * Called by `db:migrate` and at startup; enabling a module runs them too. Idempotent.
+ */
+export async function migrateEnabledModules(conn: Db = db): Promise<string[]> {
+  await refreshModuleStates(conn);
+  const applied: string[] = [];
+  for (const m of loadModules()) {
+    if (!enabled.has(m.manifest.key) || !m.api?.migrations) continue;
+    for (const name of await migrateModule(db, m.manifest.key, m.api.migrations))
+      applied.push(`${m.manifest.key}:${name}`);
+  }
+  return applied;
+}
+
 export async function disableModule(key: string, conn: Db = db) {
   await refreshModuleStates(conn);
   const dependents = loadModules().filter(
@@ -128,6 +143,14 @@ export function moduleMenu(): ModuleMenuItem[] {
   return loadModules()
     .filter((m) => enabled.has(m.manifest.key))
     .flatMap((m) => m.manifest.menu_items.map((i) => ({ ...i, moduleKey: m.manifest.key })))
+    .sort((a, b) => a.order - b.order);
+}
+
+/** Record-page tabs of enabled modules, with the permission each needs. */
+export function modulePanels() {
+  return loadModules()
+    .filter((m) => enabled.has(m.manifest.key))
+    .flatMap((m) => m.manifest.record_panels.map((p) => ({ ...p, moduleKey: m.manifest.key })))
     .sort((a, b) => a.order - b.order);
 }
 

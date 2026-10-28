@@ -163,3 +163,33 @@ export function ObjectOutlet() {
     );
   return routes;
 }
+
+/** A record-page tab a module provides; its web entry loads on first use. */
+export function ModulePanel({
+  moduleKey,
+  panelKey,
+  entity,
+  uuid,
+}: {
+  moduleKey: string;
+  panelKey: string;
+  entity: string;
+  uuid: string;
+}) {
+  const [mod, setMod] = useState<Mod | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    loadModule(moduleKey).then(
+      (m) => live && setMod(m),
+      () => live && setFailed(true),
+    );
+    return () => {
+      live = false;
+    };
+  }, [moduleKey]);
+  const Render = mod?.panels?.[panelKey];
+  if (failed || (mod && !Render)) return <p className="text-sm text-muted">This panel is not available.</p>;
+  if (!Render) return <Spinner />;
+  return Render({ entity, uuid });
+}

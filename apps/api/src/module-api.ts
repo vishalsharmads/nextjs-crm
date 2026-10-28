@@ -47,7 +47,7 @@ export { getBranding } from './core/settings/settings.service';
 export { randomToken, sha256 } from './lib/crypto';
 export { rateLimiter, appUrl, cookieOptions, uploadSingle, sanitizeDocumentHtml } from './modules/helpers';
 export { storeFile } from './core/files/files.service';
-export { getRow } from './core/records/service';
+export { getRow, updateRecord } from './core/records/service';
 export { recordDefs } from './core/records/registry';
 export { defineRecordType, type RecordColumnSpec, type RecordTypeSpec } from './core/records/record-type';
 export type { ResourceDef } from './core/records/types';

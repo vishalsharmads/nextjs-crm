@@ -15,7 +15,13 @@ import { remindDueRequests } from './core/privacy/requests.service';
 import { runRetention } from './core/privacy/retention.service';
 import { startAutomationScheduler } from './core/automations/automations';
 import { loadCustomObjects } from './core/objects/objects';
-import { installModuleGate, loadModules, moduleRouteGroups, refreshModuleStates } from './modules/registry';
+import {
+  installModuleGate,
+  loadModules,
+  migrateEnabledModules,
+  moduleRouteGroups,
+  refreshModuleStates,
+} from './modules/registry';
 
 export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promise<void> }> {
   loadModules();
@@ -23,6 +29,8 @@ export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promi
   if (await isInstalled()) {
     await syncPermissions();
     await refreshModuleStates();
+    // A release may add migrations to modules that are already on.
+    await migrateEnabledModules();
     await loadCustomObjects();
   } else {
     logger.warn('This instance is not installed yet. Run: npm run install:instance -- --blueprint=<key>');

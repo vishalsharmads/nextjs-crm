@@ -3,9 +3,18 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Package, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import type { WebModule } from '@app/module-sdk';
-import { ApiError, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { ApiError, apiGet, apiPatch, apiPost, apiPut } from '@/lib/api';
+import {
+  LineItemsEditor,
+  TotalsSummary,
+  toEditable,
+  toInput,
+  type EditableLine,
+  type LineDto,
+} from '@/components/commerce/line-items';
+import { Checkbox } from '@/components/ui/checkbox';
 import { formatMoney } from '@/lib/format';
-import { useCan } from '@/app/session';
+import { useBoot, useCan } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
@@ -301,9 +310,75 @@ function ProductsPage() {
   );
 }
 
+interface DealLines {
+  lines: LineDto[];
+  totals: { total: number };
+  currency: string;
+  dealValue: number;
+}
+
+/** Line items tab on the deal page. */
+function DealLinesPanel({ uuid }: { uuid: string }) {
+  const can = useCan();
+  const boot = useBoot();
+  const qc = useQueryClient();
+  const key = ['m', 'products', 'deal-lines', uuid];
+  const q = useQuery({ queryKey: key, queryFn: () => apiGet<DealLines>(`/m/products/deals/${uuid}/lines`) });
+  const [draft, setDraft] = useState<EditableLine[] | null>(null);
+  const [apply, setApply] = useState(true);
+  const save = useMutation({
+    mutationFn: () =>
+      apiPut<DealLines>(`/m/products/deals/${uuid}/lines`, {
+        lines: toInput(draft ?? []),
+        applyToValue: apply,
+      }),
+    onSuccess: (r) => {
+      qc.setQueryData(key, r);
+      setDraft(null);
+      toast.success('Saved');
+      // The deal's value may have changed.
+      void qc.invalidateQueries({ queryKey: ['records'] });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Could not save the line items'),
+  });
+  if (q.isPending) return <Skeleton className="h-32" />;
+  if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
+  const editable = can('core.deals.update');
+  const lines = draft ?? toEditable(q.data.lines);
+  if (!lines.length && !editable)
+    return <EmptyState title="No line items" description="Nothing has been added yet." />;
+  return (
+    <div className="flex flex-col gap-3">
+      {editable ? (
+        <LineItemsEditor
+          lines={lines}
+          onChange={setDraft}
+          currency={q.data.currency}
+          canUseProducts
+          defaultTaxRate={boot.settings.commerce.defaultTaxRate}
+        />
+      ) : null}
+      <TotalsSummary lines={lines} currency={q.data.currency} />
+      {editable && draft ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={apply} onCheckedChange={setApply} /> Use the total as the value
+          </label>
+          <Button variant="primary" onClick={() => save.mutate()} loading={save.isPending}>
+            Save line items
+          </Button>
+          <Button onClick={() => setDraft(null)}>Cancel</Button>
+        </div>
+      ) : null}
+      <p className="text-xs text-muted">Current value: {formatMoney(q.data.dealValue, q.data.currency)}</p>
+    </div>
+  );
+}
+
 const productsModule: WebModule = {
   key: 'products',
   routes: [{ path: '', element: <ProductsPage /> }],
+  panels: { 'deal-lines': ({ uuid }) => <DealLinesPanel uuid={uuid} /> },
 };
 
 export default productsModule;

@@ -52,6 +52,9 @@ const commands: Record<string, Command> = {
   async 'db:migrate'() {
     await ensureDatabase(env.DATABASE_URL);
     const applied = await migrateCore(db);
+    const { loadModules, migrateEnabledModules } = await import('../modules/registry');
+    loadModules();
+    applied.push(...(await migrateEnabledModules()));
     out(applied.length ? `Applied: ${applied.join(', ')}` : 'Already up to date');
   },
 
