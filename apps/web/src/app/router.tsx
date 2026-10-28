@@ -34,6 +34,10 @@ const FieldsPage = lazyPage(() => import('@/features/settings/fields-page'), 'Fi
 const AiClientsPage = lazyPage(() => import('@/features/settings/ai-clients'), 'AiClientsPage');
 const ReportsPage = lazyPage(() => import('@/features/reports/reports-page'), 'ReportsPage');
 const CurrenciesPage = lazyPage(() => import('@/features/settings/currencies-page'), 'CurrenciesPage');
+const OAuthAuthorizePage = lazyPage(
+  () => import('@/features/settings/oauth-authorize-page'),
+  'OAuthAuthorizePage',
+);
 const ObjectsPage = lazyPage(() => import('@/features/settings/objects-page'), 'ObjectsPage');
 const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'), 'PipelinesPage');
 const DealsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'DealsPage');
@@ -145,6 +149,8 @@ export const router = createBrowserRouter(
       element: <RequireAuth />,
       errorElement: <RouteError />,
       children: [
+        // The OAuth approval page: signed in, but outside the shell (it is a decision, not a workspace page).
+        { path: 'oauth/authorize', element: page(<OAuthAuthorizePage />) },
         {
           element: <AppShell />,
           children: [

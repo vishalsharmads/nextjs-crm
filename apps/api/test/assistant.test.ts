@@ -72,6 +72,7 @@ function streamEvents(reply: Record<string, unknown>, url: string): object[] {
     },
   );
   out.push({ type: 'message_delta', usage: { output_tokens: 5 } });
+  out.push({ type: 'message_stop' });
   return out;
 }
 

@@ -9,6 +9,7 @@ import { isTest } from '../../config/env';
 import { getBranding, getGroup } from '../settings/settings.service';
 import { availableTools, callTool, inputJsonSchema, type ToolContext } from '../tools/registry';
 import '../tools/core-tools';
+import { wwwAuthenticate } from '../oauth/oauth';
 
 /** MCP protocol versions this server speaks, newest first. */
 const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
@@ -171,11 +172,19 @@ export const mcpRoutes = defineRoutes('/mcp', ['mcp'])
   .add({
     method: 'post',
     path: '/',
-    permission: 'authenticated',
+    // Checked below, so an unauthenticated client learns where to sign in (WWW-Authenticate).
+    permission: 'public',
     before: [requireEnabled, limiter],
     summary: 'MCP endpoint for AI clients (JSON-RPC 2.0)',
     body: z.unknown(),
     handler: async ({ req, res, ctx, user, body }) => {
+      if (!user) {
+        res
+          .status(401)
+          .set('WWW-Authenticate', wwwAuthenticate())
+          .json({ error: { code: 'UNAUTHENTICATED', message: 'Sign in to continue' } });
+        return;
+      }
       const parsed = rpcSchema.safeParse(body);
       if (!parsed.success) {
         res

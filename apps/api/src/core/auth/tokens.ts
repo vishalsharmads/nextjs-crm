@@ -160,4 +160,8 @@ export async function burnUserTokens(conn: Db, userId: number) {
     .where({ user_id: userId })
     .whereNull('revoked_at')
     .update({ revoked_at: new Date() });
+  await conn('oauth_tokens')
+    .where({ user_id: userId })
+    .whereNull('revoked_at')
+    .update({ revoked_at: new Date() });
 }

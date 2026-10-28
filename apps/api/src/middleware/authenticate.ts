@@ -7,6 +7,7 @@ import { loadAccess } from '../core/rbac/access';
 import { db } from '../db/knex';
 import { authenticateApiKey } from '../core/api-keys/api-keys';
 import { authenticatePersonalToken, TOKEN_PATHS } from '../core/tokens/tokens';
+import { authenticateOAuthToken } from '../core/oauth/oauth';
 import { effectiveCompliance, effectiveSecurity } from '../core/settings/settings.service';
 
 /** Attach request context. Never rejects; route permission checks decide what is allowed. */
@@ -29,6 +30,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       // Personal access tokens reach only the MCP endpoint; anywhere else they authenticate nobody.
       req.ctx.user = TOKEN_PATHS.includes(path)
         ? ((await authenticatePersonalToken(token, await effectiveCompliance())) ??
+          (await authenticateOAuthToken(token)) ??
           (await authenticateApiKey(token, await effectiveCompliance())))
         : await authenticateApiKey(token, await effectiveCompliance());
       return next();
