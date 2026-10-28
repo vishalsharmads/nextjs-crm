@@ -26,6 +26,9 @@ import { formsRoutes, publicFormsRoutes } from './forms/forms';
 import { templatesRoutes } from './templates/templates';
 import { emailRoutes } from './email/email';
 import { objectRecordRoutes, objectsRoutes } from './objects/objects.routes';
+import { tokensRoutes } from './tokens/tokens';
+import { mcpRoutes } from './mcp/mcp.routes';
+import { toolsRoutes } from './tools/tools.routes';
 
 /** All core route groups. Specific paths (e.g. /deals/board) are registered before /:uuid. */
 export function coreRouteGroups(): RouteGroup[] {
@@ -33,6 +36,7 @@ export function coreRouteGroups(): RouteGroup[] {
     publicRoutes,
     publicFormsRoutes,
     authRoutes,
+    tokensRoutes,
     meRoutes,
     usersRoutes,
     rolesRoutes,
@@ -66,6 +70,8 @@ export function coreRouteGroups(): RouteGroup[] {
     templatesRoutes,
     emailRoutes,
     objectsRoutes,
+    mcpRoutes,
+    toolsRoutes,
     objectRecordRoutes,
     ...entityCollectionRoutes(),
     ...contactsRoutes,
