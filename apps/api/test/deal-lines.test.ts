@@ -44,6 +44,12 @@ describe('deal line items and record panels', () => {
       }),
     );
     await viewer.get(`/m/products/deals/${deal.body.uuid}/lines`).expect(404);
+    const editor = await loginAs(
+      await createUser({
+        roleKeys: [await createRole(['core.deals.*', 'products.products.view'], { 'core.deals': 'own' })],
+      }),
+    );
+    await editor.put(`/m/products/deals/${deal.body.uuid}/lines`, { lines: [] }).expect(404);
     const reader = await loginAs(
       await createUser({
         roleKeys: [await createRole(['core.deals.view', 'products.products.view'], { 'core.deals': 'all' })],

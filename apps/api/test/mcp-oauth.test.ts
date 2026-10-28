@@ -140,18 +140,20 @@ describe('OAuth for MCP clients', () => {
 
   it('rotates refresh tokens and honours read-only consent', async () => {
     await enable();
-    const { app, token } = await connect(admin, 'read');
+    const { app, token, clientId } = await connect(admin, 'read');
     const tools = (await rpc(app, token.access_token, 'tools/list')).body.result.tools as { name: string }[];
     expect(tools.map((t) => t.name)).not.toContain('create_record');
     const next = await request(app)
       .post('/api/v1/oauth/token')
-      .send({ grant_type: 'refresh_token', refresh_token: token.refresh_token })
+      .send({ grant_type: 'refresh_token', refresh_token: token.refresh_token, client_id: clientId })
       .expect(200);
     expect(next.body.access_token).not.toBe(token.access_token);
     const reuse = await request(app)
       .post('/api/v1/oauth/token')
-      .send({ grant_type: 'refresh_token', refresh_token: token.refresh_token });
+      .send({ grant_type: 'refresh_token', refresh_token: token.refresh_token, client_id: clientId });
     expect(reuse.body.error).toBe('invalid_grant');
+    // Reusing a spent refresh token ends the whole grant, including the newer tokens.
+    expect((await rpc(app, next.body.access_token, 'ping')).status).toBe(401);
     expect((await rpc(app, token.access_token, 'ping')).status).toBe(401);
   });
 

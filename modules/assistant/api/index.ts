@@ -313,6 +313,8 @@ async function systemPrompt(cfg: ConfigRow, user: AuthUser) {
 interface Sink {
   text(delta: string): void;
   tool(title: string): void;
+  /** The browser went away: stop before the next model call. */
+  closed(): boolean;
 }
 const streamSink = new AsyncLocalStorage<Sink>();
 
@@ -326,11 +328,17 @@ async function respond<T>(req: Request, res: Response, status: number, run: () =
   res.status(status);
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
   res.flushHeaders();
+  let closed = false;
+  res.on('close', () => (closed = true));
   const send = (event: string, data: unknown) =>
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   try {
     const result = await streamSink.run(
-      { text: (delta) => send('text', { delta }), tool: (title) => send('tool', { title }) },
+      {
+        text: (delta) => !closed && send('text', { delta }),
+        tool: (title) => !closed && send('tool', { title }),
+        closed: () => closed,
+      },
       run,
     );
     send('done', result);
@@ -378,6 +386,7 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
     await assertWithinCaps(cfg, user.id);
     const messages = await history(conv.id);
     const sink = streamSink.getStore();
+    if (sink?.closed()) return;
     const reply = sink
       ? await chatStream(provider, { system, messages, tools }, { text: sink.text })
       : await chat(provider, { system, messages, tools });

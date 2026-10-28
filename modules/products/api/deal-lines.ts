@@ -63,14 +63,15 @@ export const dealLinesRoutes = defineRoutes('/m/products/deals', ['products'], '
     handler: async ({ ctx, user, params, body }) => {
       assertCan(user, `${recordDefs.deal.resource}.update`);
       const deal = await getRow(recordDefs.deal, user, params.uuid);
+      const resolved = await resolveProducts(body.lines, db);
+      // Set the value first, through the deal service (validated, audited, emitted): if it is
+      // refused, nothing has changed yet.
+      if (body.applyToValue)
+        await updateRecord(recordDefs.deal, ctx, user, deal.uuid, { value: documentTotals(resolved).total });
       const totals = await db.transaction(async (trx) => {
-        const t = await saveLines(
-          trx,
-          DEAL_LINES,
-          'deal_id',
-          deal.id,
-          await resolveProducts(body.lines, trx),
-        );
+        // Lock the deal so two saves cannot interleave their delete and insert.
+        await getRow(recordDefs.deal, user, params.uuid, trx, { forUpdate: true });
+        const t = await saveLines(trx, DEAL_LINES, 'deal_id', deal.id, resolved);
         await audit(trx, ctx, {
           action: 'products.deal_lines.updated',
           entity: 'deal',
@@ -80,9 +81,6 @@ export const dealLinesRoutes = defineRoutes('/m/products/deals', ['products'], '
         });
         return t;
       });
-      // Through the deal service, so the change is audited, scoped and emitted like any edit.
-      if (body.applyToValue)
-        await updateRecord(recordDefs.deal, ctx, user, deal.uuid, { value: totals.total });
       const lines = (await loadLines(DEAL_LINES, 'deal_id', [deal.id], PRODUCTS)).get(deal.id) ?? [];
       const fresh = await db('deals').where({ id: deal.id }).first('value');
       return { lines, totals, currency: deal.currency, dealValue: Number(fresh.value) };

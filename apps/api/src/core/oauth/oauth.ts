@@ -8,16 +8,34 @@ import { env } from '../../config/env';
 import { AppError, notFound } from '../../lib/errors';
 import { randomToken, sha256 } from '../../lib/crypto';
 import { newUuid } from '../../lib/ids';
-import { authLimiter } from '../../middleware/rate-limit';
+import { rateLimiter } from '../../modules/helpers';
+import type { Db } from '../../db/knex';
+import { mfaRequiredFor } from '@app/shared';
 import { audit } from '../audit/audit.service';
 import { loadAccess } from '../rbac/access';
-import { getBranding, getGroup } from '../settings/settings.service';
+import { effectiveCompliance, effectiveSecurity, getBranding, getGroup } from '../settings/settings.service';
 import { iso } from '../records/hydrate';
 
 /** Access tokens are short-lived; refresh tokens rotate on every use. */
 const ACCESS_TTL_S = 3600;
 const REFRESH_TTL_MS = 30 * 86_400_000;
 const CODE_TTL_MS = 5 * 60_000;
+/** An approval lasts at most this long without the person approving again (or the compliance limit). */
+const MAX_GRANT_DAYS = 365;
+
+const tokenBody = z.object({
+  grant_type: z.string().max(40),
+  code: z.string().max(200).optional(),
+  code_verifier: z.string().min(43).max(128).optional(),
+  client_id: z.string().max(64).optional(),
+  redirect_uri: z.string().max(2000).optional(),
+  refresh_token: z.string().max(200).optional(),
+});
+
+/** Registration is public: its own tight per-address limit, separate from sign-in. */
+const registerLimiter = rateLimiter(10);
+/** Token and revocation calls, per address, apart from the sign-in limiter. */
+const clientLimiter = rateLimiter(60);
 export const OAUTH_TOKEN_PREFIX = 'mat_';
 const SCOPES = { read: 'mcp:read', full: 'mcp:full' } as const;
 
@@ -92,27 +110,81 @@ async function clientFor(clientId: string, uri: string) {
 
 const s256 = (verifier: string) => createHash('sha256').update(verifier).digest('base64url');
 
-async function issueTokens(clientId: number, userId: number, readOnly: boolean) {
+interface Grant {
+  clientId: number;
+  userId: number;
+  readOnly: boolean;
+  /** Shared by every token of one approval; reuse of a spent refresh token revokes them all. */
+  familyId: string;
+  /** When the person approved the client; refreshes never extend past the credential age limit. */
+  grantedAt: Date;
+  codeId?: number | null;
+}
+
+async function issueTokens(conn: Db, g: Grant) {
   const access = `${OAUTH_TOKEN_PREFIX}${randomToken(32)}`;
   const refresh = `mrt_${randomToken(32)}`;
-  const uuid = newUuid();
-  await db('oauth_tokens').insert({
-    uuid,
-    client_id: clientId,
-    user_id: userId,
+  const { apiKeyMaxDays } = await effectiveCompliance();
+  const limit = g.grantedAt.getTime() + (apiKeyMaxDays > 0 ? apiKeyMaxDays : MAX_GRANT_DAYS) * 86_400_000;
+  const refreshUntil = new Date(Math.min(Date.now() + REFRESH_TTL_MS, limit));
+  const [id] = await conn('oauth_tokens').insert({
+    uuid: newUuid(),
+    client_id: g.clientId,
+    user_id: g.userId,
     access_hash: sha256(access),
     refresh_hash: sha256(refresh),
-    read_only: readOnly,
-    access_expires_at: new Date(Date.now() + ACCESS_TTL_S * 1000),
-    refresh_expires_at: new Date(Date.now() + REFRESH_TTL_MS),
+    read_only: g.readOnly,
+    access_expires_at: new Date(Math.min(Date.now() + ACCESS_TTL_S * 1000, refreshUntil.getTime())),
+    refresh_expires_at: refreshUntil,
+    family_id: g.familyId,
+    granted_at: g.grantedAt,
+    code_id: g.codeId ?? null,
   });
   return {
-    access_token: access,
-    token_type: 'Bearer',
-    expires_in: ACCESS_TTL_S,
-    refresh_token: refresh,
-    scope: readOnly ? SCOPES.read : `${SCOPES.read} ${SCOPES.full}`,
+    id: id!,
+    body: {
+      access_token: access,
+      token_type: 'Bearer',
+      expires_in: ACCESS_TTL_S,
+      refresh_token: refresh,
+      scope: g.readOnly ? SCOPES.read : `${SCOPES.read} ${SCOPES.full}`,
+    },
   };
+}
+
+/** Token lifecycle in the audit log, attributed to the person the token acts for. */
+async function auditToken(
+  conn: Db,
+  req: Request,
+  userId: number,
+  action: string,
+  tokenId: number,
+  diff?: unknown,
+) {
+  const user = await conn('users')
+    .where({ id: userId })
+    .first('id', 'uuid', 'email', 'first_name', 'last_name');
+  await audit(
+    conn,
+    { ...req.ctx, user: user ? ({ id: user.id, via: 'mcp' } as AuthUser) : null },
+    {
+      action,
+      entity: 'oauth_token',
+      entityId: tokenId,
+      diff,
+    },
+  );
+}
+
+/** Whether a person may hold AI-client tokens now (two-factor enrolment when the workspace requires it). */
+async function mayHoldTokens(userId: number, conn: Db = db) {
+  const u = await conn('users')
+    .where({ id: userId, status: 'active' })
+    .whereNull('deleted_at')
+    .first('totp_enabled');
+  if (!u) return false;
+  if (u.totp_enabled) return true;
+  return !mfaRequiredFor(await loadAccess(userId), await effectiveSecurity(), await effectiveCompliance());
 }
 
 /** OAuth errors use the RFC 6749 shape, which clients expect, not the app's error shape. */
@@ -144,10 +216,10 @@ export const oauthRoutes = defineRoutes('/oauth', ['mcp'])
     method: 'post',
     path: '/register',
     permission: 'public',
-    before: [requireMcp, authLimiter],
+    before: [requireMcp, registerLimiter],
     summary: 'Dynamic client registration (RFC 7591) for MCP clients',
     body: z.unknown(),
-    handler: async ({ res, body }) => {
+    handler: async ({ req, res, body }) => {
       const parsed = z
         .object({
           client_name: z.string().trim().min(1).max(200).optional(),
@@ -157,10 +229,19 @@ export const oauthRoutes = defineRoutes('/oauth', ['mcp'])
       if (!parsed.success)
         return oauthError(res, 'invalid_redirect_uri', parsed.error.issues[0]?.message ?? 'Invalid');
       const clientId = newUuid();
-      await db('oauth_clients').insert({
-        client_id: clientId,
-        name: parsed.data.client_name ?? 'AI client',
-        redirect_uris: JSON.stringify(parsed.data.redirect_uris),
+      await db.transaction(async (trx) => {
+        const [id] = await trx('oauth_clients').insert({
+          client_id: clientId,
+          name: parsed.data.client_name ?? 'AI client',
+          redirect_uris: JSON.stringify(parsed.data.redirect_uris),
+        });
+        await audit(trx, req.ctx, {
+          action: 'oauth.client_registered',
+          entity: 'oauth_client',
+          entityId: id,
+          entityUuid: clientId,
+          diff: { name: parsed.data.client_name ?? null, redirectUris: parsed.data.redirect_uris },
+        });
       });
       res.status(201).json({
         client_id: clientId,
@@ -184,7 +265,14 @@ export const oauthRoutes = defineRoutes('/oauth', ['mcp'])
       const { appName } = await getBranding();
       return {
         appName,
-        client: { name: client.name, redirectHost: new URL(query.redirect_uri).host },
+        // Names are chosen by whoever registered the client: show where codes go and when it appeared.
+        client: {
+          name: client.name,
+          redirectUri: query.redirect_uri,
+          registeredAt: iso(
+            (await db('oauth_clients').where({ id: client.id }).first('created_at'))?.created_at,
+          ),
+        },
         wantsFull: (query.scope ?? '').split(' ').includes(SCOPES.full),
       };
     },
@@ -233,12 +321,14 @@ export const oauthRoutes = defineRoutes('/oauth', ['mcp'])
     method: 'post',
     path: '/token',
     permission: 'public',
-    before: [requireMcp, authLimiter],
+    before: [requireMcp, clientLimiter],
     summary: 'Exchange a code (with its PKCE verifier) or a refresh token for tokens',
     body: z.unknown(),
-    handler: async ({ res, body }) => {
+    handler: async ({ req, res, body }) => {
       res.set('Cache-Control', 'no-store');
-      const b = (body ?? {}) as Record<string, string | undefined>;
+      const parsed = tokenBody.safeParse(body ?? {});
+      if (!parsed.success) return oauthError(res, 'invalid_request', 'Malformed token request');
+      const b = parsed.data;
       if (b.grant_type === 'authorization_code') {
         if (!b.code || !b.code_verifier || !b.client_id || !b.redirect_uri)
           return oauthError(
@@ -246,42 +336,80 @@ export const oauthRoutes = defineRoutes('/oauth', ['mcp'])
             'invalid_request',
             'code, code_verifier, client_id and redirect_uri are required',
           );
-        const row = await db('oauth_codes as c')
-          .join('oauth_clients as k', 'k.id', 'c.client_id')
-          .where('c.code_hash', sha256(b.code))
-          .first('c.*', 'k.client_id as public_id');
-        // A code works once, briefly, for the client and address it was issued to, with its verifier.
-        const valid =
-          row &&
-          !row.used_at &&
-          new Date(row.expires_at) > new Date() &&
-          row.public_id === b.client_id &&
-          row.redirect_uri === b.redirect_uri &&
-          s256(b.code_verifier) === row.code_challenge;
-        if (row) await db('oauth_codes').where({ id: row.id }).update({ used_at: new Date() });
-        if (!valid) return oauthError(res, 'invalid_grant', 'The code is invalid, expired or already used');
-        const user = await db('users')
-          .where({ id: row.user_id, status: 'active' })
-          .whereNull('deleted_at')
-          .first('id');
-        if (!user) return oauthError(res, 'invalid_grant', 'The account is not active');
-        res.json(await issueTokens(row.client_id, row.user_id, !!row.read_only));
+        const result = await db.transaction(async (trx) => {
+          const row = await trx('oauth_codes as c')
+            .join('oauth_clients as k', 'k.id', 'c.client_id')
+            .where('c.code_hash', sha256(b.code!))
+            .forUpdate()
+            .first('c.*', 'k.client_id as public_id');
+          if (!row) return null;
+          if (row.used_at) {
+            // A replayed code: revoke whatever it already produced (RFC 6749 §4.1.2).
+            await trx('oauth_tokens')
+              .where({ code_id: row.id })
+              .whereNull('revoked_at')
+              .update({ revoked_at: new Date() });
+            return null;
+          }
+          await trx('oauth_codes').where({ id: row.id }).update({ used_at: new Date() });
+          // A code works once, briefly, for the client and address it was issued to, with its verifier.
+          const valid =
+            new Date(row.expires_at) > new Date() &&
+            row.public_id === b.client_id &&
+            row.redirect_uri === b.redirect_uri &&
+            s256(b.code_verifier!) === row.code_challenge;
+          if (!valid || !(await mayHoldTokens(row.user_id, trx))) return null;
+          const issued = await issueTokens(trx, {
+            clientId: row.client_id,
+            userId: row.user_id,
+            readOnly: !!row.read_only,
+            familyId: newUuid(),
+            grantedAt: new Date(),
+            codeId: row.id,
+          });
+          await auditToken(trx, req, row.user_id, 'oauth.token_issued', issued.id, { client: b.client_id });
+          return issued.body;
+        });
+        if (!result) return oauthError(res, 'invalid_grant', 'The code is invalid, expired or already used');
+        res.json(result);
         return;
       }
       if (b.grant_type === 'refresh_token') {
-        if (!b.refresh_token) return oauthError(res, 'invalid_request', 'refresh_token is required');
-        const row = await db('oauth_tokens')
-          .where({ refresh_hash: sha256(b.refresh_token) })
-          .first();
-        if (!row || row.revoked_at || new Date(row.refresh_expires_at) <= new Date())
-          return oauthError(res, 'invalid_grant', 'The refresh token is invalid or expired');
-        // Rotation: the old pair stops working the moment a new one is issued.
-        const n = await db('oauth_tokens')
-          .where({ id: row.id })
-          .whereNull('revoked_at')
-          .update({ revoked_at: new Date() });
-        if (!n) return oauthError(res, 'invalid_grant', 'The refresh token was already used');
-        res.json(await issueTokens(row.client_id, row.user_id, !!row.read_only));
+        if (!b.refresh_token || !b.client_id)
+          return oauthError(res, 'invalid_request', 'refresh_token and client_id are required');
+        const result = await db.transaction(async (trx) => {
+          const row = await trx('oauth_tokens as t')
+            .join('oauth_clients as k', 'k.id', 't.client_id')
+            .where('t.refresh_hash', sha256(b.refresh_token!))
+            .forUpdate()
+            .first('t.*', 'k.client_id as public_id');
+          if (!row || row.public_id !== b.client_id) return null;
+          if (row.revoked_at) {
+            // A spent refresh token used again: someone has a copy. End the whole grant (OAuth 2.1 §4.3.1).
+            await trx('oauth_tokens')
+              .where({ family_id: row.family_id })
+              .whereNull('revoked_at')
+              .update({ revoked_at: new Date() });
+            await auditToken(trx, req, row.user_id, 'oauth.token_reuse_detected', row.id);
+            return null;
+          }
+          if (new Date(row.refresh_expires_at) <= new Date() || !(await mayHoldTokens(row.user_id, trx)))
+            return null;
+          // Rotation: the old pair stops working the moment a new one is issued.
+          await trx('oauth_tokens').where({ id: row.id }).update({ revoked_at: new Date() });
+          const issued = await issueTokens(trx, {
+            clientId: row.client_id,
+            userId: row.user_id,
+            readOnly: !!row.read_only,
+            familyId: row.family_id,
+            grantedAt: new Date(row.granted_at),
+          });
+          await auditToken(trx, req, row.user_id, 'oauth.token_refreshed', issued.id);
+          return issued.body;
+        });
+        if (!result)
+          return oauthError(res, 'invalid_grant', 'The refresh token is invalid, expired or already used');
+        res.json(result);
         return;
       }
       oauthError(res, 'unsupported_grant_type', 'Use authorization_code or refresh_token');
@@ -291,16 +419,26 @@ export const oauthRoutes = defineRoutes('/oauth', ['mcp'])
     method: 'post',
     path: '/revoke',
     permission: 'public',
-    before: [authLimiter],
+    before: [clientLimiter],
     summary: 'Revoke an access or refresh token (RFC 7009)',
     body: z.unknown(),
-    handler: async ({ res, body }) => {
-      const token = String((body as { token?: unknown } | null)?.token ?? '');
+    handler: async ({ req, res, body }) => {
+      const raw = (body as { token?: unknown } | null)?.token;
+      const token = typeof raw === 'string' ? raw : '';
       if (token)
-        await db('oauth_tokens')
-          .where((w) => w.where({ access_hash: sha256(token) }).orWhere({ refresh_hash: sha256(token) }))
-          .whereNull('revoked_at')
-          .update({ revoked_at: new Date() });
+        await db.transaction(async (trx) => {
+          const row = await trx('oauth_tokens')
+            .where((w) => w.where({ access_hash: sha256(token) }).orWhere({ refresh_hash: sha256(token) }))
+            .whereNull('revoked_at')
+            .first('id', 'user_id', 'family_id');
+          if (!row) return;
+          await trx('oauth_tokens')
+            .where({ family_id: row.family_id })
+            .whereNull('revoked_at')
+            .update({ revoked_at: new Date() });
+          await auditToken(trx, req, row.user_id, 'oauth.token_revoked', row.id);
+        });
+      // Always 200, so the endpoint does not reveal which tokens exist (RFC 7009).
       res.status(200).end();
     },
   });
@@ -315,8 +453,26 @@ export async function authenticateOAuthToken(token: string): Promise<AuthUser | 
     .where('t.access_expires_at', '>', new Date())
     .whereNull('u.deleted_at')
     .where('u.status', 'active')
-    .first('t.id', 't.read_only', 'u.id as user_id', 'u.uuid', 'u.email', 'u.first_name', 'u.last_name');
+    .first(
+      't.id',
+      't.read_only',
+      't.granted_at',
+      'u.id as user_id',
+      'u.uuid',
+      'u.email',
+      'u.first_name',
+      'u.last_name',
+    );
   if (!row) return null;
+  // The same rules as personal tokens: two-factor enrolment when required, and the credential age limit.
+  const { apiKeyMaxDays } = await effectiveCompliance();
+  if (
+    apiKeyMaxDays > 0 &&
+    row.granted_at &&
+    Date.now() - new Date(row.granted_at).getTime() > apiKeyMaxDays * 86_400_000
+  )
+    return null;
+  if (!(await mayHoldTokens(row.user_id as number))) return null;
   void db('oauth_tokens')
     .where({ id: row.id })
     .update({ last_used_at: new Date() })
@@ -380,3 +536,17 @@ export const connectedAppsRoutes = defineRoutes('/me/connected-apps', ['mcp'])
       });
     },
   });
+
+/** Drop what no longer matters: unused clients after a day, spent codes, and long-dead tokens. */
+export async function purgeOAuth(now = new Date()) {
+  const day = new Date(now.getTime() - 86_400_000);
+  await db('oauth_codes').where('expires_at', '<', day).delete();
+  await db('oauth_tokens')
+    .where('refresh_expires_at', '<', new Date(now.getTime() - 30 * 86_400_000))
+    .delete();
+  await db('oauth_clients')
+    .where('created_at', '<', day)
+    .whereNotExists(db('oauth_tokens').whereRaw('oauth_tokens.client_id = oauth_clients.id'))
+    .whereNotExists(db('oauth_codes').whereRaw('oauth_codes.client_id = oauth_clients.id'))
+    .delete();
+}

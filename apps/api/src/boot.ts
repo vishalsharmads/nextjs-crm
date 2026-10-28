@@ -14,6 +14,7 @@ import { maintainAuditLogs } from './core/audit/integrity';
 import { remindDueRequests } from './core/privacy/requests.service';
 import { runRetention } from './core/privacy/retention.service';
 import { startAutomationScheduler } from './core/automations/automations';
+import { purgeOAuth } from './core/oauth/oauth';
 import { loadCustomObjects } from './core/objects/objects';
 import {
   installModuleGate,
@@ -45,6 +46,7 @@ export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promi
     startWebhookRetries();
     startMailSync();
     startAutomationScheduler();
+    every(60 * 60_000, 'oauth.purge', () => purgeOAuth());
     every(60 * 60_000, 'audit.maintain', maintainAuditLogs);
     every(60 * 60_000, 'privacy.reminders', remindDueRequests);
     every(6 * 60 * 60_000, 'privacy.retention', () => runRetention());

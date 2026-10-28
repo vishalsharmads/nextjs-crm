@@ -20,6 +20,7 @@ import * as m0018 from './0018_automation_timing';
 import * as m0019 from './0019_assign_cursor';
 import * as m0020 from './0020_exchange_rates';
 import * as m0021 from './0021_mcp_oauth';
+import * as m0022 from './0022_oauth_families';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -49,4 +50,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0019_assign_cursor': m0019,
   '0020_exchange_rates': m0020,
   '0021_mcp_oauth': m0021,
+  '0022_oauth_families': m0022,
 };

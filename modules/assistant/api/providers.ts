@@ -242,6 +242,19 @@ async function open(url: string, headers: Record<string, string>, body: unknown)
   return res;
 }
 
+const CUT_OFF = "The AI provider's reply was cut off. Try again.";
+/** Content blocks or tool calls one reply may hold. */
+const MAX_BLOCKS = 32;
+
+/** Tool arguments as sent; half-sent or broken JSON is an error, never an empty input. */
+function toolInput(json: string): Record<string, unknown> {
+  if (!json.trim()) return {};
+  const value = parse(json);
+  if (!value)
+    throw new AppError('UPSTREAM_FAILED', 'The AI provider sent tool input that could not be read.');
+  return value;
+}
+
 const parse = (s: string): Record<string, unknown> | null => {
   try {
     return JSON.parse(s) as Record<string, unknown>;
@@ -271,10 +284,14 @@ async function messagesStream(
     { type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; json: string }
   )[] = [];
   const usage = { input: 0, output: 0 };
+  let finished = false;
   for await (const { data } of sseEvents(res)) {
     const e = parse(data);
     if (!e) continue;
     const index = Number(e.index ?? -1);
+    if (e.type === 'message_stop') finished = true;
+    if (e.type?.toString().startsWith('content_block') && !(index >= 0 && index < MAX_BLOCKS))
+      throw new AppError('UPSTREAM_FAILED', 'The AI provider sent a reply that could not be read.');
     if (e.type === 'message_start') {
       const u = (e.message as { usage?: { input_tokens?: number } } | undefined)?.usage;
       usage.input = u?.input_tokens ?? 0;
@@ -297,10 +314,11 @@ async function messagesStream(
       throw new AppError('UPSTREAM_FAILED', 'The AI provider stopped with an error. Try again.');
     }
   }
+  if (!finished) throw new AppError('UPSTREAM_FAILED', CUT_OFF);
   const content: Block[] = blocks.flatMap((b): Block[] => {
     if (!b) return [];
     if (b.type === 'text') return b.text ? [{ type: 'text', text: b.text }] : [];
-    return [{ type: 'tool_use', id: b.id, name: b.name, input: parse(b.json || '{}') ?? {} }];
+    return [{ type: 'tool_use', id: b.id, name: b.name, input: toolInput(b.json) }];
   });
   return { content, usage };
 }
@@ -328,8 +346,12 @@ async function chatCompletionsStream(
   let text = '';
   const calls: { id: string; name: string; args: string }[] = [];
   const usage = { input: 0, output: 0 };
+  let finished = false;
   for await (const { data } of sseEvents(res)) {
-    if (data === '[DONE]') break;
+    if (data === '[DONE]') {
+      finished = true;
+      break;
+    }
     const e = parse(data) as {
       choices?: {
         delta?: {
@@ -340,6 +362,9 @@ async function chatCompletionsStream(
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     } | null;
     if (!e) continue;
+    if ((e as { error?: unknown }).error)
+      throw new AppError('UPSTREAM_FAILED', 'The AI provider stopped with an error. Try again.');
+    if ((e.choices?.[0] as { finish_reason?: string | null } | undefined)?.finish_reason) finished = true;
     if (e.usage) {
       usage.input = e.usage.prompt_tokens ?? 0;
       usage.output = e.usage.completion_tokens ?? 0;
@@ -350,16 +375,19 @@ async function chatCompletionsStream(
       on.text(delta.content);
     }
     for (const c of delta?.tool_calls ?? []) {
+      if (!(c.index >= 0 && c.index < MAX_BLOCKS))
+        throw new AppError('UPSTREAM_FAILED', 'The AI provider sent a reply that could not be read.');
       const call = (calls[c.index] ??= { id: '', name: '', args: '' });
       if (c.id) call.id = c.id;
       if (c.function?.name) call.name += c.function.name;
       if (c.function?.arguments) call.args += c.function.arguments;
     }
   }
+  if (!finished) throw new AppError('UPSTREAM_FAILED', CUT_OFF);
   const content: Block[] = [];
   if (text) content.push({ type: 'text', text });
   for (const c of calls)
-    if (c) content.push({ type: 'tool_use', id: c.id, name: c.name, input: parse(c.args || '{}') ?? {} });
+    if (c) content.push({ type: 'tool_use', id: c.id, name: c.name, input: toolInput(c.args) });
   return { content, usage };
 }
 

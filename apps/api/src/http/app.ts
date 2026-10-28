@@ -40,8 +40,8 @@ export function createApp(opts: AppOptions = {}): Express {
   if (origins.length) app.use(cors({ origin: origins, credentials: true }));
   app.use(cookieParser());
   app.use(express.json({ limit: '1mb' }));
-  // OAuth token requests are form-encoded (RFC 6749).
-  app.use(express.urlencoded({ extended: false, limit: '16kb' }));
+  // OAuth token requests are form-encoded (RFC 6749); nothing else accepts form posts.
+  app.use('/api/v1/oauth', express.urlencoded({ extended: false, limit: '16kb' }));
   app.use(contextMiddleware);
   if (!isTest) {
     app.use(
