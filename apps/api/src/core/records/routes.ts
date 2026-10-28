@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { ENTITY_ROUTE, listQuerySchema } from '@app/shared';
+import { listQuerySchema } from '@app/shared';
 import { defineRoutes, type RouteGroup } from '../../http/routes';
 import type { ResourceDef } from './types';
+import { recordBasePath } from './paths';
 import {
   createRecord,
   deleteRecord,
@@ -18,9 +19,8 @@ export const uuidParam = z.object({ uuid: z.uuid() });
 
 /** Standard REST endpoints for a record entity. Entity-specific routes are added by the caller. */
 export function recordRoutes(def: ResourceDef, tag: string): RouteGroup {
-  const base = `/${ENTITY_ROUTE[def.entity]}`;
   const p = (action: string) => `${def.resource}.${action}`;
-  return defineRoutes(base, [tag])
+  return defineRoutes(recordBasePath(def), [tag], def.moduleKey)
     .add({
       method: 'get',
       path: '/',

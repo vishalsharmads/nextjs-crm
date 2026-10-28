@@ -62,6 +62,8 @@ export async function runBulk(def: ResourceDef, ctx: RequestContext, user: AuthU
     case 'remove_tags': {
       assertCan(user, p('update'));
       if (!input.tags?.length) throw new AppError('VALIDATION_FAILED', 'Choose tags');
+      if (def.moduleKey)
+        throw new AppError('VALIDATION_FAILED', 'Tags are not available for this record type');
       await db.transaction(async (trx) => {
         const tagIds =
           input.action === 'add_tags'

@@ -1,10 +1,27 @@
+import { z } from 'zod';
+
 /** Core business entities. Fixed tables with real foreign keys; extended through custom fields. */
 export const CORE_ENTITIES = ['contact', 'organization', 'lead', 'deal', 'activity'] as const;
 export type CoreEntity = (typeof CORE_ENTITIES)[number];
 
-/** Entities that carry a `custom` JSON column and support custom fields. */
+/**
+ * Key of any record type: a core entity, or a record type a module registers (for example
+ * `property`). Module keys are validated at registration and checked against the registry at
+ * runtime, so this type is open.
+ */
+export type RecordEntity = CoreEntity | (string & {});
+
+export const ENTITY_KEY_PATTERN = /^[a-z][a-z0-9_]{1,31}$/;
+
+/** Well-formed entity key. The API still checks it names a registered, enabled record type. */
+export const entityKeySchema = z.string().regex(ENTITY_KEY_PATTERN, 'Invalid entity');
+
+/** Core entities that carry a `custom` JSON column. Module record types are added at runtime. */
 export const CUSTOMIZABLE_ENTITIES = CORE_ENTITIES;
-export type CustomizableEntity = CoreEntity;
+export type CustomizableEntity = RecordEntity;
+
+export const isCoreEntity = (entity: string): entity is CoreEntity =>
+  (CORE_ENTITIES as readonly string[]).includes(entity);
 
 /** Entities whose display name can be overridden by vocabulary (labels table). */
 export const LABEL_ENTITY_KEYS = [...CORE_ENTITIES, 'pipeline', 'stage', 'tag', 'user', 'team'] as const;

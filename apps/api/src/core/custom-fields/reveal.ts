@@ -3,7 +3,7 @@ import type { AuthUser, RequestContext } from '../../http/context';
 import { notFound } from '../../lib/errors';
 import { assertCan } from '../rbac/access';
 import { getRow } from '../records/service';
-import { recordDefs } from '../records/registry';
+import { getRecordDef } from '../records/registry';
 import { decryptValue, isEncryptedValue } from '../records/custom';
 import { logAccess } from '../audit/access-log';
 import { fieldLevel, getDefinitions } from './definitions';
@@ -19,7 +19,7 @@ export async function revealField(
   uuid: string,
   key: string,
 ) {
-  const def = recordDefs[entity];
+  const def = getRecordDef(entity);
   assertCan(user, `${def.resource}.view`);
   const row = await getRow(def, user, uuid);
   const field = (await getDefinitions(entity)).find((d) => d.key === key && d.sensitivity === 'special');

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  CUSTOMIZABLE_ENTITIES,
+  type CustomizableEntity,
   fieldKeySchema,
   FILTERABLE_TYPES,
   SENSITIVE_TYPES,
@@ -17,11 +17,12 @@ import { AppError, conflict, notFound } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
 import { audit } from '../audit/audit.service';
 import { revealField } from './reveal';
-import { ENTITY_TABLE, bumpDefinitionsVersion, getDefinitions, rowToDef } from './definitions';
+import { customizableEntities, recordEntitySchema } from '../records/registry';
+import { entityTable, bumpDefinitionsVersion, getDefinitions, rowToDef } from './definitions';
 import { dropCustomFieldIndex, ensureCustomFieldIndexes, MAX_INDEXED_FIELDS } from './ddl.service';
 
 const entityQuery = z.object({
-  entity: z.enum(CUSTOMIZABLE_ENTITIES).optional(),
+  entity: recordEntitySchema.optional(),
   includeArchived: z.coerce.boolean().optional(),
 });
 const uuidParam = z.object({ uuid: z.uuid() });
@@ -35,7 +36,7 @@ function configJson(input: { options?: unknown; currency?: string; placeholder?:
   return JSON.stringify({ options: input.options, currency: input.currency, placeholder: input.placeholder });
 }
 
-async function assertIndexCapacity(entity: (typeof CUSTOMIZABLE_ENTITIES)[number], excludingUuid?: string) {
+async function assertIndexCapacity(entity: CustomizableEntity, excludingUuid?: string) {
   const q = db('custom_field_definitions').where({ entity, active: true, filterable: true });
   if (excludingUuid) q.whereNot({ uuid: excludingUuid });
   const n = Number(((await q.count({ c: '*' }).first()) as { c: number }).c);
@@ -44,8 +45,8 @@ async function assertIndexCapacity(entity: (typeof CUSTOMIZABLE_ENTITIES)[number
 }
 
 /** Records with no value for a field (shown as a banner when a field becomes required). */
-async function missingCount(entity: (typeof CUSTOMIZABLE_ENTITIES)[number], key: string) {
-  const row = await db(ENTITY_TABLE[entity])
+async function missingCount(entity: CustomizableEntity, key: string) {
+  const row = await db(entityTable(entity))
     .whereNull('deleted_at')
     .whereRaw('JSON_EXTRACT(custom, ?) IS NULL', [`$.${key}`])
     .count({ c: '*' })
@@ -64,7 +65,7 @@ export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields
     method: 'get',
     path: '/reveal',
     permission: 'core.fields.reveal',
-    query: z.object({ entity: z.enum(CUSTOMIZABLE_ENTITIES), uuid: z.uuid(), key: fieldKeySchema }),
+    query: z.object({ entity: recordEntitySchema, uuid: z.uuid(), key: fieldKeySchema }),
     summary: 'Show one sensitive field value (always written to the access log)',
     handler: ({ ctx, user, query, res }) => {
       // A decrypted value must not be kept by browsers or proxies.
@@ -78,7 +79,7 @@ export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields
     permission: 'core.fields.manage',
     query: entityQuery,
     handler: async ({ query }) => {
-      const entities = query.entity ? [query.entity] : CUSTOMIZABLE_ENTITIES;
+      const entities = query.entity ? [query.entity] : customizableEntities();
       const out = [];
       for (const e of entities)
         out.push(...(await getDefinitions(e, { includeArchived: query.includeArchived })));
@@ -89,7 +90,7 @@ export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields
     method: 'post',
     path: '/',
     permission: 'core.fields.manage',
-    body: customFieldInputSchema,
+    body: customFieldInputSchema.extend({ entity: recordEntitySchema }),
     status: 201,
     handler: async ({ ctx, body }) => {
       if (await db('custom_field_definitions').where({ entity: body.entity, key: body.key }).first()) {
@@ -319,7 +320,7 @@ export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields
     method: 'put',
     path: '/order',
     permission: 'core.fields.manage',
-    body: z.object({ entity: z.enum(CUSTOMIZABLE_ENTITIES), uuids: z.array(z.uuid()).max(500) }),
+    body: z.object({ entity: recordEntitySchema, uuids: z.array(z.uuid()).max(500) }),
     handler: async ({ ctx, body }) => {
       await db.transaction(async (trx) => {
         for (const [i, uuid] of body.uuids.entries()) {
@@ -334,7 +335,7 @@ export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields
   });
 
 const groupBody = z.object({
-  entity: z.enum(CUSTOMIZABLE_ENTITIES),
+  entity: recordEntitySchema,
   key: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
   label: z.string().trim().min(1).max(100),
   sortOrder: z.number().int().optional(),
@@ -394,7 +395,7 @@ export const fieldGroupsRoutes = defineRoutes('/custom-field-groups', ['custom-f
     path: '/:entity/:key',
     permission: 'core.fields.manage',
     params: z.object({
-      entity: z.enum(CUSTOMIZABLE_ENTITIES),
+      entity: recordEntitySchema,
       key: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
     }),
     handler: async ({ ctx, params }) => {
@@ -419,7 +420,7 @@ export const layoutsRoutes = defineRoutes('/layouts', ['custom-fields'])
     method: 'get',
     path: '/',
     permission: 'authenticated',
-    query: z.object({ entity: z.enum(CUSTOMIZABLE_ENTITIES).optional() }),
+    query: z.object({ entity: recordEntitySchema.optional() }),
     handler: async ({ query }) => {
       const q = db('layouts').where({ is_default: true });
       if (query.entity) q.where({ entity: query.entity });
@@ -433,7 +434,7 @@ export const layoutsRoutes = defineRoutes('/layouts', ['custom-fields'])
     path: '/',
     permission: 'core.fields.manage',
     body: z.object({
-      entity: z.enum(CUSTOMIZABLE_ENTITIES),
+      entity: recordEntitySchema,
       context: z.enum(['form', 'detail', 'list']),
       sections: z
         .array(

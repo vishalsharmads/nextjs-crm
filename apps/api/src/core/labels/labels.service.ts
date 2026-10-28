@@ -3,6 +3,14 @@ import { db, type Db } from '../../db/knex';
 
 export type LabelMap = Record<string, { singular: string; plural: string }>;
 
+/** Default vocabulary of module record types (registered with the type; admins can override it). */
+const moduleDefaults: LabelMap = {};
+
+export function registerDefaultLabels(entity: string, labels: { singular: string; plural: string }) {
+  moduleDefaults[entity] = labels;
+  cache.clear();
+}
+
 const cache = new Map<string, { value: LabelMap; at: number }>();
 export const clearLabelCache = () => cache.clear();
 
@@ -11,7 +19,7 @@ export async function getLabels(locale = 'en', conn: Db = db): Promise<LabelMap>
   const hit = cache.get(locale);
   if (hit && Date.now() - hit.at < 3000) return hit.value;
   const rows = await conn('labels').whereIn('locale', [locale, 'en']).orderByRaw('locale = ? asc', [locale]);
-  const out: LabelMap = { ...DEFAULT_LABELS };
+  const out: LabelMap = { ...DEFAULT_LABELS, ...moduleDefaults };
   for (const r of rows)
     out[r.entity_key as string] = { singular: r.singular as string, plural: r.plural as string };
   cache.set(locale, { value: out, at: Date.now() });

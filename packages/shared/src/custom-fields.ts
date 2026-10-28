@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CUSTOMIZABLE_ENTITIES } from './entities';
+import { entityKeySchema, type CustomizableEntity } from './entities';
 
 export const FIELD_TYPES = [
   'text',
@@ -92,7 +92,7 @@ export const fieldConfigSchema = z
 
 /** Input shape for creating a definition (admin UI and blueprints). */
 export const customFieldInputSchema = z.object({
-  entity: z.enum(CUSTOMIZABLE_ENTITIES),
+  entity: entityKeySchema,
   key: fieldKeySchema,
   label: z.string().min(1).max(100),
   type: z.enum(FIELD_TYPES),
@@ -116,7 +116,7 @@ export type CustomFieldInput = z.input<typeof customFieldInputSchema>;
 /** Definition as returned by the API and used to build forms and validators. */
 export interface CustomFieldDef {
   uuid: string;
-  entity: (typeof CUSTOMIZABLE_ENTITIES)[number];
+  entity: CustomizableEntity;
   key: string;
   label: string;
   type: FieldType;

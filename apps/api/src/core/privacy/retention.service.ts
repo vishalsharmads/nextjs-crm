@@ -1,5 +1,5 @@
 import type { Knex } from 'knex';
-import { SCOPED_RESOURCES, type Housekeeping, type RetentionRule } from '@app/shared';
+import { type Housekeeping, type RetentionRule } from '@app/shared';
 import { systemContext, type AuthUser, type RequestContext } from '../../http/context';
 import { db } from '../../db/knex';
 import { logger } from '../../lib/logger';
@@ -8,6 +8,7 @@ import { audit } from '../audit/audit.service';
 import { effectiveCompliance } from '../settings/settings.service';
 import { recordDefs } from '../records/registry';
 import { eraseSubject } from './privacy.service';
+import { scopedResources } from '../rbac/scoped';
 
 const DAY = 86_400_000;
 /** Records handled per rule per run, so one run never holds the database for long. */
@@ -23,7 +24,7 @@ const SYSTEM: AuthUser = {
   roleKeys: [],
   isAdmin: true,
   permissions: ['*'],
-  scopes: Object.fromEntries(SCOPED_RESOURCES.map((r) => [r, 'all' as const])),
+  scopes: Object.fromEntries(scopedResources().map((r) => [r, 'all' as const])),
   sessionId: null,
 };
 

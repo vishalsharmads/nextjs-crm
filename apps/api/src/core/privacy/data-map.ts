@@ -1,7 +1,7 @@
 import { CUSTOMIZABLE_ENTITIES, type CustomizableEntity, type Sensitivity } from '@app/shared';
 import { env } from '../../config/env';
 import { db } from '../../db/knex';
-import { ENTITY_TABLE, getDefinitions } from '../custom-fields/definitions';
+import { entityTable, getDefinitions } from '../custom-fields/definitions';
 import { effectiveCompliance } from '../settings/settings.service';
 import { privacyHandlers } from './handlers';
 
@@ -47,7 +47,7 @@ export async function dataMap(): Promise<DataMapDto> {
   for (const entity of CUSTOMIZABLE_ENTITIES) {
     const defs = await getDefinitions(entity);
     const rows = Number(
-      ((await db(ENTITY_TABLE[entity]).whereNull('deleted_at').count({ n: '*' }).first()) as { n: number }).n,
+      ((await db(entityTable(entity)).whereNull('deleted_at').count({ n: '*' }).first()) as { n: number }).n,
     );
     records.push({
       entity,

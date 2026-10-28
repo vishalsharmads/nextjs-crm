@@ -70,6 +70,7 @@ export function statusForStage(stage: { is_won: number | boolean; is_lost: numbe
 
 export const dealsDef: ResourceDef<Row, DealDto> = {
   entity: 'deal',
+  route: 'deals',
   table: 'deals',
   resource: 'core.deals',
   ownerColumns: ['deals.owner_id'],

@@ -2,6 +2,8 @@ import {
   FIELD_KEY_RE,
   VISIBILITY_RANK,
   visibilitySchema,
+  isCoreEntity,
+  type CoreEntity,
   type CustomFieldDef,
   type CustomizableEntity,
   type FieldType,
@@ -11,13 +13,36 @@ import {
 import { db, type Db } from '../../db/knex';
 import type { AuthUser } from '../../http/context';
 
-export const ENTITY_TABLE: Record<CustomizableEntity, string> = {
+const CORE_TABLES: Record<CoreEntity, string> = {
   contact: 'contacts',
   organization: 'organizations',
   lead: 'leads',
   deal: 'deals',
   activity: 'activities',
 };
+
+/** Tables of module record types, filled by `registerRecordType` (kept here to avoid an import cycle). */
+const moduleTables = new Map<string, string>();
+
+export function registerEntityTable(entity: string, table: string) {
+  moduleTables.set(entity, table);
+}
+
+export function unregisterEntityTable(entity: string) {
+  moduleTables.delete(entity);
+}
+
+/** Table holding the `custom` column of an entity. */
+export function entityTable(entity: CustomizableEntity): string {
+  const table = isCoreEntity(entity) ? CORE_TABLES[entity] : moduleTables.get(entity);
+  if (!table) throw new Error(`Unknown record type "${entity}"`);
+  return table;
+}
+
+/** Every entity with custom fields, including module types whose module is disabled (DDL reconcile). */
+export function allCustomEntities(): CustomizableEntity[] {
+  return [...Object.keys(CORE_TABLES), ...moduleTables.keys()];
+}
 
 type Row = Record<string, unknown>;
 const json = <T>(v: unknown, fallback: T): T => (v === null || v === undefined ? fallback : (v as T));

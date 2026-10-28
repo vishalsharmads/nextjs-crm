@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Plus, Trash2 } from 'lucide-react';
-import { CUSTOMIZABLE_ENTITIES, type CustomizableEntity, type LayoutSection } from '@app/shared';
+import { CUSTOMIZABLE_ENTITIES, type CoreEntity, type LayoutSection } from '@app/shared';
 import { apiPut } from '@/lib/api';
 import { labelVars } from '@/lib/labels';
 import { bootstrapKey, useBoot, useT } from '@/app/session';
@@ -39,13 +39,13 @@ export function LayoutBuilderPage() {
   const t = useT();
   const boot = useBoot();
   const L = labelVars(boot.labels);
-  const [entity, setEntity] = useState<CustomizableEntity>('contact');
+  const [entity, setEntity] = useState<CoreEntity>('contact');
   return (
     <SettingsPage
       title={t('settings.layouts')}
       description="Choose which fields appear where. Forms and record pages use these sections; lists start with these columns."
     >
-      <Tabs value={entity} onValueChange={(v) => setEntity(v as CustomizableEntity)}>
+      <Tabs value={entity} onValueChange={(v) => setEntity(v as CoreEntity)}>
         <TabsList>
           {CUSTOMIZABLE_ENTITIES.filter(
             (e) => e !== 'activity' && (e !== 'lead' || boot.settings.features.leads),
@@ -61,7 +61,7 @@ export function LayoutBuilderPage() {
   );
 }
 
-function EntityLayout({ entity }: { entity: CustomizableEntity }) {
+function EntityLayout({ entity }: { entity: CoreEntity }) {
   const boot = useBoot();
   const qc = useQueryClient();
   const config = useMemo(() => buildConfig(entity, boot), [entity, boot]);

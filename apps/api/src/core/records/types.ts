@@ -1,6 +1,6 @@
 import type { Knex } from 'knex';
 import type { z } from 'zod';
-import type { CoreEntity, FilterCondition } from '@app/shared';
+import type { FilterCondition, RecordEntity, RecordTypeMeta } from '@app/shared';
 import type { AuthUser, RequestContext } from '../../http/context';
 import type { Db } from '../../db/knex';
 
@@ -20,8 +20,18 @@ export interface CoreFieldSpec {
 }
 
 export interface ResourceDef<Row extends Record<string, unknown> = Record<string, unknown>, Dto = unknown> {
-  entity: CoreEntity;
+  entity: RecordEntity;
   table: string;
+  /** URL segment of the REST routes (`contacts`; module types mount under `/m/<moduleKey>/`). */
+  route: string;
+  /** Set for record types a module registers. */
+  moduleKey?: string;
+  /** Default vocabulary for module record types (core entities use `DEFAULT_LABELS`). */
+  labels?: { singular: string; plural: string };
+  /** What the web needs to render a module record type generically. */
+  meta?: RecordTypeMeta;
+  /** CSV import/export columns of a module record type (core entities use `CORE_COLUMNS`). */
+  ioColumns?: IoColumn[];
   /** Permission resource, e.g. `core.contacts`. */
   resource: string;
   /** Table has `merged_into_id`: merged-away rows are soft-deleted but are not in the trash. */
@@ -50,6 +60,16 @@ export interface ResourceDef<Row extends Record<string, unknown> = Record<string
     ctx: WriteContext,
     op: 'create' | 'update',
   ): Promise<void>;
+}
+
+export interface IoColumn {
+  /** Import target name (core input) and DTO key. */
+  key: string;
+  header: string;
+  get: (d: Record<string, unknown>) => unknown;
+  importable?: boolean;
+  required?: boolean;
+  kind?: string;
 }
 
 export interface ReadContext {

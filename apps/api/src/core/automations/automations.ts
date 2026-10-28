@@ -10,9 +10,9 @@ import { logger } from '../../lib/logger';
 import { enqueue, registerJob } from '../../lib/jobs';
 import { audit } from '../audit/audit.service';
 import { loadAccess } from '../rbac/access';
-import { EVENT_TYPES, eventDepth, onEvent, type DomainEvent } from '../events/events';
+import { eventDepth, eventTypeSchema, eventTypes, onEvent, type DomainEvent } from '../events/events';
 import { notify } from '../notifications/notifications.service';
-import { recordDefs } from '../records/registry';
+import { findRecordDef, recordDefs } from '../records/registry';
 import { createRecord, updateRecord } from '../records/service';
 import { ensureTags } from '../records/hydrate';
 import { sendMail } from '../../lib/mailer';
@@ -56,7 +56,7 @@ export type AutomationAction = z.infer<typeof actionSchema>;
 const automationBody = z.object({
   name: z.string().trim().min(1).max(150),
   description: z.string().max(500).default(''),
-  triggerEvent: z.enum(EVENT_TYPES),
+  triggerEvent: eventTypeSchema,
   conditions: filterSchema.nullish(),
   actions: z.array(actionSchema).min(1).max(10),
   active: z.boolean().default(true),
@@ -173,7 +173,7 @@ async function runAction(
   user: AuthUser,
   ctx: RequestContext,
 ): Promise<string> {
-  const def = recordDefs[e.entity as keyof typeof recordDefs];
+  const def = findRecordDef(e.entity);
   const vars = { record: e.record, event: { type: e.type } };
   switch (action.type) {
     case 'update_field': {
@@ -341,7 +341,7 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
     permission: 'core.automations.manage',
     handler: async () => ({
       data: (await db('automations').orderBy('id', 'desc')).map(dto),
-      events: EVENT_TYPES,
+      events: eventTypes(),
     }),
   })
   .add({

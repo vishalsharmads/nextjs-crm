@@ -1,4 +1,4 @@
-import type { CoreEntity, TimelineItem } from '@app/shared';
+import type { RecordEntity, TimelineItem } from '@app/shared';
 import type { Knex } from 'knex';
 import { db } from '../../db/knex';
 import type { AuthUser } from '../../http/context';
@@ -34,7 +34,7 @@ const NOISE = new Set([
  * contacts and deals. Limited to records the user may view, so notes on out-of-scope deals never leak.
  * Returns id subqueries (wrapped: an async function must never return a Knex builder).
  */
-async function rolledUp(entity: CoreEntity, id: number, user: AuthUser) {
+async function rolledUp(entity: RecordEntity, id: number, user: AuthUser) {
   const visible = async (def: ResourceDef, link: (qb: Knex.QueryBuilder) => void) => {
     if (!can(user, `${def.resource}.view`)) return null;
     const { qb } = await scopedQuery(def, user);
@@ -62,7 +62,7 @@ async function rolledUp(entity: CoreEntity, id: number, user: AuthUser) {
 }
 
 export async function recordTimeline(
-  entity: CoreEntity,
+  entity: RecordEntity,
   row: Record<string, unknown>,
   user: AuthUser,
   opts: { kinds?: string; before?: string; limit: number },

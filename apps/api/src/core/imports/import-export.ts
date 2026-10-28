@@ -6,6 +6,7 @@ import {
   SENSITIVE_MASK,
   filterSchema,
   normalizePhone,
+  entityKeySchema,
   type CoreEntity,
   type CustomFieldDef,
 } from '@app/shared';
@@ -20,7 +21,8 @@ import { audit } from '../audit/audit.service';
 import { assertCan, loadAccess } from '../rbac/access';
 import { customContext } from '../records/common';
 import { applyListCriteria, createRecord, scopedQuery, updateRecord } from '../records/service';
-import { recordDefs } from '../records/registry';
+import { getRecordDef, recordDefs } from '../records/registry';
+import type { IoColumn, ResourceDef } from '../records/types';
 import { applySort } from '../records/filters';
 import { getGroup } from '../settings/settings.service';
 
@@ -30,13 +32,7 @@ const MAX_ROWS = 50_000;
 
 type Dto = Record<string, unknown> & { custom: Record<string, unknown> };
 
-interface CoreColumn {
-  /** Import target name (core input) and export header. */
-  key: string;
-  header: string;
-  get: (d: Dto) => unknown;
-  importable?: boolean;
-}
+type CoreColumn = Omit<IoColumn, 'get'> & { get: (d: Dto) => unknown };
 
 const owner = (d: Dto) => (d.owner as { name?: string } | null)?.name ?? '';
 const tags = (d: Dto) => ((d.tags as { name: string }[]) ?? []).map((t) => t.name).join('; ');
@@ -121,6 +117,22 @@ export const CORE_COLUMNS: Record<Exclude<CoreEntity, 'activity'>, CoreColumn[]>
   ],
 };
 
+/** Record types CSV import and export work on: core entities except activities, and module types. */
+export function ioDef(entity: string): ResourceDef {
+  const def = getRecordDef(entity);
+  if (def.entity === 'activity')
+    throw new AppError('VALIDATION_FAILED', 'Activities cannot be imported or exported');
+  return def;
+}
+
+function ioColumns(def: ResourceDef): CoreColumn[] {
+  // Every DTO carries `custom`, so a module column getter accepts it as well.
+  if (def.ioColumns) return def.ioColumns;
+  return CORE_COLUMNS[def.entity as Exclude<CoreEntity, 'activity'>];
+}
+
+const REQUIRED_CORE: Record<string, string> = { organization: 'name', deal: 'title' };
+
 function exportValue(def: CustomFieldDef, v: unknown): string {
   if (v === null || v === undefined) return '';
   const label = (k: unknown) => def.options.find((o) => o.key === k)?.label ?? String(k);
@@ -142,17 +154,17 @@ export const exportQuerySchema = z.object({
 
 /** Stream a CSV of everything the user can see in the current list (visible custom fields only). */
 export async function exportCsv(
-  entity: Exclude<CoreEntity, 'activity'>,
+  def: ResourceDef,
   ctx: RequestContext,
   user: AuthUser,
   query: z.infer<typeof exportQuerySchema>,
   res: Response,
 ) {
-  const def = recordDefs[entity];
+  const entity = def.entity;
   assertCan(user, `${def.resource}.export`);
   const { defs, levels } = await customContext(entity, user);
   const visible = defs.filter((d) => levels[d.key] !== 'hidden');
-  const columns = CORE_COLUMNS[entity];
+  const columns = ioColumns(def);
   const { qb } = await scopedQuery(def, user, db);
   const filter = query.filter ? filterSchema.parse(JSON.parse(query.filter)) : undefined;
   const fc = await applyListCriteria(qb, def, user, { filter, q: query.q, view: query.view });
@@ -206,17 +218,14 @@ export interface ImportTarget {
   required?: boolean;
 }
 
-export async function importTargets(
-  entity: Exclude<CoreEntity, 'activity'>,
-  user: AuthUser,
-): Promise<ImportTarget[]> {
-  const { defs, levels } = await customContext(entity, user);
-  const core = CORE_COLUMNS[entity]
+export async function importTargets(def: ResourceDef, user: AuthUser): Promise<ImportTarget[]> {
+  const { defs, levels } = await customContext(def.entity, user);
+  const core = ioColumns(def)
     .filter((c) => c.importable)
     .map((c) => ({
       key: c.key,
       label: c.header,
-      required: entity === 'organization' ? c.key === 'name' : entity === 'deal' ? c.key === 'title' : false,
+      required: c.required ?? REQUIRED_CORE[def.entity] === c.key,
     }));
   return [
     ...core,
@@ -317,6 +326,29 @@ export function coerceCustom(def: CustomFieldDef, raw: string, dateFormat: strin
   }
 }
 
+/** CSV cells of module record type columns, converted to their input types. */
+function coerceModuleColumns(columns: IoColumn[], core: Record<string, unknown>, dateFormat: string) {
+  for (const c of columns) {
+    const raw = core[c.key];
+    if (typeof raw !== 'string') continue;
+    if (c.kind === 'number' || c.kind === 'money') {
+      const cleaned = raw.replace(/[,\s]/g, '').replace(/^[^\d-]+/, '');
+      const n = Number(cleaned);
+      if (!cleaned || !Number.isFinite(n)) throw new Error(`${c.header} must be a number`);
+      core[c.key] = n;
+    } else if (c.kind === 'boolean') {
+      if (/^(yes|y|true|1|x)$/i.test(raw)) core[c.key] = true;
+      else if (/^(no|n|false|0)$/i.test(raw)) core[c.key] = false;
+      else throw new Error(`${c.header} must be yes or no`);
+    } else if (c.kind === 'date') core[c.key] = parseDate(raw, dateFormat, c.header);
+    else if (c.kind === 'datetime') {
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) throw new Error(`${c.header} must be a date and time`);
+      core[c.key] = d.toISOString();
+    }
+  }
+}
+
 export function parseDate(v: string, format: string, label: string): string {
   if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
   const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(v);
@@ -329,7 +361,7 @@ export function parseDate(v: string, format: string, label: string): string {
 }
 
 export const importStartSchema = z.object({
-  entity: z.enum(['contact', 'organization', 'lead', 'deal']),
+  entity: entityKeySchema,
   fileUuid: z.uuid(),
   mapping: z.record(z.string().max(200), z.string().max(80).nullable()),
   options: z
@@ -344,7 +376,7 @@ export const importStartSchema = z.object({
 type StartInput = z.infer<typeof importStartSchema>;
 
 export async function startImport(ctx: RequestContext, user: AuthUser, input: StartInput) {
-  const def = recordDefs[input.entity];
+  const def = ioDef(input.entity);
   assertCan(user, `${def.resource}.import`);
   assertCan(user, `${def.resource}.create`);
   const file = await db('files')
@@ -352,7 +384,7 @@ export async function startImport(ctx: RequestContext, user: AuthUser, input: St
     .whereNull('deleted_at')
     .first();
   if (!file) throw new AppError('NOT_FOUND', 'Upload the file again');
-  const targets = new Set((await importTargets(input.entity, user)).map((t) => t.key));
+  const targets = new Set((await importTargets(def, user)).map((t) => t.key));
   for (const target of Object.values(input.mapping)) {
     if (target && !targets.has(target)) throw new AppError('VALIDATION_FAILED', `Unknown field: ${target}`);
   }
@@ -370,8 +402,9 @@ export async function startImport(ctx: RequestContext, user: AuthUser, input: St
 }
 
 /** Find an existing record to dedupe against. */
-async function findExisting(entity: StartInput['entity'], user: AuthUser, row: Record<string, unknown>) {
-  const def = recordDefs[entity];
+async function findExisting(def: ResourceDef, user: AuthUser, row: Record<string, unknown>) {
+  const entity = def.entity;
+  if (def.moduleKey) return null;
   const { qb } = await scopedQuery(def, user, db);
   if ((entity === 'contact' || entity === 'lead') && row.email)
     qb.where(`${def.table}.email_norm`, String(row.email).toLowerCase());
@@ -395,7 +428,7 @@ registerJob('import', async (job, progress) => {
     ...access,
   };
   const ctx: RequestContext = { requestId: `job:${job.uuid}`, ip: null, userAgent: null, user };
-  const def = recordDefs[input.entity];
+  const def = ioDef(input.entity);
   const file = await db('files').where({ uuid: input.fileUuid }).first();
   const { headers, rows } = parseCsv(await readStoredFile(file));
   const { defs } = await customContext(input.entity, user);
@@ -453,7 +486,9 @@ registerJob('import', async (job, progress) => {
             .filter(Boolean),
           ...input.options.tags,
         ];
-      if (core.value !== undefined) core.value = Number(String(core.value).replace(/[^\d.-]/g, ''));
+      if (def.ioColumns) coerceModuleColumns(def.ioColumns, core, dateFormat);
+      if (core.value !== undefined && !def.moduleKey)
+        core.value = Number(String(core.value).replace(/[^\d.-]/g, ''));
       if (core.expectedClose)
         core.expectedClose = parseDate(String(core.expectedClose), dateFormat, 'Expected close');
       if (core.organizationName) {
@@ -489,8 +524,7 @@ registerJob('import', async (job, progress) => {
       delete core.pipelineName;
       if (Object.keys(custom).length) core.custom = custom;
 
-      const existing =
-        input.options.duplicates === 'create' ? null : await findExisting(input.entity, user, core);
+      const existing = input.options.duplicates === 'create' ? null : await findExisting(def, user, core);
       if (existing && input.options.duplicates === 'skip') result.skipped++;
       else if (existing) {
         await updateRecord(def, ctx, user, existing.uuid, core);

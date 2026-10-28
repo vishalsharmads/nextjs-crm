@@ -12,8 +12,8 @@ import { applySearch, applySort, compileFilter, type FilterContext } from './fil
 import { maskEncrypted, prepareCustom, redactDiff } from './custom';
 import { notify } from '../notifications/notifications.service';
 import { emit, type EventType } from '../events/events';
-import { ENTITY_ROUTE } from '@app/shared';
 import type { ResourceDef } from './types';
+import { recordBasePath } from './paths';
 
 export async function filterContext(def: ResourceDef, user: AuthUser): Promise<FilterContext> {
   const customDefs = await getDefinitions(def.entity);
@@ -309,7 +309,7 @@ export async function notifyAssignment(
     {
       type: `${def.entity}.assigned`,
       title: `${who} assigned you ${title ? `“${title}”` : 'a record'}`,
-      link: def.entity === 'activity' ? '/tasks' : `/${ENTITY_ROUTE[def.entity]}/${row.uuid as string}`,
+      link: def.entity === 'activity' ? '/tasks' : `${recordBasePath(def)}/${row.uuid as string}`,
       data: { entity: def.entity, uuid: row.uuid },
       email: true,
     },

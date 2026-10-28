@@ -8,7 +8,7 @@ import {
 } from '@app/shared';
 import { db } from '../../db/knex';
 import { logger } from '../../lib/logger';
-import { ENTITY_TABLE, getDefinitions, bumpDefinitionsVersion } from './definitions';
+import { allCustomEntities, entityTable, getDefinitions, bumpDefinitionsVersion } from './definitions';
 
 /** Max indexed custom fields per table (MySQL allows 64 indexes per table in total). */
 export const MAX_INDEXED_FIELDS = 40;
@@ -45,8 +45,12 @@ const COLUMN_TYPE: Partial<Record<FieldType, string>> = {
 };
 
 function assertSafe(table: string, key: string) {
-  if (!Object.values(ENTITY_TABLE).includes(table)) throw new Error(`Unknown table ${table}`);
+  if (!allCustomEntities().map(entityTable).includes(table)) throw new Error(`Unknown table ${table}`);
   if (!FIELD_KEY_RE.test(key)) throw new Error(`Unsafe field key ${key}`);
+}
+
+async function tableExists(table: string): Promise<boolean> {
+  return db.schema.hasTable(table);
 }
 
 async function existingIndexes(table: string): Promise<Set<string>> {
@@ -81,9 +85,11 @@ async function reconcile(only?: CustomizableEntity): Promise<string[]> {
     if ((lock[0] as { l: number }[])[0]?.l !== 1)
       throw new Error('Could not acquire the custom field DDL lock');
     try {
-      const entities = (only ? [only] : Object.keys(ENTITY_TABLE)) as CustomizableEntity[];
+      const entities = only ? [only] : allCustomEntities();
       for (const entity of entities) {
-        const table = ENTITY_TABLE[entity];
+        const table = entityTable(entity);
+        // A module record type whose migrations have not run yet (module never enabled).
+        if (!(await tableExists(table))) continue;
         const defs = (await getDefinitions(entity, { includeArchived: true })).filter(
           (d) => d.active && d.filterable && FILTERABLE_TYPES.includes(d.type),
         );
@@ -151,7 +157,7 @@ async function ensureOne(
 
 /** Explicit admin action: drop the generated column and index of an archived field. Values stay in JSON. */
 export async function dropCustomFieldIndex(entity: CustomizableEntity, key: string) {
-  const table = ENTITY_TABLE[entity];
+  const table = entityTable(entity);
   assertSafe(table, key);
   const col = generatedColumnName(key);
   const idx = await existingIndexes(table);

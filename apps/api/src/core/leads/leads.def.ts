@@ -16,6 +16,7 @@ type Row = Record<string, unknown> & { id: number };
 
 export const leadsDef: ResourceDef<Row, LeadDto> = {
   entity: 'lead',
+  route: 'leads',
   table: 'leads',
   resource: 'core.leads',
   ownerColumns: ['leads.owner_id'],
