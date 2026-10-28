@@ -48,15 +48,26 @@ function idleHeaders(): Record<string, string> {
   return idle === undefined ? {} : { 'x-idle-ms': idle };
 }
 
+/** Forget a CSRF token the server rejected (signed before a restart with a new secret). */
+function dropCsrfCookie() {
+  document.cookie = `${CSRF_COOKIE}=; Max-Age=0; path=/`;
+}
+
 let refreshPromise: Promise<boolean> | null = null;
 /** Single-flight refresh: concurrent 401s share one refresh request. */
 function refreshSession(): Promise<boolean> {
   refreshPromise ??= (async () => {
-    const res = await fetch(`${BASE}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'x-csrf-token': await csrfToken(), ...idleHeaders() },
-    });
+    const send = async () =>
+      fetch(`${BASE}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'x-csrf-token': await csrfToken(), ...idleHeaders() },
+      });
+    let res = await send();
+    if (res.status === 403) {
+      dropCsrfCookie();
+      res = await send();
+    }
     return res.ok;
   })().finally(() => {
     refreshPromise = null;
@@ -88,7 +99,11 @@ export function buildUrl(path: string, query?: RequestOptions['query']) {
   return url.pathname + url.search;
 }
 
-export async function api<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
+export async function api<T = unknown>(
+  path: string,
+  opts: RequestOptions = {},
+  csrfRetried = false,
+): Promise<T> {
   const method = opts.method ?? 'GET';
   const isForm = opts.body instanceof FormData;
   const headers: Record<string, string> = { Accept: 'application/json', ...idleHeaders() };
@@ -116,7 +131,7 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
       .json()
       .catch(() => null)) as ApiErrorBody | null;
     if (body?.error.code === 'TOKEN_EXPIRED' || body?.error.code === 'UNAUTHENTICATED') {
-      if (await refreshSession()) return api<T>(path, { ...opts, noRetry: true });
+      if (await refreshSession()) return api<T>(path, { ...opts, noRetry: true }, csrfRetried);
       unauthenticatedListeners.forEach((fn) => fn());
     }
   }
@@ -125,9 +140,11 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
       .clone()
       .json()
       .catch(() => null)) as ApiErrorBody | null;
-    if (body?.error.code === 'CSRF_INVALID' && !opts.noRetry) {
-      document.cookie = `${CSRF_COOKIE}=; Max-Age=0; path=/`;
-      return api<T>(path, { ...opts, noRetry: true });
+    // Independent of noRetry: sign-in skips the session refresh, but a stale token must not lock
+    // people out until they clear cookies. Fetch a fresh one and try once more.
+    if (body?.error.code === 'CSRF_INVALID' && !csrfRetried) {
+      dropCsrfCookie();
+      return api<T>(path, opts, true);
     }
   }
 
