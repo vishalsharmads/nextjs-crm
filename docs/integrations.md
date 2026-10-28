@@ -33,6 +33,19 @@ Every call runs as the token's person, through the same permission, record-scope
 
 Tools: `describe_schema`, `search_records`, `list_records`, `get_record`, `get_timeline`, `list_pipelines` (read) and `create_record`, `update_record`, `add_note`, `create_task`, `log_activity`, `move_deal_stage` (write; not offered to read-only tokens). Resources: `crm://schema` and `crm://record/{entity}/{uuid}`.
 
+## Assistant
+
+The `assistant` module adds an in-app chat that answers questions about records, summarises history, drafts notes and emails, and proposes changes. Enable it in **Settings → Modules**, then set it up on its **Settings** tab (permission `assistant.settings.manage`):
+
+- **API format**: "Messages API" (native tool-use blocks; the base URL is the host, `/v1/messages` is added) or "Chat completions API" (the widely used format; the base URL includes `/v1`, then `/chat/completions` is added). Self-hosted and cloud-hosted models that speak either format work.
+- **Model**, **API key** (stored encrypted, never shown again, rotated by `crypto:rotate`) and any **extra request headers** the provider requires, for example an API version header.
+- **Assistant name**: what people see. No provider name appears anywhere in the product.
+- **Limits**: tokens per month for the workspace and per person per day (0 is no limit). **Retention**: conversations are deleted after this many days (30 by default).
+- **Never send these to the provider**: record types the assistant may not read or change.
+- Under the `hipaa` compliance profile the assistant stays off until an admin confirms an agreement with the provider covers health information.
+
+The assistant runs the same tools as MCP clients, as the signed-in person: their permissions, record scope and field visibility apply, hidden fields are never sent and sensitive values stay masked. Read tools run on their own. Every change (create, update, note, task, stage move) is shown to the person, who confirms or declines it; confirmed changes are audited with actor type `assistant`. Conversation text is not written to the audit log. Each conversation is visible only to the person who started it. Usage per person per month is on the Settings tab. Data subject requests reach messages that mention the person.
+
 ## Webhooks
 
 **Settings → Webhooks.** Choose events (or all). Each delivery is a `POST` with a JSON body:
