@@ -5,7 +5,7 @@ import type { DealDto, StageDto } from '@app/shared';
 import { qk } from '@/lib/query-keys';
 import { cn } from '@/lib/cn';
 import { useBoot, useCan, useT } from '@/app/session';
-import { Badge } from '@/components/ui/misc';
+import { StageBadge, stageStyle } from '@/components/data/stage-color';
 import { LostReasonDialog } from './lost-reason-dialog';
 import { patchDealStage } from './stage-move';
 
@@ -64,11 +64,7 @@ export function StageTrack({ deal }: { deal: DealDto }) {
   });
 
   if (!stages.length) {
-    return (
-      <Badge tone={deal.stage.isWon ? 'primary' : deal.stage.isLost ? 'accent' : 'neutral'}>
-        {deal.stage.name}
-      </Badge>
-    );
+    return <StageBadge name={deal.stage.name} color={deal.stage.color} />;
   }
 
   const needsReason = (s: StageDto) => s.isLost && settings.deals.lostReasons.length > 0;
@@ -96,7 +92,7 @@ export function StageTrack({ deal }: { deal: DealDto }) {
           const current = s.uuid === deal.stage.uuid;
           const done = !deal.stage.isLost && currentIndex >= 0 && i < currentIndex;
           return (
-            <li key={s.uuid} className="shrink-0">
+            <li key={s.uuid} className="shrink-0" style={stageStyle(s.color)}>
               <button
                 type="button"
                 disabled={!canMove}
@@ -104,13 +100,16 @@ export function StageTrack({ deal }: { deal: DealDto }) {
                 onClick={() => choose(s)}
                 className={cn(
                   'h-8 rounded-sm px-3 text-xs font-medium whitespace-nowrap transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.97] disabled:cursor-default pointer-coarse:h-10',
-                  current && !s.isLost && 'bg-primary text-primary-fg',
-                  current && s.isLost && 'bg-accent text-accent-fg',
-                  !current && done && 'bg-primary-soft text-ink',
+                  'inline-flex items-center gap-1.5',
+                  current && 'bg-(--sc) text-(--sc-fg)',
+                  !current && done && 'stage-soft text-ink',
                   !current && !done && 'bg-subtle text-muted',
                   !current && canMove && 'hover:bg-hover hover:text-ink',
                 )}
               >
+                {!current ? (
+                  <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-(--sc)" />
+                ) : null}
                 {s.name}
               </button>
             </li>

@@ -1,4 +1,4 @@
-import { readableForeground, type Palette, type PublicBranding } from '@app/shared';
+import { STAGE_PALETTE, readableForeground, type Palette, type PublicBranding } from '@app/shared';
 
 export type ColorMode = 'light' | 'dark' | 'system';
 
@@ -47,6 +47,16 @@ export function paletteVars(p: Palette): Record<string, string> {
   };
 }
 
+/** Stage colors as `--stage-<key>` plus a readable `--stage-<key>-fg` for text on the solid color. */
+export function stageVars(mode: 'light' | 'dark'): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const [key, color] of Object.entries(STAGE_PALETTE[mode])) {
+    vars[`--stage-${key}`] = color;
+    vars[`--stage-${key}-fg`] = readableForeground(color);
+  }
+  return vars;
+}
+
 /** Apply branding as CSS variables on :root. No rebuild needed to rebrand. */
 export function applyBranding(
   branding: Pick<PublicBranding, 'colors' | 'fontFamily' | 'radius' | 'appName' | 'assets'>,
@@ -56,6 +66,7 @@ export function applyBranding(
   const resolved = resolveMode(mode);
   root.classList.toggle('dark', resolved === 'dark');
   for (const [k, v] of Object.entries(paletteVars(branding.colors[resolved]))) root.style.setProperty(k, v);
+  for (const [k, v] of Object.entries(stageVars(resolved))) root.style.setProperty(k, v);
   root.style.setProperty('--radius', `${branding.radius}px`);
   const family = branding.fontFamily === 'system-ui' ? 'system-ui' : `'${branding.fontFamily}'`;
   root.style.setProperty('--font-family', `${family}, system-ui, sans-serif`);

@@ -174,12 +174,12 @@
       "entity": "deal",
       "is_default": true,
       "stages": [
-        { "key": "enquiry", "name": "Enquiry", "probability": 10, "rotting_days": 2 },
-        { "key": "site_visit", "name": "Site visit", "probability": 25, "rotting_days": 5 },
-        { "key": "quoted", "name": "Quoted", "probability": 50, "rotting_days": 10 },
-        { "key": "scheduled", "name": "Scheduled", "probability": 85, "rotting_days": 30 },
-        { "key": "invoiced", "name": "Invoiced", "probability": 100, "is_won": true },
-        { "key": "lost", "name": "Lost", "probability": 0, "is_lost": true }
+        { "key": "enquiry", "name": "Enquiry", "color": "blue", "probability": 10, "rotting_days": 2 },
+        { "key": "site_visit", "name": "Site visit", "color": "teal", "probability": 25, "rotting_days": 5 },
+        { "key": "quoted", "name": "Quoted", "color": "violet", "probability": 50, "rotting_days": 10 },
+        { "key": "scheduled", "name": "Scheduled", "color": "amber", "probability": 85, "rotting_days": 30 },
+        { "key": "invoiced", "name": "Invoiced", "color": "green", "probability": 100, "is_won": true },
+        { "key": "lost", "name": "Lost", "color": "red", "probability": 0, "is_lost": true }
       ]
     }
   ],

@@ -1,4 +1,4 @@
-import { toPatch } from '@app/shared';
+import { stageColorSchema, toPatch } from '@app/shared';
 import { z } from 'zod';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
@@ -14,7 +14,7 @@ const stageBody = z.object({
     .string()
     .regex(/^[a-z][a-z0-9_]{0,63}$/)
     .optional(),
-  color: z.string().max(32).nullish(),
+  color: stageColorSchema.nullish(),
   probability: z.number().int().min(0).max(100).default(0),
   isWon: z.boolean().default(false),
   isLost: z.boolean().default(false),
@@ -62,10 +62,10 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
     status: 201,
     handler: async ({ ctx, body }) => {
       const stages = body.stages ?? [
-        { name: 'New', probability: 10, isWon: false, isLost: false },
-        { name: 'In progress', probability: 50, isWon: false, isLost: false },
-        { name: 'Won', probability: 100, isWon: true, isLost: false },
-        { name: 'Lost', probability: 0, isWon: false, isLost: true },
+        { name: 'New', color: 'blue' as const, probability: 10, isWon: false, isLost: false },
+        { name: 'In progress', color: 'amber' as const, probability: 50, isWon: false, isLost: false },
+        { name: 'Won', color: 'green' as const, probability: 100, isWon: true, isLost: false },
+        { name: 'Lost', color: 'red' as const, probability: 0, isWon: false, isLost: true },
       ];
       assertOutcomes(stages);
       const uuid = newUuid();

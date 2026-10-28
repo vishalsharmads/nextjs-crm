@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Plus, Star, Trash2 } from 'lucide-react';
-import type { PipelineDto, StageDto } from '@app/shared';
+import { STAGE_COLORS, stageColor, type PipelineDto, type StageDto } from '@app/shared';
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/api';
 import { bootstrapKey, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,8 @@ import { Field, Input, NativeSelect } from '@/components/ui/input';
 import { Badge, Pane, Skeleton } from '@/components/ui/misc';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
+import { StageDot } from '@/components/data/stage-color';
 import { SettingsPage } from './layout';
 
 export function PipelinesPage() {
@@ -150,8 +152,9 @@ function PipelineEditor({ pipeline, onChanged }: { pipeline: PipelineDto; onChan
       }
       padded={false}
     >
-      <div className="grid grid-cols-[24px_1fr_80px_90px_150px_32px] items-center gap-2 border-b border-line bg-subtle px-3 py-2 text-xs font-medium text-muted">
+      <div className="grid grid-cols-[24px_32px_1fr_80px_90px_150px_32px] items-center gap-2 border-b border-line bg-subtle px-3 py-2 text-xs font-medium text-muted">
         <span />
+        <span className="sr-only">Color</span>
         <span>Stage</span>
         <span>Win %</span>
         <span>Stalls after</span>
@@ -219,7 +222,7 @@ function StageRow({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className="grid grid-cols-[24px_1fr_80px_90px_150px_32px] items-center gap-2 bg-surface px-3 py-2"
+      className="grid grid-cols-[24px_32px_1fr_80px_90px_150px_32px] items-center gap-2 bg-surface px-3 py-2"
     >
       <button
         type="button"
@@ -230,6 +233,7 @@ function StageRow({
       >
         <GripVertical className="size-4" />
       </button>
+      <StageColorPicker stage={stage} onPick={(color) => onUpdate({ color })} />
       <Input
         aria-label="Stage name"
         value={name}
@@ -276,6 +280,33 @@ function StageRow({
         <Trash2 />
       </Button>
     </li>
+  );
+}
+
+const colorName = (c: string) => c.charAt(0).toUpperCase() + c.slice(1);
+
+function StageColorPicker({ stage, onPick }: { stage: StageDto; onPick: (color: string) => void }) {
+  const current = stageColor(stage.color);
+  return (
+    <Menu>
+      <MenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Color of ${stage.name}: ${colorName(current)}`}
+          className="flex size-7 items-center justify-center rounded-sm hover:bg-hover"
+        >
+          <StageDot color={current} className="size-3.5" />
+        </button>
+      </MenuTrigger>
+      <MenuContent align="start" className="min-w-36">
+        {STAGE_COLORS.map((c) => (
+          <MenuItem key={c} onSelect={() => c !== current && onPick(c)}>
+            <StageDot color={c} className="size-3" />
+            <span className={c === current ? 'font-medium' : undefined}>{colorName(c)}</span>
+          </MenuItem>
+        ))}
+      </MenuContent>
+    </Menu>
   );
 }
 

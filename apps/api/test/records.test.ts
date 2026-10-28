@@ -189,6 +189,12 @@ describe('deals and pipelines', () => {
     const { client } = await clientWithRoles(['admin']);
     const p = await client.post('/pipelines', { name: 'Renewals' }).expect(201);
     expect(p.body.stages).toHaveLength(4);
+    expect(p.body.stages.map((s: { color: string }) => s.color)).toEqual(['blue', 'amber', 'green', 'red']);
+    await client.post(`/pipelines/${p.body.uuid}/stages`, { name: 'Bad', color: '#ff0000' }).expect(422);
+    const recolored = await client
+      .patch(`/pipelines/${p.body.uuid}/stages/${p.body.stages[0].uuid}`, { color: 'violet' })
+      .expect(200);
+    expect(recolored.body.stages[0].color).toBe('violet');
     const withStage = await client
       .post(`/pipelines/${p.body.uuid}/stages`, { name: 'Negotiating', probability: 70 })
       .expect(201);

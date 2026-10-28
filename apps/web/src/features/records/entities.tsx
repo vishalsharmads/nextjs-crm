@@ -23,6 +23,7 @@ import { formatDate, formatMoney, formatRelative } from '@/lib/format';
 import { Avatar, Badge } from '@/components/ui/misc';
 import { CustomFieldDisplay } from '@/components/fields/custom-field';
 import { SensitiveValue } from '@/components/fields/sensitive-value';
+import { StageBadge } from '@/components/data/stage-color';
 import { buildModuleConfig } from './module-entities';
 
 export type FieldKind =
@@ -707,9 +708,7 @@ function buildCoreConfig(entity: CoreEntity, boot: ReturnType<typeof useBoot>): 
       label: L.stage!,
       kind: 'select',
       get: (r) => r.stage.uuid,
-      render: (r) => (
-        <Badge tone={r.stage.isWon ? 'primary' : r.stage.isLost ? 'accent' : 'neutral'}>{r.stage.name}</Badge>
-      ),
+      render: (r) => <StageBadge name={r.stage.name} color={r.stage.color} />,
       sortable: true,
       filterable: true,
       options: stageOptions,

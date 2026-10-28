@@ -28,6 +28,7 @@ import { cn } from '@/lib/cn';
 import { formatDate, formatMoney } from '@/lib/format';
 import { useBoot, useCan, useT } from '@/app/session';
 import { Avatar, ErrorState, Skeleton } from '@/components/ui/misc';
+import { StageDot, stageStyle } from '@/components/data/stage-color';
 import { LostReasonDialog } from './lost-reason-dialog';
 import { patchDealStage } from './stage-move';
 
@@ -267,13 +268,15 @@ export function BoardColumn({
     <section
       role="listitem"
       aria-label={column.stage.name}
+      style={stageStyle(column.stage.color)}
       className={cn(
-        'flex w-72 shrink-0 flex-col rounded-md border border-line bg-subtle transition-colors',
+        'flex w-72 shrink-0 flex-col rounded-md border border-t-[3px] border-line border-t-(--sc) bg-subtle transition-colors',
         isOver && 'border-primary bg-primary-soft',
       )}
     >
       <header className="flex items-baseline justify-between gap-2 px-3 pt-3 pb-2">
-        <h2 className="truncate text-sm font-semibold">
+        <h2 className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold">
+          <StageDot color={column.stage.color} />
           {column.stage.name} <span className="font-normal text-muted tabular">{column.count}</span>
         </h2>
         <span className="text-xs text-muted tabular">{formatMoney(column.total, currency)}</span>

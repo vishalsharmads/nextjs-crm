@@ -209,36 +209,42 @@
         {
           "key": "discovery",
           "name": "Discovery",
+          "color": "blue",
           "probability": 10,
           "rotting_days": 7
         },
         {
           "key": "fact_find",
           "name": "Fact find",
+          "color": "teal",
           "probability": 30,
           "rotting_days": 14
         },
         {
           "key": "recommendation",
           "name": "Recommendation",
+          "color": "violet",
           "probability": 50,
           "rotting_days": 10
         },
         {
           "key": "lodged",
           "name": "Lodged",
+          "color": "amber",
           "probability": 80,
           "rotting_days": 21
         },
         {
           "key": "settled",
           "name": "Settled",
+          "color": "orange",
           "probability": 100,
           "is_won": true
         },
         {
           "key": "lost",
           "name": "Lost",
+          "color": "pink",
           "probability": 0,
           "is_lost": true
         }

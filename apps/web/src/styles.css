@@ -200,6 +200,10 @@ html.dark {
 [dir='rtl'] .anim-sheet {
   --sheet-from: -16px;
 }
+/* A tint of the stage color set by stageStyle() (components/data/stage-color.tsx); ink text stays readable on it. */
+.stage-soft {
+  background-color: color-mix(in oklch, var(--sc) 16%, var(--surface));
+}
 .anim-pop {
   animation: pop-in 140ms var(--ease-out);
 }

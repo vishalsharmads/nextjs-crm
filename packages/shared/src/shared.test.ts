@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCustomSchema, type CustomFieldDef } from './custom-fields';
+import { STAGE_COLORS, STAGE_PALETTE, stageColor } from './stages';
 import { checkPaletteContrast, contrastRatio, DEFAULT_BRANDING, readableForeground } from './branding';
 import { filterSchema } from './filters';
 import { hasPermission } from './permissions';
@@ -80,6 +81,18 @@ describe('contrast', () => {
   });
   it('accepts the default palette', () => {
     expect(checkPaletteContrast(DEFAULT_BRANDING.colors)).toEqual([]);
+  });
+  it('keeps every stage color at 3:1 on the factory surface', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      for (const key of STAGE_COLORS) {
+        expect(
+          contrastRatio(STAGE_PALETTE[mode][key], DEFAULT_BRANDING.colors[mode].surface),
+        ).toBeGreaterThanOrEqual(3);
+      }
+    }
+    expect(stageColor('blue')).toBe('blue');
+    expect(stageColor('#ff0000')).toBe('gray');
+    expect(stageColor(null)).toBe('gray');
   });
 });
 

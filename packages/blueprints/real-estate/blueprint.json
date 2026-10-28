@@ -217,36 +217,42 @@
         {
           "key": "appraisal",
           "name": "Appraisal",
+          "color": "blue",
           "probability": 20,
           "rotting_days": 14
         },
         {
           "key": "listed",
           "name": "Listed",
+          "color": "teal",
           "probability": 40,
           "rotting_days": 21
         },
         {
           "key": "open_homes",
           "name": "Open homes",
+          "color": "violet",
           "probability": 60,
           "rotting_days": 28
         },
         {
           "key": "under_offer",
           "name": "Under offer",
+          "color": "amber",
           "probability": 85,
           "rotting_days": 10
         },
         {
           "key": "settled",
           "name": "Settled",
+          "color": "orange",
           "probability": 100,
           "is_won": true
         },
         {
           "key": "withdrawn",
           "name": "Withdrawn",
+          "color": "pink",
           "probability": 0,
           "is_lost": true
         }

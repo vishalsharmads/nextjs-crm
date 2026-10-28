@@ -42,6 +42,7 @@ import { Timeline } from './timeline';
 import { FilesPanel } from './files-panel';
 import { ConsentPanel } from '@/features/privacy/consent-panel';
 import { StageTrack } from '@/features/deals/stage-track';
+import { StageBadge } from '@/components/data/stage-color';
 
 type Rec = Record<string, unknown> & {
   uuid: string;
@@ -296,9 +297,7 @@ function RelatedRecords({ entity, rec }: { entity: RecordEntity; rec: Rec }) {
                   {d.title}
                 </Link>
                 <span className="flex items-center gap-2">
-                  <Badge tone={d.stage.isWon ? 'primary' : d.stage.isLost ? 'accent' : 'neutral'}>
-                    {d.stage.name}
-                  </Badge>
+                  <StageBadge name={d.stage.name} color={d.stage.color} />
                   <span className="tabular">{formatMoney(d.value, d.currency)}</span>
                 </span>
               </li>
