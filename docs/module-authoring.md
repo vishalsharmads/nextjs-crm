@@ -31,7 +31,8 @@ Rules:
 - The FULLTEXT index lists exactly the `searchable` columns, in order.
 - To add a column, add it to the spec and write a new migration. Committed migrations are immutable.
 - Record keys (`--entity`) are global: they must not reuse a core entity or a vocabulary key.
-- Pass `--personal` when the records describe people. Then fill in the generated `PrivacyHandler` so access exports and erasure reach them.
+- A record type with an `email` or `phone` column, or a relation to a contact or lead, holds personal data. Its module must return a `PrivacyHandler`, or the API refuses to start. Pass `--personal` to generate a stub, then fill it in so access exports and erasure reach these records. Events about a linked restricted person are skipped by automations and webhooks.
+- Relation columns accept only records the user may view. A linked record outside the reader's scope shows as empty.
 - Not yet available on record types: tags, activities, files, merge and Kanban boards. Add your own routes and pages for those.
 
 ## Layout
