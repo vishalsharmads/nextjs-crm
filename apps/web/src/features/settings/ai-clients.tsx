@@ -193,12 +193,10 @@ export function AiClientsPage() {
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Could not save'),
   });
-  const allowed = (name: string) => !draft?.tools.length || draft.tools.includes(name);
+  const allowed = (name: string) => !!draft && (draft.allTools || draft.tools.includes(name));
   const toggleTool = (name: string, on: boolean) => {
-    if (!draft || !tools.data) return;
-    const current = draft.tools.length ? draft.tools : tools.data.map((x) => x.name);
-    const next = on ? [...current, name] : current.filter((n) => n !== name);
-    setDraft({ ...draft, tools: next.length === tools.data.length ? [] : next });
+    if (!draft) return;
+    setDraft({ ...draft, tools: on ? [...draft.tools, name] : draft.tools.filter((n) => n !== name) });
   };
   return (
     <SettingsPage
@@ -248,12 +246,36 @@ export function AiClientsPage() {
               </Field>
             </div>
           </Pane>
-          <Pane title="Tools" padded={false}>
+          <Pane
+            title="Tools"
+            padded={false}
+            actions={
+              <label className="flex items-center gap-2 text-sm text-muted">
+                <Switch
+                  checked={draft.allTools}
+                  onCheckedChange={(allTools) =>
+                    setDraft({
+                      ...draft,
+                      allTools,
+                      tools: allTools ? draft.tools : (tools.data?.map((x) => x.name) ?? []),
+                    })
+                  }
+                />
+                All tools
+              </label>
+            }
+          >
+            {!draft.allTools && !draft.tools.length ? (
+              <p className="border-b border-line px-4 py-3 text-sm text-muted">
+                No tools are allowed, so AI clients can connect but cannot do anything.
+              </p>
+            ) : null}
             <ul className="divide-y divide-line">
               {tools.data.map((tool) => (
                 <li key={tool.name} className="flex items-start gap-3 px-4 py-3">
                   <Checkbox
                     checked={allowed(tool.name)}
+                    disabled={draft.allTools}
                     onCheckedChange={(on) => toggleTool(tool.name, on)}
                     aria-label={tool.title}
                     className="mt-0.5"

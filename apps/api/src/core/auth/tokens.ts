@@ -150,7 +150,14 @@ export async function consumeOneTimeToken(
   return affected === 1 ? (row.user_id as number) : null;
 }
 
-/** Invalidate every unused one-time token for a user (on disable, password change). */
+/**
+ * Invalidate every unused one-time token and every personal access token of a user (on disable,
+ * password change or reset, signing out everywhere), so a leaked token dies with the sessions.
+ */
 export async function burnUserTokens(conn: Db, userId: number) {
   await conn('auth_tokens').where({ user_id: userId }).whereNull('used_at').update({ used_at: new Date() });
+  await conn('personal_access_tokens')
+    .where({ user_id: userId })
+    .whereNull('revoked_at')
+    .update({ revoked_at: new Date() });
 }

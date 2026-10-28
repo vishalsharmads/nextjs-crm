@@ -135,15 +135,19 @@ export const tokensRoutes = defineRoutes('/me/tokens', ['tokens'])
     permission: 'authenticated',
     params: z.object({ uuid: z.uuid() }),
     handler: async ({ ctx, user, params }) => {
-      const n = await db('personal_access_tokens')
-        .where({ uuid: params.uuid, user_id: user.id })
-        .whereNull('revoked_at')
-        .update({ revoked_at: new Date() });
-      if (!n) throw notFound('Token');
-      await audit(db, ctx, {
-        action: 'token.revoked',
-        entity: 'personal_access_token',
-        entityUuid: params.uuid,
+      await db.transaction(async (trx) => {
+        const row = await trx('personal_access_tokens')
+          .where({ uuid: params.uuid, user_id: user.id })
+          .whereNull('revoked_at')
+          .first('id');
+        if (!row) throw notFound('Token');
+        await trx('personal_access_tokens').where({ id: row.id }).update({ revoked_at: new Date() });
+        await audit(trx, ctx, {
+          action: 'token.revoked',
+          entity: 'personal_access_token',
+          entityId: row.id as number,
+          entityUuid: params.uuid,
+        });
       });
     },
   });

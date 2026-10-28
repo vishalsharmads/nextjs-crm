@@ -45,10 +45,8 @@ export function allTools(): ToolInfo[] {
 
 /** Tools this user may call through MCP: allowed by the admin list, and read-only for read tokens. */
 export async function availableTools(user: AuthUser): Promise<ToolDef[]> {
-  const { tools: allowed } = await getGroup('mcp');
-  return [...tools.values()].filter(
-    (t) => (!allowed.length || allowed.includes(t.name)) && (!t.write || !user.readOnly),
-  );
+  const { allTools: all, tools: allowed } = await getGroup('mcp');
+  return [...tools.values()].filter((t) => (all || allowed.includes(t.name)) && (!t.write || !user.readOnly));
 }
 
 export function inputJsonSchema(tool: ToolDef) {

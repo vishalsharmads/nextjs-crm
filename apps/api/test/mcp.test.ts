@@ -136,13 +136,33 @@ describe('personal access tokens and MCP', () => {
   });
 
   it('honours the admin tool allow-list and serves resources', async () => {
-    await enable({ tools: ['describe_schema'] });
+    await enable({ allTools: false, tools: ['describe_schema'] });
     const t = await newToken(admin);
     const tools = (await rpc(t.secret, 'tools/list')).body.result.tools as { name: string }[];
     expect(tools.map((x) => x.name)).toEqual(['describe_schema']);
     const schema = await rpc(t.secret, 'resources/read', { uri: 'crm://schema' });
     expect(schema.body.result.contents[0].text).toContain('contact');
     expect((await rpc(t.secret, 'nope')).body.error.code).toBe(-32601);
+    // An empty list allows nothing (it never falls back to every tool).
+    await enable({ allTools: false, tools: [] });
+    expect((await rpc(t.secret, 'tools/list')).body.result.tools).toEqual([]);
+  });
+
+  it('revokes tokens when the person signs out everywhere, and limits notes to visible records', async () => {
+    await enable();
+    const other = await admin.post('/contacts', { firstName: 'Out', lastName: unique('Scope') }).expect(201);
+    const role = await createRole(['core.contacts.*', 'core.activities.*'], { 'core.contacts': 'own' });
+    const user = await createUser({ roleKeys: [role] });
+    const rep = await loginAs(user);
+    const t = await newToken(rep);
+    const note = await call(t.secret, 'add_note', {
+      related: { type: 'contact', uuid: other.body.uuid },
+      body: 'x',
+    });
+    expect(note.body.result.isError).toBe(true);
+    await rep.post('/me/password', { currentPassword: user.password, newPassword: 'AnotherPass123!' });
+    const after = await rpc(t.secret, 'ping');
+    expect(after.status).toBe(401);
   });
 
   it('caps token lifetime under the compliance profile and needs a session to create tokens', async () => {

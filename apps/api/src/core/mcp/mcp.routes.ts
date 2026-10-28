@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import rateLimit from 'express-rate-limit';
 import type { Request, Response } from 'express';
 import { entityKeySchema } from '@app/shared';
@@ -29,13 +29,14 @@ class RpcError extends Error {
   }
 }
 
-/** Per token (or per user for a session) calls per minute, from Settings → AI clients. */
+/** Calls per person (or per API key) per minute, from Settings → AI clients. */
 const limiter = rateLimit({
   windowMs: 60_000,
   limit: async () => (isTest ? 100_000 : (await getGroup('mcp')).rateLimitPerMinute),
   keyGenerator: (req: Request) => {
     const u = req.ctx.user;
-    return u?.tokenId ? `t${u.tokenId}` : u?.apiKeyId ? `k${u.apiKeyId}` : `u${u?.id ?? req.ip}`;
+    // Per person, not per token, so creating more tokens does not raise the limit.
+    return u?.apiKeyId ? `k${u.apiKeyId}` : `u${u?.id ?? req.ip}`;
   },
   standardHeaders: 'draft-7',
   legacyHeaders: false,
@@ -94,13 +95,25 @@ async function handle(method: string, params: Record<string, unknown>, tc: ToolC
         };
       } catch (err) {
         // Tool failures go back to the model as results it can read and correct, not protocol errors.
-        if (err instanceof AppError)
+        const toolErr =
+          err instanceof ZodError
+            ? new AppError(
+                'VALIDATION_FAILED',
+                'The input is not valid',
+                err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+              )
+            : err;
+        if (toolErr instanceof AppError)
           return {
             isError: true,
             content: [
               {
                 type: 'text',
-                text: JSON.stringify({ error: err.code, message: err.message, details: err.details }),
+                text: JSON.stringify({
+                  error: toolErr.code,
+                  message: toolErr.message,
+                  details: toolErr.details,
+                }),
               },
             ],
           };
