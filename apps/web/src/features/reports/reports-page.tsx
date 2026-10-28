@@ -5,6 +5,7 @@ import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } fro
 import type { ForecastDto, QuotaRowDto, VelocityDto } from '@app/shared';
 import { ApiError, apiGet, apiPut } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
+import { ReportBuilder } from './report-builder';
 import { useBoot, useCan } from '@/app/session';
 import { Input, NativeSelect } from '@/components/ui/input';
 import {
@@ -66,6 +67,7 @@ export function ReportsPage() {
             <TabsTrigger value="forecast">Forecast</TabsTrigger>
             <TabsTrigger value="quotas">Quotas</TabsTrigger>
             <TabsTrigger value="velocity">Velocity</TabsTrigger>
+            <TabsTrigger value="custom">Custom</TabsTrigger>
           </TabsList>
           <TabsContent value="forecast" className="mt-4">
             <Forecast pipelineUuid={pipelineUuid} />
@@ -75,6 +77,9 @@ export function ReportsPage() {
           </TabsContent>
           <TabsContent value="velocity" className="mt-4">
             <Velocity pipelineUuid={pipelineUuid} />
+          </TabsContent>
+          <TabsContent value="custom" className="mt-4">
+            <ReportBuilder />
           </TabsContent>
         </Tabs>
       </div>

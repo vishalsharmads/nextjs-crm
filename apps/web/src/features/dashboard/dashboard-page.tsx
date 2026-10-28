@@ -1,16 +1,20 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import type { ReportDefinition, ReportResultDto, SavedReportDto } from '@app/shared';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { AlertCircle, Blocks } from 'lucide-react';
-import { apiGet } from '@/lib/api';
+import { AlertCircle, ArrowDown, ArrowUp, Blocks, Pencil, X } from 'lucide-react';
+import { ApiError, apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate, formatMoney, formatRelative } from '@/lib/format';
 import { useBranding } from '@/app/branding';
-import { useBoot, useT } from '@/app/session';
+import { useBoot, useCan, useT } from '@/app/session';
 import { setDocumentTitle } from '@/theme/apply';
 import { Button } from '@/components/ui/button';
 import { PageHeader, Skeleton } from '@/components/ui/misc';
+import { NativeSelect } from '@/components/ui/input';
+import { ReportChart } from '@/features/reports/report-chart';
 import { labelVars } from '@/lib/labels';
 import { ModuleWidget } from '@/modules/loader';
 import { orderWidgets } from './dashboard-layout';
@@ -35,8 +39,18 @@ const SPAN: Record<Widget['size'], string> = {
   lg: 'lg:col-span-3',
 };
 
+/** Widgets anyone can add; module widgets come from the shared dashboard. */
+const BUILT_IN: { type: string; title: string; size: Widget['size'] }[] = [
+  { type: 'pipeline_value', title: 'Pipeline', size: 'lg' },
+  { type: 'tasks_due', title: 'Tasks due', size: 'sm' },
+  { type: 'conversion', title: 'Conversion', size: 'sm' },
+  { type: 'activity_by_user', title: 'Activity by person', size: 'md' },
+];
+
 export function DashboardPage() {
   const t = useT();
+  const can = useCan();
+  const qc = useQueryClient();
   const { me } = useBoot();
   const { branding } = useBranding();
   useEffect(() => setDocumentTitle(t('nav.home'), branding.appName), [t, branding.appName]);
@@ -44,7 +58,60 @@ export function DashboardPage() {
     queryKey: ['dashboards'],
     queryFn: () => apiGet<{ data: Dashboard[] }>('/dashboards').then((r) => r.data),
   });
-  const dash = dashboards.data?.find((d) => !d.shared) ?? dashboards.data?.[0];
+  const personal = dashboards.data?.find((d) => !d.shared);
+  const dash = personal ?? dashboards.data?.[0];
+  const [draft, setDraft] = useState<Widget[] | null>(null);
+  const reports = useQuery({
+    queryKey: ['reports', 'custom'],
+    queryFn: () => apiGet<{ data: SavedReportDto[] }>('/reports/custom').then((r) => r.data),
+    enabled: !!draft && can('core.reports.view'),
+  });
+  const refresh = () => void qc.invalidateQueries({ queryKey: ['dashboards'] });
+  const save = useMutation({
+    mutationFn: (widgets: Widget[]) =>
+      personal
+        ? apiPut(`/dashboards/${personal.uuid}`, { widgets })
+        : apiPost('/dashboards', { name: 'My dashboard', widgets }),
+    onSuccess: () => {
+      toast.success('Saved');
+      setDraft(null);
+      refresh();
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Could not save the dashboard'),
+  });
+  const reset = useMutation({
+    mutationFn: () => apiDelete(`/dashboards/${personal!.uuid}`),
+    onSuccess: () => {
+      toast.success('Reset');
+      setDraft(null);
+      refresh();
+    },
+  });
+  const editing = draft !== null;
+  const shown = editing ? draft : orderWidgets(dash?.widgets ?? []);
+  const update = (i: number, w: Widget | null) =>
+    setDraft((cur) =>
+      cur ? (w ? cur.map((x, j) => (j === i ? w : x)) : cur.filter((_, j) => j !== i)) : cur,
+    );
+  const move = (i: number, d: -1 | 1) =>
+    setDraft((cur) => {
+      if (!cur || !cur[i + d]) return cur;
+      const next = [...cur];
+      [next[i], next[i + d]] = [next[i + d]!, next[i]!];
+      return next;
+    });
+  const add = (value: string) => {
+    if (!value || !draft) return;
+    const key = `w_${Date.now().toString(36)}`;
+    if (value.startsWith('report:')) {
+      const r = reports.data?.find((x) => x.uuid === value.slice(7));
+      if (r)
+        setDraft([...draft, { key, type: 'report', title: r.name, size: 'md', params: { report: r.uuid } }]);
+      return;
+    }
+    const b = BUILT_IN.find((x) => x.type === value);
+    if (b) setDraft([...draft, { key, type: b.type, title: b.title, size: b.size, params: {} }]);
+  };
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
@@ -54,24 +121,107 @@ export function DashboardPage() {
           day: 'numeric',
           month: 'long',
         }).format(new Date())}
+        actions={
+          editing ? (
+            <>
+              <NativeSelect
+                aria-label="Add widget"
+                value=""
+                onChange={(e) => add(e.target.value)}
+                className="w-48"
+              >
+                <option value="">Add a widget…</option>
+                {BUILT_IN.map((b) => (
+                  <option key={b.type} value={b.type}>
+                    {b.title}
+                  </option>
+                ))}
+                {reports.data?.map((r) => (
+                  <option key={r.uuid} value={`report:${r.uuid}`}>
+                    Report: {r.name}
+                  </option>
+                ))}
+              </NativeSelect>
+              {personal ? (
+                <Button variant="ghost" onClick={() => reset.mutate()} loading={reset.isPending}>
+                  Reset to shared
+                </Button>
+              ) : null}
+              <Button onClick={() => setDraft(null)}>Cancel</Button>
+              <Button variant="primary" onClick={() => save.mutate(draft)} loading={save.isPending}>
+                Save
+              </Button>
+            </>
+          ) : dash ? (
+            <Button onClick={() => setDraft(dash.widgets)}>
+              <Pencil /> Edit dashboard
+            </Button>
+          ) : null
+        }
       />
       {/* Rows are as tall as their content needs (no fixed minimum), so short widgets stop leaving dead space. */}
       <div className="grid grid-flow-row-dense gap-4 p-4 md:p-6 lg:grid-cols-3">
         {dashboards.isPending
           ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 lg:col-span-1" />)
-          : orderWidgets(dash?.widgets ?? []).map((w) => (
+          : shown.map((w, i) => (
               <section
                 key={w.key}
                 className={cn(
                   'flex min-h-32 flex-col rounded-md border border-line bg-surface p-4',
                   w.type === 'pipeline_value' && 'shadow-raised',
+                  editing && 'border-dashed border-line-strong',
                   SPAN[w.size],
                 )}
               >
-                <h2 className="mb-3 text-sm font-semibold">{w.title ?? w.type}</h2>
+                <div className="mb-3 flex items-center gap-2">
+                  <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{w.title ?? w.type}</h2>
+                  {editing ? (
+                    <div className="flex items-center gap-1">
+                      <NativeSelect
+                        aria-label={`Size of ${w.title ?? w.type}`}
+                        value={w.size}
+                        onChange={(e) => update(i, { ...w, size: e.target.value as Widget['size'] })}
+                        className="h-7 w-24 text-xs"
+                      >
+                        <option value="sm">Small</option>
+                        <option value="md">Medium</option>
+                        <option value="lg">Wide</option>
+                      </NativeSelect>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Move earlier"
+                        disabled={i === 0}
+                        onClick={() => move(i, -1)}
+                      >
+                        <ArrowUp />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Move later"
+                        disabled={i === shown.length - 1}
+                        onClick={() => move(i, 1)}
+                      >
+                        <ArrowDown />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Remove ${w.title ?? w.type}`}
+                        onClick={() => update(i, null)}
+                      >
+                        <X />
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
                 <WidgetBody widget={w} />
               </section>
             ))}
+        {editing && !shown.length ? (
+          <p className="text-sm text-muted lg:col-span-3">No widgets. Add one from the menu above.</p>
+        ) : null}
       </div>
     </div>
   );
@@ -120,6 +270,10 @@ function WidgetBody({ widget }: { widget: Widget }) {
       return <ActivityByUser data={q.data as never} />;
     case 'date_window':
       return <DateWindow data={q.data as never} />;
+    case 'report': {
+      const r = q.data as unknown as { definition: ReportDefinition; result: ReportResultDto };
+      return <ReportChart result={r.result} definition={r.definition} height={200} />;
+    }
     default:
       if (widget.type.startsWith('module:'))
         return <ModuleWidget type={widget.type.slice(7)} data={q.data} />;
