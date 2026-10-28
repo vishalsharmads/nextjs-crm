@@ -77,6 +77,8 @@ export function checkPermission(
       : new AppError('UNAUTHENTICATED', 'Sign in to continue');
   }
   if (permission === 'authenticated') return user;
+  if (user.readOnly && !permission.endsWith('.view'))
+    throw new AppError('FORBIDDEN', 'This access token is read-only');
   if (!user.isAdmin && !hasPermission(user.permissions, permission)) {
     throw new AppError('FORBIDDEN', 'You do not have permission to do that');
   }

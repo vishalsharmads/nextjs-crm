@@ -13,13 +13,17 @@ export interface AuditEntry {
 export function actorColumns(ctx: RequestContext) {
   return {
     actor_id: ctx.user?.id ?? null,
-    actor_type: ctx.user?.apiKeyId
-      ? 'api_key'
-      : ctx.user
-        ? 'user'
-        : ctx.requestId.startsWith('cli')
-          ? 'cli'
-          : 'system',
+    actor_type: ctx.user?.via
+      ? ctx.user.via
+      : ctx.user?.apiKeyId
+        ? 'api_key'
+        : ctx.user?.tokenId
+          ? 'token'
+          : ctx.user
+            ? 'user'
+            : ctx.requestId.startsWith('cli')
+              ? 'cli'
+              : 'system',
   };
 }
 

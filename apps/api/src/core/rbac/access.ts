@@ -58,6 +58,7 @@ export async function loadAccess(userId: number, conn: Db = db): Promise<UserAcc
 }
 
 export function can(user: AuthUser, permission: string): boolean {
+  if (user.readOnly && !permission.endsWith('.view')) return false;
   return user.isAdmin || hasPermission(user.permissions, permission);
 }
 

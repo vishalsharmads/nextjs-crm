@@ -10,6 +10,7 @@ import { recordBasePath } from '../records/paths';
 import { snake } from '../records/record-type';
 import type { ResourceDef } from '../records/types';
 import { getGroup } from '../settings/settings.service';
+import type { AuthUser } from '../../http/context';
 
 interface SearchProvider {
   entity: RecordEntity;
@@ -41,33 +42,39 @@ export const searchRoutes = defineRoutes('/search', ['search']).add({
     types: z.string().max(100).optional(),
     limit: z.coerce.number().int().min(1).max(20).default(5),
   }),
-  handler: async ({ user, query }) => {
-    const types = query.types ? new Set(query.types.split(',')) : null;
-    const { leads } = await getGroup('features');
-    const results = await Promise.all(
-      providers()
-        .filter((s) => (!types || types.has(s.entity)) && (s.entity !== 'lead' || leads))
-        .map(async (s) => {
-          const def = s.def;
-          if (!can(user, `${def.resource}.view`)) return [];
-          const { qb } = await scopedQuery(def, user, db);
-          applySearch(qb, query.q, def);
-          const rows = await qb
-            .limit(query.limit)
-            .select(
-              `${def.table}.uuid`,
-              `${def.table}.${s.title} as title`,
-              s.subtitle ? `${def.table}.${s.subtitle} as subtitle` : db.raw('NULL as subtitle'),
-            );
-          return rows.map((r) => ({
-            type: s.entity,
-            uuid: r.uuid,
-            title: r.title || '(no name)',
-            subtitle: r.subtitle ?? null,
-            url: `${recordBasePath(def)}/${r.uuid as string}`,
-          }));
-        }),
-    );
-    return { data: results.flat() };
-  },
+  handler: async ({ user, query }) => ({ data: await searchRecords(user, query) }),
 });
+
+/** Records matching `q` that the user may see, across every searchable record type. */
+export async function searchRecords(
+  user: AuthUser,
+  query: { q: string; types?: string | undefined; limit: number },
+) {
+  const types = query.types ? new Set(query.types.split(',')) : null;
+  const { leads } = await getGroup('features');
+  const results = await Promise.all(
+    providers()
+      .filter((s) => (!types || types.has(s.entity)) && (s.entity !== 'lead' || leads))
+      .map(async (s) => {
+        const def = s.def;
+        if (!can(user, `${def.resource}.view`)) return [];
+        const { qb } = await scopedQuery(def, user, db);
+        applySearch(qb, query.q, def);
+        const rows = await qb
+          .limit(query.limit)
+          .select(
+            `${def.table}.uuid`,
+            `${def.table}.${s.title} as title`,
+            s.subtitle ? `${def.table}.${s.subtitle} as subtitle` : db.raw('NULL as subtitle'),
+          );
+        return rows.map((r) => ({
+          type: s.entity,
+          uuid: r.uuid,
+          title: r.title || '(no name)',
+          subtitle: r.subtitle ?? null,
+          url: `${recordBasePath(def)}/${r.uuid as string}`,
+        }));
+      }),
+  );
+  return results.flat();
+}

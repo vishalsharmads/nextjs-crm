@@ -14,6 +14,7 @@ import * as m0012 from './0012_encryption';
 import * as m0013 from './0013_open_entities';
 import * as m0014 from './0014_lead_pipeline';
 import * as m0015 from './0015_custom_objects';
+import * as m0016 from './0016_access_tokens';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -37,4 +38,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0013_open_entities': m0013,
   '0014_lead_pipeline': m0014,
   '0015_custom_objects': m0015,
+  '0016_access_tokens': m0016,
 };

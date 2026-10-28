@@ -33,7 +33,8 @@
     "doctor": "npm run cli -w @app/api -- doctor",
     "demo:reset": "npm run cli -w @app/api -- demo:reset",
     "check:brand": "node scripts/check-brand-strings.mjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "mcp": "tsx apps/api/src/cli/mcp-stdio.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",

@@ -322,7 +322,10 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
     body: z.record(z.string(), z.unknown()),
     handler: async ({ ctx, user, params, body }) => {
       // Security and compliance settings can weaken every account's protection: admins only.
-      if ((params.group === 'security' || params.group === 'compliance') && !user.isAdmin)
+      if (
+        (params.group === 'security' || params.group === 'compliance' || params.group === 'mcp') &&
+        !user.isAdmin
+      )
         throw new AppError('FORBIDDEN', 'Only admins can change security and compliance settings');
       const current = (await getRaw(params.group)) ?? {};
       let next: object = SETTINGS_GROUPS[params.group].parse({ ...(current as object), ...body });

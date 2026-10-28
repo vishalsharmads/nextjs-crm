@@ -2,6 +2,8 @@ import sanitizeHtml from 'sanitize-html';
 import { activityCreateSchema, activityPatchSchema, type ActivityDto, type RelatedType } from '@app/shared';
 import type { Db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
+import type { AuthUser } from '../../http/context';
+import { applyScope, can } from '../rbac/access';
 import type { ResourceDef } from '../records/types';
 import { serializeCustom } from '../records/custom';
 import {
@@ -53,11 +55,21 @@ export function sanitizeBody(html: string | null | undefined): string | null | u
   });
 }
 
-async function resolveRelated(conn: Db, related: { type: RelatedType; uuid: string } | null | undefined) {
+/** The linked record must be one the user may view: missing and out of scope look the same. */
+async function resolveRelated(
+  conn: Db,
+  user: AuthUser,
+  related: { type: RelatedType; uuid: string } | null | undefined,
+) {
   if (related === undefined) return {};
   if (related === null) return { related_type: null, related_id: null };
   const meta = RELATED_TABLE[related.type];
-  const row = await conn(meta.table).where({ uuid: related.uuid }).whereNull('deleted_at').first('id');
+  // Imported lazily: the records registry imports this definition.
+  const { recordDefs } = await import('../records/registry');
+  const parent = recordDefs[related.type];
+  const qb = conn(meta.table).where(`${meta.table}.uuid`, related.uuid).whereNull(`${meta.table}.deleted_at`);
+  await applyScope(qb, user, parent.resource, parent.ownerColumns, conn);
+  const row = can(user, `${parent.resource}.view`) ? await qb.first(`${meta.table}.id`) : undefined;
   if (!row)
     throw new AppError('VALIDATION_FAILED', 'The linked record was not found', [
       { path: 'related', message: 'Not found' },
@@ -124,6 +136,7 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
       assignee_id: await userIdFromRef(input.assigneeUuid as string | null | undefined, user, conn),
       ...(await resolveRelated(
         conn,
+        user,
         input.related as { type: RelatedType; uuid: string } | null | undefined,
       )),
     });

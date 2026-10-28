@@ -55,6 +55,7 @@ export function useSettingsSections() {
         { to: 'email', label: t('settings.email'), permission: 'core.email.manage' },
         { to: 'webhooks', label: t('settings.webhooks'), permission: 'core.webhooks.manage' },
         { to: 'api-keys', label: t('settings.apiKeys'), permission: 'core.api_keys.manage' },
+        { to: 'ai-clients', label: t('settings.aiClients'), adminOnly: true },
         { to: 'modules', label: t('settings.modules'), permission: 'core.modules.manage' },
         { to: 'blueprint', label: t('settings.blueprint'), permission: 'core.blueprints.manage' },
         { to: 'audit', label: t('settings.audit'), permission: 'core.audit.view' },

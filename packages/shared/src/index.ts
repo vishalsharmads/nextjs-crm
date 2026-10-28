@@ -15,3 +15,4 @@ export * from './patch';
 export * from './templates';
 export * from './stages';
 export * from './objects';
+export * from './tokens';

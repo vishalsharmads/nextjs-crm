@@ -17,6 +17,22 @@ curl -X POST https://crm.example/api/v1/contacts -H "Authorization: Bearer sk_�
 - Errors always look like `{ "error": { "code", "message", "details?" } }`.
 - The full OpenAPI document is at `/api/v1/openapi.json` (admin session or a key with settings access).
 
+## AI clients (MCP)
+
+AI assistants that support the Model Context Protocol can work with the workspace on a person's behalf.
+
+1. An admin turns it on in **Settings → AI clients**, chooses which tools clients may call, and sets a per-token rate limit (default 60 calls a minute).
+2. Each person creates a token in **Profile → Access tokens**: read only, or read and write, expiring within a year (or sooner under the compliance profile's key limit). The secret is shown once.
+3. The client connects to `POST https://<host>/api/v1/mcp` (Streamable HTTP, JSON responses) with `Authorization: Bearer pat_…`. Clients that only launch local commands use the stdio bridge:
+
+   ```
+   MCP_URL=https://<host>/api/v1/mcp MCP_TOKEN=pat_… npx tsx apps/api/src/cli/mcp-stdio.ts
+   ```
+
+Every call runs as the token's person, through the same permission, record-scope, field-visibility, access-log and audit paths as the app; audit rows show `mcp` as the actor type. Hidden fields never leave the API and sensitive values stay masked. Tokens authenticate only the MCP endpoint, never the REST API, and a person who must enrol in two-factor authentication cannot use one until they do.
+
+Tools: `describe_schema`, `search_records`, `list_records`, `get_record`, `get_timeline`, `list_pipelines` (read) and `create_record`, `update_record`, `add_note`, `create_task`, `log_activity`, `move_deal_stage` (write; not offered to read-only tokens). Resources: `crm://schema` and `crm://record/{entity}/{uuid}`.
+
 ## Webhooks
 
 **Settings → Webhooks.** Choose events (or all). Each delivery is a `POST` with a JSON body:
