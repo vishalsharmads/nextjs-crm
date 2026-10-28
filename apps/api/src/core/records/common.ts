@@ -57,6 +57,7 @@ export const relationField = (
   sortColumn: string,
 ): CoreFieldSpec => ({
   kind: 'relation',
+  relation: { column: `${table}.${column}`, table: related },
   sortable: true,
   sortExpr: `(SELECT r.${sortColumn} FROM ${related} r WHERE r.id = ${table}.${column})`,
   filter: (qb, cond) => {

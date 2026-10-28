@@ -17,3 +17,4 @@ export * from './stages';
 export * from './objects';
 export * from './tokens';
 export * from './reports';
+export * from './report-builder';

@@ -88,6 +88,7 @@ function AssistantPage() {
 
 function Chat({ ready, loading, admin }: { ready: boolean; loading: boolean; admin: boolean }) {
   const qc = useQueryClient();
+  const { labels } = useBoot();
   const [params] = useSearchParams();
   const [active, setActive] = useState<string | null>(null);
   const [text, setText] = useState('');
@@ -216,7 +217,7 @@ function Chat({ ready, loading, admin }: { ready: boolean; loading: boolean; adm
             {!active && !send.isPending ? (
               <EmptyState
                 title="Ask about your records"
-                description="For example: which deals close this month, summarise this contact's history, or draft a follow-up note."
+                description={`For example: which ${(labels.deal?.plural ?? '').toLowerCase()} close this month, summarise the history of this ${(labels.contact?.singular ?? '').toLowerCase()}, or draft a follow-up note.`}
               />
             ) : conv.isError ? (
               <ErrorState error={conv.error} onRetry={() => void conv.refetch()} />

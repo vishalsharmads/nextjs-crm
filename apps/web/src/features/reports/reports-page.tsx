@@ -5,7 +5,8 @@ import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } fro
 import type { ForecastDto, QuotaRowDto, VelocityDto } from '@app/shared';
 import { ApiError, apiGet, apiPut } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
-import { useBoot, useCan } from '@/app/session';
+import { ReportBuilder } from './report-builder';
+import { useBoot, useCan, useT } from '@/app/session';
 import { Input, NativeSelect } from '@/components/ui/input';
 import {
   EmptyState,
@@ -35,14 +36,15 @@ const monthLabel = (m: string) =>
   });
 
 export function ReportsPage() {
-  const { labels, pipelines } = useBoot();
+  const t = useT();
+  const { pipelines } = useBoot();
   const dealPipelines = pipelines.filter((p) => p.entity === 'deal');
   const [pipelineUuid, setPipelineUuid] = useState('');
   return (
     <div className="flex flex-col">
       <PageHeader
         title="Reports"
-        description={`Forecast, quotas and velocity for the ${labels.deal?.plural.toLowerCase() ?? 'deals'} you can see.`}
+        description={t('reports.description')}
         actions={
           dealPipelines.length > 1 ? (
             <NativeSelect
@@ -66,6 +68,7 @@ export function ReportsPage() {
             <TabsTrigger value="forecast">Forecast</TabsTrigger>
             <TabsTrigger value="quotas">Quotas</TabsTrigger>
             <TabsTrigger value="velocity">Velocity</TabsTrigger>
+            <TabsTrigger value="custom">Custom</TabsTrigger>
           </TabsList>
           <TabsContent value="forecast" className="mt-4">
             <Forecast pipelineUuid={pipelineUuid} />
@@ -75,6 +78,9 @@ export function ReportsPage() {
           </TabsContent>
           <TabsContent value="velocity" className="mt-4">
             <Velocity pipelineUuid={pipelineUuid} />
+          </TabsContent>
+          <TabsContent value="custom" className="mt-4">
+            <ReportBuilder />
           </TabsContent>
         </Tabs>
       </div>

@@ -11,6 +11,7 @@ import { recordDefs } from '../records/registry';
 import { getDefinition } from '../custom-fields/definitions';
 import { isModuleEnabled } from '../../modules/registry';
 import { moduleWidget } from '../../modules/widgets';
+import { runReport, visibleReport } from '../reports/builder';
 
 const widgetSchema = z.object({
   key: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
@@ -43,6 +44,20 @@ async function widgetData(type: string, params: Record<string, unknown>, user: A
     return moduleWidget(type.slice(7), params, user);
   }
   switch (type) {
+    case 'report': {
+      // A saved report, run as the viewer: their scope applies, and others' private reports stay private.
+      if (!can(user, 'core.reports.view') || typeof params.report !== 'string')
+        return { unavailable: true, reason: 'forbidden' };
+      try {
+        const row = await visibleReport(params.report, user);
+        const definition = typeof row.definition === 'string' ? JSON.parse(row.definition) : row.definition;
+        return { name: row.name, definition, result: await runReport(definition, user) };
+      } catch (err) {
+        if (err instanceof AppError)
+          return { unavailable: true, reason: err.code === 'NOT_FOUND' ? 'not_found' : 'forbidden' };
+        throw err;
+      }
+    }
     case 'pipeline_value': {
       if (!can(user, 'core.deals.view')) return { unavailable: true, reason: 'forbidden' };
       const pipeline =
@@ -290,6 +305,26 @@ export const dashboardRoutes = defineRoutes('/dashboards', ['dashboard'])
         });
       });
       return dto(await db('dashboards').where({ id: d.id }).first(), user);
+    },
+  })
+  .add({
+    method: 'delete',
+    path: '/:uuid',
+    permission: 'core.dashboard.view',
+    params: z.object({ uuid: z.uuid() }),
+    summary: 'Delete my personal dashboard (back to the shared one)',
+    handler: async ({ ctx, user, params }) => {
+      await db.transaction(async (trx) => {
+        const d = await trx('dashboards').where({ uuid: params.uuid, owner_id: user.id }).first('id');
+        if (!d) throw notFound('Dashboard');
+        await trx('dashboards').where({ id: d.id }).delete();
+        await audit(trx, ctx, {
+          action: 'dashboard.deleted',
+          entity: 'dashboard',
+          entityId: d.id,
+          entityUuid: params.uuid,
+        });
+      });
     },
   })
   .add({

@@ -29,6 +29,7 @@ import { objectRecordRoutes, objectsRoutes } from './objects/objects.routes';
 import { tokensRoutes } from './tokens/tokens';
 import { mcpRoutes } from './mcp/mcp.routes';
 import { reportsRoutes } from './reports/reports.routes';
+import { reportBuilderRoutes } from './reports/builder';
 import { toolsRoutes } from './tools/tools.routes';
 
 /** All core route groups. Specific paths (e.g. /deals/board) are registered before /:uuid. */
@@ -72,6 +73,7 @@ export function coreRouteGroups(): RouteGroup[] {
     emailRoutes,
     objectsRoutes,
     mcpRoutes,
+    reportBuilderRoutes,
     reportsRoutes,
     toolsRoutes,
     objectRecordRoutes,

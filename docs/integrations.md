@@ -73,15 +73,22 @@ Events: `contact|organization|lead|deal.created|updated|deleted`, `deal.stage_ch
 
 **Settings → Automations.** Each automation has three parts:
 
-- **When:** an event.
-- **Only if:** the same filters as lists, plus _changed fields_ for updates.
-- **Then:** one or more actions. Update a field, create a task, notify someone, send an email, or add tags.
+- **When:** an event, optionally after a wait (minutes, hours or days), or **on a schedule** (daily or weekly at a time in the workspace time zone) for every record of one type that matches.
+- **Only if:** the same filters as lists, plus _changed fields_ for updates. After a wait the conditions are checked again against the record as it is then, so "three days after a deal is created, if it is still open" works; a deleted record, or one the rule's owner can no longer see, is skipped.
+- **Then:** one or more actions. Update a field, create a task, notify someone, send an email, add or remove tags, add a note, or assign the record to one of a list of people in turn.
 
 Text can use the record, for example `{{record.title}}` or `{{record.owner.name}}`.
 
 - Automations run in the background as the person who created them, with that person's permissions.
 - Each run is logged with its outcome.
 - Automations triggered by other automations stop after 3 levels, so rules cannot loop forever.
+- Waiting runs are kept in the database, so a restart does not lose them. A scheduled rule visits at most 500 records per run. Erasing a person drops runs waiting for them.
+
+## Reports and dashboards
+
+**Reports** (permission `core.reports.view`) has four tabs: a forecast of open value by expected close month weighted by stage probability; monthly **quotas** with attainment (set them with `core.quotas.manage`); **velocity** (win rate, average won value, cycle length and time in each stage); and **custom** reports. A custom report takes one record type, groups it by a field (a choice, a person, a stage or pipeline, or a date by day, week, month, quarter or year), measures a count, total or average of a number field, applies list filters, and shows bars, a line, a pie or a table. Reports run as the viewer, so record scope and field visibility apply; grouping by a linked record (a contact, say) is not offered, so names outside someone's scope never appear. Reports can be shared with everyone (`core.saved_views.share`).
+
+**Dashboards.** Anyone can edit their home dashboard: add built-in widgets or saved reports, resize, reorder and remove them. The first save creates a personal copy; **Reset to shared** goes back to the workspace dashboard, which only people with `core.dashboard.manage` can change.
 
 ## Web forms
 

@@ -155,6 +155,14 @@ async function eraseCoreTraces(
       .where('payload', 'like', `%${escapeLike(uuid)}%`)
       .update({ payload: JSON.stringify({ redacted: true }), result: null }),
   );
+  // Delayed automation runs waiting for this person never run.
+  add(
+    'automationQueue',
+    await trx('automation_queue')
+      .where({ record_uuid: uuid })
+      .orWhere('event', 'like', `%${escapeLike(uuid)}%`)
+      .delete(),
+  );
   add(
     'automationRuns',
     await trx('automation_runs')

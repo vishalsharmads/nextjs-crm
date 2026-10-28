@@ -203,5 +203,8 @@
     "noReplies": "No saved replies match",
     "undo": "Undo edit",
     "redo": "Redo edit"
+  },
+  "reports": {
+    "description": "Forecast, quotas and velocity for the {{dealPluralLower}} you can see."
   }
 }

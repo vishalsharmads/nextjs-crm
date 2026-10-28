@@ -181,7 +181,8 @@ const related = z
 defineTool({
   name: 'add_note',
   title: 'Add a note',
-  description: 'Adds a note to a contact, organization, deal or lead.',
+  description:
+    'Adds a note to a record (record type keys contact, organization, deal or lead; their names in this workspace come from describe_schema).',
   write: true,
   input: z.object({ related, body: z.string().min(1).max(20_000).describe('Plain text or simple HTML') }),
   async handler(input, { ctx, user }) {
@@ -229,7 +230,7 @@ defineTool({
 
 defineTool({
   name: 'move_deal_stage',
-  title: 'Move a deal to a stage',
+  title: 'Move to another stage',
   description: 'Moves a deal to another stage of its pipeline (stage ids come from list_pipelines).',
   write: true,
   input: z.object({ dealUuid: uuid, stageUuid: z.uuid() }),

@@ -34,7 +34,17 @@ type Action =
     }
   | { type: 'notify'; to: string; title: string; body?: string }
   | { type: 'send_email'; to: string; subject: string; body: string }
-  | { type: 'add_tags'; tags: string[] };
+  | { type: 'add_tags'; tags: string[] }
+  | { type: 'remove_tags'; tags: string[] }
+  | { type: 'assign'; users: string[] }
+  | { type: 'add_note'; body: string };
+
+interface Schedule {
+  entity: string;
+  frequency: 'daily' | 'weekly';
+  weekday: number;
+  time: string;
+}
 
 interface AutomationRow {
   uuid: string;
@@ -43,6 +53,9 @@ interface AutomationRow {
   triggerEvent: string;
   conditions: FilterNode | null;
   actions: Action[];
+  delayMinutes: number;
+  schedule: Schedule | null;
+  nextRunAt: string | null;
   active: boolean;
   runCount: number;
   lastRunAt: string | null;
@@ -85,6 +98,7 @@ function useEventLabel() {
     low: 'runs low',
   };
   return (event: string) => {
+    if (event === 'schedule') return 'On a schedule';
     const [entity, action] = event.split('.') as [string, string];
     const noun = entity === 'form' ? 'Web form' : (L[entity] ?? entity);
     return `${noun} ${verbs[action] ?? action}`;
@@ -97,7 +111,17 @@ const ACTION_LABEL: Record<Action['type'], string> = {
   notify: 'Send an in-app notification',
   send_email: 'Send an email',
   add_tags: 'Add tags',
+  remove_tags: 'Remove tags',
+  assign: 'Assign in turn',
+  add_note: 'Add a note',
 };
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DELAY_UNITS = [
+  { value: 1, label: 'minutes' },
+  { value: 60, label: 'hours' },
+  { value: 1440, label: 'days' },
+];
 
 export function AutomationsPage() {
   const t = useT();
@@ -204,7 +228,19 @@ function AutomationEditor({
       },
     ],
   );
-  const entity = trigger.split('.')[0] as CoreEntity | 'form';
+  const [schedule, setSchedule] = useState<Schedule>(
+    automation?.schedule ?? { entity: 'deal', frequency: 'daily', weekday: 1, time: '09:00' },
+  );
+  const initialDelay = automation?.delayMinutes ?? 0;
+  const initialUnit = [1440, 60, 1].find((u) => initialDelay % u === 0 && initialDelay >= u) ?? 60;
+  const [delayUnit, setDelayUnit] = useState(initialUnit);
+  const [delayAmount, setDelayAmount] = useState(initialDelay ? initialDelay / initialUnit : 0);
+  const scheduled = trigger === 'schedule';
+  const entity = (scheduled ? schedule.entity : trigger.split('.')[0]) as CoreEntity | 'form';
+  const scheduleEntities = [
+    ...['contact', 'organization', 'lead', 'deal', 'activity'],
+    ...boot.recordTypes.map((t) => t.entity),
+  ];
   const config = useMemo(() => (entity === 'form' ? null : buildConfig(entity, boot)), [entity, boot]);
   const runs = useQuery({
     queryKey: ['automations', automation?.uuid, 'runs'],
@@ -221,6 +257,8 @@ function AutomationEditor({
         triggerEvent: trigger,
         conditions: conditions.length ? { and: conditions } : null,
         actions,
+        schedule: scheduled ? schedule : null,
+        delayMinutes: scheduled ? 0 : Math.max(0, Math.round(delayAmount * delayUnit)),
       };
       return automation ? apiPatch(`/automations/${automation.uuid}`, body) : apiPost('/automations', body);
     },
@@ -293,12 +331,91 @@ function AutomationEditor({
             onChange={(v) => (setTrigger(v as string), setConditions([]))}
             options={events.map((e) => ({ value: e, label: eventLabel(e) }))}
           />
+          {scheduled ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              For each
+              <NativeSelect
+                aria-label="Record type"
+                value={schedule.entity}
+                onChange={(e) => (setSchedule({ ...schedule, entity: e.target.value }), setConditions([]))}
+                className="h-8 w-40"
+              >
+                {scheduleEntities.map((e) => (
+                  <option key={e} value={e}>
+                    {boot.labels[e]?.singular ?? e}
+                  </option>
+                ))}
+              </NativeSelect>
+              that matches, run
+              <NativeSelect
+                aria-label="Frequency"
+                value={schedule.frequency}
+                onChange={(e) =>
+                  setSchedule({ ...schedule, frequency: e.target.value as Schedule['frequency'] })
+                }
+                className="h-8 w-28"
+              >
+                <option value="daily">every day</option>
+                <option value="weekly">every week</option>
+              </NativeSelect>
+              {schedule.frequency === 'weekly' ? (
+                <NativeSelect
+                  aria-label="Day"
+                  value={schedule.weekday}
+                  onChange={(e) => setSchedule({ ...schedule, weekday: Number(e.target.value) })}
+                  className="h-8 w-32"
+                >
+                  {WEEKDAYS.map((d, i) => (
+                    <option key={d} value={i}>
+                      on {d}
+                    </option>
+                  ))}
+                </NativeSelect>
+              ) : null}
+              at
+              <Input
+                aria-label="Time"
+                type="time"
+                value={schedule.time}
+                onChange={(e) => setSchedule({ ...schedule, time: e.target.value })}
+                className="h-8 w-28"
+              />
+              <span className="text-xs text-muted">({boot.settings.general.timezone})</span>
+            </div>
+          ) : (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              Wait
+              <Input
+                aria-label="Delay"
+                type="number"
+                min={0}
+                value={delayAmount}
+                onChange={(e) => setDelayAmount(Math.max(0, Number(e.target.value)))}
+                className="h-8 w-20"
+              />
+              <NativeSelect
+                aria-label="Delay unit"
+                value={delayUnit}
+                onChange={(e) => setDelayUnit(Number(e.target.value))}
+                className="h-8 w-28"
+              >
+                {DELAY_UNITS.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
+                  </option>
+                ))}
+              </NativeSelect>
+              <span className="text-xs text-muted">
+                {delayAmount > 0 ? 'then check the conditions again before acting' : 'act straight away'}
+              </span>
+            </div>
+          )}
         </section>
         {config ? (
           <section>
             <h3 className="mb-2 text-sm font-semibold">Only if</h3>
             <FilterBar
-              fields={trigger.endsWith('.updated') ? [changedField, ...fields] : fields}
+              fields={!scheduled && trigger.endsWith('.updated') ? [changedField, ...fields] : fields}
               conditions={conditions}
               onChange={setConditions}
             />
@@ -413,7 +530,12 @@ function defaultAction(type: Action['type']): Action {
         body: '<p>Thanks for getting in touch.</p>',
       };
     case 'add_tags':
+    case 'remove_tags':
       return { type, tags: [] };
+    case 'assign':
+      return { type, users: [] };
+    case 'add_note':
+      return { type, body: 'Checked in on {{record.title}}' };
   }
 }
 
@@ -525,7 +647,51 @@ function ActionEditor({
         </div>
       );
     case 'add_tags':
+    case 'remove_tags':
       return <TagsInput value={action.tags} onChange={(tags) => onChange({ ...action, tags })} />;
+    case 'assign':
+      return (
+        <div className="flex flex-col gap-2">
+          {action.users.map((u, i) => (
+            <div key={`${u}-${i}`} className="flex items-center gap-2">
+              <div className="flex-1">
+                <UserPicker
+                  value={u}
+                  onChange={(v) =>
+                    onChange({
+                      ...action,
+                      users: action.users.map((x, j) => (j === i ? (v ?? '') : x)).filter(Boolean),
+                    })
+                  }
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label="Remove person"
+                onClick={() => onChange({ ...action, users: action.users.filter((_, j) => j !== i) })}
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          ))}
+          <UserPicker
+            value={null}
+            onChange={(v) => v && onChange({ ...action, users: [...action.users, v] })}
+          />
+          <p className="text-xs text-muted">Each run assigns the next person in the list.</p>
+        </div>
+      );
+    case 'add_note':
+      return (
+        <RichTextEditor
+          aria-label="Note"
+          mode="basic"
+          value={action.body}
+          onChange={(body) => onChange({ ...action, body })}
+          className="min-h-24"
+        />
+      );
   }
 }
 
