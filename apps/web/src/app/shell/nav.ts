@@ -21,6 +21,7 @@ import {
   Target,
   Ticket,
   Users,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react';
 import type { BootstrapDto } from '@app/shared';
@@ -63,6 +64,7 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   notebook: Notebook,
   package: Package,
   receipt: Receipt,
+  sparkles: Sparkles,
   ticket: Ticket,
 };
 

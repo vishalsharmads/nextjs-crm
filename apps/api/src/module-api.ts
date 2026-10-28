@@ -54,3 +54,15 @@ export type { ResourceDef } from './core/records/types';
 export { mergeFieldGroups } from './core/templates/merge-fields';
 export type { Knex } from 'knex';
 export { logger } from './lib/logger';
+import './core/tools/core-tools';
+export {
+  allTools,
+  callTool,
+  inputJsonSchema,
+  toolDefs,
+  type ToolDef,
+  type ToolContext,
+} from './core/tools/registry';
+export { encrypt, decrypt } from './lib/crypto';
+export { effectiveCompliance } from './core/settings/settings.service';
+export { assertSafeUrl } from './core/webhooks/webhooks';

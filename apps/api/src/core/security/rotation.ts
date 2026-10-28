@@ -50,6 +50,8 @@ const SECRET_COLUMNS: [table: string, column: string, aad: (id: number) => strin
   ['users', 'totp_secret_enc', totpAad],
   ['webhooks', 'secret_enc', () => 'webhooks.secret_enc'],
   ['mail_accounts', 'password_enc', () => 'mail_accounts.password_enc'],
+  // Module tables exist only once the module has been enabled.
+  ['m_assistant_config', 'api_key_enc', () => 'm_assistant_config.api_key_enc'],
 ];
 
 /**
@@ -62,6 +64,7 @@ export async function rotateKeys(): Promise<RotationReport> {
 
   for (const [table, column, aadFor] of SECRET_COLUMNS) {
     const area = `${table}.${column}`;
+    if (!(await db.schema.hasTable(table))) continue;
     for (const { id } of await db(table).whereNotNull(column).select('id')) {
       try {
         await db.transaction(async (trx) => {
