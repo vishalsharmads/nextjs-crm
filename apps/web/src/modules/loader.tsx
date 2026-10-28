@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { Navigate, useParams, useRoutes } from 'react-router';
 import type { WebModule } from '@app/module-sdk';
+import { CUSTOM_OBJECTS_KEY } from '@app/shared';
 import { useBoot } from '@/app/session';
 import { Spinner } from '@/components/ui/spinner';
 import { RecordListPage } from '@/features/records/list-page';
@@ -138,4 +139,27 @@ export function PublicModuleOutlet() {
     );
   if (!state.mod.publicRoutes?.length) return <Navigate to="/login" replace />;
   return <PublicRoutes mod={state.mod} />;
+}
+
+/** Pages of an admin-defined object (`/o/<route>`); archived or unknown objects show a notice. */
+export function ObjectOutlet() {
+  const { object = '' } = useParams();
+  const boot = useBoot();
+  const meta = boot.recordTypes.find((t) => t.moduleKey === CUSTOM_OBJECTS_KEY && t.route === object);
+  const routes = useRoutes(
+    meta
+      ? [
+          { index: true, element: <RecordListPage key={meta.entity} entity={meta.entity} /> },
+          { path: ':uuid', element: <RecordPage key={meta.entity} entity={meta.entity} /> },
+        ]
+      : [],
+  );
+  if (!meta)
+    return (
+      <EmptyState
+        title="This page is not available"
+        description="It may have been archived, or you may not have access. Ask an admin."
+      />
+    );
+  return routes;
 }

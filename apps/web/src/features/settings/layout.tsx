@@ -40,6 +40,7 @@ export function useSettingsSections() {
     {
       title: t('settings.data'),
       links: [
+        { to: 'objects', label: t('settings.objects'), permission: 'core.fields.manage' },
         { to: 'fields', label: t('settings.fields'), permission: 'core.fields.manage' },
         { to: 'layouts', label: t('settings.layouts'), permission: 'core.fields.manage' },
         { to: 'pipelines', label: t('settings.pipelines'), permission: 'core.pipelines.manage' },

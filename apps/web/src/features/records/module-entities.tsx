@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   ENTITY_ROUTE,
+  recordTypePath,
   type CustomFieldDef,
   type RecordColumnMeta,
   type RecordTypeMeta,
@@ -160,7 +161,7 @@ export function buildModuleConfig(
   const editable = meta.columns.filter((c) => c.kind !== 'datetime');
   return {
     entity: meta.entity,
-    route: `m/${meta.moduleKey}/${meta.route}`,
+    route: recordTypePath(meta),
     resource: meta.resource,
     singular: labels.singular,
     plural: labels.plural,

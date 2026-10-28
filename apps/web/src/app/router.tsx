@@ -9,7 +9,7 @@ import { SettingsLayout } from '@/features/settings/layout';
 import { RecordListPage } from '@/features/records/list-page';
 import { RecordPage } from '@/features/records/record-page';
 import { TrashPage } from '@/features/records/trash-page';
-import { ModuleOutlet, PublicModuleOutlet } from '@/modules/loader';
+import { ModuleOutlet, ObjectOutlet, PublicModuleOutlet } from '@/modules/loader';
 import { basePath } from '@/lib/app-url';
 
 const lazyPage = <T extends Record<string, unknown>>(loader: () => Promise<T>, name: keyof T) =>
@@ -31,6 +31,7 @@ const UsersPage = lazyPage(() => import('@/features/settings/people-pages'), 'Us
 const TeamsPage = lazyPage(() => import('@/features/settings/people-pages'), 'TeamsPage');
 const RolesPage = lazyPage(() => import('@/features/settings/people-pages'), 'RolesPage');
 const FieldsPage = lazyPage(() => import('@/features/settings/fields-page'), 'FieldsPage');
+const ObjectsPage = lazyPage(() => import('@/features/settings/objects-page'), 'ObjectsPage');
 const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'), 'PipelinesPage');
 const DealsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'DealsPage');
 const LeadsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'LeadsPage');
@@ -95,6 +96,7 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'users', element: <UsersPage /> },
   { path: 'teams', element: <TeamsPage /> },
   { path: 'roles', element: <RolesPage /> },
+  { path: 'objects', element: <ObjectsPage /> },
   { path: 'fields', element: <FieldsPage /> },
   { path: 'pipelines', element: <PipelinesPage /> },
   { path: 'audit', element: <AuditPage /> },
@@ -144,6 +146,7 @@ export const router = createBrowserRouter(
             { index: true, element: page(<DashboardPage />) },
             { path: 'import/:route', element: page(<ImportPage />) },
             { path: 'm/:moduleKey/*', element: <ModuleOutlet /> },
+            { path: 'o/:object/*', element: <ObjectOutlet /> },
             { path: 'contacts', element: <RecordListPage entity="contact" /> },
             { path: 'contacts/:uuid', element: <RecordPage entity="contact" /> },
             { path: 'organizations', element: <RecordListPage entity="organization" /> },

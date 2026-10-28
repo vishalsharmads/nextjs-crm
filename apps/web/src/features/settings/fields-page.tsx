@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import {
   DndContext,
@@ -75,7 +76,8 @@ export function FieldsPage() {
   const t = useT();
   const boot = useBoot();
   const L = labelVars(boot.labels);
-  const [entity, setEntity] = useState<CustomizableEntity>('contact');
+  const [params] = useSearchParams();
+  const [entity, setEntity] = useState<CustomizableEntity>(params.get('entity') ?? 'contact');
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<CustomFieldDef | 'new' | null>(null);
   const qc = useQueryClient();
