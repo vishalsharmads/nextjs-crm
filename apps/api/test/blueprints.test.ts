@@ -37,6 +37,58 @@ describe('blueprint engine', () => {
     expect(after).toEqual(before);
   });
 
+  it('seeds objects with their fields and role permissions, idempotently, and exports them', async () => {
+    const next = bump(generic, await nextVersion(), (b) => {
+      b.objects.push({
+        key: 'bp_site',
+        singular: 'Site',
+        plural: 'Sites',
+        icon: 'map-pin',
+        links: ['organization'],
+      });
+      b.custom_fields.bp_site = [
+        {
+          key: 'area',
+          label: 'Area',
+          type: 'number',
+          sensitivity: 'normal',
+          required: false,
+          filterable: true,
+          show_in_list: true,
+        },
+      ];
+      b.roles.push({
+        key: 'bp_site_viewer',
+        name: 'Site viewer',
+        description: '',
+        permissions: ['custom.bp_site.view'],
+        scopes: {},
+      });
+    });
+    const report = await applyBlueprint(db, next);
+    expect(report.created).toEqual(expect.arrayContaining(['object.bp_site', 'field.bp_site.area']));
+    expect(await db.schema.hasColumn('m_custom_bp_site', 'cf_area')).toBe(true);
+    expect(await db.schema.hasColumn('m_custom_bp_site', 'organization_id')).toBe(true);
+    const again = await applyBlueprint(db, next);
+    expect(again.created).toEqual([]);
+    expect(again.status).toBe('unchanged');
+    const exported = await exportBlueprint(db);
+    expect(exported.objects).toContainEqual(
+      expect.objectContaining({ key: 'bp_site', links: ['organization'] }),
+    );
+    expect(exported.custom_fields.bp_site).toContainEqual(expect.objectContaining({ key: 'area' }));
+  });
+
+  it('refuses objects with reserved or module keys before changing anything', async () => {
+    for (const key of ['contact', 'invoice', 'demo_item']) {
+      const bad = bump(generic, await nextVersion(), (b) => {
+        b.objects.push({ key, singular: 'X', plural: 'Xs', icon: 'box', links: [] });
+      });
+      await expect(applyBlueprint(db, bad)).rejects.toThrow(/reserved|module/);
+      expect(await db('custom_objects').where({ entity: key }).first()).toBeUndefined();
+    }
+  });
+
   it('never overwrites a client-edited item and reports a conflict', async () => {
     await db('custom_field_definitions')
       .where({ entity: 'contact', key: 'linkedin' })

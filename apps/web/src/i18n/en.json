@@ -114,6 +114,7 @@
     "roles": "Roles",
     "teams": "Teams",
     "security": "Security",
+    "objects": "Objects",
     "fields": "Custom fields",
     "pipelines": "Pipelines",
     "modules": "Modules",

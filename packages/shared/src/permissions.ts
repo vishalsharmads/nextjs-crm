@@ -51,7 +51,7 @@ export const CORE_PERMISSIONS: PermissionDef[] = [
   { key: 'core.branding.manage', description: 'Manage branding' },
   { key: 'core.users.manage', description: 'Manage users and teams' },
   { key: 'core.roles.manage', description: 'Manage roles and permissions' },
-  { key: 'core.fields.manage', description: 'Manage custom fields and layouts' },
+  { key: 'core.fields.manage', description: 'Manage objects, custom fields and layouts' },
   { key: 'core.pipelines.manage', description: 'Manage pipelines and stages' },
   { key: 'core.labels.manage', description: 'Manage vocabulary' },
   { key: 'core.audit.view', description: 'View the audit log' },

@@ -35,12 +35,12 @@ export interface PrivacyHandler {
   erase(subject: DataSubject, trx: Db, mode: 'anonymize' | 'delete'): Promise<ErasureResult>;
 }
 
-/** Module handlers whose tables exist (a module never enabled has no tables). */
+/** Module and object handlers whose tables exist (a module never enabled has no tables). */
 export async function privacyHandlers(conn: Db): Promise<PrivacyHandler[]> {
   const { loadModules } = await import('../../modules/registry');
+  const { objectPrivacyHandlers } = await import('../objects/objects');
   const out: PrivacyHandler[] = [];
-  for (const m of loadModules()) {
-    const h = m.api?.privacy;
+  for (const h of [...loadModules().map((m) => m.api?.privacy), ...objectPrivacyHandlers()]) {
     if (h && (await conn.schema.hasTable(h.tables[0]!))) out.push(h);
   }
   return out;

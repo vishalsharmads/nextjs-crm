@@ -163,7 +163,10 @@ Severity: **B** blocker · **I** important · **N** nice-to-have. Effort: **S / 
   - It refuses to overwrite an existing folder.
 - **Proof.** A test-only fixture module (`apps/api/test/fixtures/`) exercises the whole path: custom field, view, search, import, bulk, trash, automation trigger, and scope (`own` can't read others).
 
-**6c: admin-defined entities (#5 amended, approved).**
+**6c: admin-defined entities (#5 amended, approved). Done.**
+
+As built (decision 7): each object gets its own table, `m_custom_<key>`, created when the object is created, instead of one shared `custom_records` table. The records engine and the custom-field DDL work per table (generated `cf_<key>` columns, FULLTEXT index, scope and filters), so a shared table would have needed an object filter in every query path and field keys would collide between objects. The 20-object limit bounds the number of tables. Details: `core/objects/` (registry, DDL, privacy, menu) and `/o/:object` record routes resolved per request, so new objects need no restart. Links are to core entities only; object-to-object links are parked in the roadmap.
+
 - Admins create entities in Settings → Objects. Storage is a fixed set of tables, `custom_objects` (definitions) and `custom_records` (core columns, owner, team, `custom` JSON, `object_id`), with generated columns from the existing DDL service.
 - Guardrails:
   - at most 20 objects
@@ -228,7 +231,7 @@ Severity: **B** blocker · **I** important · **N** nice-to-have. Effort: **S / 
 | `phase-6a2-ui-polish` | Premium UI refresh: motion, elevation and type tokens, text contrast, linked list rows, touch targets, pipeline-first dashboard, stage track on the deal page, settle motion on the board. **Done.** | Later milestones (custom objects, the assistant panel) build on the refreshed components instead of restyling them |
 | `phase-6a3-rich-text` | Rich text editor (Visual / Markdown / HTML) for notes, emails, templates, automation emails and document templates; saved replies inserted with `/`; merge fields picked with `{{`; document tables, dividers, page breaks and live preview. **Done.** | Notes, emails and documents were plain textareas; templates were raw HTML |
 | `phase-6b-records-engine` | ResourceDef for modules; module scaffolding CLI; search provider registry. **Done.** Reference module `records-demo`. Tags, activities, files, merge and boards on module types are deferred | Prerequisite for 6c and for good MCP coverage |
-| `phase-6c-custom-objects` | Admin-defined entities (#5 amended) | Builds on 6b |
+| `phase-6c-custom-objects` | Admin-defined entities (#5 amended). **Done.** Settings → Objects, `/o/<key>` pages, blueprint `objects` | Builds on 6b |
 | `phase-6d-tool-layer-mcp` | `defineTool` registry; personal access tokens; MCP endpoint and stdio wrapper | Shared foundation for AI |
 | `phase-6e-assistant` | AI settings, provider interface, chat panel, confirmed writes, usage caps | Needs 6d |
 | `phase-6f-sales-depth` | Forecasting, quotas, velocity reports, deal line items | Highest-value CRM gaps |
@@ -247,3 +250,4 @@ Each milestone ships with tests, docs and a `phase-report`, per CLAUDE.md.
 | 4 | Assistant packaging | **Tool layer and MCP in core; assistant ships as module `assistant`.** Reasons: it can be sold and priced as a separate add-on, deployments that don't want AI (for example under the `hipaa` profile) leave it out entirely, and it proves the module SDK is strong enough for a large feature. Under the `hipaa` profile the module needs an explicit admin acknowledgement before it can be enabled, and `special` (encrypted) field values are never sent to a model. |
 | 5 | UI refresh before 6b | **Yes, as `phase-6a2-ui-polish`**, scoped to foundations plus three signature changes. The palette stays client-owned branding, so the refresh works through tokens every instance inherits (type scale, elevation, motion, contrast) and through hierarchy on the home screen and the deal page. No new color scheme, no layout redesign of lists, navigation or modules. |
 | 6 | Rich text before 6b | **Yes, as `phase-6a3-rich-text`.** TipTap (MIT core only) because it is headless and takes the theme tokens. HTML stays the stored format, so nothing migrates; Markdown is a way of writing. Saved replies are email templates keyed `reply.*` (no new table), rendered on the server for a record the user may see. Markup the visual editor would change (block helpers, placeholders in attributes, classes) opens in the HTML view. Images in text are out (they need upload, scope and encryption work). |
+| 7 | Storage of admin-defined objects | **One table per object (`m_custom_<key>`), created at runtime**, rather than the shared `custom_records` table in §3. The engine, custom-field indexes and FULLTEXT search are per table; a shared table would need an object filter on every path and per-object field keys would collide. At most 20 objects; archiving hides an object and keeps its table. Records link to core entities (contact, organization, deal, lead); links can be added, never removed. Permissions are `custom.<key>.<action>` and are managed with `core.fields.manage`. |
