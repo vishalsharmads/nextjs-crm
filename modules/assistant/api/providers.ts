@@ -1,4 +1,4 @@
-import { AppError } from '@app/api/module-api';
+import { AppError, assertSafeUrl } from '@app/api/module-api';
 
 /** Content in the conversation, in one shape for every provider. */
 export type Block =
@@ -46,19 +46,28 @@ export type ProviderKind = (typeof PROVIDERS)[number];
 
 const TIMEOUT_MS = 60_000;
 
+/** Largest provider response read (bytes). */
+const MAX_RESPONSE = 2_000_000;
+
 async function post(url: string, headers: Record<string, string>, body: unknown): Promise<unknown> {
+  // Checked on every call too, so a host that later resolves to an internal address is refused.
+  await assertSafeUrl(url, 'baseUrl');
   let res: Response;
   try {
     res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
       body: JSON.stringify(body),
+      // Never follow redirects: the key and headers must reach only the configured address.
+      redirect: 'manual',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch {
     throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
   }
   const text = await res.text();
+  if (text.length > MAX_RESPONSE)
+    throw new AppError('UPSTREAM_FAILED', 'The AI provider sent a response that is too large.');
   if (!res.ok) {
     // The provider's own message can name the provider: keep it out of what people see.
     const status =
@@ -80,7 +89,7 @@ const join = (base: string, path: string) => `${base.replace(/\/+$/, '')}${path}
 async function messagesApi(cfg: ProviderConfig, req: ChatRequest): Promise<ChatResult> {
   const out = (await post(
     join(cfg.baseUrl, '/v1/messages'),
-    { 'x-api-key': cfg.apiKey, ...cfg.headers },
+    { ...cfg.headers, 'x-api-key': cfg.apiKey },
     {
       model: cfg.model,
       max_tokens: 2048,
@@ -126,9 +135,10 @@ async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promis
   }
   const out = (await post(
     join(cfg.baseUrl, '/chat/completions'),
-    { authorization: `Bearer ${cfg.apiKey}`, ...cfg.headers },
+    { ...cfg.headers, authorization: `Bearer ${cfg.apiKey}` },
     {
       model: cfg.model,
+      max_tokens: 2048,
       messages,
       tools: req.tools.map((t) => ({
         type: 'function',

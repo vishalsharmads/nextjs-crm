@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import {
   AppError,
+  assertSafeUrl,
   audit,
+  escapeLike,
   callTool,
   db,
   decrypt,
@@ -21,6 +23,7 @@ import {
   type PrivacyHandler,
   type RequestContext,
   type ToolDef,
+  type Knex,
 } from '@app/api/module-api';
 import * as m0001 from './migrations/0001_assistant';
 import { chat, PROVIDERS, type Block, type ChatMessage, type ProviderConfig } from './providers';
@@ -88,6 +91,16 @@ const configDto = (row: ConfigRow) => ({
   hipaaAcknowledged: !!row.hipaa_acknowledged,
 });
 
+/** Set by the app for every request; an admin's extra headers may not replace them. */
+const RESERVED_HEADERS = new Set([
+  'authorization',
+  'x-api-key',
+  'content-type',
+  'content-length',
+  'host',
+  'cookie',
+]);
+
 const configSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
   provider: z.enum(PROVIDERS).nullish(),
@@ -153,8 +166,8 @@ async function recordUsage(userId: number, usage: { input: number; output: numbe
 interface Pending {
   /** Results of read tools already run in this step. */
   results: Block[];
-  /** Write tools waiting for the person to confirm or decline. */
-  proposals: { id: string; name: string; title: string; input: Record<string, unknown> }[];
+  /** Write tools waiting for the person to confirm or decline. `id` is ours, never the model's. */
+  proposals: { id: string; toolUseId: string; name: string; title: string; input: Record<string, unknown> }[];
 }
 
 async function conversationFor(uuid: string, user: AuthUser) {
@@ -179,6 +192,60 @@ function toolsAllowed(_cfg: ConfigRow): ToolDef[] {
   return toolDefs();
 }
 
+const LINK_FIELDS: Record<string, string> = {
+  contactUuid: 'contact',
+  organizationUuid: 'organization',
+  dealUuid: 'deal',
+  leadUuid: 'lead',
+};
+
+/**
+ * Every record type a tool call reads or writes, judged per tool rather than by argument shape, so
+ * an excluded type cannot be reached through a link, an activity or a roll-up. Unknown tools touch
+ * `*` and are refused whenever anything is excluded.
+ */
+function touches(name: string, input: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const add = (v: unknown) => typeof v === 'string' && out.push(v);
+  const related = (v: unknown) => add((v as { type?: unknown } | null | undefined)?.type);
+  switch (name) {
+    case 'describe_schema':
+    case 'search_records':
+      return []; // Results are filtered by type afterwards.
+    case 'list_records':
+    case 'get_record':
+      add(input.entity);
+      // A deal or activity record names its linked people and organizations.
+      if (input.entity === 'deal') out.push('contact', 'organization');
+      if (input.entity === 'activity') out.push('contact', 'organization', 'deal', 'lead');
+      return out;
+    case 'get_timeline':
+      // A timeline rolls up activities and changes from linked records.
+      add(input.entity);
+      out.push('activity', 'contact', 'organization', 'deal', 'lead');
+      return out;
+    case 'list_pipelines':
+    case 'move_deal_stage':
+      return ['deal'];
+    case 'add_note':
+    case 'create_task':
+    case 'log_activity':
+      out.push('activity');
+      related(input.related);
+      return out;
+    case 'create_record':
+    case 'update_record': {
+      add(input.entity);
+      const data = (input.data ?? {}) as Record<string, unknown>;
+      related(data.related);
+      for (const [k, t] of Object.entries(LINK_FIELDS)) if (data[k]) out.push(t);
+      return out;
+    }
+    default:
+      return ['*'];
+  }
+}
+
 /** Runs a tool as the person, tagged `assistant` in the audit log; errors go back to the model. */
 async function runTool(
   block: Extract<Block, { type: 'tool_use' }>,
@@ -187,28 +254,29 @@ async function runTool(
   user: AuthUser,
 ) {
   const excluded = json<string[]>(cfg.excluded_entities);
-  const target = (block.input.entity ?? (block.input.related as { type?: string } | undefined)?.type) as
-    string | undefined;
   let content: string;
   let isError = false;
   try {
-    if (target && excluded.includes(target))
+    const hit = excluded.length ? touches(block.name, block.input) : [];
+    if (hit.some((t) => t === '*' || excluded.includes(t)))
       throw new AppError('FORBIDDEN', 'The assistant may not use this record type');
     const asUser: AuthUser = { ...user, via: 'assistant' };
-    const result = await callTool(
+    let result = await callTool(
       block.name,
       block.input,
       { ctx: { ...ctx, user: asUser }, user: asUser },
       toolsAllowed(cfg),
     );
-    content = JSON.stringify(result);
-    // Lists of excluded record types are filtered out of what the model sees.
+    // Excluded record types are filtered out of what the model sees.
     if (block.name === 'describe_schema' && excluded.length) {
       const schema = result as { recordTypes: { entity: string }[] };
-      content = JSON.stringify({
-        recordTypes: schema.recordTypes.filter((t) => !excluded.includes(t.entity)),
-      });
+      result = { recordTypes: schema.recordTypes.filter((t) => !excluded.includes(t.entity)) };
     }
+    if (block.name === 'search_records' && excluded.length) {
+      const found = result as { results: { type: string }[] };
+      result = { results: found.results.filter((r) => !excluded.includes(r.type)) };
+    }
+    content = JSON.stringify(result);
   } catch (err) {
     isError = true;
     content = JSON.stringify(
@@ -239,8 +307,25 @@ async function systemPrompt(cfg: ConfigRow, user: AuthUser) {
   ].join('\n');
 }
 
+/** One model loop per person at a time, so concurrent requests cannot overshoot the caps together. */
+const running = new Map<number, Promise<unknown>>();
+function serialized<T>(userId: number, fn: () => Promise<T>): Promise<T> {
+  const prev = running.get(userId) ?? Promise.resolve();
+  const next = prev.catch(() => undefined).then(fn);
+  running.set(userId, next);
+  void next.finally(() => running.get(userId) === next && running.delete(userId)).catch(() => undefined);
+  return next;
+}
+
+/** Providers that report no usage are charged an estimate (about four characters a token). */
+const estimate = (v: unknown) => Math.ceil(JSON.stringify(v).length / 4);
+
 /** Ask the model, run read tools, and stop at an answer or at write proposals that need a decision. */
-async function advance(conv: { id: number }, cfg: ConfigRow, ctx: RequestContext, user: AuthUser) {
+function advance(conv: { id: number }, cfg: ConfigRow, ctx: RequestContext, user: AuthUser) {
+  return serialized(user.id, () => advanceNow(conv, cfg, ctx, user));
+}
+
+async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestContext, user: AuthUser) {
   const provider = await providerConfig(cfg);
   if (!provider) throw new AppError('NOT_FOUND', 'The assistant is not set up yet. An admin can set it up.');
   const tools = toolsAllowed(cfg).map((t) => ({
@@ -251,8 +336,12 @@ async function advance(conv: { id: number }, cfg: ConfigRow, ctx: RequestContext
   const system = await systemPrompt(cfg, user);
   for (let step = 0; step < MAX_STEPS; step++) {
     await assertWithinCaps(cfg, user.id);
-    const reply = await chat(provider, { system, messages: await history(conv.id), tools });
-    await recordUsage(user.id, reply.usage);
+    const messages = await history(conv.id);
+    const reply = await chat(provider, { system, messages, tools });
+    await recordUsage(user.id, {
+      input: reply.usage.input || estimate([system, messages]),
+      output: reply.usage.output || estimate(reply.content),
+    });
     const content = reply.content.length ? reply.content : [{ type: 'text' as const, text: '…' }];
     await append(conv.id, 'assistant', content);
     const uses = content.filter((b): b is Extract<Block, { type: 'tool_use' }> => b.type === 'tool_use');
@@ -262,7 +351,15 @@ async function advance(conv: { id: number }, cfg: ConfigRow, ctx: RequestContext
     const proposals: Pending['proposals'] = [];
     for (const use of uses) {
       const def = defs.get(use.name);
-      if (def?.write) proposals.push({ id: use.id, name: use.name, title: def.title, input: use.input });
+      // A tool_use must always get a result, or the conversation cannot continue.
+      if (def?.write)
+        proposals.push({
+          id: `p${proposals.length + 1}`,
+          toolUseId: use.id,
+          name: use.name,
+          title: def.title,
+          input: use.input,
+        });
       else results.push(await runTool(use, cfg, ctx, user));
     }
     if (proposals.length) {
@@ -327,7 +424,18 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     body: configSchema,
     handler: async ({ ctx, body }) => {
       const cfg = await loadConfig();
+      if (body.baseUrl) await assertSafeUrl(body.baseUrl, 'baseUrl');
+      const reserved = Object.keys(body.headers ?? {}).filter((h) => RESERVED_HEADERS.has(h.toLowerCase()));
+      if (reserved.length)
+        throw new AppError('VALIDATION_FAILED', 'These headers are set by the app', [
+          { path: 'headers', message: `Remove ${reserved.join(', ')}` },
+        ]);
       const patch: Record<string, unknown> = { updated_at: new Date() };
+      // A new address must come with its key, so the saved key is never sent somewhere else.
+      const moved =
+        (body.baseUrl !== undefined && body.baseUrl !== cfg.base_url) ||
+        (body.provider !== undefined && body.provider !== cfg.provider);
+      if (moved && body.apiKey === undefined) patch.api_key_enc = null;
       if (body.name !== undefined) patch.name = body.name;
       if (body.provider !== undefined) patch.provider = body.provider;
       if (body.baseUrl !== undefined) patch.base_url = body.baseUrl;
@@ -414,6 +522,13 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
         throw new AppError('NOT_FOUND', 'The assistant is not set up yet. An admin can set it up.');
       const uuid = newUuid();
       const [id] = await db(CONVERSATIONS).insert({ uuid, user_id: user.id, title: body.text.slice(0, 120) });
+      // Conversation text stays out of the audit log; only that it exists.
+      await audit(db, ctx, {
+        action: 'assistant.conversation.created',
+        entity: 'assistant.conversation',
+        entityId: id!,
+        entityUuid: uuid,
+      });
       await append(id!, 'user', [{ type: 'text', text: withContext(body.text, body.context) }]);
       await advance({ id: id! }, cfg, ctx, user);
       return conversationDto(uuid, user);
@@ -452,26 +567,52 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     handler: async ({ ctx, user, params, body }) => {
       const conv = await conversationFor(params.uuid, user);
       if (!conv.pending) throw new AppError('CONFLICT', 'Nothing is waiting for a decision');
+      // Claim the proposals under a row lock: a double click or a retry cannot run a change twice.
+      const claimed = await db.transaction(async (trx) => {
+        const row = await trx(CONVERSATIONS).where({ id: conv.id }).forUpdate().first('pending');
+        if (!row?.pending) return null;
+        await trx(CONVERSATIONS).where({ id: conv.id }).update({ pending: null });
+        return row.pending as Pending | string;
+      });
+      if (!claimed) throw new AppError('CONFLICT', 'These changes were already decided');
       const cfg = await loadConfig();
-      const pending = json<Pending>(conv.pending);
+      const pending = json<Pending>(claimed);
       const results = [...pending.results];
       for (const p of pending.proposals) {
-        // Only what the person explicitly confirmed runs; anything else is declined.
-        if (body.decisions[p.id] === true)
+        // Only what the person explicitly confirmed runs, with exactly the input they saw.
+        const approved = body.decisions[p.id] === true;
+        if (approved)
           results.push(
-            await runTool({ type: 'tool_use', id: p.id, name: p.name, input: p.input }, cfg, ctx, user),
+            await runTool(
+              { type: 'tool_use', id: p.toolUseId, name: p.name, input: p.input },
+              cfg,
+              ctx,
+              user,
+            ),
           );
         else
           results.push({
             type: 'tool_result',
-            tool_use_id: p.id,
+            tool_use_id: p.toolUseId,
             content: 'The person declined this change.',
             is_error: true,
           });
+        await audit(db, ctx, {
+          action: approved ? 'assistant.change.confirmed' : 'assistant.change.declined',
+          entity: 'assistant.conversation',
+          entityId: conv.id,
+          entityUuid: conv.uuid,
+          diff: { tool: p.name },
+        });
       }
-      await db(CONVERSATIONS).where({ id: conv.id }).update({ pending: null });
       await append(conv.id, 'user', results);
-      await advance(conv, cfg, ctx, user);
+      try {
+        await advance(conv, cfg, ctx, user);
+      } catch (err) {
+        // The confirmed changes already ran: say so instead of failing the whole request.
+        const message = err instanceof AppError ? err.message : 'The assistant could not continue.';
+        await append(conv.id, 'assistant', [{ type: 'text', text: `Your changes were made. ${message}` }]);
+      }
       return conversationDto(params.uuid, user);
     },
   })
@@ -480,9 +621,17 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     path: '/conversations/:uuid',
     permission: 'assistant.chat.use',
     params: uuidParam,
-    handler: async ({ user, params }) => {
+    handler: async ({ ctx, user, params }) => {
       const conv = await conversationFor(params.uuid, user);
-      await db(CONVERSATIONS).where({ id: conv.id }).delete();
+      await db.transaction(async (trx) => {
+        await trx(CONVERSATIONS).where({ id: conv.id }).delete();
+        await audit(trx, ctx, {
+          action: 'assistant.conversation.deleted',
+          entity: 'assistant.conversation',
+          entityId: conv.id,
+          entityUuid: conv.uuid,
+        });
+      });
     },
   });
 
@@ -491,28 +640,53 @@ function withContext(text: string, context?: { entity: string; uuid: string }) {
 }
 
 /**
- * Conversations can quote a person's details from tool results. Access requests list the messages
- * that mention them; erasure deletes those messages.
+ * Conversations can quote a person's details from tool results. Matching is case-insensitive over
+ * messages, titles and pending results; erasure deletes whole conversations (a partial one could not
+ * continue), and access requests export the matching messages.
  */
 const privacy: PrivacyHandler = {
   key: 'assistant',
   tables: [MESSAGES],
   viewPermission: 'assistant.settings.manage',
   async export(subject, conn) {
-    const rows = await mentioning(subject, conn).select('created_at', 'role');
+    const ids = await mentioning(subject, conn);
+    const rows = ids.length
+      ? await conn(MESSAGES)
+          .whereIn('conversation_id', ids)
+          .orderBy('id')
+          .select('created_at', 'role', 'content')
+      : [];
     return { messages: rows };
   },
   async erase(subject, trx) {
-    const n = await mentioning(subject, trx).delete();
-    return { cleared: { messages: n } };
+    const ids = await mentioning(subject, trx);
+    const n = ids.length ? await trx(CONVERSATIONS).whereIn('id', ids).delete() : 0;
+    return { cleared: { conversations: n } };
   },
 };
 
-function mentioning(subject: { uuid: string; email: string | null }, conn: typeof db) {
-  return conn(MESSAGES).where((w) => {
-    w.where('content', 'like', `%${subject.uuid}%`);
-    if (subject.email) w.orWhere('content', 'like', `%${subject.email.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-  });
+/** Conversations whose messages, title or pending results mention the person's id or email. */
+async function mentioning(
+  subject: { uuid: string; email: string | null },
+  conn: typeof db,
+): Promise<number[]> {
+  const terms = [subject.uuid, subject.email]
+    .filter((t): t is string => !!t)
+    .map((t) => `%${escapeLike(t.toLowerCase())}%`);
+  const like = (col: string) => (w: Knex.QueryBuilder) => {
+    for (const t of terms) w.orWhereRaw(`LOWER(CAST(${col} AS CHAR)) LIKE ?`, [t]);
+  };
+  const fromMessages = await conn(MESSAGES)
+    .where(like('content'))
+    .distinct('conversation_id')
+    .pluck('conversation_id');
+  const fromConversations = await conn(CONVERSATIONS)
+    .where((w) => {
+      like('title')(w);
+      like('pending')(w);
+    })
+    .pluck('id');
+  return [...new Set([...fromMessages, ...fromConversations].map(Number))];
 }
 
 export const assistant: ApiModule = {

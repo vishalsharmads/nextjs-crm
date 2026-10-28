@@ -65,3 +65,4 @@ export {
 } from './core/tools/registry';
 export { encrypt, decrypt } from './lib/crypto';
 export { effectiveCompliance } from './core/settings/settings.service';
+export { assertSafeUrl } from './core/webhooks/webhooks';

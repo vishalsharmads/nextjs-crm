@@ -46,24 +46,25 @@ function isPrivate(ip: string): boolean {
   );
 }
 
-/** Webhook targets must be https (or http in dev) and must not resolve to internal addresses. */
-export async function assertSafeUrl(raw: string) {
+/**
+ * Outbound targets (webhooks, the assistant's model provider) must be https (or http in dev) and
+ * must not resolve to internal addresses, unless WEBHOOKS_ALLOW_PRIVATE is set.
+ */
+export async function assertSafeUrl(raw: string, path = 'url') {
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
-    throw new AppError('VALIDATION_FAILED', 'Enter a valid URL', [{ path: 'url', message: 'Invalid URL' }]);
+    throw new AppError('VALIDATION_FAILED', 'Enter a valid URL', [{ path, message: 'Invalid URL' }]);
   }
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && env.WEBHOOKS_ALLOW_PRIVATE)) {
-    throw new AppError('VALIDATION_FAILED', 'Webhook URLs must use https', [
-      { path: 'url', message: 'Use https' },
-    ]);
+    throw new AppError('VALIDATION_FAILED', 'Webhook URLs must use https', [{ path, message: 'Use https' }]);
   }
   if (env.WEBHOOKS_ALLOW_PRIVATE) return;
   const addrs = await lookup(url.hostname, { all: true }).catch(() => []);
   if (!addrs.length || addrs.some((a) => isPrivate(a.address))) {
     throw new AppError('VALIDATION_FAILED', 'This address is not reachable from the internet', [
-      { path: 'url', message: 'Private or unknown host' },
+      { path, message: 'Private or unknown host' },
     ]);
   }
 }
