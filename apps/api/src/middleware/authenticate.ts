@@ -6,6 +6,7 @@ import { activityAt, sessionEndReason } from '../core/auth/session-policy';
 import { loadAccess } from '../core/rbac/access';
 import { db } from '../db/knex';
 import { authenticateApiKey } from '../core/api-keys/api-keys';
+import { authenticatePersonalToken, TOKEN_PATHS } from '../core/tokens/tokens';
 import { effectiveCompliance, effectiveSecurity } from '../core/settings/settings.service';
 
 /** Attach request context. Never rejects; route permission checks decide what is allowed. */
@@ -23,7 +24,13 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   try {
     const bearer = req.get('authorization');
     if (bearer?.startsWith('Bearer ')) {
-      req.ctx.user = await authenticateApiKey(bearer.slice(7).trim(), await effectiveCompliance());
+      const token = bearer.slice(7).trim();
+      const path = req.originalUrl.split('?')[0]!;
+      // Personal access tokens reach only the MCP endpoint; anywhere else they authenticate nobody.
+      req.ctx.user = TOKEN_PATHS.includes(path)
+        ? ((await authenticatePersonalToken(token, await effectiveCompliance())) ??
+          (await authenticateApiKey(token, await effectiveCompliance())))
+        : await authenticateApiKey(token, await effectiveCompliance());
       return next();
     }
     const token = req.cookies?.[ACCESS_COOKIE] as string | undefined;

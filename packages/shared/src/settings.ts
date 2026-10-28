@@ -69,6 +69,19 @@ export const commerceSettingsSchema = z.object({
 });
 export type CommerceSettings = z.infer<typeof commerceSettingsSchema>;
 
+/** AI clients over MCP (Settings → AI clients). Admin only; off until an admin turns it on. */
+export const mcpSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Tool names clients may call. Empty means every tool. */
+  tools: z
+    .array(z.string().regex(/^[a-z][a-z0-9_]{1,63}$/))
+    .max(100)
+    .default([]),
+  /** Calls per token per minute. */
+  rateLimitPerMinute: z.number().int().min(1).max(1000).default(60),
+});
+export type McpSettings = z.infer<typeof mcpSettingsSchema>;
+
 /** Setting groups addressable via PATCH /settings/:group. Branding has its own endpoint. */
 export const SETTINGS_GROUPS = {
   general: generalSettingsSchema,
@@ -78,6 +91,7 @@ export const SETTINGS_GROUPS = {
   contacts: contactSettingsSchema,
   commerce: commerceSettingsSchema,
   compliance: complianceSettingsSchema,
+  mcp: mcpSettingsSchema,
 } as const;
 export type SettingsGroup = keyof typeof SETTINGS_GROUPS;
 
