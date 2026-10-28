@@ -21,6 +21,8 @@ export const ERROR_CODES = [
   'UNSUPPORTED_FILE_TYPE',
   'NOT_INSTALLED',
   'INTERNAL',
+  'UPSTREAM_FAILED',
+  'QUOTA_EXCEEDED',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -47,6 +49,8 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   UNSUPPORTED_FILE_TYPE: 415,
   NOT_INSTALLED: 503,
   INTERNAL: 500,
+  UPSTREAM_FAILED: 502,
+  QUOTA_EXCEEDED: 429,
 };
 
 export interface ApiErrorBody {

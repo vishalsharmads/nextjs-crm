@@ -67,3 +67,8 @@ export async function callTool(name: string, args: unknown, tc: ToolContext, poo
     );
   return tool.handler(parsed.data, tc);
 }
+
+/** Every tool, for the in-app assistant (its own settings decide what it may touch). */
+export function toolDefs(): ToolDef[] {
+  return [...tools.values()];
+}
