@@ -14,3 +14,4 @@ export * from './commerce';
 export * from './patch';
 export * from './templates';
 export * from './stages';
+export * from './objects';

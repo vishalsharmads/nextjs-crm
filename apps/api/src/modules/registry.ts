@@ -4,6 +4,7 @@ import {
   type ModuleManifest,
   type ModuleMenuItem,
 } from '@app/module-sdk';
+import { CUSTOM_OBJECTS_KEY } from '@app/shared';
 import { db, type Db } from '../db/knex';
 import { migrateModule } from '../db/migrate';
 import { AppError } from '../lib/errors';
@@ -31,6 +32,8 @@ export function loadModules(): LoadedModule[] {
   const order = sortByDependencies(parsed.map((m) => m.manifest)).map((m) => m.key);
   modules = order.map((key) => parsed.find((m) => m.manifest.key === key)!);
   for (const m of modules) {
+    if (m.manifest.key === CUSTOM_OBJECTS_KEY)
+      throw new Error(`Module key "${CUSTOM_OBJECTS_KEY}" is reserved`);
     registerModulePermissions(m.manifest.key, m.manifest.permissions);
     for (const def of m.api?.recordTypes ?? []) {
       if (def.moduleKey !== m.manifest.key)
