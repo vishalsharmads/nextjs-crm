@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { RelatedType } from '@app/shared';
 import { apiGet, apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { RichTextEditor } from '@/components/editor/rich-text-editor';
+import { useSavedReplies } from '@/components/editor/use-templates';
 import { Sheet } from '@/components/ui/dialog';
-
-const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** Write an email to a record's address; it is sent and logged on the record's timeline. */
 export function ComposeEmail({
@@ -28,15 +28,15 @@ export function ComposeEmail({
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [account, setAccount] = useState<string>('');
+  // A saved reply fills the subject too, unless one is already written.
+  const onRendered = useCallback((r: { subject: string }) => setSubject((s) => s || r.subject), []);
+  const replies = useSavedReplies(related, onRendered);
   const send = useMutation({
     mutationFn: () =>
       apiPost('/email/send', {
         to: recipients.split(/[,;\s]+/).filter(Boolean),
         subject,
-        body: body
-          .split(/\n{2,}/)
-          .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
-          .join(''),
+        body,
         related,
         accountUuid: account || null,
       }),
@@ -60,7 +60,7 @@ export function ComposeEmail({
             variant="primary"
             onClick={() => send.mutate()}
             loading={send.isPending}
-            disabled={!recipients.trim() || !subject.trim() || !body.trim()}
+            disabled={!recipients.trim() || !subject.trim() || !body}
           >
             Send email
           </Button>
@@ -92,9 +92,19 @@ export function ComposeEmail({
         <Field label="Subject">
           {(p) => <Input {...p} value={subject} onChange={(e) => setSubject(e.target.value)} autoFocus />}
         </Field>
-        <Field label="Message">
+        <Field label="Message" help="Type / to insert a saved reply.">
           {(p) => (
-            <Textarea {...p} value={body} onChange={(e) => setBody(e.target.value)} className="min-h-64" />
+            <RichTextEditor
+              {...p}
+              aria-label="Message"
+              value={body}
+              onChange={setBody}
+              replies={replies}
+              className="min-h-64"
+              onSubmitShortcut={() => {
+                if (recipients.trim() && subject.trim() && body) send.mutate();
+              }}
+            />
           )}
         </Field>
       </div>

@@ -84,7 +84,7 @@ export function CommandPaletteProvider({
       <D.Root open={isOpen} onOpenChange={setOpen}>
         <D.Portal>
           <D.Overlay className="anim-fade fixed inset-0 z-40 bg-overlay" />
-          <D.Content className="anim-pop fixed inset-x-0 top-[14vh] z-50 mx-auto w-[calc(100vw-2rem)] max-w-xl overflow-hidden rounded-lg border border-line bg-surface shadow-2xl">
+          <D.Content className="anim-pop fixed inset-x-0 top-[14vh] z-50 mx-auto w-[calc(100vw-2rem)] max-w-xl overflow-hidden rounded-lg border border-line bg-surface shadow-overlay">
             <D.Title className="sr-only">{t('nav.search')}</D.Title>
             <D.Description className="sr-only">{t('nav.search')}</D.Description>
             <Command label={t('nav.search')} shouldFilter loop>

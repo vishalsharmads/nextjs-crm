@@ -18,6 +18,8 @@ import { FilterBar } from '@/components/data/filter-bar';
 import { buildConfig } from '@/features/records/entities';
 import { labelVars } from '@/lib/labels';
 import { SettingsPage } from './layout';
+import { RichTextEditor } from '@/components/editor/rich-text-editor';
+import { useMergeFields } from '@/components/editor/use-templates';
 
 // ---------------- Automations ----------------
 
@@ -351,6 +353,7 @@ function AutomationEditor({
               </div>
               <ActionEditor
                 action={a}
+                entity={entity}
                 onChange={(x) => setAction(i, x)}
                 fieldOptions={fields
                   .filter((f) => f.input || f.def)
@@ -448,10 +451,12 @@ function Recipient({
 
 function ActionEditor({
   action,
+  entity,
   onChange,
   fieldOptions,
 }: {
   action: Action;
+  entity: CoreEntity | 'form';
   onChange: (a: Action) => void;
   fieldOptions: { value: string; label: string }[];
 }) {
@@ -516,17 +521,45 @@ function ActionEditor({
             value={action.subject}
             onChange={(e) => onChange({ ...action, subject: e.target.value })}
           />
-          <Textarea
-            aria-label="Body"
-            value={action.body}
-            onChange={(e) => onChange({ ...action, body: e.target.value })}
-            className="font-mono text-xs"
-          />
+          <EmailBody entity={entity} value={action.body} onChange={(body) => onChange({ ...action, body })} />
         </div>
       );
     case 'add_tags':
       return <TagsInput value={action.tags} onChange={(tags) => onChange({ ...action, tags })} />;
   }
+}
+
+/** The automation renders `{{record.*}}` from the record that triggered it. */
+function EmailBody({
+  entity,
+  value,
+  onChange,
+}: {
+  entity: CoreEntity | 'form';
+  value: string;
+  onChange: (html: string) => void;
+}) {
+  const groups = useMergeFields();
+  const mergeFields = useMemo(() => {
+    const group = groups?.find((g) => g.key === entity);
+    return group
+      ? [
+          {
+            ...group,
+            fields: group.fields.map((f) => ({ ...f, path: f.path.replace(/^[a-z]+\./, 'record.') })),
+          },
+        ]
+      : undefined;
+  }, [groups, entity]);
+  return (
+    <RichTextEditor
+      aria-label="Body"
+      value={value}
+      onChange={onChange}
+      mergeFields={mergeFields}
+      className="min-h-32"
+    />
+  );
 }
 
 // ---------------- Web forms ----------------

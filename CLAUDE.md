@@ -8,6 +8,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 
 - Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
 - **Phases 1–5 complete.** Phase 5 is compliance readiness (profiles, access logging, data subject rights, retention, encryption; see `docs/compliance/`). New work goes through the roadmap's Future list.
+- **Phase 6** follows [docs/plan/phase-6.md](docs/plan/phase-6.md): 6a (quick wins), 6a2 (UI polish) and 6a3 (rich text) are done; 6b (records engine) is next.
 
 ## Non-negotiables
 
@@ -49,6 +50,7 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 | @dnd-kit/*                                                                                      | Accessible drag and drop (Kanban, column order)                                 |
 | @fullcalendar/*                                                                                 | Calendar view (MIT standard views)                                              |
 | recharts                                                                                        | Dashboard charts                                                                |
+| @tiptap/* (MIT core only, no Pro or cloud extensions)                                           | Rich text editor: headless, so it takes theme tokens; Markdown, tables, menus   |
 | i18next, react-i18next                                                                          | Locale files + vocabulary interpolation                                         |
 | qrcode                                                                                          | 2FA setup QR code                                                               |
 | @fontsource/*                                                                                   | Self-hosted fonts selectable from branding (no external font CDN)               |
@@ -151,17 +153,20 @@ Run test suites one workspace at a time on this machine; running all three in pa
 
 - **Server state** lives in TanStack Query only. Query keys come from `lib/query-keys.ts`. Simple mutations (task complete, stage move, inline edit) use optimistic updates.
 - **Forms, detail pages, and list columns render from layouts + field definitions.** Never hardcode a custom field.
+- **Lists link their rows.** `DataTable` takes `rowHref` so the title cell is a real link (Tab, Enter, open in a new tab); a plain click still opens the peek. Its keyboard cursor stays hidden until the first key press or click.
 - **Every data view** has loading (skeleton matching the layout), empty (next action + one primary button), and error (what failed + how to fix) states.
 - **Product patterns** (plan §9): `⌘K` command palette, keyboard shortcuts, record peek sheet, inline edit with undo toast, saved views as tabs, virtualized tables with bulk bar, Kanban with dnd-kit.
 - **`Button asChild`** renders its single child only (Radix Slot needs exactly one child).
 - **Never `import * as Icons from 'lucide-react'`** (pulls every icon into the bundle). Module menu icons come from the curated map in `app/shell/nav.ts`.
 - **Accessibility:** labelled inputs, visible focus, focus trap in dialogs and sheets, AA contrast, full keyboard reach, `prefers-reduced-motion`.
 - **RTL-ready:** use logical properties (`ms-`, `pe-`, `start-`, `end-`), never `ml-`/`pr-`/`left-`/`right-`.
-- **Motion:** 120–200 ms ease-out, only in response to user actions.
+- **Motion:** 120–200 ms with the `--ease-out` token (it is also Tailwind's `ease-out`), only in response to user actions; never on keyboard-driven ones (`j`/`k`, `⌘K`, `c`). Overlays use the `anim-pop`, `anim-fade` and `anim-sheet` classes in `styles.css`. Their exits (about 120 ms) need their own keyframes, because Radix keeps an element mounted only while a differently named exit animation runs, and a closing overlay has `pointer-events: none`. Buttons and nav links scale slightly on press. Tests must find a dialog by name, since the one that is closing is still in the page for a moment.
+- **Elevation, type and touch:** use `shadow-raised` and `shadow-overlay` (derived from brand tokens; dark mode darkens the canvas instead of glowing) and `text-title` for page titles. `--faint` and `--muted` text must stay at 4.5:1 or better on surface, canvas and subtle backgrounds. Controls grow under `pointer-coarse:` (36–40 px) and inputs use 16 px text there so iOS does not zoom.
 - **Auth tokens** live in httpOnly cookies only. Never use localStorage or sessionStorage for tokens. The API client sends `X-CSRF-Token` and does a single-flight refresh on 401.
 - **Module pages** link with absolute paths, and buttons inside forms that are not submits need `type="button"`. Restart `npm run dev` after adding a module folder (Vite globs module entries at startup). Module web entries live outside `apps/web`, so `styles.css` declares `@source '../../../modules'`; without it, Tailwind classes used only in modules are never generated.
 - **The app may run under a sub-path** (`/app` in the single-server setup, `APP_BASE_PATH`). Navigate with the router; links that leave it (new tabs, copyable URLs) use `appUrl()`/`basePath` from `lib/app-url.ts`, never a bare `/path` or `window.location.origin`.
 - **Shared-clock screens** (bookings board, front desk) show the workspace time zone via `lib/zoned.ts`, never the browser's, because the server validates in the workspace zone.
+- **Rich text** goes through `RichTextEditor` (`components/editor`), never a raw `Textarea`. It emits HTML; the server sanitizes it again (`sanitizeBody` for notes and email, `sanitizeDocumentHtml` for documents), and `basic` mode only produces tags `sanitizeBody` keeps. Placeholders are stored as plain `{{path}}` text. Pass `mergeFields` for templates and `replies` (`useSavedReplies`) where people write to a record. Show stored HTML inside `.rte-prose`. Notes are never compiled as Handlebars; only templates are.
 - **Copy:** sentence case, active verbs. A button and its resulting toast use the same verb ("Archive" → "Archived").
 
 ## Testing

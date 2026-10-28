@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link } from 'react-router';
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,6 +25,10 @@ export interface DataTableProps<T> {
   selected?: Set<string>;
   onSelectedChange?: (s: Set<string>) => void;
   onRowOpen?: (row: T) => void;
+  /** Gives each row a real link, so Tab, Enter and open-in-new-tab work. A plain click still calls onRowOpen. */
+  rowHref?: (row: T) => string;
+  /** The column that carries the link; the first column when unset or hidden. */
+  linkColumnId?: string;
   activeKey?: string | null;
   page: number;
   pageSize: number;
@@ -44,6 +49,8 @@ export function DataTable<T>({
   selected,
   onSelectedChange,
   onRowOpen,
+  rowHref,
+  linkColumnId,
   activeKey,
   page,
   pageSize,
@@ -53,18 +60,38 @@ export function DataTable<T>({
   empty,
 }: DataTableProps<T>) {
   const [cursor, setCursor] = useState(0);
+  // The keyboard cursor stays hidden until the first key press or row click, so no row looks selected on load.
+  const [cursorActive, setCursorActive] = useState(false);
   const bodyRef = useRef<HTMLTableSectionElement>(null);
   const rowH = density === 'compact' ? 'h-8' : 'h-10';
   const sortField = sort?.replace(/^-/, '').split(',')[0];
   const sortDir = sort?.startsWith('-') ? 'desc' : 'asc';
   const selectable = !!onSelectedChange && !!selected;
   const keys = useMemo(() => (rows ?? []).map(rowKey), [rows, rowKey]);
+  const linkIndex = Math.max(
+    0,
+    columns.findIndex((c) => c.id === linkColumnId),
+  );
 
-  useEffect(() => setCursor(0), [rows]);
+  // Keep the cursor on the same row when the list refreshes; hide it when that row is gone (new page, filter).
+  const cursorKey = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const at = cursorKey.current ? keys.indexOf(cursorKey.current) : -1;
+    if (at >= 0) setCursor(at);
+    else {
+      setCursor(0);
+      setCursorActive(false);
+    }
+  }, [keys]);
+  useEffect(() => {
+    cursorKey.current = cursorActive ? keys[cursor] : undefined;
+  }, [keys, cursor, cursorActive]);
 
   // j/k to move, Enter to open, x to select — only when focus is not in a field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Something closer to the target (a menu item, say) already used this key.
+      if (e.defaultPrevented) return;
       const el = e.target as HTMLElement;
       if (
         el.isContentEditable ||
@@ -75,14 +102,20 @@ export function DataTable<T>({
       if (e.metaKey || e.ctrlKey || e.altKey || !rows?.length) return;
       if (e.key === 'j' || e.key === 'ArrowDown') {
         e.preventDefault();
-        setCursor((c) => Math.min(c + 1, rows.length - 1));
+        // The first press reveals the cursor on the first row instead of skipping past it.
+        setCursor((c) => (cursorActive ? Math.min(c + 1, rows.length - 1) : 0));
+        setCursorActive(true);
       } else if (e.key === 'k' || e.key === 'ArrowUp') {
         e.preventDefault();
-        setCursor((c) => Math.max(c - 1, 0));
-      } else if (e.key === 'Enter' && onRowOpen) {
+        setCursor((c) => (cursorActive ? Math.max(c - 1, 0) : 0));
+        setCursorActive(true);
+      } else if (e.key === 'Enter' && onRowOpen && cursorActive) {
+        // Enter on a focused link or button keeps its own meaning.
+        if (el.closest('a, button, [role="menuitem"], [role="checkbox"], [role="tab"], [role="option"]'))
+          return;
         e.preventDefault();
         onRowOpen(rows[cursor]!);
-      } else if (e.key === 'x' && selectable) {
+      } else if (e.key === 'x' && selectable && cursorActive) {
         e.preventDefault();
         const k = keys[cursor]!;
         const next = new Set(selected);
@@ -93,11 +126,11 @@ export function DataTable<T>({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [rows, cursor, keys, onRowOpen, selectable, selected, onSelectedChange]);
+  }, [rows, cursor, cursorActive, keys, onRowOpen, selectable, selected, onSelectedChange]);
 
   useEffect(() => {
-    bodyRef.current?.querySelectorAll('tr')[cursor]?.scrollIntoView({ block: 'nearest' });
-  }, [cursor]);
+    if (cursorActive) bodyRef.current?.querySelectorAll('tr')[cursor]?.scrollIntoView({ block: 'nearest' });
+  }, [cursor, cursorActive]);
 
   const toggleSort = (id: string) => {
     if (!onSortChange) return;
@@ -114,7 +147,7 @@ export function DataTable<T>({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full border-separate border-spacing-0 text-table">
+        <table className="w-full border-separate border-spacing-0 text-table tabular-nums">
           <thead className="sticky top-0 z-10">
             <tr>
               {selectable ? (
@@ -184,12 +217,13 @@ export function DataTable<T>({
               : rows?.map((row, i) => {
                   const k = keys[i]!;
                   const isActive = activeKey === k;
-                  const isCursor = cursor === i;
+                  const isCursor = cursorActive && cursor === i;
                   return (
                     <tr
                       key={k}
                       onClick={() => {
                         setCursor(i);
+                        setCursorActive(true);
                         onRowOpen?.(row);
                       }}
                       className={cn(
@@ -228,7 +262,24 @@ export function DataTable<T>({
                             isCursor && ci === 0 && 'shadow-[inset_2px_0_0_var(--primary)]',
                           )}
                         >
-                          {c.cell(row)}
+                          {rowHref && ci === linkIndex ? (
+                            <Link
+                              to={rowHref(row)}
+                              className="hover:underline"
+                              onClick={(e) => {
+                                // Modified clicks open the page; a plain click is the row's own (peek).
+                                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+                                  e.stopPropagation();
+                                  return;
+                                }
+                                e.preventDefault();
+                              }}
+                            >
+                              {c.cell(row)}
+                            </Link>
+                          ) : (
+                            c.cell(row)
+                          )}
                         </td>
                       ))}
                     </tr>

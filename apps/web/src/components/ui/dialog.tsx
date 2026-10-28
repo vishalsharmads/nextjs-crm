@@ -26,7 +26,7 @@ export function DialogContent({
       <D.Overlay className="anim-fade fixed inset-0 z-40 bg-overlay" />
       <D.Content
         className={cn(
-          'anim-pop fixed inset-x-0 top-[12vh] z-50 mx-auto flex max-h-[76vh] w-[calc(100vw-2rem)] max-w-lg flex-col rounded-lg border border-line bg-surface shadow-2xl',
+          'anim-pop fixed inset-x-0 top-[12vh] z-50 mx-auto flex max-h-[76vh] w-[calc(100vw-2rem)] max-w-lg flex-col rounded-lg border border-line bg-surface shadow-overlay',
           className,
         )}
       >
@@ -79,8 +79,13 @@ export function Sheet({
       <D.Portal>
         <D.Overlay className="anim-fade fixed inset-0 z-40 bg-overlay md:bg-transparent" />
         <D.Content
+          // Focus the panel, not its first button: a header action would open its tooltip on load.
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).focus();
+          }}
           className={cn(
-            'anim-sheet fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-line bg-surface shadow-2xl',
+            'anim-sheet fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-line bg-surface shadow-overlay outline-none',
             width,
           )}
         >

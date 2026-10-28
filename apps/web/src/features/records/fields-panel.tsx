@@ -3,12 +3,16 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { Pencil } from 'lucide-react';
 import { ApiError } from '@/lib/api';
-import { useCan } from '@/app/session';
+import { useCan, useT } from '@/app/session';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { useRecordMutations } from './api';
 import type { EntityConfig, FieldConfig } from './entities';
 import { FieldInputControl, useFormSections } from './record-form';
+
+/** A value with nothing to read: unset, blank, an empty list, or an unticked box (shown as a dash). */
+export const isEmptyValue = (v: unknown) =>
+  v == null || v === '' || v === false || (Array.isArray(v) && v.length === 0);
 
 type Rec = Record<string, unknown> & { uuid: string; custom: Record<string, unknown> };
 
@@ -22,9 +26,25 @@ export function FieldsPanel({
   record: Rec;
   compact?: boolean;
 }) {
-  const sections = useFormSections(config);
+  const allSections = useFormSections(config);
   const can = useCan();
+  const t = useT();
+  const [showEmpty, setShowEmpty] = useState(false);
   const editable = can(`${config.resource}.update`);
+
+  // Empty fields are tucked away so a record shows what is known. A record with nothing filled in
+  // shows every field, since that is the moment you want to fill them in.
+  const empty = (f: FieldConfig) => isEmptyValue(f.get(record));
+  const emptyCount = allSections.reduce((n, s) => n + s.fields.filter(empty).length, 0);
+  const filledCount = allSections.reduce((n, s) => n + s.fields.length, 0) - emptyCount;
+  const collapsible = emptyCount > 0 && filledCount > 0;
+  const sections =
+    collapsible && !showEmpty
+      ? allSections
+          .map((s) => ({ ...s, fields: s.fields.filter((f) => !empty(f)) }))
+          .filter((s) => s.fields.length)
+      : allSections;
+
   return (
     <div className="flex flex-col gap-5">
       {sections.map((s) => (
@@ -44,6 +64,18 @@ export function FieldsPanel({
           </dl>
         </section>
       ))}
+      {collapsible ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="self-start"
+          aria-expanded={showEmpty}
+          onClick={() => setShowEmpty((v) => !v)}
+        >
+          {showEmpty ? t('common.hideEmptyFields') : t('common.showEmptyFields', { count: emptyCount })}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -62,10 +94,11 @@ function FieldRow({
   compact?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
-  const display = field.render ? (
-    field.render(record)
-  ) : (
-    <span>{String(field.get(record) ?? '') || <span className="text-faint">—</span>}</span>
+  // A renderer may return nothing for an empty value (tags), so fall back to the dash.
+  const display = (field.render ? field.render(record) : null) ?? (
+    <span>
+      {(field.render ? '' : String(field.get(record) ?? '')) || <span className="text-faint">—</span>}
+    </span>
   );
   return (
     <div className={cn('contents', compact && 'flex flex-col py-1')}>
@@ -86,7 +119,7 @@ function FieldRow({
           >
             <span className="min-w-0 flex-1 truncate">{display}</span>
             {editable ? (
-              <Pencil className="size-3 shrink-0 text-faint opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
+              <Pencil className="size-3 shrink-0 text-faint opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 pointer-coarse:opacity-100" />
             ) : null}
           </button>
         )}

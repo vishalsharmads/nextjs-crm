@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn';
 import { Spinner } from './spinner';
 
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-sm font-medium transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -17,11 +17,11 @@ export const buttonVariants = cva(
         link: 'text-primary underline-offset-2 hover:underline',
       },
       size: {
-        sm: 'h-7 px-2.5 text-xs',
-        md: 'h-8 px-3 text-sm',
+        sm: 'h-7 px-2.5 text-xs pointer-coarse:h-9',
+        md: 'h-8 px-3 text-sm pointer-coarse:h-10',
         lg: 'h-10 px-4 text-sm',
-        icon: 'size-8',
-        'icon-sm': 'size-7',
+        icon: 'size-8 pointer-coarse:size-10',
+        'icon-sm': 'size-7 pointer-coarse:size-9',
       },
     },
     defaultVariants: { variant: 'secondary', size: 'md' },

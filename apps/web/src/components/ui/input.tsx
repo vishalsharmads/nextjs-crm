@@ -9,10 +9,12 @@ import {
 import { cn } from '@/lib/cn';
 
 const control =
-  'w-full rounded-sm border border-line bg-surface px-2.5 text-sm text-ink placeholder:text-faint transition-colors hover:border-line-strong focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-soft disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-accent';
+  'w-full rounded-sm border border-line bg-surface px-2.5 text-sm pointer-coarse:text-base text-ink placeholder:text-faint transition-colors hover:border-line-strong focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-soft disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-accent';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
-  ({ className, ...props }, ref) => <input ref={ref} className={cn(control, 'h-8', className)} {...props} />,
+  ({ className, ...props }, ref) => (
+    <input ref={ref} className={cn(control, 'h-8 pointer-coarse:h-10', className)} {...props} />
+  ),
 );
 Input.displayName = 'Input';
 
@@ -25,7 +27,7 @@ Textarea.displayName = 'Textarea';
 
 export const NativeSelect = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
   ({ className, children, ...props }, ref) => (
-    <select ref={ref} className={cn(control, 'h-8 pe-7', className)} {...props}>
+    <select ref={ref} className={cn(control, 'h-8 pe-7 pointer-coarse:h-10', className)} {...props}>
       {children}
     </select>
   ),

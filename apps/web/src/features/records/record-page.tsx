@@ -34,6 +34,7 @@ import { RecordFormSheet } from './record-form';
 import { Timeline } from './timeline';
 import { FilesPanel } from './files-panel';
 import { ConsentPanel } from '@/features/privacy/consent-panel';
+import { StageTrack } from '@/features/deals/stage-track';
 
 type Rec = Record<string, unknown> & {
   uuid: string;
@@ -93,7 +94,7 @@ export function RecordPage({ entity }: { entity: CoreEntity }) {
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold tracking-tight">{title}</h1>
+            <h1 className="truncate text-xl font-semibold tracking-tight md:text-title">{title}</h1>
             <RecordSubheader entity={entity} rec={rec} config={config} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -199,12 +200,16 @@ function RecordSubheader({ entity, rec, config }: { entity: CoreEntity; rec: Rec
   if (entity === 'deal') {
     const d = rec as unknown as DealDto;
     return (
-      <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
-        <span className="tabular text-ink">{formatMoney(d.value, d.currency)}</span>
-        <Badge tone={d.stage.isWon ? 'primary' : d.stage.isLost ? 'accent' : 'neutral'}>{d.stage.name}</Badge>
-        {d.reference ? <span>#{d.reference}</span> : null}
-        {d.rotting ? <Badge tone="accent">Stalled</Badge> : null}
-      </p>
+      <div className="mt-1">
+        <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
+          <span className="tabular text-ink">{formatMoney(d.value, d.currency)}</span>
+          {d.reference ? <span>#{d.reference}</span> : null}
+          {d.rotting ? <Badge tone="accent">Stalled</Badge> : null}
+        </p>
+        <div className="mt-2">
+          <StageTrack deal={d} />
+        </div>
+      </div>
     );
   }
   if (entity === 'lead') {

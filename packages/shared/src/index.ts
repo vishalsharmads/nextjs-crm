@@ -12,3 +12,4 @@ export * from './meta';
 export * from './records';
 export * from './commerce';
 export * from './patch';
+export * from './templates';

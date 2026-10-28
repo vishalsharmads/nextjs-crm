@@ -28,7 +28,9 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - Deal velocity and forecast reports built on `deal_stage_history`.
 - Extract remaining literal English UI copy into `apps/web/src/i18n/en.json` (entity names already go through vocabulary).
 - Dashboard editing in the UI (add, remove, resize widgets). Phase 1 ships blueprint-defined dashboards and the API to save personal copies.
-- Mouse-friendly "Move to stage" menu on Kanban cards (keyboard drag works today).
+- Mouse-friendly "Move to stage" menu on Kanban cards (keyboard drag works today; the deal page has a stage track).
+- A display font in branding, used for page titles only (body and tables keep the readable families).
+- Exit animation for the record peek (it closes instantly today, which suits something opened often).
 - Per-user notification preferences UI (the `preferences.emailNotifications` flag exists).
 - OAuth mailbox connection (Google, Microsoft) instead of app passwords.
 - Threaded email view and reply-from-CRM using `In-Reply-To`.
@@ -40,7 +42,9 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 - Quote and invoice panels on deal and organization record pages.
 - Recurring bookings and a member self-service booking page in the client portal.
 - Configurable ticket response targets (per priority and business hours), and email-to-ticket.
-- A rich-text template editor for documents, and drawn signatures.
+- Drawn signatures on documents.
+- Images in rich text (notes, emails, documents): upload, scope-checked file access, encryption at rest, and email embedding.
+- Conditional sections (`{{#if}}`) editable in the visual editor, instead of only in the HTML view.
 - Barcode scanning for asset tags and stock counts.
 - Visitor pre-registration and printed badges for the front desk.
 - Bookings and front desk show linked contact names to anyone with view access (shared calendar by design); add an option to hide names outside the viewer's contact scope.

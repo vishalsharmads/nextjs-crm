@@ -62,7 +62,8 @@ export function applyBranding(
   void FONT_LOADERS[branding.fontFamily]?.();
 
   setMeta('theme-color', branding.colors[resolved].primary);
-  setFavicon(branding.assets.favicon);
+  const { primary } = branding.colors[resolved];
+  setFavicon(branding.assets.favicon ?? fallbackFavicon(primary, branding.appName));
 }
 
 export function setDocumentTitle(page: string | undefined, appName: string) {
@@ -77,6 +78,21 @@ function setMeta(name: string, content: string) {
     document.head.appendChild(el);
   }
   el.content = content;
+}
+
+/**
+ * Icon for instances without an uploaded favicon: the app's first letter on its primary color. Made from the
+ * instance's own branding, so it carries no vendor mark, and it stops the browser asking for /favicon.ico.
+ */
+export function fallbackFavicon(primary: string, appName: string): string {
+  // A letter or digit only, so nothing from the name can break out of the markup.
+  const letter = (appName.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase();
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">` +
+    `<rect width="32" height="32" rx="7" fill="${primary}"/>` +
+    `<text x="16" y="22.5" font-family="system-ui,sans-serif" font-size="18" font-weight="600" ` +
+    `text-anchor="middle" fill="${readableForeground(primary)}">${letter}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 function setFavicon(href: string | undefined) {

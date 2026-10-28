@@ -13,6 +13,8 @@ export const qk = {
   tags: (q = '') => ['tags', q] as const,
   customFields: (entity?: string) => ['custom-fields', entity ?? 'all'] as const,
   pipelines: () => ['pipelines'] as const,
+  savedReplies: () => ['templates', 'replies'] as const,
+  mergeFields: () => ['templates', 'fields'] as const,
   views: (entity: string) => ['saved-views', entity] as const,
   consents: (entity: string, uuid: string) => ['privacy', 'consents', entity, uuid] as const,
   privacyRequests: (params?: unknown) =>

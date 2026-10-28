@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Columns3, Download, Plus, Rows3, Rows4, Search, Inbox, Upload } from 'lucide-react';
+import { Columns3, Download, MoreHorizontal, Plus, Rows3, Rows4, Search, Inbox, Upload } from 'lucide-react';
 import { buildUrl } from '@/lib/api';
 import type { CoreEntity, FilterCondition } from '@app/shared';
 import { useBranding } from '@/app/branding';
@@ -10,7 +10,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState, ErrorState, PageHeader } from '@/components/ui/misc';
-import { Popover, PopoverContent, PopoverTrigger, Tooltip } from '@/components/ui/menu';
+import {
+  Menu,
+  MenuContent,
+  MenuItem,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  MenuTrigger,
+  Tooltip,
+} from '@/components/ui/menu';
 import { DataTable, type Column } from '@/components/data/data-table';
 import { FilterBar } from '@/components/data/filter-bar';
 import { useHotkeys } from '@/app/shell/hotkeys';
@@ -180,6 +189,20 @@ export function RecordListPage({
   );
 
   const filtered = state.q || state.conditions.length || state.view;
+  const canImport = entity !== 'activity' && can(`${config.resource}.import`);
+  const canExport = entity !== 'activity' && can(`${config.resource}.export`);
+  const exportHref = buildUrl(`/${config.route}/export`, {
+    filter: state.conditions.length ? JSON.stringify({ and: state.conditions }) : undefined,
+    q: state.q || undefined,
+    view: state.view ?? undefined,
+    sort: state.sort,
+  });
+  const downloadExport = () => {
+    const a = document.createElement('a');
+    a.href = exportHref;
+    a.download = '';
+    a.click();
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -223,25 +246,43 @@ export function RecordListPage({
         <FilterBar fields={config.fields} conditions={state.conditions} onChange={state.setConditions} />
         <div className="ms-auto flex items-center gap-1">
           {toolbarExtra}
-          {entity !== 'activity' && can(`${config.resource}.import`) ? (
-            <Button size="sm" variant="ghost" onClick={() => navigate(`/import/${config.route}`)}>
-              <Upload /> Import
-            </Button>
-          ) : null}
-          {entity !== 'activity' && can(`${config.resource}.export`) ? (
-            <Button size="sm" variant="ghost" asChild>
-              <a
-                href={buildUrl(`/${config.route}/export`, {
-                  filter: state.conditions.length ? JSON.stringify({ and: state.conditions }) : undefined,
-                  q: state.q || undefined,
-                  view: state.view ?? undefined,
-                  sort: state.sort,
-                })}
-                download
-              >
-                <Download /> Export
-              </a>
-            </Button>
+          {/* Wide screens: labelled buttons. Phones: one menu, so the toolbar fits on a row. */}
+          <div className="hidden items-center gap-1 md:flex">
+            {canImport ? (
+              <Button size="sm" variant="ghost" onClick={() => navigate(`/import/${config.route}`)}>
+                <Upload /> {tr('common.import')}
+              </Button>
+            ) : null}
+            {canExport ? (
+              <Button size="sm" variant="ghost" asChild>
+                <a href={exportHref} download>
+                  <Download /> {tr('common.export')}
+                </a>
+              </Button>
+            ) : null}
+          </div>
+          {canImport || canExport ? (
+            <div className="md:hidden">
+              <Menu>
+                <MenuTrigger asChild>
+                  <Button size="icon-sm" variant="ghost" aria-label={tr('common.more')}>
+                    <MoreHorizontal />
+                  </Button>
+                </MenuTrigger>
+                <MenuContent>
+                  {canImport ? (
+                    <MenuItem onSelect={() => navigate(`/import/${config.route}`)}>
+                      <Upload /> {tr('common.import')}
+                    </MenuItem>
+                  ) : null}
+                  {canExport ? (
+                    <MenuItem onSelect={downloadExport}>
+                      <Download /> {tr('common.export')}
+                    </MenuItem>
+                  ) : null}
+                </MenuContent>
+              </Menu>
+            </div>
           ) : null}
           <ColumnPicker config={config} value={columnIds} onChange={saveColumns} />
           <Tooltip content={density === 'compact' ? 'Comfortable rows' : 'Compact rows'}>
@@ -287,6 +328,8 @@ export function RecordListPage({
           selected={selected}
           onSelectedChange={setSelected}
           onRowOpen={(r) => state.set({ peek: r.uuid as string, page: String(state.page) })}
+          rowHref={(r) => `/${config.route}/${r.uuid as string}`}
+          linkColumnId={config.defaultColumns[0]}
           activeKey={state.peek}
           page={state.page}
           pageSize={PAGE_SIZE}

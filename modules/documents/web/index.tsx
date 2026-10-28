@@ -22,7 +22,9 @@ import { labelVars } from '@/lib/labels';
 import { useBoot, useCan } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { RichTextEditor } from '@/components/editor/rich-text-editor';
+import { useMergeFields } from '@/components/editor/use-templates';
 import { Badge, EmptyState, ErrorState, PageHeader, Pane, Skeleton } from '@/components/ui/misc';
 import { RecordPicker } from '@/components/fields/pickers';
 
@@ -450,18 +452,6 @@ function RequestsTab() {
   );
 }
 
-const PLACEHOLDERS = [
-  '{{contact.firstName}}',
-  '{{contact.fullName}}',
-  '{{contact.email}}',
-  '{{contact.custom.<field>}}',
-  '{{organization.name}}',
-  '{{business.name}}',
-  '{{business.address}}',
-  '{{user.name}}',
-  '{{today}}',
-];
-
 function TemplateDialog({ template, onDone }: { template: Template | null; onDone: () => void }) {
   const qc = useQueryClient();
   const [v, setV] = useState({
@@ -482,11 +472,18 @@ function TemplateDialog({ template, onDone }: { template: Template | null; onDon
     },
   });
   const errors = save.error instanceof ApiError ? save.error.fieldErrors() : {};
+  const fields = useMergeFields(`${API}/templates/fields`);
+  const nouns = useNouns();
+  const [previewFor, setPreviewFor] = useState<Ref | null>(null);
+  const preview = useMutation({
+    mutationFn: () =>
+      apiPost<{ html: string }>(`${API}/templates/preview`, { body: v.body, contactUuid: previewFor!.uuid }),
+  });
   return (
     <Dialog open onOpenChange={(o) => !o && onDone()}>
       <DialogContent
         title={template ? `Edit ${template.name}` : 'New template'}
-        className="max-w-3xl"
+        className="max-w-4xl"
         footer={
           <>
             <Button variant="ghost" onClick={onDone}>
@@ -511,29 +508,49 @@ function TemplateDialog({ template, onDone }: { template: Template | null; onDon
             label="Content"
             required
             error={errors.body}
-            help="HTML with placeholders. Scripts and styles are removed."
+            help="Type {{ to insert a field from the record. Scripts and styles are removed."
           >
             {(p) => (
-              <Textarea
+              <RichTextEditor
                 {...p}
-                rows={14}
+                aria-label="Content"
+                mode="document"
                 value={v.body}
-                onChange={(e) => setV({ ...v, body: e.target.value })}
-                className="font-mono text-xs"
+                onChange={(body) => setV({ ...v, body })}
+                mergeFields={fields ?? []}
+                className="min-h-72"
               />
             )}
           </Field>
-          <div className="flex flex-wrap gap-1">
-            {PLACEHOLDERS.map((ph) => (
-              <button
-                key={ph}
+          <div className="flex flex-col gap-2 rounded-md border border-line p-3">
+            <div className="flex flex-wrap items-end gap-2">
+              <Field label={`Preview for ${nouns.contact.toLowerCase()}`} className="min-w-56 flex-1">
+                {(p) => (
+                  <RecordPicker
+                    {...p}
+                    route="contacts"
+                    value={previewFor?.uuid ?? null}
+                    label={previewFor?.name}
+                    onChange={(uuid, name) => setPreviewFor(uuid ? { uuid, name: name ?? '' } : null)}
+                  />
+                )}
+              </Field>
+              <Button
                 type="button"
-                className="rounded-sm border border-line px-1.5 py-0.5 font-mono text-2xs text-muted hover:bg-hover"
-                onClick={() => setV({ ...v, body: `${v.body}${ph}` })}
+                disabled={!previewFor || !v.body.trim()}
+                loading={preview.isPending}
+                onClick={() => preview.mutate()}
               >
-                {ph}
-              </button>
-            ))}
+                Show preview
+              </Button>
+            </div>
+            {preview.error ? (
+              <p role="alert" className="text-sm text-accent">
+                {preview.error.message}
+              </p>
+            ) : preview.data ? (
+              <DocumentBody html={preview.data.html} />
+            ) : null}
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -787,14 +804,15 @@ function DocumentPage() {
                   />
                 )}
               </Field>
-              <Field label="Content (HTML)">
+              <Field label="Content">
                 {(p) => (
-                  <Textarea
+                  <RichTextEditor
                     {...p}
-                    rows={16}
+                    aria-label="Content"
+                    mode="document"
                     value={draft.bodyHtml}
-                    onChange={(e) => setDraft({ ...draft, bodyHtml: e.target.value })}
-                    className="font-mono text-xs"
+                    onChange={(bodyHtml) => setDraft({ ...draft, bodyHtml })}
+                    className="min-h-96"
                   />
                 )}
               </Field>
@@ -828,10 +846,7 @@ export function DocumentBody({
 }) {
   return (
     <article className="rounded-md border border-line bg-surface p-6 md:p-10 print:border-0 print:p-0">
-      <div
-        className="text-sm leading-relaxed [&_a]:text-primary [&_a]:underline [&_h1]:mb-4 [&_h1]:text-2xl [&_h1]:font-semibold [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:font-semibold [&_li]:ms-5 [&_ol]:my-2 [&_ol]:list-decimal [&_p]:my-2 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:border-line [&_td]:p-1.5 [&_th]:border [&_th]:border-line [&_th]:p-1.5 [&_th]:text-start [&_ul]:my-2 [&_ul]:list-disc"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <div className="rte-prose text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />
       {signedName ? (
         <div className="mt-10 border-t border-line pt-4 text-sm">
           <p className="text-xs tracking-wide text-muted uppercase">Signed</p>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DndContext,
@@ -22,15 +22,14 @@ import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
 import type { DealDto, FilterCondition } from '@app/shared';
-import { apiGet, apiPatch } from '@/lib/api';
+import { apiGet } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { cn } from '@/lib/cn';
 import { formatDate, formatMoney } from '@/lib/format';
-import { useBoot, useCan } from '@/app/session';
+import { useBoot, useCan, useT } from '@/app/session';
 import { Avatar, ErrorState, Skeleton } from '@/components/ui/misc';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { ListSelect } from '@/components/fields/pickers';
+import { LostReasonDialog } from './lost-reason-dialog';
+import { patchDealStage } from './stage-move';
 
 interface Column {
   stage: {
@@ -65,6 +64,7 @@ export function DealBoard({
 }) {
   const qc = useQueryClient();
   const can = useCan();
+  const t = useT();
   const boot = useBoot();
   const params = {
     pipeline: pipelineUuid,
@@ -82,6 +82,13 @@ export function DealBoard({
       }),
   });
   const [activeId, setActiveId] = useState<string | null>(null);
+  // The card that was just moved gets a short highlight that settles, so the eye can follow it to its new place.
+  const [settledId, setSettledId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!settledId) return;
+    const t = setTimeout(() => setSettledId(null), 650);
+    return () => clearTimeout(t);
+  }, [settledId]);
   const [lostPrompt, setLostPrompt] = useState<{
     deal: DealDto;
     stageUuid: string;
@@ -95,13 +102,7 @@ export function DealBoard({
   const canMove = can('core.deals.update');
 
   const move = useMutation({
-    mutationFn: (v: {
-      uuid: string;
-      stageUuid: string;
-      beforeUuid?: string;
-      afterUuid?: string;
-      lostReason?: string;
-    }) => apiPatch<DealDto>(`/deals/${v.uuid}/stage`, v),
+    mutationFn: patchDealStage,
     onMutate: async (v) => {
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<Board>(key);
@@ -179,6 +180,7 @@ export function DealBoard({
       return;
     }
     move.mutate({ uuid: deal.uuid, stageUuid: column.stage.uuid, beforeUuid, afterUuid });
+    setSettledId(deal.uuid);
     if (column.stage.uuid !== deal.stage.uuid) toast.success(`Moved to ${column.stage.name}`);
   };
 
@@ -204,13 +206,24 @@ export function DealBoard({
       <div
         className="flex h-full min-h-0 gap-3 overflow-x-auto p-4 md:px-6"
         role="list"
-        aria-label="Pipeline stages"
+        aria-label={t('common.pipelineStages')}
       >
         {board.data.columns.map((c) => (
-          <BoardColumn key={c.stage.uuid} column={c} onOpen={onOpen} disabled={!canMove} />
+          <BoardColumn
+            key={c.stage.uuid}
+            column={c}
+            onOpen={onOpen}
+            disabled={!canMove}
+            dragging={!!activeId}
+            settledId={settledId}
+          />
         ))}
       </div>
-      <DragOverlay dropAnimation={{ duration: 160, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+      {/* After a move the card appears in its new column with a highlight, so the overlay must not fly back to the
+          old spot first (the optimistic update lands a tick after the drop). A cancelled drag still glides home. */}
+      <DragOverlay
+        dropAnimation={settledId ? null : { duration: 180, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }}
+      >
         {active ? <DealCard deal={active} overlay /> : null}
       </DragOverlay>
       {lostPrompt ? (
@@ -218,6 +231,7 @@ export function DealBoard({
           deal={lostPrompt.deal}
           onCancel={() => setLostPrompt(null)}
           onConfirm={(reason) => {
+            setSettledId(lostPrompt.deal.uuid);
             move.mutate({
               uuid: lostPrompt.deal.uuid,
               stageUuid: lostPrompt.stageUuid,
@@ -233,14 +247,19 @@ export function DealBoard({
   );
 }
 
-function BoardColumn({
+export function BoardColumn({
   column,
   onOpen,
   disabled,
+  dragging,
+  settledId,
 }: {
   column: Column;
   onOpen: (uuid: string) => void;
   disabled: boolean;
+  /** A card is being dragged somewhere on the board. */
+  dragging: boolean;
+  settledId: string | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.stage.uuid });
   const currency = column.deals[0]?.currency;
@@ -262,10 +281,21 @@ function BoardColumn({
       <div ref={setNodeRef} className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
         <SortableContext items={column.deals.map((d) => d.uuid)} strategy={verticalListSortingStrategy}>
           {column.deals.map((d) => (
-            <SortableCard key={d.uuid} deal={d} onOpen={onOpen} disabled={disabled} />
+            <SortableCard
+              key={d.uuid}
+              deal={d}
+              onOpen={onOpen}
+              disabled={disabled}
+              settled={settledId === d.uuid}
+              // Right after a drop the column is already in its final order; sliding the neighbours back
+              // would only cross the card that just arrived.
+              instant={settledId !== null}
+            />
           ))}
         </SortableContext>
-        {!column.deals.length ? <p className="px-2 py-6 text-center text-xs text-faint">Drop here</p> : null}
+        {!column.deals.length && dragging ? (
+          <p className="px-2 py-6 text-center text-xs text-faint">Drop here</p>
+        ) : null}
       </div>
     </section>
   );
@@ -275,10 +305,14 @@ function SortableCard({
   deal,
   onOpen,
   disabled,
+  settled,
+  instant,
 }: {
   deal: DealDto;
   onOpen: (uuid: string) => void;
   disabled: boolean;
+  settled: boolean;
+  instant: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: deal.uuid,
@@ -287,17 +321,27 @@ function SortableCard({
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{ transform: CSS.Transform.toString(transform), transition: instant ? 'none' : transition }}
       className={cn(isDragging && 'opacity-40')}
       {...attributes}
       {...listeners}
     >
-      <DealCard deal={deal} onOpen={() => onOpen(deal.uuid)} />
+      <DealCard deal={deal} onOpen={() => onOpen(deal.uuid)} settled={settled} />
     </div>
   );
 }
 
-function DealCard({ deal, onOpen, overlay }: { deal: DealDto; onOpen?: () => void; overlay?: boolean }) {
+function DealCard({
+  deal,
+  onOpen,
+  overlay,
+  settled,
+}: {
+  deal: DealDto;
+  onOpen?: () => void;
+  overlay?: boolean;
+  settled?: boolean;
+}) {
   return (
     <article
       onClick={onOpen}
@@ -306,6 +350,7 @@ function DealCard({ deal, onOpen, overlay }: { deal: DealDto; onOpen?: () => voi
         'cursor-grab rounded-md border border-line bg-surface p-2.5 text-sm hover:border-line-strong',
         overlay && 'cursor-grabbing shadow-xl',
         deal.rotting && 'border-s-2 border-s-accent',
+        settled && 'anim-settle',
       )}
     >
       <p className="line-clamp-2 font-medium">{deal.title}</p>
@@ -323,41 +368,5 @@ function DealCard({ deal, onOpen, overlay }: { deal: DealDto; onOpen?: () => voi
         </span>
       </div>
     </article>
-  );
-}
-
-function LostReasonDialog({
-  deal,
-  onCancel,
-  onConfirm,
-}: {
-  deal: DealDto;
-  onCancel: () => void;
-  onConfirm: (reason: string) => void;
-}) {
-  const boot = useBoot();
-  const [reason, setReason] = useState<string | null>(null);
-  return (
-    <Dialog open onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent
-        title={`Why was “${deal.title}” lost?`}
-        description="Knowing why helps you see patterns later."
-        footer={
-          <>
-            <Button onClick={onCancel}>Cancel</Button>
-            <Button variant="primary" disabled={!reason} onClick={() => reason && onConfirm(reason)}>
-              Mark as lost
-            </Button>
-          </>
-        }
-      >
-        <ListSelect
-          value={reason}
-          onChange={setReason}
-          options={boot.settings.deals.lostReasons}
-          placeholder="Choose a reason"
-        />
-      </DialogContent>
-    </Dialog>
   );
 }

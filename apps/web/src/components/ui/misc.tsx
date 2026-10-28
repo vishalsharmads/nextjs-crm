@@ -113,7 +113,7 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
   return (
     <TabsPrimitive.Trigger
       value={value}
-      className="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-muted transition-colors hover:text-ink data-[state=active]:border-primary data-[state=active]:font-medium data-[state=active]:text-ink"
+      className="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-muted transition-[color,border-color] duration-150 ease-out hover:text-ink data-[state=active]:border-primary data-[state=active]:font-medium data-[state=active]:text-ink"
     >
       {children}
     </TabsPrimitive.Trigger>
@@ -135,7 +135,7 @@ export function PageHeader({
     <div className="border-b border-line bg-surface px-4 pt-4 md:px-6">
       <div className="flex flex-wrap items-start justify-between gap-3 pb-3">
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-semibold tracking-tight">{title}</h1>
+          <h1 className="truncate text-xl font-semibold tracking-tight md:text-title">{title}</h1>
           {description ? <p className="mt-0.5 text-sm text-muted">{description}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
@@ -160,7 +160,7 @@ export function Pane({
   padded?: boolean;
 }) {
   return (
-    <section className={cn('rounded-md border border-line bg-surface', className)}>
+    <section className={cn('rounded-md border border-line bg-surface shadow-raised', className)}>
       {title ? (
         <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-2.5">
           <h2 className="text-sm font-semibold">{title}</h2>

@@ -20,7 +20,7 @@ export function Checkbox({
       checked={checked}
       onCheckedChange={(v) => onCheckedChange(v === true)}
       className={cn(
-        'flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-line-strong bg-surface data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary text-primary-fg',
+        'relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-line-strong bg-surface data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary text-primary-fg pointer-coarse:before:absolute pointer-coarse:before:-inset-2.5',
         className,
       )}
       {...props}

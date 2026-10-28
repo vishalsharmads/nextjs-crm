@@ -65,7 +65,13 @@ export function sanitizeDocumentHtml(html: string): string {
       'span',
       'div',
     ],
-    allowedAttributes: { a: ['href'], td: ['colspan', 'rowspan'], th: ['colspan', 'rowspan'] },
+    allowedAttributes: {
+      a: ['href'],
+      td: ['colspan', 'rowspan'],
+      th: ['colspan', 'rowspan'],
+      // A print page break from the editor.
+      hr: ['data-page-break'],
+    },
     allowedSchemes: ['https', 'mailto'],
     transformTags: { a: sanitize.simpleTransform('a', { rel: 'noopener noreferrer' }) },
   });

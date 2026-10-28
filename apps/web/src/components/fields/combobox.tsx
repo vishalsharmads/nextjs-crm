@@ -118,7 +118,7 @@ export function Combobox({
         <P.Content
           align="start"
           sideOffset={4}
-          className="anim-pop z-50 w-[var(--radix-popover-trigger-width)] min-w-56 overflow-hidden rounded-md border border-line bg-surface shadow-xl"
+          className="anim-pop z-50 w-[var(--radix-popover-trigger-width)] min-w-56 origin-(--radix-popover-content-transform-origin) overflow-hidden rounded-md border border-line bg-surface shadow-overlay"
         >
           <Command shouldFilter={!onSearch} loop>
             <Command.Input

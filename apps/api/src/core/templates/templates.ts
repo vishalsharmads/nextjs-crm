@@ -1,4 +1,4 @@
-import { toPatch } from '@app/shared';
+import { RELATED_TYPES, toPatch } from '@app/shared';
 import Handlebars from 'handlebars';
 import { z } from 'zod';
 import { defineRoutes } from '../../http/routes';
@@ -9,6 +9,8 @@ import { audit } from '../audit/audit.service';
 import { DEFAULT_EMAIL_TEMPLATES } from '../mail/templates';
 import { getBranding } from '../settings/settings.service';
 import { getLabels } from '../labels/labels.service';
+import { mergeFieldGroups } from './merge-fields';
+import { listReplies, renderReply } from './replies';
 
 const body = z.object({
   key: z.string().regex(/^[a-z][a-z0-9_.]{0,99}$/),
@@ -69,6 +71,29 @@ export const templatesRoutes = defineRoutes('/templates', ['templates'])
         }));
       return { data: [...rows, ...builtIns] };
     },
+  })
+  .add({
+    method: 'get',
+    path: '/fields',
+    permission: 'core.templates.manage',
+    summary: 'Fields a template can insert as placeholders, as the current user may see them',
+    handler: async ({ user }) => ({ data: await mergeFieldGroups(user) }),
+  })
+  .add({
+    method: 'get',
+    path: '/replies',
+    permission: 'authenticated',
+    summary: 'Saved replies anyone can insert into an email or note',
+    handler: async () => ({ data: await listReplies() }),
+  })
+  .add({
+    method: 'post',
+    path: '/replies/:uuid/render',
+    permission: 'authenticated',
+    params: z.object({ uuid: z.uuid() }),
+    body: z.object({ related: z.object({ type: z.enum(RELATED_TYPES), uuid: z.uuid() }).nullish() }),
+    summary: 'Render a saved reply for a record the user may see',
+    handler: async ({ ctx, user, params, body: b }) => renderReply(ctx, user, params.uuid, b.related),
   })
   .add({
     method: 'post',
