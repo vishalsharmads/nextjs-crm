@@ -60,6 +60,7 @@ describe('blueprint engine', () => {
       b.roles.push({
         key: 'bp_site_viewer',
         name: 'Site viewer',
+        description: '',
         permissions: ['custom.bp_site.view'],
         scopes: {},
       });
