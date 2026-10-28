@@ -131,6 +131,11 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
         if (body.active !== undefined) {
           if (!body.active && (p.is_default || body.isDefault))
             throw conflict('Make another pipeline the default first');
+          if (!body.active && p.active) {
+            const { table } = STAGED[p.entity as StagedEntity];
+            const held = await trx(table).where({ pipeline_id: p.id }).whereNull('deleted_at').first('id');
+            if (held) throw conflict('Move the records on this pipeline to another one first');
+          }
           patch.active = body.active;
         }
         await trx('pipelines').where({ id: p.id }).update(patch);
@@ -262,30 +267,27 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
       if (Number((remaining as { c: number }).c) < 2) throw conflict('A pipeline needs at least two stages');
       const entity = p.entity as StagedEntity;
       const { table } = STAGED[entity];
-      const recordCount = Number(
-        (
-          (await db(table).where({ stage_id: s.id }).whereNull('deleted_at').count({ c: '*' }).first()) as {
-            c: number;
-          }
-        ).c,
-      );
-      let target = null;
-      if (recordCount) {
-        if (!query.moveTo)
-          throw new AppError(
-            'VALIDATION_FAILED',
-            `${recordCount} records are in this stage. Choose where to move them.`,
-            [{ path: 'moveTo', message: 'Required' }],
-          );
-        target = await db('pipeline_stages')
-          .where({ uuid: query.moveTo, pipeline_id: p.id, active: true })
-          .whereNot({ id: s.id })
-          .first();
-        if (!target) throw new AppError('STAGE_INVALID', 'Choose a stage in the same pipeline');
-      }
+      let recordCount = 0;
       await db.transaction(async (trx) => {
-        if (target) {
-          const ids = (await trx(table).where({ stage_id: s.id }).pluck('id')) as number[];
+        // Lock the stage's records so none moves in between the count and the move.
+        const ids = (await trx(table)
+          .where({ stage_id: s.id })
+          .whereNull('deleted_at')
+          .forUpdate()
+          .pluck('id')) as number[];
+        recordCount = ids.length;
+        if (recordCount) {
+          if (!query.moveTo)
+            throw new AppError(
+              'VALIDATION_FAILED',
+              `${recordCount} records are in this stage. Choose where to move them.`,
+              [{ path: 'moveTo', message: 'Required' }],
+            );
+          const target = await trx('pipeline_stages')
+            .where({ uuid: query.moveTo, pipeline_id: p.id, active: true })
+            .whereNot({ id: s.id })
+            .first();
+          if (!target) throw new AppError('STAGE_INVALID', 'Choose a stage in the same pipeline');
           await trx(table)
             .whereIn('id', ids)
             .update({

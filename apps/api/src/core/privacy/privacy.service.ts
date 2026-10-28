@@ -390,6 +390,16 @@ export async function exportSubject(
       })),
     ),
   };
+  if (entity === 'lead') {
+    sections.stageHistory = plain(
+      await db('lead_stage_history as h')
+        .leftJoin('pipeline_stages as f', 'f.id', 'h.from_stage_id')
+        .join('pipeline_stages as t', 't.id', 'h.to_stage_id')
+        .whereIn('h.lead_id', ids)
+        .orderBy('h.id')
+        .select({ from: 'f.name', to: 't.name', changedAt: 'h.changed_at' }),
+    );
+  }
   if (entity === 'contact') {
     const { qb: orgQb } = await scopedQuery(organizationsDef, user, db);
     const canOrgs = can(user, `${organizationsDef.resource}.view`);

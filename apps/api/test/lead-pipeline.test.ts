@@ -1,3 +1,4 @@
+import { inflateRawSync } from 'node:zlib';
 import { afterAll, describe, expect, it } from 'vitest';
 import { clientWithRoles } from './helpers';
 import { db } from '../src/db/knex';
@@ -81,7 +82,14 @@ describe('lead pipeline', () => {
     expect(
       await db('audit_logs').where({ entity: 'lead', entity_id: id, action: 'lead.stage_changed' }).first(),
     ).toBeTruthy();
-    expect(events.some((e) => e.uuid === lead.body.uuid)).toBe(true);
+    const event = events.find((e) => e.uuid === lead.body.uuid);
+    // Payloads leave the API: stage uuids and names, never internal ids.
+    expect(event?.changes).toEqual({
+      stage: {
+        from: { uuid: columns[0]!.stage.uuid, name: columns[0]!.stage.name },
+        to: { uuid: contacted.uuid, name: contacted.name },
+      },
+    });
 
     const timeline = await client.get(`/leads/${lead.body.uuid}/timeline`).expect(200);
     expect(timeline.body.data.some((i: { kind: string }) => i.kind === 'stage')).toBe(true);
@@ -160,5 +168,39 @@ describe('lead pipeline', () => {
     if (res.status === 200) expect(res.body.affected).toBe(0);
     else expect(res.status).toBe(403);
     expect((await rep1.get(`/leads/${mine.body.uuid}`)).body.stage.uuid).toBe(columns[0]!.stage.uuid);
+  });
+
+  it('a personal data export includes the lead stage history', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const lead = await client.post('/leads', { firstName: 'Export', lastName: 'Stages' }).expect(201);
+    const columns = (await client.get('/leads/board').expect(200)).body.columns as Column[];
+    await client.patch(`/leads/${lead.body.uuid}/stage`, { stageUuid: columns[1]!.stage.uuid }).expect(200);
+    const res = await client.agent
+      .get(`/api/v1/privacy/lead/${lead.body.uuid}/export`)
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks: Buffer[] = [];
+        r.on('data', (d: Buffer) => chunks.push(d));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+    // personal-data.json is the first entry: inflate it from its local file header.
+    const zip = res.body as Buffer;
+    const start = 30 + zip.readUInt16LE(26) + zip.readUInt16LE(28);
+    const data = JSON.parse(inflateRawSync(zip.subarray(start, start + zip.readUInt32LE(18))).toString()) as {
+      stageHistory: { from: string | null; to: string }[];
+    };
+    expect(data.stageHistory.map((h) => h.to)).toEqual([columns[0]!.stage.name, columns[1]!.stage.name]);
+  });
+
+  it('a pipeline that still holds records cannot be deactivated', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const pipeline = await client.post('/pipelines', { name: 'Holding', entity: 'lead' }).expect(201);
+    const lead = await client
+      .post('/leads', { firstName: 'Held', lastName: 'Lead', pipelineUuid: pipeline.body.uuid })
+      .expect(201);
+    await client.patch(`/pipelines/${pipeline.body.uuid}`, { active: false }).expect(409);
+    await client.delete(`/leads/${lead.body.uuid}`).expect(204);
+    await client.patch(`/pipelines/${pipeline.body.uuid}`, { active: false }).expect(200);
   });
 });

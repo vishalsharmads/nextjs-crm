@@ -8,7 +8,7 @@ import { audit } from '../audit/audit.service';
 import { assertCan } from '../rbac/access';
 import { createRecord, emitDealStage, emitLeadStage, emitRecordEvent, getRow } from '../records/service';
 import { boardQuerySchema, loadBoard, moveToStage } from '../pipelines/board';
-import { endOfStage, recordStageHistory } from '../pipelines/stage-engine';
+import { endOfStage, publicStageChanges, recordStageHistory } from '../pipelines/stage-engine';
 import { recordRoutes } from '../records/routes';
 import { dealsDef, statusForStage } from './deals.def';
 import { leadsDef } from '../leads/leads.def';
@@ -66,9 +66,11 @@ export const dealsRoutes = [
         );
         const [dto] = await dealsDef.toDtos([updated.row], { user, conn: db });
         if (updated.stageChange)
-          await emitDealStage(dto as unknown as Record<string, unknown>, user, {
-            stage_id: updated.stageChange,
-          });
+          await emitDealStage(
+            dto as unknown as Record<string, unknown>,
+            user,
+            await publicStageChanges(db, { stage_id: updated.stageChange }),
+          );
         return dto!;
       },
     }),
@@ -109,9 +111,11 @@ export const leadsRoutes = [
         const updated = await moveToStage(leadsDef, 'lead', ctx, user, params.uuid, body);
         const [dto] = await leadsDef.toDtos([updated.row], { user, conn: db });
         if (updated.stageChange)
-          await emitLeadStage(dto as unknown as Record<string, unknown>, user, {
-            stage_id: updated.stageChange,
-          });
+          await emitLeadStage(
+            dto as unknown as Record<string, unknown>,
+            user,
+            await publicStageChanges(db, { stage_id: updated.stageChange }),
+          );
         return dto!;
       },
     })

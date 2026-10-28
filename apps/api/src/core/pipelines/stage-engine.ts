@@ -135,3 +135,32 @@ export function isRotting(stage: StageRow | undefined, enteredAt: unknown): bool
   if (!stage?.rotting_days || stage.is_won || stage.is_lost || !enteredAt) return false;
   return Date.now() - new Date(enteredAt as string).getTime() > Number(stage.rotting_days) * 86_400_000;
 }
+
+type Changes = Record<string, { from: unknown; to: unknown }>;
+
+/**
+ * Event payloads leave the API (webhooks), so internal stage and pipeline ids become uuids: `stage_id` and
+ * `pipeline_id` are replaced by `stage` and `pipeline` carrying `{ uuid, name }` on each side.
+ */
+export async function publicStageChanges(conn: Db, changes: Changes): Promise<Changes> {
+  const { stage_id, pipeline_id, ...rest } = changes;
+  const ids = (c: Changes[string] | undefined) => (c ? [c.from, c.to].filter((v) => v != null) : []);
+  const ref = async (table: string, c: Changes[string] | undefined) => {
+    if (!c) return undefined;
+    const rows = (await conn(table)
+      .whereIn('id', ids(c) as number[])
+      .select('id', 'uuid', 'name')) as {
+      id: number;
+      uuid: string;
+      name: string;
+    }[];
+    const pick = (v: unknown) => {
+      const r = rows.find((x) => x.id === Number(v));
+      return r ? { uuid: r.uuid, name: r.name } : null;
+    };
+    return { from: pick(c.from), to: pick(c.to) };
+  };
+  const stage = await ref('pipeline_stages', stage_id);
+  const pipeline = await ref('pipelines', pipeline_id);
+  return { ...rest, ...(stage ? { stage } : {}), ...(pipeline ? { pipeline } : {}) };
+}
