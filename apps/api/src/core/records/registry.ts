@@ -55,7 +55,11 @@ export function setRecordTypeGate(fn: (key: string) => boolean) {
 /** Register a record type, or replace an object's definition after an admin edits it. */
 export function registerRecordType(def: ResourceDef, opts: { replace?: boolean } = {}) {
   if (!def.moduleKey) throw new Error(`Record type "${def.entity}" must name its module`);
-  if (isCoreEntity(def.entity) || (moduleDefs.has(def.entity) && !opts.replace)) {
+  const existing = moduleDefs.get(def.entity);
+  // Only an object may replace its own earlier definition; nothing replaces a module's type.
+  const replacing =
+    opts.replace && existing?.moduleKey === CUSTOM_OBJECTS_KEY && def.moduleKey === CUSTOM_OBJECTS_KEY;
+  if (isCoreEntity(def.entity) || (existing && !replacing)) {
     throw new Error(`Record type "${def.entity}" is already registered`);
   }
   const prefix = moduleTablePrefix(def.moduleKey);

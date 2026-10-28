@@ -11,6 +11,7 @@ import {
 } from '@app/blueprints';
 import {
   CUSTOM_OBJECTS_KEY,
+  MAX_CUSTOM_OBJECTS,
   SETTINGS_GROUPS,
   objectRoute,
   type SettingsGroup,
@@ -24,7 +25,7 @@ import { clearLabelCache } from '../core/labels/labels.service';
 import { bumpDefinitionsVersion } from '../core/custom-fields/definitions';
 import { ensureCustomFieldIndexes } from '../core/custom-fields/ddl.service';
 import { loadModules, enableModule, getModule } from '../modules/registry';
-import { loadCustomObjects } from '../core/objects/objects';
+import { loadCustomObjects, objectKeyProblem } from '../core/objects/objects';
 import { seedSampleData } from './sample-data';
 import { audit } from '../core/audit/audit.service';
 import { systemContext, type RequestContext } from '../http/context';
@@ -244,6 +245,14 @@ class Applier {
 
   /** Objects are seeded as rows; their tables are created after the transaction (DDL). */
   async object(o: BlueprintObject, i: number) {
+    const problem = await objectKeyProblem(o.key, this.trx, { allowExistingObject: true });
+    if (problem) throw new BlueprintError(`Object ${problem}`);
+    const exists = await this.trx('custom_objects').where({ entity: o.key }).first();
+    if (!exists) {
+      const { n } = (await this.trx('custom_objects').count({ n: '*' }).first()) as { n: number };
+      if (Number(n) >= MAX_CUSTOM_OBJECTS)
+        throw new BlueprintError(`Object "${o.key}" would exceed the limit of ${MAX_CUSTOM_OBJECTS} objects`);
+    }
     await this.upsert({
       table: 'custom_objects',
       sourceKey: `object.${o.key}`,

@@ -79,6 +79,16 @@ describe('blueprint engine', () => {
     expect(exported.custom_fields.bp_site).toContainEqual(expect.objectContaining({ key: 'area' }));
   });
 
+  it('refuses objects with reserved or module keys before changing anything', async () => {
+    for (const key of ['contact', 'invoice', 'demo_item']) {
+      const bad = bump(generic, await nextVersion(), (b) => {
+        b.objects.push({ key, singular: 'X', plural: 'Xs', icon: 'box', links: [] });
+      });
+      await expect(applyBlueprint(db, bad)).rejects.toThrow(/reserved|module/);
+      expect(await db('custom_objects').where({ entity: key }).first()).toBeUndefined();
+    }
+  });
+
   it('never overwrites a client-edited item and reports a conflict', async () => {
     await db('custom_field_definitions')
       .where({ entity: 'contact', key: 'linkedin' })

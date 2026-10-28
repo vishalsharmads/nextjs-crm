@@ -25,6 +25,10 @@ describe('custom objects', () => {
   it('rejects reserved and duplicate keys, and removing links', async () => {
     await admin.post('/objects', { key: 'contact', singular: 'A', plural: 'As' }).expect(409);
     await admin.post('/objects', { key: 'pipeline', singular: 'A', plural: 'As' }).expect(409);
+    // Names used by audit rows and events, module record types and module keys.
+    await admin.post('/objects', { key: 'invoice', singular: 'A', plural: 'As' }).expect(409);
+    await admin.post('/objects', { key: 'demo_item', singular: 'A', plural: 'As' }).expect(409);
+    await admin.post('/objects', { key: 'records_demo', singular: 'A', plural: 'As' }).expect(409);
     await admin.post('/objects', { key, singular: 'A', plural: 'As' }).expect(409);
     await admin.post('/objects', { key: 'Bad Key', singular: 'A', plural: 'As' }).expect(422);
     await admin.patch(`/objects/${objectUuid}`, { links: [] }).expect(422);

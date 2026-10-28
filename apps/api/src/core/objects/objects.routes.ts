@@ -1,11 +1,9 @@
 import { z } from 'zod';
 import {
   CUSTOM_OBJECTS_KEY,
-  LABEL_ENTITY_KEYS,
   MAX_CUSTOM_OBJECTS,
   customObjectInputSchema,
   customObjectPatchSchema,
-  isCoreEntity,
   listQuerySchema,
   objectRoute,
 } from '@app/shared';
@@ -30,7 +28,13 @@ import { runBulk } from '../bulk/bulk.service';
 import { exportCsv, exportQuerySchema } from '../imports/import-export';
 import { assertCan } from '../rbac/access';
 import { clearLabelCache } from '../labels/labels.service';
-import { ensureObjectTable, loadCustomObjects, toObjectDto, type ObjectRow } from './objects';
+import {
+  ensureObjectTable,
+  loadCustomObjects,
+  objectKeyProblem,
+  toObjectDto,
+  type ObjectRow,
+} from './objects';
 
 const uuidParam = z.object({ uuid: z.uuid() });
 
@@ -65,13 +69,8 @@ export const objectsRoutes = defineRoutes('/objects', ['objects'])
     status: 201,
     handler: async ({ ctx, user, body }) => {
       const key = body.key;
-      const taken =
-        isCoreEntity(key) ||
-        (LABEL_ENTITY_KEYS as readonly string[]).includes(key) ||
-        allModuleRecordDefs().some((d) => d.entity === key) ||
-        (await db('custom_objects').where({ entity: key }).first());
-      if (taken)
-        throw conflict('That key is already in use', [{ path: 'key', message: 'Choose another key' }]);
+      const problem = await objectKeyProblem(key);
+      if (problem) throw conflict('That key is already in use', [{ path: 'key', message: problem }]);
       const { n } = (await db('custom_objects').count({ n: '*' }).first()) as { n: number };
       if (Number(n) >= MAX_CUSTOM_OBJECTS)
         throw new AppError('VALIDATION_FAILED', `You can have at most ${MAX_CUSTOM_OBJECTS} objects`);

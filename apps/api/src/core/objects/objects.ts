@@ -1,5 +1,7 @@
 import {
   CUSTOM_OBJECTS_KEY,
+  LABEL_ENTITY_KEYS,
+  isCoreEntity,
   type CustomObjectDto,
   type ModuleMenuItemDto,
   type ObjectLinkTarget,
@@ -13,6 +15,87 @@ import { registerModulePermissions, syncPermissions } from '../rbac/catalog';
 import { iso } from '../records/hydrate';
 import type { PrivacyHandler } from '../privacy/handlers';
 import type { ResourceDef } from '../records/types';
+import { maskEncrypted } from '../records/custom';
+import { logger } from '../../lib/logger';
+
+/**
+ * Entity names already used by audit rows, events and modules. An object with one of these keys
+ * would mix its timeline, webhooks and automations with the other entity's.
+ */
+const RESERVED_KEYS = new Set([
+  'access_log',
+  'activity',
+  'api_key',
+  'asset',
+  'assistant',
+  'audit_log',
+  'automation',
+  'blueprint',
+  'booking',
+  'branding',
+  'case',
+  'contract',
+  'custom_field',
+  'custom_field_group',
+  'custom_object',
+  'dashboard',
+  'document',
+  'document_request',
+  'email',
+  'file',
+  'form',
+  'import',
+  'invoice',
+  'labels',
+  'layout',
+  'mail_account',
+  'module',
+  'note',
+  'notification',
+  'payment',
+  'permission',
+  'personal_access_token',
+  'portal_account',
+  'privacy_request',
+  'product',
+  'quote',
+  'quota',
+  'report',
+  'retention',
+  'role',
+  'saved_view',
+  'security',
+  'session',
+  'settings',
+  'stock',
+  'task',
+  'template',
+  'ticket',
+  'token',
+  'web_form',
+  'webhook',
+]);
+
+/**
+ * Why `key` cannot name an object, or null when it can. Shared by Settings → Objects, blueprints
+ * and boot, so no path can register an object over a core entity, module type or reserved name.
+ */
+export async function objectKeyProblem(
+  key: string,
+  conn: Db = db,
+  opts: { allowExistingObject?: boolean } = {},
+): Promise<string | null> {
+  if (isCoreEntity(key) || (LABEL_ENTITY_KEYS as readonly string[]).includes(key) || RESERVED_KEYS.has(key))
+    return `"${key}" is reserved`;
+  if (allModuleRecordDefs().some((d) => d.entity === key && d.moduleKey !== CUSTOM_OBJECTS_KEY))
+    return `"${key}" is used by a module`;
+  const { loadModules } = await import('../../modules/registry');
+  if (loadModules().some((m) => m.manifest.key.replace(/-/g, '_') === key))
+    return `"${key}" is a module name`;
+  if (!opts.allowExistingObject && (await conn('custom_objects').where({ entity: key }).first()))
+    return `"${key}" is already an object`;
+  return null;
+}
 
 /** A row of `custom_objects`. */
 export interface ObjectRow {
@@ -117,9 +200,14 @@ export async function ensureObjectTable(row: Pick<ObjectRow, 'entity' | 'links'>
       t.index(['owner_id'], `ix_${table}_owner`);
       t.index(['deleted_at', 'created_at'], `ix_${table}_deleted`);
     });
+  }
+  // Checked on every pass, so a crash between CREATE and ALTER is repaired on the next load.
+  const [indexes] = (await conn.raw('SHOW INDEX FROM ?? WHERE Key_name = ?', [table, `ft_${table}`])) as [
+    unknown[],
+  ];
+  if (!indexes.length)
     // Must list exactly the searchable columns of the record type (`name`).
     await conn.raw(`ALTER TABLE ?? ADD FULLTEXT INDEX ?? (name)`, [table, `ft_${table}`]);
-  }
   for (const target of linksOf(row)) {
     const col = `${target}_id`;
     if (await conn.schema.hasColumn(table, col)) continue;
@@ -156,8 +244,15 @@ export async function loadCustomObjects(conn: Db = db) {
   if (!(await conn.schema.hasTable('custom_objects'))) return;
   const rows = (await conn('custom_objects').orderBy('sort_order').orderBy('id')) as ObjectRow[];
   for (const row of rows) {
-    await ensureObjectTable(row, conn);
-    registerObject(row);
+    // One bad object (a key a newer module now uses, a failed DDL) must not stop the app.
+    try {
+      const problem = await objectKeyProblem(row.entity, conn, { allowExistingObject: true });
+      if (problem) throw new Error(problem);
+      await ensureObjectTable(row, conn);
+      registerObject(row);
+    } catch (err) {
+      logger.error({ err, object: row.entity }, 'Object could not be loaded');
+    }
   }
   registerModulePermissions(CUSTOM_OBJECTS_KEY, objectPermissions(rows));
   await syncPermissions(conn);
@@ -205,15 +300,25 @@ export function objectPrivacyHandlers(): PrivacyHandler[] {
           if (!links.includes(subject.entity as 'contact' | 'lead')) return {};
           const rows = await conn(def.table)
             .where(`${subject.entity}_id`, subject.id)
-            .select('uuid', 'name', 'created_at', 'updated_at', 'deleted_at');
-          return { [def.entity]: rows };
+            .select('uuid', 'name', 'custom', 'created_at', 'updated_at', 'deleted_at');
+          return { [def.entity]: rows.map((r) => ({ ...r, custom: maskEncrypted(r.custom) })) };
         },
         async erase(subject, trx) {
           if (!links.includes(subject.entity as 'contact' | 'lead')) return {};
           const n = await trx(def.table)
             .where(`${subject.entity}_id`, subject.id)
             .update({ [`${subject.entity}_id`]: null });
-          return { cleared: { [def.entity]: n } };
+          return {
+            cleared: { [def.entity]: n },
+            retained: n
+              ? [
+                  {
+                    area: def.entity,
+                    reason: 'Records belong to the workspace; only the link to the person was removed',
+                  },
+                ]
+              : undefined,
+          };
         },
       };
       return [handler];
