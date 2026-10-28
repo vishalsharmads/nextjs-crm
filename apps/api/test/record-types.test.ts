@@ -57,6 +57,9 @@ describe('module record types', () => {
     const uuid = created.body.uuid as string;
 
     await admin.post(BASE, { name: '' }).expect(422);
+    // Forms send '' for empty optional inputs and 'true'/'false' from yes/no selects.
+    const blank = await admin.post(BASE, { name: 'Blank', notes: '', dueOn: '', value: '' }).expect(201);
+    expect(blank.body).toMatchObject({ notes: null, dueOn: null, value: null });
     await admin.post(BASE, { name: 'X', status: 'nope' }).expect(422);
     await admin.post(BASE, { name: 'X', custom: { grade: 'z' } }).expect(422);
 

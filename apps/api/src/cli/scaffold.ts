@@ -77,7 +77,7 @@ export async function up(knex: Knex) {
     t.bigIncrements('id').unsigned().primary();
     t.specificType('uuid', 'CHAR(36)').notNullable().unique();
     t.string('name', 200).notNullable();
-    t.string('status', 32).notNullable().defaultTo('active');
+    t.string('status', 32).nullable().defaultTo('active');
     t.text('notes').nullable();
     t.bigInteger('owner_id').unsigned().nullable().references('id').inTable('users').onDelete('SET NULL');
     t.json('custom').notNullable();

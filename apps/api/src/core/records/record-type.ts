@@ -118,7 +118,13 @@ function inputSchema(c: RecordColumnSpec): z.ZodType {
       s = z.uuid();
       break;
   }
-  return c.required ? s : s.nullish();
+  // Forms send '' for an empty input and 'true'/'false' from a yes/no select.
+  const blank = (v: unknown) => (v === '' && !c.required ? null : v);
+  const bool = (v: unknown) => (v === 'true' ? true : v === 'false' ? false : v);
+  return z.preprocess(
+    (v) => (c.kind === 'boolean' ? bool(blank(v)) : blank(v)),
+    c.required ? s : s.nullish(),
+  );
 }
 
 function fieldSpec(table: string, c: RecordColumnSpec): CoreFieldSpec {
@@ -157,8 +163,8 @@ function validateSpec(spec: RecordTypeSpec) {
 /**
  * Build the records-engine definition of a module record type. The table must have the standard
  * columns (id, uuid, owner_id, custom, created_by, updated_by, created_at, updated_at, deleted_at),
- * one column per spec column (relations as `<key>_id`), and a FULLTEXT index over the searchable
- * text columns in spec order. `module:new` generates such a migration.
+ * one column per spec column (relations as `<key>_id`; nullable unless the column is required),
+ * and a FULLTEXT index over the searchable text columns in spec order. `module:new` generates such a migration.
  */
 export function defineRecordType(spec: RecordTypeSpec): ResourceDef {
   validateSpec(spec);
