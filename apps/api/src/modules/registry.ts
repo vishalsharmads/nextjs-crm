@@ -154,6 +154,13 @@ export function modulePanels() {
     .sort((a, b) => a.order - b.order);
 }
 
+/** Top-bar side panels of enabled modules. */
+export function moduleShellPanels() {
+  return loadModules()
+    .filter((m) => enabled.has(m.manifest.key))
+    .flatMap((m) => m.manifest.shell_panels.map((p) => ({ ...p, moduleKey: m.manifest.key })));
+}
+
 export function enabledModuleKeys(): string[] {
   return [...enabled];
 }

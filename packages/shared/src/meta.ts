@@ -138,7 +138,12 @@ export interface BootstrapDto {
   fieldGroups: FieldGroupDto[];
   layouts: LayoutDto[];
   pipelines: PipelineDto[];
-  modules: { enabled: string[]; menu: ModuleMenuItemDto[]; panels: RecordPanelDto[] };
+  modules: {
+    enabled: string[];
+    menu: ModuleMenuItemDto[];
+    panels: RecordPanelDto[];
+    shellPanels: { moduleKey: string; key: string; title: string; icon: string }[];
+  };
   /** Record types of enabled modules the user can view. */
   recordTypes: RecordTypeMeta[];
 }

@@ -169,3 +169,57 @@ export const apiPost = <T>(path: string, body?: unknown) =>
 export const apiPatch = <T>(path: string, body: unknown) => api<T>(path, { method: 'PATCH', body });
 export const apiPut = <T>(path: string, body: unknown) => api<T>(path, { method: 'PUT', body });
 export const apiDelete = <T>(path: string) => api<T>(path, { method: 'DELETE' });
+
+/**
+ * POST and read a server-sent event response (`?stream=1` endpoints). Each event goes to `onEvent`;
+ * a JSON error response (refused before streaming) throws `ApiError` like `api()`.
+ */
+export async function apiStream(
+  path: string,
+  body: unknown,
+  onEvent: (event: string, data: unknown) => void,
+): Promise<void> {
+  const headers: Record<string, string> = {
+    Accept: 'text/event-stream',
+    'Content-Type': 'application/json',
+    'x-csrf-token': await csrfToken(),
+    ...idleHeaders(),
+  };
+  const url = `${buildUrl(path)}${path.includes('?') ? '&' : '?'}stream=1`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin',
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'Cannot reach the server. Check your connection and try again.');
+  }
+  if (!res.ok || !res.headers.get('content-type')?.includes('text/event-stream')) {
+    if (res.status === 401 && (await refreshSession())) return apiStream(path, body, onEvent);
+    const err = (await res.json().catch(() => null)) as ApiErrorBody | null;
+    throw new ApiError(
+      res.status,
+      err?.error.code ?? 'INTERNAL',
+      err?.error.message ?? 'Something went wrong.',
+    );
+  }
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let cut: number;
+    while ((cut = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, cut);
+      buffer = buffer.slice(cut + 2);
+      const event = /^event: (.*)$/m.exec(block)?.[1] ?? 'message';
+      const data = /^data: (.*)$/m.exec(block)?.[1];
+      if (data !== undefined) onEvent(event, JSON.parse(data) as unknown);
+    }
+  }
+}

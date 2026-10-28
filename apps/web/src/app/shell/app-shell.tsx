@@ -37,6 +37,7 @@ import { CommandPaletteProvider, usePalette, type PaletteCommand } from './comma
 import { useHotkeys } from './hotkeys';
 import { IdleTimeout } from './idle-timeout';
 import { NotificationsBell } from '@/features/notifications/notifications-bell';
+import { ShellPanels } from './shell-panels';
 
 const COLLAPSE_KEY = 'ui.sidebarCollapsed';
 
@@ -325,6 +326,7 @@ function TopBar({ onMenu, onHelp }: { onMenu: () => void; onHelp: () => void }) 
         </span>
       </button>
       <div className="ms-auto flex items-center gap-1">
+        <ShellPanels />
         <NotificationsBell />
         <Menu>
           <MenuTrigger asChild>

@@ -25,8 +25,10 @@ import {
   type ToolDef,
   type Knex,
 } from '@app/api/module-api';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import type { Request, Response } from 'express';
 import * as m0001 from './migrations/0001_assistant';
-import { chat, PROVIDERS, type Block, type ChatMessage, type ProviderConfig } from './providers';
+import { chat, chatStream, PROVIDERS, type Block, type ChatMessage, type ProviderConfig } from './providers';
 
 const CONFIG = 'm_assistant_config';
 const CONVERSATIONS = 'm_assistant_conversations';
@@ -307,6 +309,44 @@ async function systemPrompt(cfg: ConfigRow, user: AuthUser) {
   ].join('\n');
 }
 
+/** Where a streamed request sends text and tool steps as they happen (absent: no streaming). */
+interface Sink {
+  text(delta: string): void;
+  tool(title: string): void;
+}
+const streamSink = new AsyncLocalStorage<Sink>();
+
+/**
+ * Answer as server-sent events when the client asks (`?stream=1`): `text` deltas, `tool` steps,
+ * then `done` with the conversation, or `error`. Checks that can fail run before this, so a
+ * refusal is still a normal JSON error.
+ */
+async function respond<T>(req: Request, res: Response, status: number, run: () => Promise<T>) {
+  if (req.query.stream !== '1') return run();
+  res.status(status);
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
+  res.flushHeaders();
+  const send = (event: string, data: unknown) =>
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  try {
+    const result = await streamSink.run(
+      { text: (delta) => send('text', { delta }), tool: (title) => send('tool', { title }) },
+      run,
+    );
+    send('done', result);
+  } catch (err) {
+    send(
+      'error',
+      err instanceof AppError
+        ? { code: err.code, message: err.message }
+        : { code: 'INTERNAL', message: 'Something went wrong.' },
+    );
+    if (!(err instanceof AppError)) logger.error({ err }, 'assistant stream failed');
+  }
+  res.end();
+  return undefined;
+}
+
 /** One model loop per person at a time, so concurrent requests cannot overshoot the caps together. */
 const running = new Map<number, Promise<unknown>>();
 function serialized<T>(userId: number, fn: () => Promise<T>): Promise<T> {
@@ -337,7 +377,10 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
   for (let step = 0; step < MAX_STEPS; step++) {
     await assertWithinCaps(cfg, user.id);
     const messages = await history(conv.id);
-    const reply = await chat(provider, { system, messages, tools });
+    const sink = streamSink.getStore();
+    const reply = sink
+      ? await chatStream(provider, { system, messages, tools }, { text: sink.text })
+      : await chat(provider, { system, messages, tools });
     await recordUsage(user.id, {
       input: reply.usage.input || estimate([system, messages]),
       output: reply.usage.output || estimate(reply.content),
@@ -360,7 +403,10 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
           title: def.title,
           input: use.input,
         });
-      else results.push(await runTool(use, cfg, ctx, user));
+      else {
+        streamSink.getStore()?.tool(def?.title ?? use.name);
+        results.push(await runTool(use, cfg, ctx, user));
+      }
     }
     if (proposals.length) {
       await db(CONVERSATIONS)
@@ -516,7 +562,7 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       /** The record the person is looking at. */
       context: z.object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid() }).optional(),
     }),
-    handler: async ({ ctx, user, body }) => {
+    handler: async ({ req, res, ctx, user, body }) => {
       const cfg = await loadConfig();
       if (!(await providerConfig(cfg)))
         throw new AppError('NOT_FOUND', 'The assistant is not set up yet. An admin can set it up.');
@@ -530,8 +576,10 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
         entityUuid: uuid,
       });
       await append(id!, 'user', [{ type: 'text', text: withContext(body.text, body.context) }]);
-      await advance({ id: id! }, cfg, ctx, user);
-      return conversationDto(uuid, user);
+      return respond(req, res, 201, async () => {
+        await advance({ id: id! }, cfg, ctx, user);
+        return conversationDto(uuid, user);
+      });
     },
   })
   .add({
@@ -550,12 +598,15 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       text: z.string().trim().min(1).max(4000),
       context: z.object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid() }).optional(),
     }),
-    handler: async ({ ctx, user, params, body }) => {
+    handler: async ({ req, res, ctx, user, params, body }) => {
       const conv = await conversationFor(params.uuid, user);
       if (conv.pending) throw new AppError('CONFLICT', 'Confirm or decline the proposed changes first');
       await append(conv.id, 'user', [{ type: 'text', text: withContext(body.text, body.context) }]);
-      await advance(conv, await loadConfig(), ctx, user);
-      return conversationDto(params.uuid, user);
+      const cfg = await loadConfig();
+      return respond(req, res, 200, async () => {
+        await advance(conv, cfg, ctx, user);
+        return conversationDto(params.uuid, user);
+      });
     },
   })
   .add({
@@ -564,7 +615,7 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     permission: 'assistant.chat.use',
     params: uuidParam,
     body: z.object({ decisions: z.record(z.string().max(200), z.boolean()) }),
-    handler: async ({ ctx, user, params, body }) => {
+    handler: async ({ req, res, ctx, user, params, body }) => {
       const conv = await conversationFor(params.uuid, user);
       if (!conv.pending) throw new AppError('CONFLICT', 'Nothing is waiting for a decision');
       // Claim the proposals under a row lock: a double click or a retry cannot run a change twice.
@@ -606,14 +657,16 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
         });
       }
       await append(conv.id, 'user', results);
-      try {
-        await advance(conv, cfg, ctx, user);
-      } catch (err) {
-        // The confirmed changes already ran: say so instead of failing the whole request.
-        const message = err instanceof AppError ? err.message : 'The assistant could not continue.';
-        await append(conv.id, 'assistant', [{ type: 'text', text: `Your changes were made. ${message}` }]);
-      }
-      return conversationDto(params.uuid, user);
+      return respond(req, res, 200, async () => {
+        try {
+          await advance(conv, cfg, ctx, user);
+        } catch (err) {
+          // The confirmed changes already ran: say so instead of failing the whole request.
+          const message = err instanceof AppError ? err.message : 'The assistant could not continue.';
+          await append(conv.id, 'assistant', [{ type: 'text', text: `Your changes were made. ${message}` }]);
+        }
+        return conversationDto(params.uuid, user);
+      });
     },
   })
   .add({
