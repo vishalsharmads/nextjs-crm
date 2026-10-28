@@ -32,6 +32,7 @@ const TeamsPage = lazyPage(() => import('@/features/settings/people-pages'), 'Te
 const RolesPage = lazyPage(() => import('@/features/settings/people-pages'), 'RolesPage');
 const FieldsPage = lazyPage(() => import('@/features/settings/fields-page'), 'FieldsPage');
 const AiClientsPage = lazyPage(() => import('@/features/settings/ai-clients'), 'AiClientsPage');
+const ReportsPage = lazyPage(() => import('@/features/reports/reports-page'), 'ReportsPage');
 const ObjectsPage = lazyPage(() => import('@/features/settings/objects-page'), 'ObjectsPage');
 const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'), 'PipelinesPage');
 const DealsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'DealsPage');
@@ -158,6 +159,7 @@ export const router = createBrowserRouter(
             { path: 'deals', element: page(<DealsPage />) },
             { path: 'deals/:uuid', element: <RecordPage entity="deal" /> },
             { path: 'trash', element: page(<TrashPage />) },
+            { path: 'reports', element: page(<ReportsPage />) },
             { path: 'tasks', element: page(<TasksPage />) },
             { path: 'calendar', element: page(<CalendarPage />) },
             {

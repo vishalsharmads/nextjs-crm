@@ -46,6 +46,8 @@ export const CORE_PERMISSIONS: PermissionDef[] = [
   { key: 'core.files.delete', description: 'Delete files' },
   { key: 'core.dashboard.view', description: 'View dashboards' },
   { key: 'core.dashboard.manage', description: 'Edit shared dashboards' },
+  { key: 'core.reports.view', description: 'View sales reports (forecast, quotas, velocity)' },
+  { key: 'core.quotas.manage', description: 'Set sales quotas' },
   { key: 'core.saved_views.share', description: 'Share saved views with everyone' },
   { key: 'core.settings.manage', description: 'Manage general settings' },
   { key: 'core.branding.manage', description: 'Manage branding' },

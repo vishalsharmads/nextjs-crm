@@ -22,6 +22,7 @@ import {
   Ticket,
   Users,
   Sparkles,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react';
 import type { BootstrapDto } from '@app/shared';
@@ -134,6 +135,8 @@ export function buildNav(boot: BootstrapDto, t: (k: string) => string): NavItem[
       section: 'main',
     });
   }
+  if (can('core.reports.view') && can('core.deals.view'))
+    items.push({ key: 'reports', label: t('nav.reports'), to: '/reports', icon: BarChart3, section: 'main' });
   for (const m of boot.modules.menu) {
     items.push({
       key: `m:${m.moduleKey}:${m.key}`,
