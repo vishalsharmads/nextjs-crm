@@ -48,6 +48,17 @@ export const moduleManifestSchema = z
         }),
       )
       .default([]),
+    /** Side panels opened from the top bar on every page (rendered by `panels` in the web entry). */
+    shell_panels: z
+      .array(
+        z.object({
+          key: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+          title: z.string().min(1).max(60),
+          icon: z.string().max(40).default('box'),
+          permission: z.string().regex(PERMISSION_KEY_RE),
+        }),
+      )
+      .default([]),
     dashboard_widgets: z
       .array(
         z.object({ type: z.string().regex(/^[a-z][a-z0-9-]*\.[a-z0-9_.-]+$/), title: z.string().max(100) }),
@@ -112,6 +123,9 @@ export interface WebModule<Element = unknown> {
   publicRoutes?: { path: string; element: Element }[];
   /** Renderers for this module's dashboard widgets, keyed by widget type (`<key>.<name>`). */
   widgets?: Record<string, (props: { data: unknown }) => Element>;
-  /** Record-page tabs declared in the manifest's `record_panels`, keyed by panel key. */
+  /**
+   * Record-page tabs (`record_panels`) and top-bar side panels (`shell_panels`), keyed by panel key.
+   * Side panels get the record on screen, if any (`entity` and `uuid` are empty otherwise).
+   */
   panels?: Record<string, (props: { entity: string; uuid: string }) => Element>;
 }

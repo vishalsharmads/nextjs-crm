@@ -110,7 +110,8 @@ async function messagesApi(cfg: ProviderConfig, req: ChatRequest): Promise<ChatR
   return { content, usage: { input: out.usage?.input_tokens ?? 0, output: out.usage?.output_tokens ?? 0 } };
 }
 
-async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promise<ChatResult> {
+/** The conversation in the chat completions shape (system message, tool calls, tool results). */
+function chatMessages(req: ChatRequest): unknown[] {
   const messages: unknown[] = [{ role: 'system', content: req.system }];
   for (const m of req.messages) {
     if (m.role === 'assistant') {
@@ -133,6 +134,11 @@ async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promis
       if (b.type === 'text') messages.push({ role: 'user', content: b.text });
     }
   }
+  return messages;
+}
+
+async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promise<ChatResult> {
+  const messages = chatMessages(req);
   const out = (await post(
     join(cfg.baseUrl, '/chat/completions'),
     { ...cfg.headers, authorization: `Bearer ${cfg.apiKey}` },
@@ -174,4 +180,190 @@ async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promis
 
 export function chat(cfg: ProviderConfig, req: ChatRequest): Promise<ChatResult> {
   return cfg.provider === 'messages' ? messagesApi(cfg, req) : chatCompletionsApi(cfg, req);
+}
+
+/** Called as a reply streams in. */
+export interface StreamHandlers {
+  text(delta: string): void;
+}
+
+/** Read a server-sent event stream as `data:` payloads (with their `event:` names). */
+async function* sseEvents(res: Response): AsyncGenerator<{ event: string | null; data: string }> {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let size = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_RESPONSE) {
+      await reader.cancel();
+      throw new AppError('UPSTREAM_FAILED', 'The AI provider sent a response that is too large.');
+    }
+    buffer += decoder.decode(value, { stream: true });
+    let cut: number;
+    while ((cut = buffer.search(/\r?\n\r?\n/)) >= 0) {
+      const block = buffer.slice(0, cut);
+      buffer = buffer.slice(cut).replace(/^\r?\n\r?\n/, '');
+      let event: string | null = null;
+      const data: string[] = [];
+      for (const line of block.split(/\r?\n/)) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
+      }
+      if (data.length) yield { event, data: data.join('\n') };
+    }
+  }
+}
+
+async function open(url: string, headers: Record<string, string>, body: unknown): Promise<Response> {
+  await assertSafeUrl(url, 'baseUrl');
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'text/event-stream', ...headers },
+      body: JSON.stringify(body),
+      redirect: 'manual',
+      signal: AbortSignal.timeout(TIMEOUT_MS * 3),
+    });
+  } catch {
+    throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
+  }
+  if (!res.ok || !res.body) {
+    const status =
+      res.status === 401 || res.status === 403 ? 'rejected the API key' : `returned ${res.status}`;
+    throw new AppError(
+      'UPSTREAM_FAILED',
+      `The AI provider ${status}. An admin can check the assistant settings.`,
+    );
+  }
+  return res;
+}
+
+const parse = (s: string): Record<string, unknown> | null => {
+  try {
+    return JSON.parse(s) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
+async function messagesStream(
+  cfg: ProviderConfig,
+  req: ChatRequest,
+  on: StreamHandlers,
+): Promise<ChatResult> {
+  const res = await open(
+    join(cfg.baseUrl, '/v1/messages'),
+    { ...cfg.headers, 'x-api-key': cfg.apiKey },
+    {
+      model: cfg.model,
+      max_tokens: 2048,
+      stream: true,
+      system: req.system,
+      messages: req.messages,
+      tools: req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.schema })),
+    },
+  );
+  const blocks: (
+    { type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; json: string }
+  )[] = [];
+  const usage = { input: 0, output: 0 };
+  for await (const { data } of sseEvents(res)) {
+    const e = parse(data);
+    if (!e) continue;
+    const index = Number(e.index ?? -1);
+    if (e.type === 'message_start') {
+      const u = (e.message as { usage?: { input_tokens?: number } } | undefined)?.usage;
+      usage.input = u?.input_tokens ?? 0;
+    } else if (e.type === 'content_block_start') {
+      const b = e.content_block as { type: string; id?: string; name?: string };
+      blocks[index] =
+        b.type === 'tool_use'
+          ? { type: 'tool_use', id: b.id ?? '', name: b.name ?? '', json: '' }
+          : { type: 'text', text: '' };
+    } else if (e.type === 'content_block_delta') {
+      const d = e.delta as { type: string; text?: string; partial_json?: string };
+      const b = blocks[index];
+      if (b?.type === 'text' && d.text) {
+        b.text += d.text;
+        on.text(d.text);
+      } else if (b?.type === 'tool_use' && d.partial_json) b.json += d.partial_json;
+    } else if (e.type === 'message_delta') {
+      usage.output = (e.usage as { output_tokens?: number } | undefined)?.output_tokens ?? usage.output;
+    } else if (e.type === 'error') {
+      throw new AppError('UPSTREAM_FAILED', 'The AI provider stopped with an error. Try again.');
+    }
+  }
+  const content: Block[] = blocks.flatMap((b): Block[] => {
+    if (!b) return [];
+    if (b.type === 'text') return b.text ? [{ type: 'text', text: b.text }] : [];
+    return [{ type: 'tool_use', id: b.id, name: b.name, input: parse(b.json || '{}') ?? {} }];
+  });
+  return { content, usage };
+}
+
+async function chatCompletionsStream(
+  cfg: ProviderConfig,
+  req: ChatRequest,
+  on: StreamHandlers,
+): Promise<ChatResult> {
+  const res = await open(
+    join(cfg.baseUrl, '/chat/completions'),
+    { ...cfg.headers, authorization: `Bearer ${cfg.apiKey}` },
+    {
+      model: cfg.model,
+      max_tokens: 2048,
+      stream: true,
+      stream_options: { include_usage: true },
+      messages: chatMessages(req),
+      tools: req.tools.map((t) => ({
+        type: 'function',
+        function: { name: t.name, description: t.description, parameters: t.schema },
+      })),
+    },
+  );
+  let text = '';
+  const calls: { id: string; name: string; args: string }[] = [];
+  const usage = { input: 0, output: 0 };
+  for await (const { data } of sseEvents(res)) {
+    if (data === '[DONE]') break;
+    const e = parse(data) as {
+      choices?: {
+        delta?: {
+          content?: string | null;
+          tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[];
+        };
+      }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    } | null;
+    if (!e) continue;
+    if (e.usage) {
+      usage.input = e.usage.prompt_tokens ?? 0;
+      usage.output = e.usage.completion_tokens ?? 0;
+    }
+    const delta = e.choices?.[0]?.delta;
+    if (delta?.content) {
+      text += delta.content;
+      on.text(delta.content);
+    }
+    for (const c of delta?.tool_calls ?? []) {
+      const call = (calls[c.index] ??= { id: '', name: '', args: '' });
+      if (c.id) call.id = c.id;
+      if (c.function?.name) call.name += c.function.name;
+      if (c.function?.arguments) call.args += c.function.arguments;
+    }
+  }
+  const content: Block[] = [];
+  if (text) content.push({ type: 'text', text });
+  for (const c of calls)
+    if (c) content.push({ type: 'tool_use', id: c.id, name: c.name, input: parse(c.args || '{}') ?? {} });
+  return { content, usage };
+}
+
+/** Like `chat`, but text arrives through `on.text` as the provider produces it. */
+export function chatStream(cfg: ProviderConfig, req: ChatRequest, on: StreamHandlers): Promise<ChatResult> {
+  return cfg.provider === 'messages' ? messagesStream(cfg, req, on) : chatCompletionsStream(cfg, req, on);
 }

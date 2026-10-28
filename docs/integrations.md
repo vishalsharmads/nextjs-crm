@@ -35,12 +35,12 @@ Tools: `describe_schema`, `search_records`, `list_records`, `get_record`, `get_t
 
 ## Assistant
 
-The `assistant` module adds an in-app chat that answers questions about records, summarises history, drafts notes and emails, and proposes changes. Enable it in **Settings → Modules**, then set it up on its **Settings** tab (permission `assistant.settings.manage`):
+The `assistant` module adds an in-app chat, opened from the top bar on any page (it knows the record you are looking at) or as a full page, that answers questions about records, summarises history, drafts notes and emails, and proposes changes. Enable it in **Settings → Modules**, then set it up on its **Settings** tab (permission `assistant.settings.manage`):
 
 - **API format**: "Messages API" (native tool-use blocks; the base URL is the host, `/v1/messages` is added) or "Chat completions API" (the widely used format; the base URL includes `/v1`, then `/chat/completions` is added). Self-hosted and cloud-hosted models that speak either format work. The base URL must use https and resolve to a public address (set `WEBHOOKS_ALLOW_PRIVATE=true` for a model on your own network); redirects are not followed, and changing the URL or format clears the saved key, so it is never sent to a new address.
 - **Model**, **API key** (stored encrypted, never shown again, rotated by `crypto:rotate`) and any **extra request headers** the provider requires, for example an API version header.
 - **Assistant name**: what people see. No provider name appears anywhere in the product.
-- **Limits**: tokens per month for the workspace and per person per day (0 is no limit). **Retention**: conversations are deleted after this many days (30 by default).
+- **Limits**: tokens per month for the workspace and per person per day (0 is no limit). **Retention**: conversations are deleted after this many days (30 by default). Replies stream in as the model writes them, and each tool step shows as it runs.
 - **Never send these to the provider**: record types the assistant may not read or change.
 - Under the `hipaa` compliance profile the assistant stays off until an admin confirms an agreement with the provider covers health information.
 

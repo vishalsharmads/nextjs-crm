@@ -19,6 +19,73 @@ const use = (name: string, input: object, id = `tu_${Math.random().toString(36).
   usage: { input_tokens: 10, output_tokens: 5 },
 });
 
+/** The same scripted reply, as each format's stream of events (text in two pieces). */
+function streamEvents(reply: Record<string, unknown>, url: string): object[] {
+  if (url.includes('chat/completions')) {
+    const msg = (
+      reply.choices as {
+        message: {
+          content?: string | null;
+          tool_calls?: { id: string; function: { name: string; arguments: string } }[];
+        };
+      }[]
+    )[0]!.message;
+    const out: object[] = [];
+    if (msg.content)
+      for (const part of [msg.content.slice(0, 3), msg.content.slice(3)])
+        out.push({ choices: [{ delta: { content: part } }] });
+    (msg.tool_calls ?? []).forEach((c, index) =>
+      out.push({
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                { index, id: c.id, function: { name: c.function.name, arguments: c.function.arguments } },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    out.push({ choices: [], usage: { prompt_tokens: 3, completion_tokens: 2 } });
+    return out;
+  }
+  const out: object[] = [{ type: 'message_start', message: { usage: { input_tokens: 10 } } }];
+  (reply.content as { type: string; text?: string; id?: string; name?: string; input?: object }[]).forEach(
+    (b, index) => {
+      if (b.type === 'text') {
+        out.push({ type: 'content_block_start', index, content_block: { type: 'text', text: '' } });
+        for (const part of [b.text!.slice(0, 3), b.text!.slice(3)])
+          out.push({ type: 'content_block_delta', index, delta: { type: 'text_delta', text: part } });
+      } else {
+        out.push({
+          type: 'content_block_start',
+          index,
+          content_block: { type: 'tool_use', id: b.id, name: b.name },
+        });
+        out.push({
+          type: 'content_block_delta',
+          index,
+          delta: { type: 'input_json_delta', partial_json: JSON.stringify(b.input) },
+        });
+      }
+    },
+  );
+  out.push({ type: 'message_delta', usage: { output_tokens: 5 } });
+  return out;
+}
+
+/** Read a server-sent event response into its events. */
+function events(textBody: string) {
+  return textBody
+    .split('\n\n')
+    .filter(Boolean)
+    .map((block) => ({
+      event: /event: (.*)/.exec(block)?.[1],
+      data: JSON.parse(/data: (.*)/.exec(block)?.[1] ?? 'null') as Record<string, unknown>,
+    }));
+}
+
 describe('assistant module', () => {
   let admin: Client;
 
@@ -28,7 +95,15 @@ describe('assistant module', () => {
       req.on('data', (c) => (raw += c));
       req.on('end', () => {
         seen.push({ url: req.url ?? '', headers: req.headers, body: JSON.parse(raw || '{}') });
-        const next = replies.shift() ?? text('Done.');
+        const next = (replies.shift() ?? text('Done.')) as Record<string, unknown>;
+        const body = JSON.parse(raw || '{}') as { stream?: boolean };
+        if (body.stream) {
+          res.setHeader('content-type', 'text/event-stream');
+          for (const e of streamEvents(next, req.url ?? '')) res.write(`data: ${JSON.stringify(e)}\n\n`);
+          if ((req.url ?? '').includes('chat/completions')) res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
         res.setHeader('content-type', 'application/json');
         res.end(JSON.stringify(next));
       });
@@ -186,6 +261,31 @@ describe('assistant module', () => {
     await admin.patch('/m/assistant/config', { userDailyTokenCap: 0 }).expect(200);
   });
 
+  it('streams text and tool steps as server-sent events', async () => {
+    const name = unique('Stream');
+    replies = [use('search_records', { query: name }), text('Hello there.')];
+    const res = await admin
+      .post('/m/assistant/conversations?stream=1', { text: 'Hi' })
+      .buffer(true)
+      .parse((r, cb) => {
+        let data = '';
+        r.on('data', (c: Buffer) => (data += c.toString()));
+        r.on('end', () => cb(null, data));
+      });
+    expect(res.status).toBe(201);
+    expect(res.headers['content-type']).toContain('text/event-stream');
+    const evs = events(res.body as string);
+    expect(
+      evs
+        .filter((e) => e.event === 'text')
+        .map((e) => e.data.delta)
+        .join(''),
+    ).toBe('Hello there.');
+    expect(evs.some((e) => e.event === 'tool')).toBe(true);
+    const done = evs.find((e) => e.event === 'done')!;
+    expect((done.data.messages as { text?: string }[]).at(-1)?.text).toBe('Hello there.');
+  });
+
   it('speaks the chat completions format too', async () => {
     await admin
       .patch('/m/assistant/config', {
@@ -218,6 +318,34 @@ describe('assistant module', () => {
     expect(seen[0]!.headers.authorization).toBe('Bearer secret-key-123');
     const msgs = seen[1]!.body.messages as { role: string }[];
     expect(msgs.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'tool']);
+    replies = [
+      {
+        choices: [
+          {
+            message: {
+              content: null,
+              tool_calls: [{ id: 'c2', function: { name: 'describe_schema', arguments: '{}' } }],
+            },
+          },
+        ],
+      },
+      { choices: [{ message: { content: 'Streamed answer.' } }] },
+    ];
+    const streamed = await admin
+      .post('/m/assistant/conversations?stream=1', { text: 'Again' })
+      .buffer(true)
+      .parse((r, cb) => {
+        let data = '';
+        r.on('data', (c: Buffer) => (data += c.toString()));
+        r.on('end', () => cb(null, data));
+      });
+    const evs = events(streamed.body as string);
+    expect(
+      evs
+        .filter((e) => e.event === 'text')
+        .map((e) => e.data.delta)
+        .join(''),
+    ).toBe('Streamed answer.');
     await admin
       .patch('/m/assistant/config', { provider: 'messages', baseUrl: base, apiKey: 'secret-key-123' })
       .expect(200);

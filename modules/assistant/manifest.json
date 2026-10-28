@@ -1,13 +1,19 @@
 {
   "key": "assistant",
   "name": "Assistant",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "available",
   "description": "An in-app assistant that answers questions about your records, summarises history, drafts notes and emails, and proposes changes you confirm. Uses the AI provider and model an admin configures; it is off until then.",
   "depends_on": [],
   "permissions": [
-    { "key": "assistant.chat.use", "description": "Use the assistant" },
-    { "key": "assistant.settings.manage", "description": "Configure the assistant and see its usage" }
+    {
+      "key": "assistant.chat.use",
+      "description": "Use the assistant"
+    },
+    {
+      "key": "assistant.settings.manage",
+      "description": "Configure the assistant and see its usage"
+    }
   ],
   "menu_items": [
     {
@@ -21,5 +27,13 @@
   ],
   "migrations_dir": "api/migrations",
   "api_entry": "api/index.ts",
-  "web_entry": "web/index.tsx"
+  "web_entry": "web/index.tsx",
+  "shell_panels": [
+    {
+      "key": "chat",
+      "title": "Assistant",
+      "icon": "sparkles",
+      "permission": "assistant.chat.use"
+    }
+  ]
 }

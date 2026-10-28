@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Check, MessageSquarePlus, Send, Trash2, X } from 'lucide-react';
 import type { WebModule } from '@app/module-sdk';
-import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { ApiError, apiDelete, apiGet, apiPatch, apiStream } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
 import { useBoot, useCan } from '@/app/session';
 import { cn } from '@/lib/cn';
@@ -86,10 +86,26 @@ function AssistantPage() {
   );
 }
 
-function Chat({ ready, loading, admin }: { ready: boolean; loading: boolean; admin: boolean }) {
+function Chat({
+  ready,
+  loading,
+  admin,
+  compact = false,
+  record,
+}: {
+  ready: boolean;
+  loading: boolean;
+  admin: boolean;
+  /** The side panel: no conversation list, the latest conversation only. */
+  compact?: boolean;
+  /** The record on screen, when opened from a record page. */
+  record?: { entity: string; uuid: string };
+}) {
   const qc = useQueryClient();
   const { labels } = useBoot();
   const [params] = useSearchParams();
+  // What the assistant is saying right now, and the steps it is taking, while a reply streams in.
+  const [live, setLive] = useState<{ text: string; steps: string[] } | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [text, setText] = useState('');
   const list = useQuery({
@@ -107,10 +123,38 @@ function Chat({ ready, loading, admin }: { ready: boolean; loading: boolean; adm
   });
   // `?about=contact:<uuid>` from a record page: the assistant knows what the person is looking at.
   const about = params.get('about');
-  const context =
-    about && /^[a-z_]+:[0-9a-f-]{36}$/.test(about)
+  const context = record?.uuid
+    ? record
+    : about && /^[a-z_]+:[0-9a-f-]{36}$/.test(about)
       ? { entity: about.split(':')[0]!, uuid: about.split(':')[1]! }
       : undefined;
+  /** Post and stream the reply: text appears as it is written, tool steps as they run. */
+  const stream = async (path: string, body: unknown) => {
+    setLive({ text: '', steps: [] });
+    let result: Conversation | null = null;
+    let failure: string | null = null;
+    try {
+      await apiStream(path, body, (event, data) => {
+        if (event === 'text')
+          setLive((l) => ({
+            text: (l?.text ?? '') + (data as { delta: string }).delta,
+            steps: l?.steps ?? [],
+          }));
+        else if (event === 'tool')
+          setLive((l) => ({
+            text: l?.text ?? '',
+            steps: [...(l?.steps ?? []), (data as { title: string }).title],
+          }));
+        else if (event === 'done') result = data as Conversation;
+        else if (event === 'error') failure = (data as { message: string }).message;
+      });
+    } finally {
+      setLive(null);
+    }
+    if (failure) throw new Error(failure);
+    if (!result) throw new Error('The reply was cut off. Try again.');
+    return result as Conversation;
+  };
   const done = (c: Conversation) => {
     qc.setQueryData([...key, 'conversation', c.uuid], c);
     setActive(c.uuid);
@@ -119,8 +163,8 @@ function Chat({ ready, loading, admin }: { ready: boolean; loading: boolean; adm
   const send = useMutation({
     mutationFn: (message: string) =>
       active
-        ? apiPost<Conversation>(`/m/assistant/conversations/${active}/messages`, { text: message, context })
-        : apiPost<Conversation>('/m/assistant/conversations', { text: message, context }),
+        ? stream(`/m/assistant/conversations/${active}/messages`, { text: message, context })
+        : stream('/m/assistant/conversations', { text: message, context }),
     onSuccess: (c) => {
       setText('');
       done(c);
@@ -129,7 +173,7 @@ function Chat({ ready, loading, admin }: { ready: boolean; loading: boolean; adm
   });
   const decide = useMutation({
     mutationFn: (decisions: Record<string, boolean>) =>
-      apiPost<Conversation>(`/m/assistant/conversations/${active}/decisions`, { decisions }),
+      stream(`/m/assistant/conversations/${active}/decisions`, { decisions }),
     onSuccess: (c) => {
       done(c);
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'm' });
@@ -147,7 +191,7 @@ function Chat({ ready, loading, admin }: { ready: boolean; loading: boolean; adm
   const bottom = useRef<HTMLDivElement>(null);
   useEffect(
     () => bottom.current?.scrollIntoView({ block: 'end' }),
-    [conv.data?.messages.length, send.isPending],
+    [conv.data?.messages.length, send.isPending, live?.text.length],
   );
 
   if (loading) return <Skeleton className="h-64" />;
@@ -170,8 +214,8 @@ function Chat({ ready, loading, admin }: { ready: boolean; loading: boolean; adm
   };
   const proposals = conv.data?.proposals ?? [];
   return (
-    <div className="grid gap-4 md:grid-cols-[240px_1fr]">
-      <Pane padded={false} className="h-fit">
+    <div className={cn('grid gap-4', !compact && 'md:grid-cols-[240px_1fr]')}>
+      <Pane padded={false} className={cn('h-fit', compact && 'hidden')}>
         <div className="border-b border-line p-2">
           <Button size="sm" className="w-full" onClick={() => setActive(null)}>
             <MessageSquarePlus /> New conversation
@@ -240,7 +284,16 @@ function Chat({ ready, loading, admin }: { ready: boolean; loading: boolean; adm
                 </div>
               ))
             )}
-            {send.isPending || decide.isPending ? <p className="text-sm text-muted">Working…</p> : null}
+            {live ? (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] rounded-lg bg-subtle px-3 py-2 text-sm whitespace-pre-wrap text-ink">
+                  {live.text || <span className="text-muted">Working…</span>}
+                  {live.steps.length ? (
+                    <p className="mt-1 text-xs text-faint">{live.steps.join(' · ')}</p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             {proposals.length ? (
               <Proposals proposals={proposals} onDecide={(d) => decide.mutate(d)} busy={decide.isPending} />
             ) : null}
@@ -539,5 +592,26 @@ function SettingsPanel() {
   );
 }
 
-const assistantModule: WebModule = { key: 'assistant', routes: [{ path: '', element: <AssistantPage /> }] };
+/** The side panel opened from the top bar, aware of the record on screen. */
+function AssistantPanel({ entity, uuid }: { entity: string; uuid: string }) {
+  const status = useQuery({
+    queryKey: [...key, 'status'],
+    queryFn: () => apiGet<{ name: string; ready: boolean }>('/m/assistant/status'),
+  });
+  return (
+    <Chat
+      ready={!!status.data?.ready}
+      loading={status.isPending}
+      admin={false}
+      compact
+      record={uuid ? { entity, uuid } : undefined}
+    />
+  );
+}
+
+const assistantModule: WebModule = {
+  key: 'assistant',
+  routes: [{ path: '', element: <AssistantPage /> }],
+  panels: { chat: ({ entity, uuid }) => <AssistantPanel entity={entity} uuid={uuid} /> },
+};
 export default assistantModule;
