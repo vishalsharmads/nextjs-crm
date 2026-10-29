@@ -8,7 +8,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 
 - Phase 0 approved. The user asked to continue through all phases (1 → 4) autonomously, in milestone branches.
 - **Phases 1–5 complete.** Phase 5 is compliance readiness (profiles, access logging, data subject rights, retention, encryption; see `docs/compliance/`). New work goes through the roadmap's Future list.
-- **Phase 6** follows [docs/plan/phase-6.md](docs/plan/phase-6.md): 6a (quick wins), 6a2 (UI polish), 6a3 (rich text), 6b (records engine for modules), 6c (admin-defined objects), 6d (tool layer, personal access tokens, MCP), 6e (assistant module), 6f (sales reports) and 6g (delayed and scheduled automations, report builder, dashboard editing) are done. Phase 6 is complete; new work goes through the roadmap's Future list.
+- **Phase 6** follows [docs/plan/phase-6.md](docs/plan/phase-6.md): 6a (quick wins), 6a2 (UI polish), 6a3 (rich text), 6b (records engine for modules), 6c (admin-defined objects), 6d (tool layer, personal access tokens, MCP), 6e (assistant module), 6f (sales reports) and 6g (delayed and scheduled automations, report builder, dashboard editing) are done. Phase 6 is complete. **Phase 7** (in-app help): 7a page help and knowledge base, 7b articles and blueprint help notes, 7c guided tours.
 
 ## Non-negotiables
 
@@ -183,6 +183,7 @@ Before an E2E run, check nothing listens on :4300/:5300. A leftover API from an 
 - **Rich text** goes through `RichTextEditor` (`components/editor`), never a raw `Textarea`. It emits HTML; the server sanitizes it again (`sanitizeBody` for notes and email, `sanitizeDocumentHtml` for documents), and `basic` mode only produces tags `sanitizeBody` keeps. Placeholders are stored as plain `{{path}}` text. Pass `mergeFields` for templates and `replies` (`useSavedReplies`) where people write to a record. Show stored HTML inside `.rte-prose`. Notes are never compiled as Handlebars; only templates are.
 - **Copy:** sentence case, active verbs. A button and its resulting toast use the same verb ("Archive" → "Archived").
 - **In-app help:** every page has a help article (`apps/web/src/help/articles/*.md`, module pages in `modules/<key>/help/*.md`), found by the `route` in its front matter and opened from the ⓘ in `PageHeader`/`SettingsPage` or with `?`. Use vocabulary placeholders (`{{dealPluralLower}}`, `{{appName}}`; quote them in front matter) and generated tables (`<!-- generated:settings:<group> -->`, `<!-- generated:permissions:<prefix> -->`, `<!-- generated:tools -->`) instead of retyping values. Every setting needs a `SETTINGS_HELP` entry (`packages/shared/src/settings-help.ts`; it does not compile otherwise). `src/help/help.test.ts` fails when a page, module or setting has no help, or help names something that no longer exists. The help sheet and articles load lazily; never import `help/registry` from shared components.
+- **Guided tours** (`src/help/tours.ts`, engine in `components/tour/tour.tsx`) point at `data-tour="<target>"` attributes; the help test fails when a target disappears. Finished tours are stored per person (`POST /me/tours/:tour/seen`, `me.toursSeen`). The welcome tour is offered once as a non-blocking message, never forced.
 
 ## Testing
 
