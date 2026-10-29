@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Dialog as D } from 'radix-ui';
@@ -14,6 +14,7 @@ import {
   Trash2,
   User,
   Keyboard,
+  BookOpen,
 } from 'lucide-react';
 import { useBranding } from '@/app/branding';
 import { useBoot, useT, bootstrapKey } from '@/app/session';
@@ -37,6 +38,8 @@ import { CommandPaletteProvider, usePalette, type PaletteCommand } from './comma
 import { useHotkeys } from './hotkeys';
 import { IdleTimeout } from './idle-timeout';
 import { NotificationsBell } from '@/features/notifications/notifications-bell';
+import { HelpProvider, useHelp } from '@/help/help-context';
+import { TourProvider } from '@/components/tour/tour';
 import { ShellPanels } from './shell-panels';
 
 const COLLAPSE_KEY = 'ui.sidebarCollapsed';
@@ -84,6 +87,19 @@ export function AppShell() {
           ],
     [navigate, trashEntities.length],
   );
+  const helpCommands = useMemo<PaletteCommand[]>(
+    () => [
+      {
+        id: 'help:kb',
+        label: t('nav.help'),
+        group: 'Go to',
+        icon: BookOpen,
+        keywords: ['help', 'guide', 'how', 'docs', 'knowledge'],
+        run: () => navigate('/help'),
+      },
+    ],
+    [navigate, t],
+  );
   const createCommands = useMemo<PaletteCommand[]>(
     () =>
       buildCreateTargets(boot, t).map((c) => ({
@@ -97,7 +113,7 @@ export function AppShell() {
   );
 
   return (
-    <CommandPaletteProvider baseCommands={[...commands, ...trashCommand, ...createCommands]}>
+    <CommandPaletteProvider baseCommands={[...commands, ...trashCommand, ...helpCommands, ...createCommands]}>
       <ShellLayout nav={nav} />
     </CommandPaletteProvider>
   );
@@ -107,6 +123,10 @@ function ShellLayout({ nav }: { nav: NavItem[] }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const helpRef = useRef<((id?: string) => void) | null>(null);
+  const setHelpOpener = useCallback((open: (id?: string) => void) => {
+    helpRef.current = open;
+  }, []);
   const palette = usePalette();
   const navigate = useNavigate();
 
@@ -124,46 +144,59 @@ function ShellLayout({ nav }: { nav: NavItem[] }) {
   const hotkeys: Record<string, () => void> = {
     'mod+k': () => palette.open(),
     '/': () => palette.open(),
-    '?': () => setHelpOpen(true),
+    // Help for the page on screen; the sheet links to the keyboard shortcuts.
+    '?': () => helpRef.current?.(),
     '[': toggle,
   };
   for (const n of nav) if (n.shortcut) hotkeys[n.shortcut] = () => navigate(n.to);
   useHotkeys(hotkeys);
 
   return (
-    <div className="flex h-dvh overflow-hidden print:block print:h-auto print:overflow-visible">
-      <aside
-        className={cn(
-          'hidden shrink-0 flex-col border-e border-line bg-surface transition-[width] duration-150 md:flex print:hidden',
-          collapsed ? 'w-14' : 'w-60',
-        )}
-      >
-        <Sidebar nav={nav} collapsed={collapsed} onToggle={toggle} />
-      </aside>
-      <D.Root open={mobileOpen} onOpenChange={setMobileOpen}>
-        <D.Portal>
-          <D.Overlay className="anim-fade fixed inset-0 z-40 bg-overlay md:hidden" />
-          <D.Content
-            className="anim-sheet fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-line bg-surface md:hidden"
-            style={{ ['--sheet-from' as string]: '-16px' }}
+    <HelpProvider onShortcuts={() => setHelpOpen(true)}>
+      <TourProvider>
+        <HelpBridge onReady={setHelpOpener} />
+        <div className="flex h-dvh overflow-hidden print:block print:h-auto print:overflow-visible">
+          <aside
+            className={cn(
+              'hidden shrink-0 flex-col border-e border-line bg-surface transition-[width] duration-150 md:flex print:hidden',
+              collapsed ? 'w-14' : 'w-60',
+            )}
           >
-            <D.Title className="sr-only">Navigation</D.Title>
-            <D.Description className="sr-only">Navigation</D.Description>
-            <Sidebar nav={nav} collapsed={false} onNavigate={() => setMobileOpen(false)} />
-          </D.Content>
-        </D.Portal>
-      </D.Root>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar onMenu={() => setMobileOpen(true)} onHelp={() => setHelpOpen(true)} />
-        <MfaRequiredBanner />
-        <main className="min-h-0 flex-1 overflow-y-auto print:overflow-visible">
-          <Outlet />
-        </main>
-      </div>
-      <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} nav={nav} />
-      <IdleTimeout />
-    </div>
+            <Sidebar nav={nav} collapsed={collapsed} onToggle={toggle} />
+          </aside>
+          <D.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+            <D.Portal>
+              <D.Overlay className="anim-fade fixed inset-0 z-40 bg-overlay md:hidden" />
+              <D.Content
+                className="anim-sheet fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-line bg-surface md:hidden"
+                style={{ ['--sheet-from' as string]: '-16px' }}
+              >
+                <D.Title className="sr-only">Navigation</D.Title>
+                <D.Description className="sr-only">Navigation</D.Description>
+                <Sidebar nav={nav} collapsed={false} onNavigate={() => setMobileOpen(false)} />
+              </D.Content>
+            </D.Portal>
+          </D.Root>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar onMenu={() => setMobileOpen(true)} onHelp={() => setHelpOpen(true)} />
+            <MfaRequiredBanner />
+            <main className="min-h-0 flex-1 overflow-y-auto print:overflow-visible">
+              <Outlet />
+            </main>
+          </div>
+          <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} nav={nav} />
+          <IdleTimeout />
+        </div>
+      </TourProvider>
+    </HelpProvider>
   );
+}
+
+/** Lets the shell's hotkeys (declared above the provider) open help. */
+function HelpBridge({ onReady }: { onReady: (open: (id?: string) => void) => void }) {
+  const help = useHelp();
+  useEffect(() => onReady(help.open), [help.open, onReady]);
+  return null;
 }
 
 /** When the workspace requires 2FA for this user's role, keep them on their profile until they enrol. */
@@ -253,7 +286,7 @@ function Sidebar({
           </span>
         ) : null}
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" aria-label="Main">
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" aria-label="Main" data-tour="nav">
         {section('main').map(link)}
         {section('modules').length ? (
           <>
@@ -316,6 +349,7 @@ function TopBar({ onMenu, onHelp }: { onMenu: () => void; onHelp: () => void }) 
       <button
         type="button"
         onClick={() => palette.open()}
+        data-tour="search"
         className="flex h-8 w-full max-w-md items-center gap-2 rounded-sm border border-line bg-canvas px-2.5 text-sm text-faint transition-colors hover:border-line-strong"
       >
         <Search className="size-4" />
@@ -334,6 +368,7 @@ function TopBar({ onMenu, onHelp }: { onMenu: () => void; onHelp: () => void }) 
               type="button"
               className="flex items-center gap-2 rounded-sm p-1 hover:bg-hover"
               aria-label={t('nav.profile')}
+              data-tour="user-menu"
             >
               <Avatar name={name} />
             </button>
@@ -346,6 +381,9 @@ function TopBar({ onMenu, onHelp }: { onMenu: () => void; onHelp: () => void }) 
             <MenuSeparator />
             <MenuItem onSelect={() => navigate('/settings/profile')}>
               <User /> {t('nav.profile')}
+            </MenuItem>
+            <MenuItem onSelect={() => navigate('/help')}>
+              <BookOpen /> {t('nav.help')}
             </MenuItem>
             <MenuItem onSelect={onHelp}>
               <Keyboard /> {t('nav.shortcuts')}

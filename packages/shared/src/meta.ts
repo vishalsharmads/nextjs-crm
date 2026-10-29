@@ -146,4 +146,6 @@ export interface BootstrapDto {
   };
   /** Record types of enabled modules the user can view. */
   recordTypes: RecordTypeMeta[];
+  /** Industry notes for help articles, by article id (from the blueprint). */
+  helpNotes: Record<string, string>;
 }

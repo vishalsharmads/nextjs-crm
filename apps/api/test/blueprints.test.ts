@@ -3,6 +3,7 @@ import { loadBlueprint, parseBlueprint, type Blueprint } from '@app/blueprints';
 import { applyBlueprint } from '../src/blueprints/applier';
 import { exportBlueprint } from '../src/blueprints/exporter';
 import { db } from '../src/db/knex';
+import { clientWithRoles } from './helpers';
 
 const bump = (bp: Blueprint, version: string, patch: (b: Blueprint) => void = () => undefined): Blueprint => {
   const copy = structuredClone(bp);
@@ -87,6 +88,21 @@ describe('blueprint engine', () => {
       await expect(applyBlueprint(db, bad)).rejects.toThrow(/reserved|module/);
       expect(await db('custom_objects').where({ entity: key }).first()).toBeUndefined();
     }
+  });
+
+  it('adds industry notes to in-app help', async () => {
+    const next = bump(generic, await nextVersion(), (b) => {
+      b.help = { 'records.deals': 'Track each **membership** as a deal.' };
+    });
+    await applyBlueprint(db, next);
+    const { client } = await clientWithRoles(['admin']);
+    const boot = await client.get('/meta/bootstrap').expect(200);
+    expect(boot.body.helpNotes['records.deals']).toContain('membership');
+    expect(() =>
+      bump(generic, '9.9.9', (b) => {
+        b.help = { 'records.deals': '[click](javascript:alert(1))' };
+      }),
+    ).toThrow();
   });
 
   it('never overwrites a client-edited item and reports a conflict', async () => {

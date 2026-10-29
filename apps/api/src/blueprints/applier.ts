@@ -212,6 +212,18 @@ class Applier {
     }
   }
 
+  /** Industry notes for in-app help, kept as one settings row the bootstrap returns. */
+  async help() {
+    if (!Object.keys(this.bp.help).length) return;
+    await this.upsert({
+      table: 'settings',
+      sourceKey: 'help.notes',
+      natural: { key: 'help_notes' },
+      values: { group: 'help', value: JSON.stringify(this.bp.help) },
+      hashOf: this.bp.help,
+    });
+  }
+
   async vocabulary() {
     for (const [entityKey, l] of Object.entries(this.bp.vocabulary)) {
       await this.upsert({
@@ -435,6 +447,7 @@ class Applier {
 
   async run() {
     await this.settings();
+    await this.help();
     await this.vocabulary();
     await this.modules();
     for (const [i, o] of this.bp.objects.entries()) await this.object(o, i);

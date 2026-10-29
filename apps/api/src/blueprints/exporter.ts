@@ -113,6 +113,10 @@ export async function exportBlueprint(knex: Knex, opts: { key?: string; version?
     body: t.body,
   }));
 
+  const helpRow = await knex('settings').where({ key: 'help_notes' }).first('value');
+  const help = (typeof helpRow?.value === 'string' ? JSON.parse(helpRow.value) : helpRow?.value) as
+    Record<string, string> | undefined;
+
   const bp: BlueprintInput = {
     key,
     name: opts.key ? opts.key : `Export of ${install?.blueprint ?? 'instance'}`,
@@ -124,6 +128,7 @@ export async function exportBlueprint(knex: Knex, opts: { key?: string; version?
     ),
     modules,
     objects,
+    ...(help && Object.keys(help).length ? { help } : {}),
     custom_field_groups,
     custom_fields,
     pipelines,

@@ -52,7 +52,7 @@ export function ObjectsPage() {
       title={t('settings.objects')}
       description="Track things your industry needs that are not built in, such as properties, vehicles or equipment. Each object gets its own list, record pages, fields, views, search, import and permissions."
       actions={
-        <Button variant="primary" onClick={() => setEditing('new')} disabled={full}>
+        <Button data-tour="new-object" variant="primary" onClick={() => setEditing('new')} disabled={full}>
           <Plus /> New object
         </Button>
       }

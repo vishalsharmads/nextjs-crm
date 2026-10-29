@@ -218,7 +218,7 @@ export function RecordListPage({
             {headerExtra}
             {canCreate ? (
               <Tooltip content="Shortcut: c">
-                <Button variant="primary" onClick={openCreate}>
+                <Button variant="primary" onClick={openCreate} data-tour="new-record">
                   <Plus /> {createLabel}
                 </Button>
               </Tooltip>
@@ -237,7 +237,10 @@ export function RecordListPage({
           onApplyColumns={saveColumns}
         />
       </PageHeader>
-      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-4 py-2 md:px-6">
+      <div
+        className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-4 py-2 md:px-6"
+        data-tour="list-toolbar"
+      >
         <div className="relative w-full max-w-64">
           <Search className="pointer-events-none absolute inset-y-0 start-2.5 my-auto size-3.5 text-faint" />
           <Input

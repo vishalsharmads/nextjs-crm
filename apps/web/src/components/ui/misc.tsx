@@ -1,3 +1,4 @@
+import { HelpButton } from '@/help/help-context';
 import type { ReactNode } from 'react';
 import { Tabs as TabsPrimitive } from 'radix-ui';
 import { AlertCircle } from 'lucide-react';
@@ -125,11 +126,14 @@ export function PageHeader({
   description,
   actions,
   children,
+  help,
 }: {
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
   children?: ReactNode;
+  /** Help article id; by default the article for the current route. */
+  help?: string;
 }) {
   return (
     <div className="border-b border-line bg-surface px-4 pt-4 md:px-6">
@@ -138,7 +142,10 @@ export function PageHeader({
           <h1 className="truncate text-xl font-semibold tracking-tight md:text-title">{title}</h1>
           {description ? <p className="mt-0.5 text-sm text-muted">{description}</p> : null}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {actions}
+          <HelpButton id={help} />
+        </div>
       </div>
       {children}
     </div>

@@ -38,6 +38,7 @@ const OAuthAuthorizePage = lazyPage(
   () => import('@/features/settings/oauth-authorize-page'),
   'OAuthAuthorizePage',
 );
+const HelpPage = lazyPage(() => import('@/features/help/help-page'), 'HelpPage');
 const ObjectsPage = lazyPage(() => import('@/features/settings/objects-page'), 'ObjectsPage');
 const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'), 'PipelinesPage');
 const DealsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'DealsPage');
@@ -168,6 +169,7 @@ export const router = createBrowserRouter(
             { path: 'deals/:uuid', element: <RecordPage entity="deal" /> },
             { path: 'trash', element: page(<TrashPage />) },
             { path: 'reports', element: page(<ReportsPage />) },
+            { path: 'help', element: page(<HelpPage />) },
             { path: 'tasks', element: page(<TasksPage />) },
             { path: 'calendar', element: page(<CalendarPage />) },
             {
