@@ -77,7 +77,7 @@ export const SETTINGS_HELP: { [G in SettingsGroup]: HelpFor<(typeof SETTINGS_GRO
   deals: {
     lostReasons: {
       label: 'Lost reasons',
-      description: 'The choices offered when a {{dealLower}} is marked lost, used in reports.',
+      description: 'The choices offered when marking {{dealPluralLower}} lost, used in reports.',
     },
     numberPrefix: {
       label: 'Reference prefix',
@@ -92,7 +92,8 @@ export const SETTINGS_HELP: { [G in SettingsGroup]: HelpFor<(typeof SETTINGS_GRO
     },
     lifecycleStatuses: {
       label: 'Lifecycle statuses',
-      description: 'The stages of your relationship with a {{contactLower}}, from first touch to customer.',
+      description:
+        'The stages of your relationship with {{contactPluralLower}}, from first touch to customer.',
     },
   },
   commerce: {

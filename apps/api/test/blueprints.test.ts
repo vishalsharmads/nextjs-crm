@@ -98,6 +98,11 @@ describe('blueprint engine', () => {
     const { client } = await clientWithRoles(['admin']);
     const boot = await client.get('/meta/bootstrap').expect(200);
     expect(boot.body.helpNotes['records.deals']).toContain('membership');
+    expect(() =>
+      bump(generic, '9.9.9', (b) => {
+        b.help = { 'records.deals': '[click](javascript:alert(1))' };
+      }),
+    ).toThrow();
   });
 
   it('never overwrites a client-edited item and reports a conflict', async () => {

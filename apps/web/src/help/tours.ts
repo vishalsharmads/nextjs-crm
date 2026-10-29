@@ -60,7 +60,7 @@ export const TOURS: Tour[] = [
     steps: [
       {
         target: 'new-record',
-        title: 'Add a {{contactLower}}',
+        title: 'Add {{contactPluralLower}}',
         body: 'Create a record here, or press c on any list.',
       },
       {
@@ -79,12 +79,12 @@ export const TOURS: Tour[] = [
       {
         target: 'board',
         title: 'Your pipeline',
-        body: 'Each column is a stage. Drag a card to move a {{dealLower}} forward; moving it to won or lost closes it.',
+        body: 'Each column is a stage. Drag a card to the next stage to move it forward; dropping it on won or lost closes it.',
       },
       {
         target: 'new-record',
-        title: 'Add a {{dealLower}}',
-        body: 'Start a new {{dealLower}} with its value and expected close date, so it counts in the forecast.',
+        title: 'Add {{dealPluralLower}}',
+        body: 'Give each new one a value and an expected close date, so it counts in the forecast.',
       },
     ],
   },

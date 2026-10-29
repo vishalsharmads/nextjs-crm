@@ -6,7 +6,7 @@ route: /, /help
 related: records.lists, records.deals, settings.profile
 ---
 
-{{appName}} keeps everything about the people and organizations you work with in one place: who they are, what you are working on with them, and what happens next.
+{{appName}} keeps everything about the {{contactPluralLower}} and {{organizationPluralLower}} you work with in one place: who they are, what you are working on with them, and what happens next.
 
 ## Find your way
 

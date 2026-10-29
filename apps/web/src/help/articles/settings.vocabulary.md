@@ -7,6 +7,6 @@ related: settings.general
 permission: core.labels.manage
 ---
 
-Rename the built-in record types to the words your business uses, such as "Members" instead of "Contacts".
+Rename the built-in record types to the words your business uses, for example "Clients" instead of "{{contactPlural}}".
 
 Each name has a singular and a plural form. The new names appear everywhere: menus, buttons, emails, reports and this help.

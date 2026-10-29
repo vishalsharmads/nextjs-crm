@@ -14,7 +14,7 @@ A secure page where your customers sign in with an emailed link to see their quo
 
 ## What you can do
 
-- **Invite** a {{contactLower}} to the portal and see when they last signed in.
+- **Invite** {{contactPluralLower}} to the portal and see when they last signed in.
 - **Revoke** access at any time.
 
 ## Permissions

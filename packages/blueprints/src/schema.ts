@@ -151,7 +151,19 @@ export const blueprintSchema = z.object({
    * `module.bookings`). Markdown; raw HTML is shown as text.
    */
   help: z
-    .record(z.string().regex(/^[a-z0-9][a-z0-9.-]{0,99}$/), z.string().trim().min(1).max(5000))
+    .record(
+      z.string().regex(/^[a-z0-9][a-z0-9.-]{0,99}$/),
+      z
+        .string()
+        .trim()
+        .min(1)
+        .max(5000)
+        // Links must be web, mail or in-app addresses (the app also neutralizes others when showing them).
+        .refine(
+          (t) => !/\]\(\s*<?\s*(?!https?:|mailto:|\/|#)[a-z][a-z0-9+.-]*:/i.test(t),
+          'Use https, mailto or in-app links only',
+        ),
+    )
     .default({}),
   roles: z.array(blueprintRoleSchema).default([]),
   layouts: z.array(blueprintLayoutSchema).default([]),
