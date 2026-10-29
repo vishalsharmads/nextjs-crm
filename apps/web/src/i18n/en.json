@@ -61,7 +61,8 @@
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "modules": "Modules",
-    "shortcuts": "Keyboard shortcuts"
+    "shortcuts": "Keyboard shortcuts",
+    "help": "Help and guides"
   },
   "auth": {
     "signIn": "Sign in",

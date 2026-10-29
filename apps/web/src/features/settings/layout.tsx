@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router';
 import { useBoot, useCan, useT } from '@/app/session';
 import { cn } from '@/lib/cn';
+import { HelpButton } from '@/help/help-context';
 
 interface SettingsLink {
   to: string;
@@ -122,11 +123,14 @@ export function SettingsPage({
   description,
   actions,
   children,
+  help,
 }: {
   title: string;
   description?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
+  /** Help article id; by default the article for the current route. */
+  help?: string;
 }) {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:px-8">
@@ -135,7 +139,10 @@ export function SettingsPage({
           <h1 className="text-xl font-semibold tracking-tight md:text-title">{title}</h1>
           {description ? <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p> : null}
         </div>
-        {actions ? <div className="flex gap-2">{actions}</div> : null}
+        <div className="flex gap-2">
+          {actions}
+          <HelpButton id={help} />
+        </div>
       </div>
       <div className="flex flex-col gap-6">{children}</div>
     </div>
