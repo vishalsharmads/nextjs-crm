@@ -54,6 +54,8 @@ export interface MeDto {
   totpEnabled: boolean;
   recoveryCodesLeft: number;
   roles: { key: string; name: string }[];
+  /** Guided tours this person finished or dismissed, so they are not offered again. */
+  toursSeen: string[];
 }
 
 /** Effective access for the current user, used by the UI to show/hide affordances. */

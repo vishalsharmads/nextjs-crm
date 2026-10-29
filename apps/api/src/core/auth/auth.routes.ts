@@ -112,8 +112,12 @@ export async function getMe(userId: number): Promise<MeDto> {
     totpEnabled: !!u.totp_enabled,
     recoveryCodesLeft: u.totp_enabled ? await auth.unusedRecoveryCodeCount(userId) : 0,
     roles: roles.map((r) => ({ key: r.key, name: r.name })),
+    toursSeen: prefsOf(u.preferences).toursSeen ?? [],
   };
 }
+
+const prefsOf = (v: unknown) =>
+  ((typeof v === 'string' ? JSON.parse(v) : v) ?? {}) as { toursSeen?: string[] } & Record<string, unknown>;
 
 export const meRoutes = defineRoutes('/me', ['me'])
   .add({ method: 'get', path: '/', permission: 'authenticated', handler: ({ user }) => getMe(user.id) })
@@ -141,6 +145,30 @@ export const meRoutes = defineRoutes('/me', ['me'])
         });
       });
       return getMe(user.id);
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/tours/:tour/seen',
+    permission: 'authenticated',
+    params: z.object({ tour: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/) }),
+    summary: 'Remember that this person finished or dismissed a guided tour',
+    handler: async ({ ctx, user, params }) => {
+      await db.transaction(async (trx) => {
+        const row = await trx('users').where({ id: user.id }).forUpdate().first('preferences');
+        const prefs = prefsOf(row?.preferences);
+        const seen = new Set(prefs.toursSeen ?? []);
+        seen.add(params.tour);
+        await trx('users')
+          .where({ id: user.id })
+          .update({ preferences: JSON.stringify({ ...prefs, toursSeen: [...seen].slice(-100) }) });
+        await audit(trx, ctx, {
+          action: 'user.tour_seen',
+          entity: 'user',
+          entityId: user.id,
+          diff: { tour: params.tour },
+        });
+      });
     },
   })
   .add({
