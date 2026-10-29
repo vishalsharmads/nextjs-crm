@@ -51,6 +51,7 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 | @fullcalendar/*                                                                                 | Calendar view (MIT standard views)                                              |
 | recharts                                                                                        | Dashboard charts                                                                |
 | @tiptap/* (MIT core only, no Pro or cloud extensions)                                           | Rich text editor: headless, so it takes theme tokens; Markdown, tables, menus   |
+| marked                                                                                          | Renders in-app help articles (already installed with the editor's Markdown)     |
 | i18next, react-i18next                                                                          | Locale files + vocabulary interpolation                                         |
 | qrcode                                                                                          | 2FA setup QR code                                                               |
 | @fontsource/*                                                                                   | Self-hosted fonts selectable from branding (no external font CDN)               |
@@ -181,6 +182,7 @@ Before an E2E run, check nothing listens on :4300/:5300. A leftover API from an 
 - **Shared-clock screens** (bookings board, front desk) show the workspace time zone via `lib/zoned.ts`, never the browser's, because the server validates in the workspace zone.
 - **Rich text** goes through `RichTextEditor` (`components/editor`), never a raw `Textarea`. It emits HTML; the server sanitizes it again (`sanitizeBody` for notes and email, `sanitizeDocumentHtml` for documents), and `basic` mode only produces tags `sanitizeBody` keeps. Placeholders are stored as plain `{{path}}` text. Pass `mergeFields` for templates and `replies` (`useSavedReplies`) where people write to a record. Show stored HTML inside `.rte-prose`. Notes are never compiled as Handlebars; only templates are.
 - **Copy:** sentence case, active verbs. A button and its resulting toast use the same verb ("Archive" → "Archived").
+- **In-app help:** every page has a help article (`apps/web/src/help/articles/*.md`, module pages in `modules/<key>/help/*.md`), found by the `route` in its front matter and opened from the ⓘ in `PageHeader`/`SettingsPage` or with `?`. Use vocabulary placeholders (`{{dealPluralLower}}`, `{{appName}}`; quote them in front matter) and generated tables (`<!-- generated:settings:<group> -->`, `<!-- generated:permissions:<prefix> -->`, `<!-- generated:tools -->`) instead of retyping values. Every setting needs a `SETTINGS_HELP` entry (`packages/shared/src/settings-help.ts`; it does not compile otherwise). `src/help/help.test.ts` fails when a page, module or setting has no help, or help names something that no longer exists. The help sheet and articles load lazily; never import `help/registry` from shared components.
 
 ## Testing
 

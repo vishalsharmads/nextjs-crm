@@ -119,6 +119,24 @@ The page renders at `/m/<key>/…`, inside the app shell, as its own lazy-loaded
 - Rich text: use `RichTextEditor` from `@/components/editor/rich-text-editor` (`mode="document"` adds tables, dividers and page breaks) and render stored HTML inside `.rte-prose`. Sanitize it on the server with `sanitizeDocumentHtml`. For templates, list your placeholders from an API route built on `mergeFieldGroups()` and pass them as `mergeFields`.
 - Uploads: put `uploadSingle()` in `before`, after a middleware that checks access, so files are never parsed for callers who may not upload. Store them with `storeFile()` against a core record.
 
+## Help
+
+Each module page needs a help article in `modules/<key>/help/<name>.md`; the web test fails without one. Front matter:
+
+```
+---
+id: module.<key>
+title: Bookings
+area: Modules
+route: /m/<key>, /m/<key>/*
+permission: <key>.<resource>.view
+module: <key>
+related: settings.modules
+---
+```
+
+Write for the people using the page: what it is for, what they can do, step by step. Use vocabulary placeholders such as `{{contactLower}}` (quote them if used in the title), and `<!-- generated:permissions:<key>. -->` to list the module's permissions from the manifest.
+
 ## Registering
 
 1. Add the module to `apps/api/src/modules/installed.ts` (a test fails if a manifest folder is not listed).
