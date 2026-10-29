@@ -39,6 +39,7 @@ import { useHotkeys } from './hotkeys';
 import { IdleTimeout } from './idle-timeout';
 import { NotificationsBell } from '@/features/notifications/notifications-bell';
 import { HelpProvider, useHelp } from '@/help/help-context';
+import { TourProvider } from '@/components/tour/tour';
 import { ShellPanels } from './shell-panels';
 
 const COLLAPSE_KEY = 'ui.sidebarCollapsed';
@@ -152,39 +153,41 @@ function ShellLayout({ nav }: { nav: NavItem[] }) {
 
   return (
     <HelpProvider onShortcuts={() => setHelpOpen(true)}>
-      <HelpBridge onReady={setHelpOpener} />
-      <div className="flex h-dvh overflow-hidden print:block print:h-auto print:overflow-visible">
-        <aside
-          className={cn(
-            'hidden shrink-0 flex-col border-e border-line bg-surface transition-[width] duration-150 md:flex print:hidden',
-            collapsed ? 'w-14' : 'w-60',
-          )}
-        >
-          <Sidebar nav={nav} collapsed={collapsed} onToggle={toggle} />
-        </aside>
-        <D.Root open={mobileOpen} onOpenChange={setMobileOpen}>
-          <D.Portal>
-            <D.Overlay className="anim-fade fixed inset-0 z-40 bg-overlay md:hidden" />
-            <D.Content
-              className="anim-sheet fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-line bg-surface md:hidden"
-              style={{ ['--sheet-from' as string]: '-16px' }}
-            >
-              <D.Title className="sr-only">Navigation</D.Title>
-              <D.Description className="sr-only">Navigation</D.Description>
-              <Sidebar nav={nav} collapsed={false} onNavigate={() => setMobileOpen(false)} />
-            </D.Content>
-          </D.Portal>
-        </D.Root>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar onMenu={() => setMobileOpen(true)} onHelp={() => setHelpOpen(true)} />
-          <MfaRequiredBanner />
-          <main className="min-h-0 flex-1 overflow-y-auto print:overflow-visible">
-            <Outlet />
-          </main>
+      <TourProvider>
+        <HelpBridge onReady={setHelpOpener} />
+        <div className="flex h-dvh overflow-hidden print:block print:h-auto print:overflow-visible">
+          <aside
+            className={cn(
+              'hidden shrink-0 flex-col border-e border-line bg-surface transition-[width] duration-150 md:flex print:hidden',
+              collapsed ? 'w-14' : 'w-60',
+            )}
+          >
+            <Sidebar nav={nav} collapsed={collapsed} onToggle={toggle} />
+          </aside>
+          <D.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+            <D.Portal>
+              <D.Overlay className="anim-fade fixed inset-0 z-40 bg-overlay md:hidden" />
+              <D.Content
+                className="anim-sheet fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-line bg-surface md:hidden"
+                style={{ ['--sheet-from' as string]: '-16px' }}
+              >
+                <D.Title className="sr-only">Navigation</D.Title>
+                <D.Description className="sr-only">Navigation</D.Description>
+                <Sidebar nav={nav} collapsed={false} onNavigate={() => setMobileOpen(false)} />
+              </D.Content>
+            </D.Portal>
+          </D.Root>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar onMenu={() => setMobileOpen(true)} onHelp={() => setHelpOpen(true)} />
+            <MfaRequiredBanner />
+            <main className="min-h-0 flex-1 overflow-y-auto print:overflow-visible">
+              <Outlet />
+            </main>
+          </div>
+          <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} nav={nav} />
+          <IdleTimeout />
         </div>
-        <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} nav={nav} />
-        <IdleTimeout />
-      </div>
+      </TourProvider>
     </HelpProvider>
   );
 }
@@ -283,7 +286,7 @@ function Sidebar({
           </span>
         ) : null}
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" aria-label="Main">
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" aria-label="Main" data-tour="nav">
         {section('main').map(link)}
         {section('modules').length ? (
           <>
@@ -346,6 +349,7 @@ function TopBar({ onMenu, onHelp }: { onMenu: () => void; onHelp: () => void }) 
       <button
         type="button"
         onClick={() => palette.open()}
+        data-tour="search"
         className="flex h-8 w-full max-w-md items-center gap-2 rounded-sm border border-line bg-canvas px-2.5 text-sm text-faint transition-colors hover:border-line-strong"
       >
         <Search className="size-4" />
@@ -364,6 +368,7 @@ function TopBar({ onMenu, onHelp }: { onMenu: () => void; onHelp: () => void }) 
               type="button"
               className="flex items-center gap-2 rounded-sm p-1 hover:bg-hover"
               aria-label={t('nav.profile')}
+              data-tour="user-menu"
             >
               <Avatar name={name} />
             </button>

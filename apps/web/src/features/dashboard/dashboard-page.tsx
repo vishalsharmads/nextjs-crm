@@ -153,7 +153,7 @@ export function DashboardPage() {
               </Button>
             </>
           ) : dash ? (
-            <Button onClick={() => setDraft(dash.widgets)}>
+            <Button data-tour="dashboard-edit" onClick={() => setDraft(dash.widgets)}>
               <Pencil /> Edit dashboard
             </Button>
           ) : null

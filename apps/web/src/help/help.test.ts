@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CORE_PERMISSIONS, SETTINGS_GROUPS, SETTINGS_HELP } from '@app/shared';
 import { HELP_ARTICLES, articleForPath, parseArticle, routeMatches } from './registry';
+import { TOURS } from './tours';
 
 /**
  * Drift guard: help ships with the feature. A new page, setting or module without help, or help
@@ -92,6 +93,30 @@ describe('help articles', () => {
     for (const a of HELP_ARTICLES)
       for (const word of deny)
         expect(`${a.title} ${a.text}`.toLowerCase().includes(word), `${a.id}: ${word}`).toBe(false);
+  });
+});
+
+describe('guided tours', () => {
+  // Every `data-tour` target in the web app and modules.
+  const sources = {
+    ...import.meta.glob<string>('../**/*.tsx', { query: '?raw', import: 'default', eager: true }),
+    ...import.meta.glob<string>('../../../../modules/*/web/**/*.tsx', {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    }),
+  };
+  const targets = new Set(
+    Object.values(sources).flatMap((src) => [...src.matchAll(/data-tour="([a-z0-9-]+)"/g)].map((m) => m[1]!)),
+  );
+
+  it('point at elements that exist, on pages that have help', () => {
+    expect(new Set(TOURS.map((t) => t.id)).size).toBe(TOURS.length);
+    for (const t of TOURS) {
+      expect(articleForPath(t.route), t.id).toBeTruthy();
+      if (t.permission) expect(permissions.has(t.permission), `${t.id}: ${t.permission}`).toBe(true);
+      for (const step of t.steps) expect(targets.has(step.target), `${t.id}: ${step.target}`).toBe(true);
+    }
   });
 });
 

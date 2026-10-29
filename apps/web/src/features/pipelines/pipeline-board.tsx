@@ -248,6 +248,7 @@ export function PipelineBoard({
     >
       <div
         className="flex h-full min-h-0 gap-3 overflow-x-auto p-4 md:px-6"
+        data-tour="board"
         role="list"
         aria-label={t('common.pipelineStages')}
       >

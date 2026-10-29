@@ -128,13 +128,17 @@ export function FieldsPage() {
       title={t('settings.fields')}
       description="Capture what your industry needs. Fields appear in forms, record pages, list columns, filters, import and export."
       actions={
-        <Button variant="primary" onClick={() => setEditing('new')}>
+        <Button data-tour="new-field" variant="primary" onClick={() => setEditing('new')}>
           <Plus /> New field
         </Button>
       }
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs value={entity} onValueChange={(v) => setEntity(v as CustomizableEntity)}>
+        <Tabs
+          data-tour="field-entities"
+          value={entity}
+          onValueChange={(v) => setEntity(v as CustomizableEntity)}
+        >
           <TabsList>
             {[
               ...CUSTOMIZABLE_ENTITIES.filter((e) => e !== 'lead' || boot.settings.features.leads),

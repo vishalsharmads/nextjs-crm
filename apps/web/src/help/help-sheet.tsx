@@ -1,13 +1,14 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { Keyboard } from 'lucide-react';
+import { Keyboard, Route } from 'lucide-react';
 import { useBoot, useCan } from '@/app/session';
 import { useBranding } from '@/app/branding';
 import { labelVars } from '@/lib/labels';
 import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/dialog';
 import { ArticleView, interpolate } from './article-view';
-import { HELP_ARTICLES, articleForPath, type HelpArticle } from './registry';
+import { HELP_ARTICLES, articleForPath, routeMatches, type HelpArticle } from './registry';
+import { useTours } from '@/components/tour/tour';
 
 /** Vocabulary and branding for `{{var}}` in articles. */
 export function useHelpVars(): Record<string, string> {
@@ -48,6 +49,9 @@ export function HelpSheet({
   const boot = useBoot();
   const visible = useVisibleArticles();
   const article = id ? visible.find((a) => a.id === id) : articleForPath(path, visible);
+  const { tours, start } = useTours();
+  // Tours that run on a page this article covers.
+  const pageTours = article ? tours.filter((t) => article.routes.some((r) => routeMatches(r, t.route))) : [];
   const related = (article?.related ?? [])
     .map((r) => visible.find((a) => a.id === r))
     .filter(Boolean) as HelpArticle[];
@@ -79,6 +83,25 @@ export function HelpSheet({
             {vars.appName}.
           </p>
         )}
+        {pageTours.length ? (
+          <section>
+            <h3 className="mb-2 text-xs font-medium text-muted">Guided tour</h3>
+            <div className="flex flex-wrap gap-2">
+              {pageTours.map((t) => (
+                <Button
+                  key={t.id}
+                  size="sm"
+                  onClick={() => {
+                    onClose();
+                    start(t.id);
+                  }}
+                >
+                  <Route /> {interpolate(t.title, vars, false)}
+                </Button>
+              ))}
+            </div>
+          </section>
+        ) : null}
         {related.length ? (
           <section>
             <h3 className="mb-2 text-xs font-medium text-muted">Related</h3>

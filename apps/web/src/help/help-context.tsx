@@ -69,6 +69,7 @@ export function HelpButton({ id }: { id?: string | undefined }) {
       variant="ghost"
       size="icon"
       aria-label="Help for this page"
+      data-tour="help"
       title="Help (?)"
       onClick={() => help.open(id)}
     >

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { BookOpen, Search } from 'lucide-react';
+import { BookOpen, Route, Search } from 'lucide-react';
+import { useTours } from '@/components/tour/tour';
 import { cn } from '@/lib/cn';
 import { useBoot } from '@/app/session';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,7 @@ const AREAS = ['Getting started', 'Records', 'Modules', 'Reports', 'Settings', '
 /** Every article the person may read, searchable, grouped by area. */
 export function HelpPage() {
   const articles = useVisibleArticles();
+  const { tours, start } = useTours();
   const boot = useBoot();
   const vars = useHelpVars();
   const [params, setParams] = useSearchParams();
@@ -52,6 +54,22 @@ export function HelpPage() {
               />
             </div>
           </div>
+          {tours.length && !q ? (
+            <div className="border-b border-line p-2">
+              <p className="px-2 pb-1 text-2xs font-medium text-faint">Guided tours</p>
+              {tours.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => start(t.id)}
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-start text-sm hover:bg-hover"
+                >
+                  <Route className="size-4 text-faint" aria-hidden />
+                  {interpolate(t.title, vars, false)}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {groups.length ? (
             <nav aria-label="Help articles" className="max-h-[70vh] overflow-y-auto p-2">
               {groups.map((g) => (

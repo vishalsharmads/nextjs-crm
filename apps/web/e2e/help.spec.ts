@@ -29,3 +29,15 @@ test('page help explains settings from the code, and the knowledge base searches
   await page.getByLabel('Search help').fill('quota');
   await expect(page.getByRole('button', { name: 'Reports' })).toBeVisible();
 });
+
+test('the welcome tour is offered once and walks through the app', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('button', { name: 'Start the tour' }).click();
+  await expect(page.getByRole('dialog', { name: 'Everything in one place' })).toBeVisible();
+  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByRole('dialog', { name: 'Your profile' })).toBeVisible();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: /Good to see you, Erin/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start the tour' })).toHaveCount(0);
+});
