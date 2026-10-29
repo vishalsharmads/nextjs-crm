@@ -37,7 +37,14 @@ const MARKER = /<!--\s*generated:([a-z-]+)(?::([a-z0-9_.-]+))?\s*-->/g;
  */
 function noteHtml(note: string, vars: Record<string, string>) {
   const safe = note.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
-  return interpolate(marked.parse(safe, { async: false, gfm: true }), vars);
+  const html = marked.parse(safe, { async: false, gfm: true });
+  // Markdown links and images can still carry `javascript:` or `data:`: keep web, mail and in-app links only.
+  return interpolate(
+    html.replace(/\s(href|src)="([^"]*)"/g, (m, attr: string, url: string) =>
+      /^(https?:|mailto:|\/(?!\/)|#)/i.test(url.replace(/&#?\w+;/g, '').trim()) ? m : ` ${attr}="#"`,
+    ),
+    vars,
+  );
 }
 
 /** An article as segments of HTML and generated tables, in order, then any workspace note. */

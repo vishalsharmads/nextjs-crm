@@ -51,3 +51,27 @@ describe('page help', () => {
     expect(sheet.textContent).toContain('no help for this page');
   });
 });
+
+describe('workspace notes', () => {
+  it('render Markdown but never HTML or script links', async () => {
+    const { ArticleView } = await import('./article-view');
+    const { parseArticle } = await import('./registry');
+    const article = parseArticle('---\nid: x\ntitle: X\n---\nBody', 'x.md');
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ArticleView
+          article={article}
+          vars={{}}
+          note={
+            '**Bold** <img src=x onerror=alert(1)> [bad](javascript:alert(1)) [good](https://example.test)'
+          }
+        />
+      </QueryClientProvider>,
+    );
+    const note = container.querySelector('section')!;
+    expect(note.querySelector('strong')?.textContent).toBe('Bold');
+    expect(note.querySelector('img')).toBeNull();
+    const links = [...note.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(links).toEqual(['#', 'https://example.test']);
+  });
+});
