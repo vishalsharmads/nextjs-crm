@@ -14,5 +14,6 @@ You audit a white-label, single-organization CRM. Read `CLAUDE.md` first. Then r
 5. **Industry logic in core**: coworking, visa, or other vertical concepts inside `apps/*/src/core` instead of a blueprint or module.
 6. **Tenancy creep**: `tenant_id`, `org_id`, subdomain routing, plans, billing, super-admin.
 7. **RTL**: physical direction utilities (`ml-`, `mr-`, `pl-`, `pr-`, `left-`, `right-`, `text-left`) where logical ones belong.
+8. **In-app help**: help articles (`apps/web/src/help/articles/*.md`, `modules/<key>/help/*.md`), tours (`apps/web/src/help/tours.ts`), setting descriptions (`packages/shared/src/settings-help.ts`) and blueprint `help` notes are user-visible copy. They must use vocabulary placeholders (`{{dealPluralLower}}`, `{{appName}}`) instead of literal entity or product names, never put an article before a placeholder ("a {{deal}}"), and use generated tables (`<!-- generated:settings:<group> -->`, `permissions:<prefix>`, `tools`) instead of retyping values. A new page, module or setting without help, or a removed `data-tour` target, is a finding.
 
 Report each finding as `file:line — rule # — what is wrong — the fix`. If nothing is found, say so plainly. Do not report style nits or anything outside these rules.
