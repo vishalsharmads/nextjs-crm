@@ -8,6 +8,7 @@ import {
   type SettingsGroup,
   type ToolInfo,
 } from '@app/shared';
+import { marked } from 'marked';
 import { apiGet } from '@/lib/api';
 import { useCan } from '@/app/session';
 import type { HelpArticle } from './registry';
@@ -30,8 +31,25 @@ export function interpolate(text: string, vars: Record<string, string>, escape =
 
 const MARKER = /<!--\s*generated:([a-z-]+)(?::([a-z0-9_.-]+))?\s*-->/g;
 
-/** An article as segments of HTML and generated tables, in order. */
-export function ArticleView({ article, vars }: { article: HelpArticle; vars: Record<string, string> }) {
+/**
+ * A workspace note from the blueprint, as Markdown. Blueprints can be uploaded by admins, so any
+ * HTML in the note is escaped first and shows as text.
+ */
+function noteHtml(note: string, vars: Record<string, string>) {
+  const safe = note.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
+  return interpolate(marked.parse(safe, { async: false, gfm: true }), vars);
+}
+
+/** An article as segments of HTML and generated tables, in order, then any workspace note. */
+export function ArticleView({
+  article,
+  vars,
+  note,
+}: {
+  article: HelpArticle;
+  vars: Record<string, string>;
+  note?: string | undefined;
+}) {
   const parts = useMemo(() => {
     const out: ReactNode[] = [];
     let last = 0;
@@ -44,7 +62,17 @@ export function ArticleView({ article, vars }: { article: HelpArticle; vars: Rec
     out.push(html(article.html.slice(last), vars, i));
     return out;
   }, [article, vars]);
-  return <div className="rte-prose text-sm">{parts}</div>;
+  return (
+    <div className="rte-prose text-sm">
+      {parts}
+      {note ? (
+        <section aria-label="For your workspace" className="mt-4 rounded-md border border-line bg-subtle p-3">
+          <h3>For your workspace</h3>
+          <div dangerouslySetInnerHTML={{ __html: noteHtml(note, vars) }} />
+        </section>
+      ) : null}
+    </div>
+  );
 }
 
 const html = (chunk: string, vars: Record<string, string>, key: number) =>

@@ -146,6 +146,13 @@ export const blueprintSchema = z.object({
   custom_field_groups: z.record(fieldEntityKey, z.array(blueprintGroupSchema)).default({}),
   custom_fields: z.record(fieldEntityKey, z.array(blueprintFieldSchema)).default({}),
   pipelines: z.array(blueprintPipelineSchema).default([]),
+  /**
+   * Industry notes added to in-app help articles, by article id (`settings.pipelines`,
+   * `module.bookings`). Markdown; raw HTML is shown as text.
+   */
+  help: z
+    .record(z.string().regex(/^[a-z0-9][a-z0-9.-]{0,99}$/), z.string().trim().min(1).max(5000))
+    .default({}),
   roles: z.array(blueprintRoleSchema).default([]),
   layouts: z.array(blueprintLayoutSchema).default([]),
   dashboard: z

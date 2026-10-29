@@ -4,7 +4,7 @@ import type { AuthUser } from '../../http/context';
 import { db } from '../../db/knex';
 import { getMe } from '../auth/auth.routes';
 import { getLabels } from '../labels/labels.service';
-import { effectiveCompliance, getGroup } from '../settings/settings.service';
+import { effectiveCompliance, getGroup, getRaw } from '../settings/settings.service';
 import { fieldAccessMap, getDefinitions, fieldLevel } from '../custom-fields/definitions';
 import { listPipelines } from '../pipelines/pipelines.repository';
 import { enabledModuleKeys, moduleMenu, modulePanels, moduleShellPanels } from '../../modules/registry';
@@ -81,6 +81,7 @@ export const metaRoutes = defineRoutes('/meta', ['meta']).add({
           .filter((p) => can(user, p.permission))
           .map(({ moduleKey, key, title, icon }) => ({ moduleKey, key, title, icon })),
       },
+      helpNotes: ((await getRaw('help_notes')) as Record<string, string> | undefined) ?? {},
       recordTypes: moduleRecordDefs()
         .filter((d) => d.meta && can(user, `${d.resource}.view`))
         .map((d) => d.meta!),

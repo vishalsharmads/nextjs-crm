@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { BookOpen, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { useBoot } from '@/app/session';
 import { Input } from '@/components/ui/input';
 import { EmptyState, PageHeader, Pane } from '@/components/ui/misc';
 import { ArticleView, interpolate } from '@/help/article-view';
@@ -13,6 +14,7 @@ const AREAS = ['Getting started', 'Records', 'Modules', 'Reports', 'Settings', '
 /** Every article the person may read, searchable, grouped by area. */
 export function HelpPage() {
   const articles = useVisibleArticles();
+  const boot = useBoot();
   const vars = useHelpVars();
   const [params, setParams] = useSearchParams();
   const [q, setQ] = useState('');
@@ -79,7 +81,7 @@ export function HelpPage() {
           {selected ? (
             <article>
               <h2 className="mb-3 text-lg font-semibold">{interpolate(selected.title, vars, false)}</h2>
-              <ArticleView article={selected} vars={vars} />
+              <ArticleView article={selected} vars={vars} note={boot.helpNotes?.[selected.id]} />
             </article>
           ) : (
             <EmptyState

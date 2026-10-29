@@ -45,6 +45,7 @@ export function HelpSheet({
   onShortcuts: () => void;
 }) {
   const vars = useHelpVars();
+  const boot = useBoot();
   const visible = useVisibleArticles();
   const article = id ? visible.find((a) => a.id === id) : articleForPath(path, visible);
   const related = (article?.related ?? [])
@@ -71,7 +72,7 @@ export function HelpSheet({
     >
       <div className="flex flex-col gap-5 p-5">
         {article ? (
-          <ArticleView article={article} vars={vars} />
+          <ArticleView article={article} vars={vars} note={boot.helpNotes?.[article.id]} />
         ) : (
           <p className="text-sm text-muted">
             There is no help for this page yet. The knowledge base has articles on every part of{' '}

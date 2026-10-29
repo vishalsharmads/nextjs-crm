@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "key": "coworking",
   "name": "Coworking space",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Members, companies and memberships for coworking and flexible-office operators, with front-desk roles.",
   "settings": {
     "features": {
@@ -220,6 +220,10 @@
       ]
     }
   ],
+  "help": {
+    "records.deals": "Use a **{{dealLower}}** for each membership or private office enquiry. Put the desk count and start date in the custom fields, so the forecast shows when new members move in.",
+    "module.bookings": "Members book meeting rooms here. Day-pass guests are booked by the front desk on their behalf."
+  },
   "roles": [
     {
       "key": "community_manager",
