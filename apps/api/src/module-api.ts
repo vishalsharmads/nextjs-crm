@@ -2,6 +2,8 @@
  * The public contract for module API code. Modules import from `@app/api/module-api` only,
  * never from API internals, so core can evolve without breaking modules.
  */
+import { env as appEnv, isProd as appIsProd } from './config/env';
+
 export { defineRoutes, type RouteGroup } from './http/routes';
 export { systemContext, type AuthUser, type RequestContext } from './http/context';
 export type { ApiModule } from './modules/types';
@@ -73,3 +75,6 @@ export {
 } from './blueprints/workspace-setup';
 export { effectiveCompliance } from './core/settings/settings.service';
 export { assertSafeUrl } from './core/webhooks/webhooks';
+
+/** Development, tests and demo instances may offer testing aids (never a production instance). */
+export const allowsTestingAids = () => !appIsProd || appEnv.DEMO_MODE;

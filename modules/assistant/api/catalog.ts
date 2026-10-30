@@ -3,12 +3,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { logger } from '@app/api/module-api';
-import { PROVIDERS } from './providers';
+import { WIRE_FORMATS } from './providers';
 
 const presetSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]{1,39}$/),
   name: z.string().min(1).max(60),
-  format: z.enum(PROVIDERS),
+  format: z.enum(WIRE_FORMATS),
   baseUrl: z.url({ protocol: /^https$/ }),
   headers: z.record(z.string(), z.string()).default({}),
   keyUrl: z.url({ protocol: /^https$/ }).optional(),

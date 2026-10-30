@@ -1,4 +1,5 @@
 import { AppError, assertSafeUrl, logger } from '@app/api/module-api';
+import { simulate } from './simulated';
 
 /** The provider's own error goes to the server log only (it can name the provider); people see ours. */
 function logRefusal(status: number, body: string) {
@@ -90,7 +91,9 @@ export interface ProviderConfig {
  * native tool-use blocks, and the widely copied "chat completions" API. Names shown to admins are
  * these formats, never a vendor's.
  */
-export const PROVIDERS = ['messages', 'chat_completions'] as const;
+export const WIRE_FORMATS = ['messages', 'chat_completions'] as const;
+/** Plus scripted replies for testing (`simulated.ts`), picked from the provider list only. */
+export const PROVIDERS = [...WIRE_FORMATS, 'simulated'] as const;
 export type ProviderKind = (typeof PROVIDERS)[number];
 
 const TIMEOUT_MS = 60_000;
@@ -279,6 +282,7 @@ async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promis
 }
 
 export function chat(cfg: ProviderConfig, req: ChatRequest): Promise<ChatResult> {
+  if (cfg.provider === 'simulated') return simulate(req);
   return cfg.provider === 'messages' ? messagesApi(cfg, req) : chatCompletionsApi(cfg, req);
 }
 
@@ -503,5 +507,6 @@ async function chatCompletionsStream(
 
 /** Like `chat`, but text arrives through `on.text` as the provider produces it. */
 export function chatStream(cfg: ProviderConfig, req: ChatRequest, on: StreamHandlers): Promise<ChatResult> {
+  if (cfg.provider === 'simulated') return simulate(req, on);
   return cfg.provider === 'messages' ? messagesStream(cfg, req, on) : chatCompletionsStream(cfg, req, on);
 }

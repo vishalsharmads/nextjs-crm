@@ -28,6 +28,8 @@ Ask questions about your records in plain words, get summaries of a record's his
 
 Any other service with a compatible API (including your own) works through **Other compatible API**.
 
+**Trying it out without AI:** on demo and development instances the list starts with **Simulated replies (testing)**. It needs no key and uses no tokens: answers are scripted, but it still looks up your records with your permissions and asks before changing anything (try "Show my contacts" or "Create a task to call back tomorrow"). It is never offered on a live instance. A key you saved for another provider is kept for when you switch back.
+
 **Recommended for best results** suggests limits and the recommended model; **Apply** fills them in, and **Save** keeps them. Below that: the name people see (never the provider's), monthly and daily limits, how long conversations are kept, record types it must never use, and usage per person.
 
 ## Setting up the workspace with the assistant

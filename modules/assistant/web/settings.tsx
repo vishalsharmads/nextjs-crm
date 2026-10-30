@@ -30,7 +30,7 @@ export interface Config {
 interface Provider {
   id: string;
   name: string;
-  format: 'messages' | 'chat_completions';
+  format: 'messages' | 'chat_completions' | 'simulated';
   baseUrl: string;
   keyUrl: string | null;
   keyPrefix: string | null;
@@ -211,11 +211,13 @@ export function SettingsPanel() {
     set({ model: next?.recommended.find((m) => !m.startsWith(':')) ?? null });
   };
   const shown = (providers.data ?? []).filter((p) => !onlyFree || p.tier !== 'paid');
+  // Simulated replies (testing) need no key and no model choice.
+  const noKey = preset?.format === 'simulated';
   const keyLooksWrong =
     !!apiKey && !!preset?.keyPrefix && apiKey.length > 6 && !apiKey.startsWith(preset.keyPrefix);
   const steps = [
     { label: 'Provider', done: !!choice && (choice !== CUSTOM || (!!draft.provider && !!draft.baseUrl)) },
-    { label: 'API key', done: keySaved || !!apiKey },
+    { label: 'API key', done: noKey || keySaved || !!apiKey },
     { label: 'Model', done: !!draft.model },
     { label: 'Connected', done: test.state === 'ok' },
   ];
@@ -353,7 +355,13 @@ export function SettingsPanel() {
           </div>
         ) : null}
 
-        {choice ? (
+        {noKey ? (
+          <p className="anim-rise mt-5 rounded-md border border-line bg-surface p-3 text-sm text-muted">
+            No key or model needed. Answers are scripted, so nothing is sent to an AI provider and no tokens
+            are used, but the assistant still looks up your records and asks before changing anything. A key
+            you saved for another provider is kept for when you switch back.
+          </p>
+        ) : choice ? (
           <div className="anim-rise mt-5 grid gap-5 lg:grid-cols-2">
             <div>
               <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">

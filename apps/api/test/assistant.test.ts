@@ -398,6 +398,55 @@ describe('assistant module', () => {
       .expect(200);
   });
 
+  it('answers with simulated replies for testing: real tools, no provider, no tokens', async () => {
+    const providers = await admin.get('/m/assistant/providers').expect(200);
+    expect(providers.body.data[0]).toMatchObject({ id: 'simulated', format: 'simulated', keyUrl: null });
+    await admin.patch('/m/assistant/config', { preset: 'simulated' }).expect(200);
+    const status = await admin.get('/m/assistant/status').expect(200);
+    expect(status.body.ready).toBe(true);
+
+    const name = unique('Sim');
+    await admin.post('/contacts', { firstName: 'Sol', lastName: name }).expect(201);
+    seen.length = 0;
+    const before = await db('m_assistant_usage').sum({ n: 'input_tokens' }).first();
+    const res = await admin.post('/m/assistant/conversations', { text: 'Show my contacts' }).expect(201);
+    const answer = res.body.messages.at(-1);
+    expect(answer.tools).toEqual(['Describe the data', 'List records']);
+    expect(answer.text).toMatch(/\| Name \| Owner \| Updated \|/);
+    expect(answer.text).toMatch(/Next: /);
+    // Nothing reached a provider, and no tokens were counted.
+    expect(seen).toHaveLength(0);
+    expect(await db('m_assistant_usage').sum({ n: 'input_tokens' }).first()).toEqual(before);
+
+    // Changes are still proposed and wait for the person.
+    const task = await admin
+      .post('/m/assistant/conversations', { text: `Create a task to call ${name}` })
+      .expect(201);
+    expect(task.body.proposals).toEqual([
+      expect.objectContaining({
+        name: 'create_task',
+        input: expect.objectContaining({ subject: `Call ${name}` }),
+      }),
+    ]);
+    const done = await admin
+      .post(`/m/assistant/conversations/${task.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    expect(done.body.messages.at(-1).text).toMatch(/task is created/);
+    expect(
+      await db('activities')
+        .where({ subject: `Call ${name}` })
+        .first(),
+    ).toBeTruthy();
+
+    // Switching back keeps the saved key for the saved address.
+    await admin
+      .patch('/m/assistant/config', { preset: null, provider: 'messages', baseUrl: base })
+      .expect(200);
+    const cfg = await admin.get('/m/assistant/config').expect(200);
+    expect(cfg.body).toMatchObject({ provider: 'messages', hasApiKey: true });
+    await admin.patch('/m/assistant/config', { model: 'test-model' }).expect(200);
+  });
+
   it('lists providers and fills in format, address and headers from the one picked', async () => {
     const list = await admin.get('/m/assistant/providers').expect(200);
     const ids = list.body.data.map((p: { id: string }) => p.id);

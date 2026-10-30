@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   AppError,
+  allowsTestingAids,
   assertSafeUrl,
   audit,
   escapeLike,
@@ -33,7 +34,7 @@ import {
   chat,
   chatStream,
   listModels,
-  PROVIDERS,
+  WIRE_FORMATS,
   type Block,
   type ChatMessage,
   type ProviderConfig,
@@ -81,6 +82,10 @@ async function loadConfig(): Promise<ConfigRow> {
 
 /** Usable when an admin set provider, model and key, and (under hipaa) acknowledged the risk. */
 async function providerConfig(row: ConfigRow): Promise<ProviderConfig | null> {
+  if (row.provider === 'simulated')
+    return allowsTestingAids()
+      ? { provider: 'simulated', baseUrl: '', model: SIMULATED.recommended[0]!, apiKey: '', headers: {} }
+      : null;
   if (!row.provider || !row.base_url || !row.model || !row.api_key_enc) return null;
   const { profile } = await effectiveCompliance();
   if (profile === 'hipaa' && !row.hipaa_acknowledged) return null;
@@ -92,6 +97,37 @@ async function providerConfig(row: ConfigRow): Promise<ProviderConfig | null> {
     headers: json<Record<string, string>>(row.headers),
   };
 }
+
+/**
+ * Scripted replies for trying the assistant out without AI or tokens (`simulated.ts`). Listed first,
+ * and only where testing aids are allowed: development, tests and demo instances.
+ */
+const SIMULATED = {
+  id: 'simulated',
+  name: 'Simulated replies (testing)',
+  format: 'simulated',
+  baseUrl: '',
+  keyUrl: null,
+  keyPrefix: null,
+  tier: 'free',
+  note: 'No AI, no API key and no tokens: scripted answers that still look up your records and propose changes to confirm.',
+  recommended: ['scripted'],
+} as const;
+
+const presets = () => [
+  ...(allowsTestingAids() ? [SIMULATED] : []),
+  ...providerPresets().map((p) => ({
+    id: p.id,
+    name: p.name,
+    format: p.format,
+    baseUrl: p.baseUrl,
+    keyUrl: p.keyUrl ?? null,
+    keyPrefix: p.keyPrefix ?? null,
+    tier: p.tier,
+    note: p.note,
+    recommended: p.recommended,
+  })),
+];
 
 const configDto = (row: ConfigRow) => ({
   name: row.name,
@@ -121,7 +157,7 @@ const RESERVED_HEADERS = new Set([
 
 const configSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
-  provider: z.enum(PROVIDERS).nullish(),
+  provider: z.enum(WIRE_FORMATS).nullish(),
   baseUrl: z
     .url({ protocol: /^https?$/ })
     .max(500)
@@ -436,10 +472,11 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
     const reply = sink
       ? await chatStream(provider, { system, messages, tools }, { text: sink.text })
       : await chat(provider, { system, messages, tools });
-    await recordUsage(user.id, {
-      input: reply.usage.input || estimate([system, messages]),
-      output: reply.usage.output || estimate(reply.content),
-    });
+    if (provider.provider !== 'simulated')
+      await recordUsage(user.id, {
+        input: reply.usage.input || estimate([system, messages]),
+        output: reply.usage.output || estimate(reply.content),
+      });
     const content = reply.content.length ? reply.content : [{ type: 'text' as const, text: '…' }];
     await append(conv.id, 'assistant', content);
     const uses = content.filter((b): b is Extract<Block, { type: 'tool_use' }> => b.type === 'tool_use');
@@ -555,11 +592,23 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       if (input.setupEnabled !== undefined && !user.isAdmin)
         throw new AppError('FORBIDDEN', 'Only admins can let the assistant set up the workspace');
       // A listed provider brings its own format, address and headers.
-      const preset = input.preset ? findPreset(input.preset) : undefined;
-      if (input.preset && !preset) throw new AppError('VALIDATION_FAILED', 'Choose a provider from the list');
-      const body = preset
-        ? { ...input, provider: preset.format, baseUrl: preset.baseUrl, headers: preset.headers }
-        : input;
+      const simulated = input.preset === SIMULATED.id && allowsTestingAids();
+      const preset = input.preset && !simulated ? findPreset(input.preset) : undefined;
+      if (input.preset && !preset && !simulated)
+        throw new AppError('VALIDATION_FAILED', 'Choose a provider from the list');
+      // Simulated replies keep the saved provider address, key and headers for switching back.
+      const body = simulated
+        ? {
+            ...input,
+            provider: 'simulated' as const,
+            model: SIMULATED.recommended[0],
+            baseUrl: undefined,
+            apiKey: undefined,
+            headers: undefined,
+          }
+        : preset
+          ? { ...input, provider: preset.format, baseUrl: preset.baseUrl, headers: preset.headers }
+          : input;
       if (body.baseUrl) await assertSafeUrl(body.baseUrl, 'baseUrl');
       const reserved = Object.keys(body.headers ?? {}).filter((h) => RESERVED_HEADERS.has(h.toLowerCase()));
       if (reserved.length)
@@ -570,7 +619,10 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       // A new address must come with its key, so the saved key is never sent somewhere else.
       const moved =
         (body.baseUrl !== undefined && body.baseUrl !== cfg.base_url) ||
-        (body.provider !== undefined && body.provider !== cfg.provider);
+        (body.provider !== undefined &&
+          body.provider !== cfg.provider &&
+          body.provider !== 'simulated' &&
+          cfg.provider !== 'simulated');
       if (moved && body.apiKey === undefined) patch.api_key_enc = null;
       if (body.name !== undefined) patch.name = body.name;
       if (body.provider !== undefined) patch.provider = body.provider;
@@ -609,19 +661,7 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     path: '/providers',
     permission: 'assistant.settings.manage',
     summary: 'AI providers an admin can pick, with where to get a key and the recommended models',
-    handler: async () => ({
-      data: providerPresets().map((p) => ({
-        id: p.id,
-        name: p.name,
-        format: p.format,
-        baseUrl: p.baseUrl,
-        keyUrl: p.keyUrl ?? null,
-        keyPrefix: p.keyPrefix ?? null,
-        tier: p.tier,
-        note: p.note,
-        recommended: p.recommended,
-      })),
-    }),
+    handler: async () => ({ data: presets() }),
   })
   .add({
     method: 'post',
@@ -632,7 +672,7 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
         .string()
         .regex(/^[a-z][a-z0-9-]{1,39}$/)
         .nullish(),
-      provider: z.enum(PROVIDERS).nullish(),
+      provider: z.enum(WIRE_FORMATS).nullish(),
       baseUrl: z
         .url({ protocol: /^https?$/ })
         .max(500)
@@ -642,6 +682,8 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     }),
     summary: "The provider's models, recommended ones first",
     handler: async ({ body }) => {
+      if (body.preset === SIMULATED.id && allowsTestingAids())
+        return { data: rankModels([...SIMULATED.recommended], [...SIMULATED.recommended]) };
       const cfg = await loadConfig();
       const preset = findPreset(body.preset);
       const provider = preset?.format ?? body.provider ?? (cfg.provider as ProviderConfig['provider'] | null);
