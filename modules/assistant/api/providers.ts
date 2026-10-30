@@ -1,9 +1,24 @@
-import { AppError, assertSafeUrl } from '@app/api/module-api';
+import { AppError, assertSafeUrl, logger } from '@app/api/module-api';
+
+/** The provider's own error goes to the server log only (it can name the provider); people see ours. */
+function logRefusal(status: number, body: string) {
+  logger.warn({ status, body: body.slice(0, 1000) }, 'AI provider refused the request');
+}
 
 /** Content in the conversation, in one shape for every provider. */
 export type Block =
   | { type: 'text'; text: string }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  | {
+      type: 'tool_use';
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+      /**
+       * Opaque data the provider attached to the call (chat completions `extra_content`, such as a
+       * reasoning signature) and requires back unchanged with the next request.
+       */
+      extra?: Record<string, unknown>;
+    }
   | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean };
 
 export interface ChatMessage {
@@ -69,6 +84,7 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
   if (text.length > MAX_RESPONSE)
     throw new AppError('UPSTREAM_FAILED', 'The AI provider sent a response that is too large.');
   if (!res.ok) {
+    logRefusal(res.status, text);
     // The provider's own message can name the provider: keep it out of what people see.
     const status =
       res.status === 401 || res.status === 403 ? 'rejected the API key' : `returned ${res.status}`;
@@ -126,6 +142,12 @@ export async function listModels(cfg: Omit<ProviderConfig, 'model'>): Promise<st
     .slice(0, 500);
 }
 
+/** Keep a provider's per-call data only when it is a small plain object. */
+function extraOf(v: unknown): { extra?: Record<string, unknown> } {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+  return JSON.stringify(v).length <= 20_000 ? { extra: v as Record<string, unknown> } : {};
+}
+
 const join = (base: string, path: string) => `${base.replace(/\/+$/, '')}${path}`;
 
 async function messagesApi(cfg: ProviderConfig, req: ChatRequest): Promise<ChatResult> {
@@ -160,7 +182,14 @@ function chatMessages(req: ChatRequest): unknown[] {
       const text = m.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n');
       const calls = m.content.flatMap((b) =>
         b.type === 'tool_use'
-          ? [{ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input) } }]
+          ? [
+              {
+                id: b.id,
+                type: 'function',
+                function: { name: b.name, arguments: JSON.stringify(b.input) },
+                ...(b.extra ? { extra_content: b.extra } : {}),
+              },
+            ]
           : [],
       );
       messages.push({
@@ -197,7 +226,7 @@ async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promis
     choices?: {
       message?: {
         content?: string | null;
-        tool_calls?: { id: string; function: { name: string; arguments: string } }[];
+        tool_calls?: { id: string; function: { name: string; arguments: string }; extra_content?: unknown }[];
       };
     }[];
     usage?: { prompt_tokens?: number; completion_tokens?: number };
@@ -212,7 +241,7 @@ async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promis
     } catch {
       input = {};
     }
-    content.push({ type: 'tool_use', id: c.id, name: c.function.name, input });
+    content.push({ type: 'tool_use', id: c.id, name: c.function.name, input, ...extraOf(c.extra_content) });
   }
   return {
     content,
@@ -274,6 +303,7 @@ async function open(url: string, headers: Record<string, string>, body: unknown)
     throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
   }
   if (!res.ok || !res.body) {
+    logRefusal(res.status, await res.text().catch(() => ''));
     const status =
       res.status === 401 || res.status === 403 ? 'rejected the API key' : `returned ${res.status}`;
     throw new AppError(
@@ -386,7 +416,7 @@ async function chatCompletionsStream(
     },
   );
   let text = '';
-  const calls: { id: string; name: string; args: string }[] = [];
+  const calls: { id: string; name: string; args: string; extra?: unknown }[] = [];
   const usage = { input: 0, output: 0 };
   let finished = false;
   for await (const { data } of sseEvents(res)) {
@@ -398,7 +428,12 @@ async function chatCompletionsStream(
       choices?: {
         delta?: {
           content?: string | null;
-          tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[];
+          tool_calls?: {
+            index: number;
+            id?: string;
+            function?: { name?: string; arguments?: string };
+            extra_content?: unknown;
+          }[];
         };
       }[];
       usage?: { prompt_tokens?: number; completion_tokens?: number };
@@ -423,13 +458,21 @@ async function chatCompletionsStream(
       if (c.id) call.id = c.id;
       if (c.function?.name) call.name += c.function.name;
       if (c.function?.arguments) call.args += c.function.arguments;
+      if (c.extra_content) call.extra = c.extra_content;
     }
   }
   if (!finished) throw new AppError('UPSTREAM_FAILED', CUT_OFF);
   const content: Block[] = [];
   if (text) content.push({ type: 'text', text });
   for (const c of calls)
-    if (c) content.push({ type: 'tool_use', id: c.id, name: c.name, input: toolInput(c.args) });
+    if (c)
+      content.push({
+        type: 'tool_use',
+        id: c.id,
+        name: c.name,
+        input: toolInput(c.args),
+        ...extraOf(c.extra),
+      });
   return { content, usage };
 }
 

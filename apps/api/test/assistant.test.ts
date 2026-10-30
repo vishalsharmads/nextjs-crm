@@ -314,7 +314,14 @@ describe('assistant module', () => {
           {
             message: {
               content: null,
-              tool_calls: [{ id: 'c1', function: { name: 'describe_schema', arguments: '{}' } }],
+              tool_calls: [
+                {
+                  id: 'c1',
+                  function: { name: 'describe_schema', arguments: '{}' },
+                  // Some providers sign each call and require the signature back unchanged.
+                  extra_content: { sig: { thought_signature: 'abc==' } },
+                },
+              ],
             },
           },
         ],
@@ -331,6 +338,7 @@ describe('assistant module', () => {
     expect(seen[0]!.url).toBe('/v1/chat/completions');
     expect(seen[0]!.headers.authorization).toBe('Bearer secret-key-123');
     const msgs = seen[1]!.body.messages as { role: string }[];
+    expect(JSON.stringify(msgs)).toContain('"extra_content":{"sig":{"thought_signature":"abc=="}}');
     expect(msgs.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'tool']);
     replies = [
       {

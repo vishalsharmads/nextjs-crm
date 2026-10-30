@@ -192,10 +192,10 @@ function Chat({
     },
   });
   const bottom = useRef<HTMLDivElement>(null);
-  useEffect(
-    () => bottom.current?.scrollIntoView({ block: 'end' }),
-    [conv.data?.messages.length, send.isPending, live?.text.length],
-  );
+  useEffect(() => {
+    // A block, not an expression: newer browsers return a Promise here, which React would call as cleanup.
+    bottom.current?.scrollIntoView({ block: 'end' });
+  }, [conv.data?.messages.length, send.isPending, live?.text.length]);
 
   if (loading) return <Skeleton className="h-64" />;
   if (!ready)
