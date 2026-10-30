@@ -491,9 +491,9 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     method: 'get',
     path: '/status',
     permission: 'assistant.chat.use',
-    handler: async () => {
+    handler: async ({ user }) => {
       const cfg = await loadConfig();
-      return { name: cfg.name, ready: !!(await providerConfig(cfg)) };
+      return { name: cfg.name, ready: !!(await providerConfig(cfg)), setup: setupAllowed(cfg, user) };
     },
   })
   .add({

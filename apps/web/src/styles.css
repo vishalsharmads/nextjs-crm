@@ -391,3 +391,97 @@ html.dark {
 .rte-content .suggestion {
   color: var(--primary);
 }
+
+/*
+ * Assistant ("AI") surfaces. Colors come from the brand tokens only. The shimmer and dots run only
+ * while the assistant is working (a loading state); reduced motion stops them (rule above).
+ */
+.ai-surface {
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--primary) 55%, transparent),
+        color-mix(in oklch, var(--accent) 45%, transparent)
+      )
+      border-box;
+  border: 1px solid transparent;
+}
+.ai-mark {
+  background: linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 55%, var(--accent)));
+  color: var(--primary-fg);
+}
+.ai-shimmer {
+  background: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      var(--muted) 35%,
+      var(--primary) 50%,
+      var(--muted) 65%,
+      var(--muted) 100%
+    )
+    0 0 / 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ai-shimmer 1.6s linear infinite;
+}
+@keyframes ai-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+.ai-dots span {
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: var(--primary);
+  animation: ai-dot 1s var(--ease-out) infinite;
+}
+.ai-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.ai-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes ai-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+/* The end of a reply that is still being written. */
+.ai-caret::after {
+  content: '';
+  display: inline-block;
+  width: 0.45em;
+  height: 1em;
+  margin-inline-start: 1px;
+  vertical-align: text-bottom;
+  background: var(--primary);
+  animation: ai-caret 0.9s steps(1) infinite;
+}
+@keyframes ai-caret {
+  50% {
+    opacity: 0;
+  }
+}
+/* A new message or step appears after the person sends something. */
+.anim-rise {
+  animation: rise-in 180ms var(--ease-out);
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
