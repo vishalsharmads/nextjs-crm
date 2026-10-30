@@ -110,6 +110,13 @@ describe('assistant module', () => {
         }
         seen.push({ url: req.url ?? '', headers: req.headers, body: JSON.parse(raw || '{}') });
         const next = (replies.shift() ?? text('Done.')) as Record<string, unknown>;
+        if (typeof next.status === 'number') {
+          // A provider turning the request away (rate limit), asking to retry after a second.
+          res.statusCode = next.status;
+          res.setHeader('retry-after', '1');
+          res.end('{"error":{"message":"slow down"}}');
+          return;
+        }
         const body = JSON.parse(raw || '{}') as { stream?: boolean };
         if (body.stream) {
           res.setHeader('content-type', 'text/event-stream');
@@ -158,7 +165,13 @@ describe('assistant module', () => {
     replies = [use('search_records', { query: name }), text('I found Zed.')];
     seen.length = 0;
     const res = await admin.post('/m/assistant/conversations', { text: `Who is ${name}?` }).expect(201);
-    expect(res.body.messages.at(-1)).toMatchObject({ role: 'assistant', text: 'I found Zed.' });
+    // The lookup shows as a step on the answer, not as a bubble of its own.
+    expect(res.body.messages).toHaveLength(2);
+    expect(res.body.messages.at(-1)).toMatchObject({
+      role: 'assistant',
+      text: 'I found Zed.',
+      tools: [expect.any(String)],
+    });
     expect(seen[0]!.url).toBe('/v1/messages');
     expect(seen[0]!.headers['x-api-key']).toBe('secret-key-123');
     expect(seen[0]!.headers['x-api-version']).toBe('1');
@@ -269,10 +282,22 @@ describe('assistant module', () => {
     seen.length = 0;
     await admin.post('/m/assistant/conversations', { text: 'Deals?' }).expect(201);
     expect(JSON.stringify(seen[1]!.body.messages)).toContain('may not use this record type');
+    // The model is told up front, so it can say so instead of trying.
+    expect(String(seen[0]!.body.system)).toContain('kept these record types away from you: deal');
     await admin.patch('/m/assistant/config', { excludedEntities: [], userDailyTokenCap: 1 }).expect(200);
     const capped = await admin.post('/m/assistant/conversations', { text: 'Hi' });
     expect(capped.status).toBe(429);
     await admin.patch('/m/assistant/config', { userDailyTokenCap: 0 }).expect(200);
+  });
+
+  it('retries when the provider is busy, then says so plainly', async () => {
+    replies = [{ status: 429 }, text('Back again.')];
+    const ok = await admin.post('/m/assistant/conversations', { text: 'Hi' }).expect(201);
+    expect(ok.body.messages.at(-1)).toMatchObject({ text: 'Back again.' });
+    replies = [{ status: 429 }, { status: 429 }, { status: 429 }];
+    const busy = await admin.post('/m/assistant/conversations', { text: 'Hi' });
+    expect(busy.body.error.message).toMatch(/busy or this model's limit is used up/);
+    expect(JSON.stringify(busy.body)).not.toContain('slow down');
   });
 
   it('streams text and tool steps as server-sent events', async () => {

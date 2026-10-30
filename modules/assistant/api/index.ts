@@ -330,6 +330,14 @@ async function runTool(
   } as Block;
 }
 
+/** Tells the model what it may not read, so it says so instead of calling tools that are refused. */
+function excludedNote(cfg: ConfigRow) {
+  const excluded = json<string[]>(cfg.excluded_entities);
+  return excluded.length
+    ? `An admin has kept these record types away from you: ${excluded.join(', ')}. Do not call tools for them; if asked, say an admin turned that off in the assistant settings.`
+    : '';
+}
+
 async function systemPrompt(cfg: ConfigRow, user: AuthUser) {
   const { appName } = await getBranding();
   return [
@@ -338,7 +346,10 @@ async function systemPrompt(cfg: ConfigRow, user: AuthUser) {
     'Call describe_schema to learn the record types and fields of this workspace before listing or changing records.',
     "Tools run with this person's permissions. When a tool returns an error, explain it plainly or try another way.",
     'To change data, call the write tool directly: the person sees each change and confirms it before it runs. Do not ask for permission in text first.',
-    'Answer briefly, in plain language. Refer to records by name, not id.',
+    'Answer briefly, in plain language. Use Markdown: short lists, **bold** for key figures. Never show ids or uuids as text.',
+    'When you mention a record a tool returned, link it as [Its name](record:<entity>/<uuid>), with the entity key and uuid from the tool result.',
+    'End each answer with one last line: "Next: " then two or three short follow-up requests the person might send, separated by " | ", written as they would ask them. Leave it out when you asked them a question.',
+    ...(excludedNote(cfg) ? [excludedNote(cfg)] : []),
     ...(setupAllowed(cfg, user) ? [SETUP_PROMPT] : []),
   ].join('\n');
 }
@@ -470,14 +481,29 @@ async function conversationDto(uuid: string, user: AuthUser) {
   const messages = await history(conv.id);
   const defs = new Map([...toolDefs(), ...SETUP_TOOLS].map((t) => [t.name, t]));
   const items: { role: 'user' | 'assistant'; text?: string; tools?: string[] }[] = [];
+  // Steps the assistant took (tool calls, often with blank text) are gathered onto its next reply,
+  // so one answer shows as one bubble instead of a row of empty ones.
+  let steps: string[] = [];
   for (const m of messages) {
-    const text = m.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n');
+    const text = m.content
+      .flatMap((b) => (b.type === 'text' ? [b.text] : []))
+      .join('\n')
+      .trim();
     const tools = m.content.flatMap((b) =>
       b.type === 'tool_use' ? [defs.get(b.name)?.title ?? b.name] : [],
     );
-    if (text || tools.length)
-      items.push({ role: m.role, ...(text ? { text } : {}), ...(tools.length ? { tools } : {}) });
+    if (m.role === 'assistant') {
+      steps = [...steps, ...tools];
+      if (!text || text === '…') continue;
+      items.push({ role: m.role, text, ...(steps.length ? { tools: [...new Set(steps)] } : {}) });
+      steps = [];
+    } else if (text) {
+      if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
+      steps = [];
+      items.push({ role: m.role, text });
+    }
   }
+  if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
   const pending = conv.pending ? json<Pending>(conv.pending) : null;
   return { uuid: conv.uuid, title: conv.title, messages: items, proposals: pending?.proposals ?? [] };
 }

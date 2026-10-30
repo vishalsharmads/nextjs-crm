@@ -460,7 +460,8 @@ html.dark {
   }
 }
 /* The end of a reply that is still being written. */
-.ai-caret::after {
+.ai-caret::after,
+.ai-caret-md > :last-child::after {
   content: '';
   display: inline-block;
   width: 0.45em;
@@ -474,6 +475,39 @@ html.dark {
   50% {
     opacity: 0;
   }
+}
+/* A record the assistant mentions, and the follow-ups it offers. */
+.ai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.05rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--primary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color 150ms var(--ease-out),
+    border-color 150ms var(--ease-out);
+}
+a.ai-chip:hover,
+button.ai-chip:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--subtle);
+}
+.ai-chip-next {
+  padding: 0.25rem 0.75rem;
+  color: var(--ink);
+  text-align: start;
+}
+.ai-chip-next:disabled {
+  opacity: 0.6;
+}
+.rte-prose a.ai-chip {
+  text-decoration: none;
 }
 /* A new message or step appears after the person sends something. */
 .anim-rise {

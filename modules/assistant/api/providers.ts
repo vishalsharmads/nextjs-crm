@@ -5,6 +5,40 @@ function logRefusal(status: number, body: string) {
   logger.warn({ status, body: body.slice(0, 1000) }, 'AI provider refused the request');
 }
 
+/** What people see when the provider says no. Its own message can name it, so it stays in the log. */
+function refusal(status: number) {
+  if (status === 401 || status === 403)
+    return new AppError(
+      'UPSTREAM_FAILED',
+      'The AI provider rejected the API key. An admin can check the assistant settings.',
+    );
+  if (status === 429)
+    return new AppError(
+      'UPSTREAM_FAILED',
+      "The AI provider is busy or this model's limit is used up. Wait a minute and try again, or an admin can pick another model.",
+    );
+  return new AppError(
+    'UPSTREAM_FAILED',
+    `The AI provider returned ${status}. An admin can check the assistant settings.`,
+  );
+}
+
+/** Retries a request the provider turned away for being busy (429, 503), waiting as it asks, briefly. */
+const RETRY_WAITS_MS = [1_500, 4_000];
+const MAX_RETRY_WAIT_MS = 10_000;
+
+async function withRetry(send: () => Promise<Response>): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await send();
+    if ((res.status !== 429 && res.status !== 503) || attempt >= RETRY_WAITS_MS.length) return res;
+    const after = Number(res.headers.get('retry-after'));
+    const wait = Number.isFinite(after) && after > 0 ? after * 1000 : RETRY_WAITS_MS[attempt]!;
+    if (wait > MAX_RETRY_WAIT_MS) return res;
+    await res.body?.cancel().catch(() => undefined);
+    await new Promise((r) => setTimeout(r, wait));
+  }
+}
+
 /** Content in the conversation, in one shape for every provider. */
 export type Block =
   | { type: 'text'; text: string }
@@ -67,31 +101,26 @@ const MAX_RESPONSE = 2_000_000;
 async function post(url: string, headers: Record<string, string>, body: unknown): Promise<unknown> {
   // Checked on every call too, so a host that later resolves to an internal address is refused.
   await assertSafeUrl(url, 'baseUrl');
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify(body),
-      // Never follow redirects: the key and headers must reach only the configured address.
-      redirect: 'manual',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-  } catch {
-    throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
-  }
+  const res = await withRetry(async () => {
+    try {
+      return await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify(body),
+        // Never follow redirects: the key and headers must reach only the configured address.
+        redirect: 'manual',
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch {
+      throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
+    }
+  });
   const text = await res.text();
   if (text.length > MAX_RESPONSE)
     throw new AppError('UPSTREAM_FAILED', 'The AI provider sent a response that is too large.');
   if (!res.ok) {
     logRefusal(res.status, text);
-    // The provider's own message can name the provider: keep it out of what people see.
-    const status =
-      res.status === 401 || res.status === 403 ? 'rejected the API key' : `returned ${res.status}`;
-    throw new AppError(
-      'UPSTREAM_FAILED',
-      `The AI provider ${status}. An admin can check the assistant settings.`,
-    );
+    throw refusal(res.status);
   }
   try {
     return JSON.parse(text) as unknown;
@@ -290,26 +319,22 @@ async function* sseEvents(res: Response): AsyncGenerator<{ event: string | null;
 
 async function open(url: string, headers: Record<string, string>, body: unknown): Promise<Response> {
   await assertSafeUrl(url, 'baseUrl');
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'text/event-stream', ...headers },
-      body: JSON.stringify(body),
-      redirect: 'manual',
-      signal: AbortSignal.timeout(TIMEOUT_MS * 3),
-    });
-  } catch {
-    throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
-  }
+  const res = await withRetry(async () => {
+    try {
+      return await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'text/event-stream', ...headers },
+        body: JSON.stringify(body),
+        redirect: 'manual',
+        signal: AbortSignal.timeout(TIMEOUT_MS * 3),
+      });
+    } catch {
+      throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
+    }
+  });
   if (!res.ok || !res.body) {
     logRefusal(res.status, await res.text().catch(() => ''));
-    const status =
-      res.status === 401 || res.status === 403 ? 'rejected the API key' : `returned ${res.status}`;
-    throw new AppError(
-      'UPSTREAM_FAILED',
-      `The AI provider ${status}. An admin can check the assistant settings.`,
-    );
+    throw refusal(res.status);
   }
   return res;
 }

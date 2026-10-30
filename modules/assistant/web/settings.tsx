@@ -568,6 +568,12 @@ export function SettingsPanel() {
             </label>
           ))}
         </fieldset>
+        {entities.length && entities.every((e) => draft.excludedEntities.includes(e)) ? (
+          <p className="mt-2 text-sm font-medium text-ink" role="status">
+            Every record type is ticked, so the assistant cannot look anything up. Untick the ones it may
+            read.
+          </p>
+        ) : null}
         <p className="mt-3 text-xs text-muted">
           Only fields each person can see are sent, and sensitive values stay masked. Changes the assistant
           proposes run only after the person confirms them, and are recorded in the audit log.
