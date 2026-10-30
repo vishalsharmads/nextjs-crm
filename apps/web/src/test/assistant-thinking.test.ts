@@ -73,3 +73,10 @@ describe('assistant record chips and next options', () => {
     expect(splitNext('Next week looks quiet.')).toEqual({ body: 'Next week looks quiet.', next: [] });
   });
 });
+
+describe('assistant follow-ups written as a sentence', () => {
+  it('keeps a long Next line as part of the answer', () => {
+    const long = `Done.\n\n**Next:** ${'Would you like me to look at something else in more detail '.repeat(4)}?`;
+    expect(splitNext(long)).toEqual({ body: long, next: [] });
+  });
+});

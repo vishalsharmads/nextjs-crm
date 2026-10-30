@@ -54,7 +54,7 @@ export function ShellPanels() {
       })}
       {active ? (
         <Sheet open onOpenChange={(o) => !o && setOpen(null)} title={active.title} width="max-w-lg">
-          <div className="flex min-h-0 flex-1 flex-col p-4">
+          <div className="flex h-full min-h-0 flex-col p-4">
             <ModulePanel
               moduleKey={active.moduleKey}
               panelKey={active.key}

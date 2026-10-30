@@ -42,7 +42,9 @@ export function splitNext(text: string): { body: string; next: string[] } {
   const next = m[1]!
     .split('|')
     .map((s) => s.trim().replace(/^[-*"'\s]+|["'\s]+$/g, ''))
-    .filter((s) => s.length > 1 && s.length <= 120)
+    .filter((s) => s.length > 1 && s.length <= 160)
     .slice(0, 3);
+  // A follow-up written as one long sentence stays part of the answer.
+  if (!next.length) return { body: text, next: [] };
   return { body: text.slice(0, m.index).trimEnd(), next };
 }

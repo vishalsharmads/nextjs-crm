@@ -478,12 +478,13 @@ html.dark {
 }
 /* A record the assistant mentions, and the follow-ups it offers. */
 .ai-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.05rem 0.5rem;
+  display: inline;
+  padding: 0.05rem 0.375rem;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 0.375rem;
+  /* A chip that wraps keeps its border and padding on every line. */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
   background: var(--surface);
   color: var(--primary);
   font-size: 0.8125rem;
@@ -499,15 +500,33 @@ button.ai-chip:hover:not(:disabled) {
   background: var(--subtle);
 }
 .ai-chip-next {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  border-radius: 999px;
   padding: 0.25rem 0.75rem;
   color: var(--ink);
   text-align: start;
+}
+@media (pointer: coarse) {
+  .ai-chip-next {
+    min-height: 2.5rem;
+  }
 }
 .ai-chip-next:disabled {
   opacity: 0.6;
 }
 .rte-prose a.ai-chip {
   text-decoration: none;
+}
+/* Tables in assistant replies scroll sideways instead of squeezing dates and names. */
+.ai-reply table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.ai-reply :is(th, td) {
+  white-space: nowrap;
 }
 /* A new message or step appears after the person sends something. */
 .anim-rise {

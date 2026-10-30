@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ENTITY_ROUTE, recordTypePath } from '@app/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -194,11 +194,13 @@ function Chat({
             thinkingWords(message, labels),
           )
         : stream('/m/assistant/conversations', { text: message, context }, thinkingWords(message, labels)),
-    onSuccess: (c) => {
-      setText('');
-      done(c);
+    // The question leaves the box as soon as it is sent, and comes back if sending fails.
+    onMutate: () => setText(''),
+    onSuccess: (c) => done(c),
+    onError: (err, message) => {
+      setText((t) => t || message);
+      toast.error(errorText(err));
     },
-    onError: (err) => toast.error(errorText(err)),
   });
   const decide = useMutation({
     mutationFn: (decisions: Record<string, boolean>) =>
@@ -298,19 +300,23 @@ function Chat({
     </>
   );
   return (
-    <div className={cn('grid gap-4', !compact && 'md:grid-cols-[240px_1fr]')}>
-      <Pane padded={false} className={cn('h-fit', compact && 'hidden')}>
-        <div className="border-b border-line p-2">
-          <Button size="sm" className="w-full" onClick={() => setActive(null)}>
-            <MessageSquarePlus /> New conversation
-          </Button>
-        </div>
-        {history}
-      </Pane>
-      <Pane padded={false}>
-        <div className="flex min-h-[50vh] flex-col">
+    <div
+      className={cn(compact ? '-m-4 flex min-h-0 flex-1 flex-col' : 'grid gap-4 md:grid-cols-[240px_1fr]')}
+    >
+      {compact ? null : (
+        <Pane padded={false} className="h-fit">
+          <div className="border-b border-line p-2">
+            <Button size="sm" className="w-full" onClick={() => setActive(null)}>
+              <MessageSquarePlus /> New conversation
+            </Button>
+          </div>
+          {history}
+        </Pane>
+      )}
+      <ChatFrame compact={compact}>
+        <div className={cn('flex flex-col', compact ? 'min-h-0 flex-1' : 'min-h-[50vh]')}>
           {compact ? (
-            <div className="flex items-center gap-1 border-b border-line p-2">
+            <div className="flex items-center gap-1 border-b border-line px-3 py-2">
               <Button
                 size="sm"
                 variant={showHistory ? 'subtle' : 'ghost'}
@@ -333,10 +339,10 @@ function Chat({
             </div>
           ) : null}
           {compact && showHistory ? (
-            <div className="flex-1 overflow-y-auto">{history}</div>
+            <div className="min-h-0 flex-1 overflow-y-auto">{history}</div>
           ) : (
             <>
-              <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
                 {!active && !send.isPending ? (
                   <Welcome
                     suggestions={[
@@ -359,10 +365,10 @@ function Chat({
                     >
                       <div
                         className={cn(
-                          'max-w-[85%] rounded-lg px-3 py-2 text-sm',
+                          'min-w-0 rounded-lg px-3 py-2 text-sm',
                           m.role === 'user'
-                            ? 'bg-primary whitespace-pre-wrap text-primary-fg'
-                            : 'bg-subtle text-ink',
+                            ? 'max-w-[85%] bg-primary whitespace-pre-wrap text-primary-fg'
+                            : 'max-w-[92%] bg-subtle text-ink',
                         )}
                       >
                         {m.tools?.length ? (
@@ -379,7 +385,7 @@ function Chat({
                         ) : null}
                         {m.text && m.role === 'assistant' ? (
                           <div
-                            className="rte-prose"
+                            className="rte-prose ai-reply"
                             onClick={openChip}
                             dangerouslySetInnerHTML={{
                               __html: replyHtml(splitNext(m.text).body, recordPath),
@@ -392,12 +398,19 @@ function Chat({
                     </div>
                   ))
                 )}
+                {send.isPending && send.variables ? (
+                  <div className="anim-rise flex justify-end">
+                    <div className="max-w-[85%] rounded-lg bg-primary px-3 py-2 text-sm whitespace-pre-wrap text-primary-fg">
+                      {send.variables}
+                    </div>
+                  </div>
+                ) : null}
                 {live ? (
                   <div className="anim-rise flex justify-start" aria-busy="true">
-                    <div className="ai-surface max-w-[85%] rounded-lg px-3 py-2 text-sm text-ink">
+                    <div className="ai-surface max-w-[92%] min-w-0 rounded-lg px-3 py-2 text-sm text-ink">
                       {live.text ? (
                         <div
-                          className="rte-prose ai-caret-md"
+                          className="rte-prose ai-reply ai-caret-md"
                           dangerouslySetInnerHTML={{
                             __html: replyHtml(splitNext(live.text).body, recordPath),
                           }}
@@ -451,13 +464,18 @@ function Chat({
                 ) : null}
                 <div ref={bottom} />
               </div>
-              <form onSubmit={submit} className="flex gap-2 border-t border-line p-3">
-                {context ? <Badge tone="outline">About this record</Badge> : null}
+              <form onSubmit={submit} className="flex flex-wrap gap-2 border-t border-line p-3">
+                {context ? (
+                  <div className="basis-full">
+                    <Badge tone="outline">About this record</Badge>
+                  </div>
+                ) : null}
                 <Input
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Ask anything about your records"
                   aria-label="Message"
+                  className="min-w-0 flex-1"
                   disabled={proposals.length > 0}
                   maxLength={4000}
                 />
@@ -473,7 +491,7 @@ function Chat({
             </>
           )}
         </div>
-      </Pane>
+      </ChatFrame>
     </div>
   );
 }
@@ -606,6 +624,15 @@ const assistantModule: WebModule = {
   panels: { chat: ({ entity, uuid }) => <AssistantPanel entity={entity} uuid={uuid} /> },
 };
 export default assistantModule;
+
+/** A card on the assistant page; in the side panel the chat fills the panel instead. */
+function ChatFrame({ compact, children }: { compact: boolean; children: ReactNode }) {
+  return compact ? (
+    <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+  ) : (
+    <Pane padded={false}>{children}</Pane>
+  );
+}
 
 /** Short status lines, one at a time, while the reply is being worked out. */
 function RotatingWords({ words }: { words: string[] }) {

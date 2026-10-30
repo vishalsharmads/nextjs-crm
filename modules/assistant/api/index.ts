@@ -39,6 +39,7 @@ import {
   type ProviderConfig,
 } from './providers';
 import { findPreset, providerPresets, rankModels } from './catalog';
+import { linkRecords, recordsIn, type RecordRef } from './links';
 import { SETUP_PROMPT, SETUP_TOOLS } from './setup-tools';
 
 const CONFIG = 'm_assistant_config';
@@ -484,7 +485,15 @@ async function conversationDto(uuid: string, user: AuthUser) {
   // Steps the assistant took (tool calls, often with blank text) are gathered onto its next reply,
   // so one answer shows as one bubble instead of a row of empty ones.
   let steps: string[] = [];
+  // Records the tools returned, so the answers can link them as chips whatever the model wrote.
+  const asked = new Map<string, unknown>();
+  const refs: RecordRef[] = [];
   for (const m of messages) {
+    for (const b of m.content) {
+      if (b.type === 'tool_use') asked.set(b.id, b.input.entity);
+      if (b.type === 'tool_result' && !b.is_error)
+        refs.push(...recordsIn(b.content, asked.get(b.tool_use_id)));
+    }
     const text = m.content
       .flatMap((b) => (b.type === 'text' ? [b.text] : []))
       .join('\n')
@@ -495,7 +504,11 @@ async function conversationDto(uuid: string, user: AuthUser) {
     if (m.role === 'assistant') {
       steps = [...steps, ...tools];
       if (!text || text === '…') continue;
-      items.push({ role: m.role, text, ...(steps.length ? { tools: [...new Set(steps)] } : {}) });
+      items.push({
+        role: m.role,
+        text: linkRecords(text, refs),
+        ...(steps.length ? { tools: [...new Set(steps)] } : {}),
+      });
       steps = [];
     } else if (text) {
       if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
