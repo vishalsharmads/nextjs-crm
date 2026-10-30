@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { listBlueprintKeys, loadBlueprint, parseBlueprint } from '@app/blueprints';
+import { listBlueprintKeys, loadBlueprint, parseBlueprint, type Blueprint } from '@app/blueprints';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
@@ -14,6 +14,29 @@ function bp(key: string) {
   return loadBlueprint(key);
 }
 
+/** What a preset brings, so admins can compare presets before previewing one. */
+function contents(b: Blueprint) {
+  const moduleNames = new Map(loadModules().map(({ manifest: m }) => [m.key, m.name]));
+  return {
+    vocabulary: Object.fromEntries(
+      Object.entries(b.vocabulary ?? {}).map(([entity, v]) => [entity, v?.plural ?? v?.singular ?? entity]),
+    ),
+    modules: (b.modules ?? []).map((key) => ({ key, name: moduleNames.get(key) ?? key })),
+    pipelines: (b.pipelines ?? []).map((p) => ({
+      name: p.name,
+      entity: p.entity,
+      stages: p.stages.map((s) => s.name),
+    })),
+    customFields: Object.entries(b.custom_fields ?? {}).flatMap(([entity, fields]) =>
+      (fields ?? []).map((f) => ({ entity, label: f.label, type: f.type })),
+    ),
+    roles: (b.roles ?? []).map((r) => r.name),
+    templates: (b.templates ?? []).length,
+    dashboardWidgets: b.dashboard?.widgets.length ?? 0,
+    sampleData: Object.values(b.sample_data ?? {}).some((v) => Array.isArray(v) && v.length > 0),
+  };
+}
+
 export const blueprintsRoutes = defineRoutes('/blueprints', ['platform'])
   .add({
     method: 'get',
@@ -23,7 +46,14 @@ export const blueprintsRoutes = defineRoutes('/blueprints', ['platform'])
       const history = await db('blueprint_applications').orderBy('id', 'desc').limit(20);
       const available = listBlueprintKeys().map((key) => {
         const bp = loadBlueprint(key);
-        return { key, name: bp.name, version: bp.version, description: bp.description, status: bp.status };
+        return {
+          key,
+          name: bp.name,
+          version: bp.version,
+          description: bp.description,
+          status: bp.status,
+          contents: contents(bp),
+        };
       });
       return {
         current: history[0]

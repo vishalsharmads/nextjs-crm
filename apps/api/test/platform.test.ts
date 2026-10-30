@@ -40,6 +40,12 @@ describe('blueprints over HTTP', () => {
     expect(list.body.available.map((b: { key: string }) => b.key)).toEqual(
       expect.arrayContaining(['generic', 'coworking', 'visa-consultancy']),
     );
+    const coworking = list.body.available.find((b: { key: string }) => b.key === 'coworking');
+    expect(coworking.contents.vocabulary.contact).toBe('Members');
+    expect(coworking.contents.modules).toContainEqual({ key: 'bookings', name: expect.any(String) });
+    expect(coworking.contents.pipelines[0].stages[0]).toBe('Enquiry');
+    expect(coworking.contents.customFields.length).toBeGreaterThan(0);
+    expect(coworking.contents.sampleData).toBe(true);
     const exported = await client.get('/blueprints/export?key=client-preset&version=2.0.0').expect(200);
     expect(exported.body.key).toBe('client-preset');
     const preview = await client
