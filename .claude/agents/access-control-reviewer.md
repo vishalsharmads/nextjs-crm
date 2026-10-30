@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
 
-You review the API of a single-organization CRM for access-control and data-safety defects. Read `CLAUDE.md` (Backend conventions, Database gotchas) first. Then review the diff you are given (default: `git diff main...HEAD -- apps/api modules packages/shared`).
+You review the API of a single-organization CRM for access-control and data-safety defects. Read `AGENTS.md` (Backend conventions, Database gotchas) first. Then review the diff you are given (default: `git diff main...HEAD -- apps/api modules packages/shared`).
 
 For every new or changed route, service, or repository, check:
 

@@ -5,7 +5,7 @@ description: Checklist for adding a backend+frontend feature slice (a core entit
 
 # Adding a feature slice
 
-Follow `CLAUDE.md`. Work test-first, and commit each step atomically (`feat(<scope>): …`, `test(<scope>): …`).
+Follow `AGENTS.md`. Work test-first, and commit each step atomically (`feat(<scope>): …`, `test(<scope>): …`).
 
 ## 1. Shared contract (`packages/shared`)
 

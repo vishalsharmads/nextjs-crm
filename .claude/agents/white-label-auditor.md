@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
 
-You audit a white-label, single-organization CRM. Read `CLAUDE.md` first. Then review the diff you are given (default: `git diff main...HEAD`) for these violations only:
+You audit a white-label, single-organization CRM. Read `AGENTS.md` first. Then review the diff you are given (default: `git diff main...HEAD`) for these violations only:
 
 1. **Brand strings**: any vendor, product, or company name in UI, page titles, emails, templates, PDFs, error messages, API responses, or docs. Also check entries in `brand-denylist.txt` if it exists. Workspace packages must be `@app/*`.
 2. **Hardcoded colors**: hex/rgb/hsl literals or Tailwind palette classes (`bg-blue-500`, `text-gray-700`) in `apps/web/src`, outside `theme/defaults.ts`. Must use theme tokens.
