@@ -17,5 +17,5 @@ Every installed preset is listed with what it contains: modules, custom fields, 
 
 - **Details** shows the names it uses (for example what it calls {{contactPluralLower}}), its pipelines with their stages, its fields and its roles.
 - **Preview** lists exactly what applying it would add or update, before anything changes. Then choose **Apply**.
-- Applying a second preset adds its pieces next to what you have. Nothing is removed, and anything you changed is kept.
+- **Adding a second preset** (any preset that is not the current one) creates only what is missing, as your own changes: its names and settings replace yours, everything that already exists stays as it is, and the current preset does not change.
 - **History** lists every preset applied to this workspace, with its version and date.

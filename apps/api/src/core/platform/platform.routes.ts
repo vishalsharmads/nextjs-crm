@@ -37,6 +37,8 @@ function contents(b: Blueprint) {
   };
 }
 
+const modeQuery = z.object({ mode: z.enum(['primary', 'add']).default('primary') });
+
 export const blueprintsRoutes = defineRoutes('/blueprints', ['platform'])
   .add({
     method: 'get',
@@ -89,16 +91,20 @@ export const blueprintsRoutes = defineRoutes('/blueprints', ['platform'])
     path: '/:key/preview',
     permission: 'core.blueprints.manage',
     params: z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{1,63}$/) }),
+    query: modeQuery,
     summary: 'Dry run: what applying this blueprint would change',
-    handler: async ({ ctx, user, params }) =>
-      applyBlueprint(db, bp(params.key), { dryRun: true, appliedBy: user.id, ctx }),
+    handler: async ({ ctx, user, params, query }) =>
+      applyBlueprint(db, bp(params.key), { dryRun: true, appliedBy: user.id, ctx, mode: query.mode }),
   })
   .add({
     method: 'post',
     path: '/:key/apply',
     permission: 'core.blueprints.manage',
     params: z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{1,63}$/) }),
-    handler: async ({ ctx, user, params }) => applyBlueprint(db, bp(params.key), { appliedBy: user.id, ctx }),
+    query: modeQuery,
+    summary: 'Apply a blueprint; mode=add adds a second preset as if an admin made the changes',
+    handler: async ({ ctx, user, params, query }) =>
+      applyBlueprint(db, bp(params.key), { appliedBy: user.id, ctx, mode: query.mode }),
   })
   .add({
     method: 'get',

@@ -129,16 +129,24 @@ export function BlueprintPage() {
         history: { key: string; version: string; appliedAt: string }[];
       }>('/blueprints'),
   });
-  const [report, setReport] = useState<{ key: string; report: Report; uploaded?: unknown } | null>(null);
+  const [report, setReport] = useState<{
+    key: string;
+    report: Report;
+    uploaded?: unknown;
+    mode?: 'primary' | 'add';
+  } | null>(null);
   const [details, setDetails] = useState<Preset | null>(null);
   const [query, setQuery] = useState('');
   const file = useRef<HTMLInputElement>(null);
+  // A preset other than the current one is added next to it, as the workspace's own changes.
+  const modeFor = (key: string) =>
+    info.data?.current && info.data.current.key !== key ? ('add' as const) : ('primary' as const);
   const preview = useMutation({
-    mutationFn: (key: string) => apiPost<Report>(`/blueprints/${key}/preview`),
-    onSuccess: (r, key) => setReport({ key, report: r }),
+    mutationFn: (key: string) => apiPost<Report>(`/blueprints/${key}/preview?mode=${modeFor(key)}`),
+    onSuccess: (r, key) => setReport({ key, report: r, mode: modeFor(key) }),
   });
   const apply = useMutation({
-    mutationFn: (key: string) => apiPost<Report>(`/blueprints/${key}/apply`),
+    mutationFn: (key: string) => apiPost<Report>(`/blueprints/${key}/apply?mode=${modeFor(key)}`),
     onSuccess: (r) => {
       toast.success(`Applied: ${r.summary}`);
       setReport(null);
@@ -278,7 +286,13 @@ export function BlueprintPage() {
       {report ? (
         <Dialog open onOpenChange={(o) => !o && setReport(null)}>
           <DialogContent
-            title={report.uploaded ? `Check: ${report.key}` : `Preview: ${report.key}`}
+            title={
+              report.uploaded
+                ? `Check: ${report.key}`
+                : report.mode === 'add'
+                  ? `Add to this workspace: ${report.key}`
+                  : `Preview: ${report.key}`
+            }
             description={report.report.summary}
             footer={
               <>
@@ -289,7 +303,7 @@ export function BlueprintPage() {
                     loading={apply.isPending}
                     onClick={() => apply.mutate(report.key)}
                   >
-                    Apply
+                    {report.mode === 'add' ? 'Add' : 'Apply'}
                   </Button>
                 ) : null}
               </>
@@ -495,7 +509,7 @@ function ReportView({ report }: { report: Report }) {
       {section('Will be added', report.created)}
       {section('Will be updated', report.updated)}
       {section(
-        'Kept as you changed them',
+        'Kept as they are',
         report.conflicts.map((c) => c.item),
         'accent',
       )}

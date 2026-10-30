@@ -37,6 +37,13 @@ export interface ApplyOptions {
   appliedBy?: number | null;
   /** Who is applying (CLI by default); recorded in the audit log. */
   ctx?: RequestContext;
+  /**
+   * `add`: add a second preset (or an assistant-drafted setup) to this workspace as if an admin made
+   * the changes. Missing items are created as the workspace's own (no blueprint owns them, so
+   * upgrades never touch them); existing items are left as they are, except names and settings,
+   * which are updated. Nothing is recorded as the workspace's blueprint.
+   */
+  mode?: 'primary' | 'add';
 }
 
 export interface Conflict {
@@ -83,6 +90,7 @@ class Applier {
   constructor(
     private readonly trx: Trx,
     private readonly bp: Blueprint,
+    private readonly add = false,
   ) {
     this.report = {
       blueprint: bp.key,
@@ -123,6 +131,8 @@ class Applier {
     const existing =
       (await trx(spec.table).where({ source_blueprint: bp.key, source_key: spec.sourceKey }).first()) ??
       (await trx(spec.table).where(spec.natural).first());
+
+    if (this.add) return this.addOnly(spec, existing as Record<string, unknown> | undefined);
 
     if (!existing) {
       const values =
@@ -191,6 +201,50 @@ class Applier {
       .update({ ...spec.values, ...bpCols });
     this.report.updated.push(spec.sourceKey);
     return { id, action: 'updated' };
+  }
+
+  /** `add` mode: create as an admin would; only names and settings change existing rows. */
+  private async addOnly(spec: UpsertSpec, existing: Record<string, unknown> | undefined) {
+    const { trx } = this;
+    if (!existing) {
+      const needsUuid = [
+        'custom_field_definitions',
+        'pipelines',
+        'pipeline_stages',
+        'roles',
+        'templates',
+        'dashboards',
+        'custom_objects',
+      ].includes(spec.table);
+      const [id] = await trx(spec.table).insert({
+        ...spec.natural,
+        ...(needsUuid ? { uuid: newUuid() } : {}),
+        ...spec.values,
+        ...spec.insertOnly,
+        customized: true,
+      });
+      this.report.created.push(spec.sourceKey);
+      return { id: id!, action: 'created' as const };
+    }
+    const id = existing.id as number;
+    if (spec.table === 'labels' || spec.table === 'settings') {
+      const same = Object.entries(spec.values).every(([k, v]) => String(existing[k]) === String(v));
+      if (same) {
+        this.report.unchanged++;
+        return { id, action: 'unchanged' as const };
+      }
+      await trx(spec.table)
+        .where({ id })
+        .update({ ...spec.values, customized: true });
+      this.report.updated.push(spec.sourceKey);
+      return { id, action: 'updated' as const };
+    }
+    this.report.conflicts.push({
+      item: spec.sourceKey,
+      reason: 'unmanaged',
+      message: 'Already exists here; left as it is',
+    });
+    return { id, action: 'conflict' as const };
   }
 
   async settings() {
@@ -460,7 +514,8 @@ class Applier {
     await this.layouts();
     await this.dashboard();
     await this.templates();
-    await this.orphans();
+    // Adding never claims what is already here, so nothing can be "no longer in the blueprint".
+    if (!this.add) await this.orphans();
   }
 }
 
@@ -473,13 +528,14 @@ export async function applyBlueprint(
     throw new BlueprintError(`Blueprint "${bp.key}" is a stub and cannot be applied yet`);
   }
   const sum = checksum(bp);
+  const add = opts.mode === 'add';
   const last = await knex('blueprint_applications').orderBy('id', 'desc').first();
-  if (last && last.blueprint_key !== bp.key && !opts.force) {
+  if (!add && last && last.blueprint_key !== bp.key && !opts.force) {
     throw new BlueprintError(
       `This instance uses blueprint "${last.blueprint_key}". One primary blueprint per instance.`,
     );
   }
-  if (last && last.blueprint_key === bp.key) {
+  if (!add && last && last.blueprint_key === bp.key) {
     const cmp = compareVersions(bp.version, last.version);
     if (cmp < 0 && !opts.force)
       throw new BlueprintError(`Refusing to downgrade from ${last.version} to ${bp.version}`);
@@ -495,12 +551,12 @@ export async function applyBlueprint(
   const DRY = Symbol('dry-run');
   try {
     report = await knex.transaction(async (trx) => {
-      const applier = new Applier(trx, bp);
+      const applier = new Applier(trx, bp, add);
       await applier.run();
       if (!opts.dryRun) {
         const r = applier.report;
         await audit(trx, opts.ctx ?? systemContext('cli'), {
-          action: 'blueprint.applied',
+          action: add ? 'blueprint.added' : 'blueprint.applied',
           entity: 'blueprint',
           diff: {
             key: bp.key,
@@ -545,7 +601,7 @@ export async function applyBlueprint(
 
   const nothingChanged = !report.created.length && !report.updated.length && !report.ddl.length;
   if (nothingChanged && last?.checksum === sum) report.status = 'unchanged';
-  if (!(nothingChanged && last?.checksum === sum)) {
+  if (!add && !(nothingChanged && last?.checksum === sum)) {
     await knex('blueprint_applications').insert({
       blueprint_key: bp.key,
       version: bp.version,

@@ -106,3 +106,34 @@ describe('openapi', () => {
     );
   });
 });
+
+describe('adding a second preset', () => {
+  it('previews over HTTP, then adds as the workspace own changes without changing the current preset', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    // Another preset cannot become primary, but it can be previewed as an addition.
+    const preview = await client.post('/blueprints/coworking/preview?mode=add').expect(200);
+    expect(preview.body.status).toBe('dry_run');
+    expect(preview.body.created.length).toBeGreaterThan(0);
+
+    const { applyBlueprint } = await import('../src/blueprints/applier');
+    const { parseBlueprint } = await import('@app/blueprints');
+    const bp = parseBlueprint({
+      key: 'addon-test',
+      name: 'Add-on',
+      version: '1.0.0',
+      description: 'test',
+      custom_fields: { contact: [{ key: 'addon_badge', label: 'Badge', type: 'text' }] },
+    });
+    const first = await applyBlueprint(db, bp, { mode: 'add' });
+    expect(first.created).toContain('field.contact.addon_badge');
+    const row = await db('custom_field_definitions').where({ key: 'addon_badge' }).first();
+    expect(row.source_blueprint).toBeNull();
+    expect(row.customized).toBeTruthy();
+    // Running it again leaves what exists alone.
+    const again = await applyBlueprint(db, bp, { mode: 'add' });
+    expect(again.created).toEqual([]);
+    expect(again.conflicts.map((c) => c.item)).toContain('field.contact.addon_badge');
+    const list = await client.get('/blueprints').expect(200);
+    expect(list.body.current.key).toBe('generic');
+  });
+});
