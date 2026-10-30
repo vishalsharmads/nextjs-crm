@@ -28,7 +28,18 @@ import {
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Request, Response } from 'express';
 import * as m0001 from './migrations/0001_assistant';
-import { chat, chatStream, PROVIDERS, type Block, type ChatMessage, type ProviderConfig } from './providers';
+import * as m0002 from './migrations/0002_presets';
+import {
+  chat,
+  chatStream,
+  listModels,
+  PROVIDERS,
+  type Block,
+  type ChatMessage,
+  type ProviderConfig,
+} from './providers';
+import { findPreset, providerPresets, rankModels } from './catalog';
+import { SETUP_PROMPT, SETUP_TOOLS } from './setup-tools';
 
 const CONFIG = 'm_assistant_config';
 const CONVERSATIONS = 'm_assistant_conversations';
@@ -54,6 +65,8 @@ interface ConfigRow {
   retention_days: number;
   excluded_entities: string[] | string;
   hipaa_acknowledged: number | boolean;
+  preset: string | null;
+  setup_enabled: number | boolean;
 }
 
 const json = <T>(v: T | string): T => (typeof v === 'string' ? (JSON.parse(v) as T) : v);
@@ -91,6 +104,8 @@ const configDto = (row: ConfigRow) => ({
   retentionDays: row.retention_days,
   excludedEntities: json<string[]>(row.excluded_entities),
   hipaaAcknowledged: !!row.hipaa_acknowledged,
+  preset: row.preset,
+  setupEnabled: !!row.setup_enabled,
 });
 
 /** Set by the app for every request; an admin's extra headers may not replace them. */
@@ -123,6 +138,13 @@ const configSchema = z.object({
     .max(50)
     .optional(),
   hipaaAcknowledged: z.boolean().optional(),
+  /** A provider from the list: fills in the API format, address and headers. Null: set them by hand. */
+  preset: z
+    .string()
+    .regex(/^[a-z][a-z0-9-]{1,39}$/)
+    .nullish(),
+  /** Let the assistant set up the workspace for admins (off by default; admins only). */
+  setupEnabled: z.boolean().optional(),
 });
 
 // ---------------- Usage caps ----------------
@@ -189,10 +211,15 @@ async function append(conversationId: number, role: ChatMessage['role'], content
   await db(CONVERSATIONS).where({ id: conversationId }).update({ updated_at: new Date() });
 }
 
-/** Every tool; excluded record types are refused per call in `runTool`. */
-function toolsAllowed(_cfg: ConfigRow): ToolDef[] {
-  return toolDefs();
+/**
+ * Every tool; excluded record types are refused per call in `runTool`. Setup tools are added only
+ * for admins, once an admin has turned setup on.
+ */
+function toolsAllowed(cfg: ConfigRow, user: AuthUser): ToolDef[] {
+  return setupAllowed(cfg, user) ? [...toolDefs(), ...SETUP_TOOLS] : toolDefs();
 }
+
+const setupAllowed = (cfg: ConfigRow, user: AuthUser) => !!cfg.setup_enabled && user.isAdmin;
 
 const LINK_FIELDS: Record<string, string> = {
   contactUuid: 'contact',
@@ -214,6 +241,12 @@ function touches(name: string, input: Record<string, unknown>): string[] {
     case 'describe_schema':
     case 'search_records':
       return []; // Results are filtered by type afterwards.
+    case 'setup_overview':
+    case 'preview_setup':
+    case 'apply_setup':
+    case 'preview_preset':
+    case 'add_preset':
+      return []; // Workspace configuration, never records.
     case 'list_records':
     case 'get_record':
       add(input.entity);
@@ -267,7 +300,7 @@ async function runTool(
       block.name,
       block.input,
       { ctx: { ...ctx, user: asUser }, user: asUser },
-      toolsAllowed(cfg),
+      toolsAllowed(cfg, user),
     );
     // Excluded record types are filtered out of what the model sees.
     if (block.name === 'describe_schema' && excluded.length) {
@@ -306,6 +339,7 @@ async function systemPrompt(cfg: ConfigRow, user: AuthUser) {
     "Tools run with this person's permissions. When a tool returns an error, explain it plainly or try another way.",
     'To change data, call the write tool directly: the person sees each change and confirms it before it runs. Do not ask for permission in text first.',
     'Answer briefly, in plain language. Refer to records by name, not id.',
+    ...(setupAllowed(cfg, user) ? [SETUP_PROMPT] : []),
   ].join('\n');
 }
 
@@ -376,7 +410,7 @@ function advance(conv: { id: number }, cfg: ConfigRow, ctx: RequestContext, user
 async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestContext, user: AuthUser) {
   const provider = await providerConfig(cfg);
   if (!provider) throw new AppError('NOT_FOUND', 'The assistant is not set up yet. An admin can set it up.');
-  const tools = toolsAllowed(cfg).map((t) => ({
+  const tools = toolsAllowed(cfg, user).map((t) => ({
     name: t.name,
     description: t.description,
     schema: inputJsonSchema(t) as Record<string, unknown>,
@@ -398,7 +432,7 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
     await append(conv.id, 'assistant', content);
     const uses = content.filter((b): b is Extract<Block, { type: 'tool_use' }> => b.type === 'tool_use');
     if (!uses.length) return;
-    const defs = new Map(toolDefs().map((t) => [t.name, t]));
+    const defs = new Map(toolsAllowed(cfg, user).map((t) => [t.name, t]));
     const results: Block[] = [];
     const proposals: Pending['proposals'] = [];
     for (const use of uses) {
@@ -434,7 +468,7 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
 async function conversationDto(uuid: string, user: AuthUser) {
   const conv = await conversationFor(uuid, user);
   const messages = await history(conv.id);
-  const defs = new Map(toolDefs().map((t) => [t.name, t]));
+  const defs = new Map([...toolDefs(), ...SETUP_TOOLS].map((t) => [t.name, t]));
   const items: { role: 'user' | 'assistant'; text?: string; tools?: string[] }[] = [];
   for (const m of messages) {
     const text = m.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n');
@@ -477,8 +511,16 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     path: '/config',
     permission: 'assistant.settings.manage',
     body: configSchema,
-    handler: async ({ ctx, body }) => {
+    handler: async ({ ctx, user, body: input }) => {
       const cfg = await loadConfig();
+      if (input.setupEnabled !== undefined && !user.isAdmin)
+        throw new AppError('FORBIDDEN', 'Only admins can let the assistant set up the workspace');
+      // A listed provider brings its own format, address and headers.
+      const preset = input.preset ? findPreset(input.preset) : undefined;
+      if (input.preset && !preset) throw new AppError('VALIDATION_FAILED', 'Choose a provider from the list');
+      const body = preset
+        ? { ...input, provider: preset.format, baseUrl: preset.baseUrl, headers: preset.headers }
+        : input;
       if (body.baseUrl) await assertSafeUrl(body.baseUrl, 'baseUrl');
       const reserved = Object.keys(body.headers ?? {}).filter((h) => RESERVED_HEADERS.has(h.toLowerCase()));
       if (reserved.length)
@@ -504,6 +546,8 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       if (body.excludedEntities !== undefined)
         patch.excluded_entities = JSON.stringify(body.excludedEntities);
       if (body.hipaaAcknowledged !== undefined) patch.hipaa_acknowledged = body.hipaaAcknowledged;
+      if (input.preset !== undefined) patch.preset = input.preset ?? null;
+      if (body.setupEnabled !== undefined) patch.setup_enabled = body.setupEnabled;
       await db.transaction(async (trx) => {
         await trx(CONFIG).where({ id: cfg.id }).update(patch);
         // Secrets are never written to the audit log, only that they changed.
@@ -519,6 +563,86 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
         });
       });
       return configDto(await loadConfig());
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/providers',
+    permission: 'assistant.settings.manage',
+    summary: 'AI providers an admin can pick, with where to get a key and the recommended models',
+    handler: async () => ({
+      data: providerPresets().map((p) => ({
+        id: p.id,
+        name: p.name,
+        format: p.format,
+        baseUrl: p.baseUrl,
+        keyUrl: p.keyUrl ?? null,
+        keyPrefix: p.keyPrefix ?? null,
+        tier: p.tier,
+        note: p.note,
+        recommended: p.recommended,
+      })),
+    }),
+  })
+  .add({
+    method: 'post',
+    path: '/models',
+    permission: 'assistant.settings.manage',
+    body: z.object({
+      preset: z
+        .string()
+        .regex(/^[a-z][a-z0-9-]{1,39}$/)
+        .nullish(),
+      provider: z.enum(PROVIDERS).nullish(),
+      baseUrl: z
+        .url({ protocol: /^https?$/ })
+        .max(500)
+        .nullish(),
+      /** Omitted: the saved key, but only for the saved address. */
+      apiKey: z.string().min(1).max(500).nullish(),
+    }),
+    summary: "The provider's models, recommended ones first",
+    handler: async ({ body }) => {
+      const cfg = await loadConfig();
+      const preset = findPreset(body.preset);
+      const provider = preset?.format ?? body.provider ?? (cfg.provider as ProviderConfig['provider'] | null);
+      const baseUrl = preset?.baseUrl ?? body.baseUrl ?? cfg.base_url;
+      if (!provider || !baseUrl) throw new AppError('VALIDATION_FAILED', 'Choose a provider first');
+      // The saved key only ever goes to the address it was saved for.
+      const apiKey =
+        body.apiKey ??
+        (cfg.api_key_enc && baseUrl === cfg.base_url ? decrypt(cfg.api_key_enc, KEY_AAD) : null);
+      if (!apiKey) throw new AppError('VALIDATION_FAILED', 'Enter the API key first');
+      const headers =
+        preset?.headers ?? (baseUrl === cfg.base_url ? json<Record<string, string>>(cfg.headers) : {});
+      const ids = await listModels({ provider, baseUrl, apiKey, headers });
+      return { data: rankModels(ids, preset?.recommended ?? []) };
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/test',
+    permission: 'assistant.settings.manage',
+    summary: 'Send one short message with the saved settings to check they work',
+    handler: async ({ ctx }) => {
+      const cfg = await loadConfig();
+      const provider = await providerConfig(cfg);
+      if (!provider) throw new AppError('VALIDATION_FAILED', 'Save a provider, model and API key first');
+      const started = Date.now();
+      const reply = await chat(provider, {
+        system: 'Reply with the single word: ready',
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'Are you there?' }] }],
+        tools: [],
+      });
+      await audit(db, ctx, { action: 'assistant.config.tested', entity: 'assistant.config', diff: {} });
+      return {
+        ok: true,
+        ms: Date.now() - started,
+        reply: reply.content
+          .flatMap((b) => (b.type === 'text' ? [b.text] : []))
+          .join(' ')
+          .slice(0, 200),
+      };
     },
   })
   .add({
@@ -753,7 +877,7 @@ async function mentioning(
 
 export const assistant: ApiModule = {
   routes: () => [routes],
-  migrations: { '0001_assistant': m0001 },
+  migrations: { '0001_assistant': m0001, '0002_presets': m0002 },
   privacy,
   // Conversations are kept for the configured number of days (30 by default).
   start: () =>

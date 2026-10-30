@@ -95,6 +95,19 @@ describe('assistant module', () => {
       let raw = '';
       req.on('data', (c) => (raw += c));
       req.on('end', () => {
+        if (req.method === 'GET' && (req.url ?? '').includes('/models')) {
+          res.setHeader('content-type', 'application/json');
+          const auth = req.headers['x-api-key'] ?? req.headers.authorization;
+          if (!auth) {
+            res.statusCode = 401;
+            res.end('{}');
+            return;
+          }
+          res.end(
+            JSON.stringify({ data: [{ id: 'zeta-chat' }, { id: 'text-embedding-3' }, { id: 'test-model' }] }),
+          );
+          return;
+        }
         seen.push({ url: req.url ?? '', headers: req.headers, body: JSON.parse(raw || '{}') });
         const next = (replies.shift() ?? text('Done.')) as Record<string, unknown>;
         const body = JSON.parse(raw || '{}') as { stream?: boolean };
@@ -350,5 +363,82 @@ describe('assistant module', () => {
     await admin
       .patch('/m/assistant/config', { provider: 'messages', baseUrl: base, apiKey: 'secret-key-123' })
       .expect(200);
+  });
+
+  it('lists providers and fills in format, address and headers from the one picked', async () => {
+    const list = await admin.get('/m/assistant/providers').expect(200);
+    const ids = list.body.data.map((p: { id: string }) => p.id);
+    expect(ids).toEqual(expect.arrayContaining(['openai', 'gemini', 'mistral', 'groq']));
+    const picked = await admin.patch('/m/assistant/config', { preset: 'openai' }).expect(200);
+    expect(picked.body).toMatchObject({ preset: 'openai', provider: 'chat_completions', hasApiKey: false });
+    expect(picked.body.baseUrl).toMatch(/^https:/);
+    await admin.patch('/m/assistant/config', { preset: 'not-listed' }).expect(422);
+    await admin
+      .patch('/m/assistant/config', {
+        preset: null,
+        provider: 'messages',
+        baseUrl: base,
+        apiKey: 'secret-key-123',
+      })
+      .expect(200);
+  });
+
+  it('fetches chat models (saved key, saved address only) and tests the connection', async () => {
+    const models = await admin.post('/m/assistant/models', {}).expect(200);
+    expect(models.body.data.map((m: { id: string }) => m.id)).toEqual(['test-model', 'zeta-chat']);
+    // The saved key is never sent to another address.
+    await admin.post('/m/assistant/models', { provider: 'messages', baseUrl: `${base}/other` }).expect(422);
+    replies = [text('ready')];
+    const tested = await admin.post('/m/assistant/test').expect(200);
+    expect(tested.body).toMatchObject({ ok: true, reply: 'ready' });
+  });
+
+  it('ranks recommended models first', async () => {
+    const { rankModels } = await import('../../../modules/assistant/api/catalog');
+    expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([
+      { id: 'b-mini', recommended: true, best: true },
+      { id: 'a-large', recommended: true, best: false },
+      { id: 'b-mini-2', recommended: false, best: false },
+      { id: 'c', recommended: false, best: false },
+    ]);
+  });
+
+  it('sets up the workspace only for admins, once an admin turns it on', async () => {
+    const role = await createRole(['assistant.chat.use', 'assistant.settings.manage']);
+    const manager = await loginAs(await createUser({ roleKeys: [role] }));
+    await manager.patch('/m/assistant/config', { setupEnabled: true }).expect(403);
+
+    seen.length = 0;
+    replies = [text('Hi.')];
+    await admin.post('/m/assistant/conversations', { text: 'Hello' }).expect(201);
+    const toolNames = () => (seen[0]!.body.tools as { name: string }[]).map((t) => t.name);
+    expect(toolNames()).not.toContain('apply_setup');
+
+    await admin.patch('/m/assistant/config', { setupEnabled: true }).expect(200);
+    const key = `setup_${Date.now().toString(36)}`;
+    const setup = { custom_fields: { contact: [{ key, label: 'Setup test', type: 'text' }] } };
+    seen.length = 0;
+    replies = [use('preview_setup', { setup }), use('apply_setup', { setup }, 'tu_setup')];
+    const res = await admin.post('/m/assistant/conversations', { text: 'Set up for a clinic' }).expect(201);
+    expect(toolNames()).toContain('apply_setup');
+    // The preview ran on its own and changed nothing; the apply waits for the admin.
+    expect(JSON.stringify(seen[1]!.body.messages)).toContain(`field.contact.${key}`);
+    expect(res.body.proposals).toEqual([expect.objectContaining({ name: 'apply_setup' })]);
+    expect(await db('custom_field_definitions').where({ key }).first()).toBeUndefined();
+
+    replies = [text('Done.')];
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    const field = await db('custom_field_definitions').where({ key }).first();
+    expect(field).toMatchObject({ source_blueprint: null });
+    expect(field.customized).toBeTruthy();
+
+    // Non-admins never get the setup tools, even with setup on.
+    seen.length = 0;
+    replies = [text('Hi.')];
+    await manager.post('/m/assistant/conversations', { text: 'Hello' }).expect(201);
+    expect(toolNames()).not.toContain('apply_setup');
+    await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
   });
 });

@@ -1,7 +1,7 @@
 {
   "key": "assistant",
   "name": "Assistant",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "status": "available",
   "description": "An in-app assistant that answers questions about your records, summarises history, drafts notes and emails, and proposes changes you confirm. Uses the AI provider and model an admin configures; it is off until then.",
   "depends_on": [],

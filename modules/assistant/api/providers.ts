@@ -84,6 +84,48 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
   }
 }
 
+/** Models the provider offers, read from its model list. Same address checks as chat calls. */
+export async function listModels(cfg: Omit<ProviderConfig, 'model'>): Promise<string[]> {
+  const url =
+    cfg.provider === 'messages' ? join(cfg.baseUrl, '/v1/models?limit=1000') : join(cfg.baseUrl, '/models');
+  await assertSafeUrl(url, 'baseUrl');
+  const auth: Record<string, string> =
+    cfg.provider === 'messages' ? { 'x-api-key': cfg.apiKey } : { authorization: `Bearer ${cfg.apiKey}` };
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { ...cfg.headers, ...auth },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Check the address.');
+  }
+  const text = await res.text();
+  if (!res.ok || text.length > MAX_RESPONSE)
+    throw new AppError(
+      'UPSTREAM_FAILED',
+      res.status === 401 || res.status === 403
+        ? 'The AI provider rejected the API key.'
+        : 'The AI provider did not return a model list.',
+    );
+  let ids: string[] = [];
+  try {
+    const out = JSON.parse(text) as {
+      data?: { id?: unknown }[];
+      models?: { id?: unknown; name?: unknown }[];
+    };
+    ids = (out.data ?? out.models ?? []).map((m) => (typeof m.id === 'string' ? m.id : '')).filter(Boolean);
+  } catch {
+    throw new AppError('UPSTREAM_FAILED', 'The AI provider sent a model list that could not be read.');
+  }
+  // Some providers prefix ids ("models/…"); chat models only, never embeddings, speech or images.
+  const NOT_CHAT = /embed|tts|whisper|dall-e|image|audio|moderation|realtime|transcri|rerank|guard|search/i;
+  return [...new Set(ids.map((id) => id.replace(/^models\//, '')).filter((id) => !NOT_CHAT.test(id)))]
+    .sort()
+    .slice(0, 500);
+}
+
 const join = (base: string, path: string) => `${base.replace(/\/+$/, '')}${path}`;
 
 async function messagesApi(cfg: ProviderConfig, req: ChatRequest): Promise<ChatResult> {

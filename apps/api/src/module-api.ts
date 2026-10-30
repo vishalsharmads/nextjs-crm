@@ -64,5 +64,12 @@ export {
   type ToolContext,
 } from './core/tools/registry';
 export { encrypt, decrypt } from './lib/crypto';
+export {
+  addPreset,
+  applySetupDraft,
+  setupDraftSchema,
+  setupOverview,
+  type SetupDraft,
+} from './blueprints/workspace-setup';
 export { effectiveCompliance } from './core/settings/settings.service';
 export { assertSafeUrl } from './core/webhooks/webhooks';
