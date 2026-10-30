@@ -295,3 +295,39 @@ describe('leads, activities, search, files', () => {
     expect(exe.status).toBe(415);
   });
 });
+
+describe('disabling a pipeline', () => {
+  it('moves its records to a stage in another pipeline, then hides it', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const from = await client.post('/pipelines', { name: 'Retiring' }).expect(201);
+    const to = await client.post('/pipelines', { name: 'Keeper' }).expect(201);
+    const deal = await client
+      .post('/deals', { title: 'Moves along', pipelineUuid: from.body.uuid })
+      .expect(201);
+    await client.patch(`/pipelines/${from.body.uuid}`, { active: false }).expect(409);
+    // The target must be in another active pipeline.
+    await client
+      .patch(`/pipelines/${from.body.uuid}`, { active: false, moveTo: from.body.stages[1].uuid })
+      .expect(422);
+    const won = to.body.stages.find((s: { isWon: boolean }) => s.isWon);
+    await client.patch(`/pipelines/${from.body.uuid}`, { active: false, moveTo: won.uuid }).expect(200);
+    const moved = await client.get(`/deals/${deal.body.uuid}`).expect(200);
+    expect(moved.body.pipeline.uuid).toBe(to.body.uuid);
+    expect(moved.body.stage.uuid).toBe(won.uuid);
+    expect(moved.body.status).toBe('won');
+    const active = (await client.get('/pipelines').expect(200)).body.data as { uuid: string }[];
+    expect(active.some((p) => p.uuid === from.body.uuid)).toBe(false);
+    const all = (await client.get('/pipelines?all=true').expect(200)).body.data as {
+      uuid: string;
+      active: boolean;
+    }[];
+    expect(all.find((p) => p.uuid === from.body.uuid)?.active).toBe(false);
+    // Turning it back on brings it back, empty.
+    await client.patch(`/pipelines/${from.body.uuid}`, { active: true }).expect(200);
+    const sales = await clientWithRoles(['sales']);
+    const seen = (await sales.client.get('/pipelines?all=true').expect(200)).body.data as {
+      active: boolean;
+    }[];
+    expect(seen.every((p) => p.active)).toBe(true);
+  });
+});

@@ -26,6 +26,8 @@ export interface PipelineDto {
   name: string;
   entity: 'deal' | 'lead' | 'ticket';
   isDefault: boolean;
+  /** False once disabled: hidden from boards, pickers and new records; history keeps it. */
+  active: boolean;
   sortOrder: number;
   stages: StageDto[];
   sourceBlueprint: string | null;
