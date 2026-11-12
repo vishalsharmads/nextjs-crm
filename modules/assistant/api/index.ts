@@ -29,6 +29,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Request, Response } from 'express';
 import * as m0001 from './migrations/0001_assistant';
 import * as m0002 from './migrations/0002_presets';
+import * as m0003 from './migrations/0003_vision';
 import {
   assertSafeModelUrl,
   chat,
@@ -36,11 +37,13 @@ import {
   chatStream,
   listModels,
   WIRE_FORMATS,
+  IMAGE_TYPES,
   type Block,
+  type ImageType,
   type ChatMessage,
   type ProviderConfig,
 } from './providers';
-import { compatibleServers, findPreset, providerPresets, rankModels } from './catalog';
+import { compatibleServers, findPreset, providerPresets, rankModels, readsImages } from './catalog';
 import { linkRecords, recordsIn, type RecordRef } from './links';
 import { CONFIG_PROMPT, CONFIG_TOOLS, describeChange, precheckConfigChange } from './config-tools';
 import { SETUP_PROMPT, SETUP_TOOLS } from './setup-tools';
@@ -71,7 +74,15 @@ interface ConfigRow {
   hipaa_acknowledged: number | boolean;
   preset: string | null;
   setup_enabled: number | boolean;
+  vision: number | boolean | null;
 }
+
+/** Whether the model reads images: the admin's choice, else the provider list (simulated: yes). */
+function visionAuto(row: ConfigRow) {
+  if (row.provider === 'simulated') return true;
+  return readsImages(findPreset(row.preset), row.model);
+}
+const readsImagesNow = (row: ConfigRow) => (row.vision === null ? visionAuto(row) : !!row.vision);
 
 const json = <T>(v: T | string): T => (typeof v === 'string' ? (JSON.parse(v) as T) : v);
 
@@ -147,6 +158,9 @@ const configDto = (row: ConfigRow) => ({
   hipaaAcknowledged: !!row.hipaa_acknowledged,
   preset: row.preset,
   setupEnabled: !!row.setup_enabled,
+  /** Null: decided from the provider list (`visionDetected`). */
+  vision: row.vision === null ? null : !!row.vision,
+  visionDetected: visionAuto(row),
 });
 
 /** Set by the app for every request; an admin's extra headers may not replace them. */
@@ -186,6 +200,8 @@ const configSchema = z.object({
     .nullish(),
   /** Let the assistant set up the workspace for admins (off by default; admins only). */
   setupEnabled: z.boolean().optional(),
+  /** Whether the model reads images; null lets the provider list decide. */
+  vision: z.boolean().nullable().optional(),
 });
 
 // ---------------- Usage caps ----------------
@@ -491,7 +507,7 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
   const system = await systemPrompt(cfg, user);
   for (let step = 0; step < MAX_STEPS; step++) {
     await assertWithinCaps(cfg, user.id);
-    const messages = await history(conv.id);
+    const messages = latestImagesOnly(await history(conv.id));
     const sink = streamSink.getStore();
     if (sink?.closed()) return;
     const reply = sink
@@ -576,7 +592,8 @@ async function conversationDto(uuid: string, user: AuthUser) {
   const conv = await conversationFor(uuid, user);
   const messages = await history(conv.id);
   const defs = new Map([...toolDefs(), ...SETUP_TOOLS, ...CONFIG_TOOLS].map((t) => [t.name, t]));
-  const items: { role: 'user' | 'assistant'; text?: string; tools?: string[] }[] = [];
+  const items: { role: 'user' | 'assistant'; text?: string; tools?: string[]; images?: string[] }[] = [];
+  let imageNo = 0;
   // Steps the assistant took (tool calls, often with blank text) are gathered onto its next reply,
   // so one answer shows as one bubble instead of a row of empty ones.
   let steps: string[] = [];
@@ -608,12 +625,87 @@ async function conversationDto(uuid: string, user: AuthUser) {
     } else if (text) {
       if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
       steps = [];
-      items.push({ role: m.role, text });
+      // The note about the page on screen is for the model; people see their question as asked.
+      const images = m.content
+        .filter((b) => b.type === 'image')
+        .map(() => `/m/assistant/conversations/${conv.uuid}/images/${imageNo++}`);
+      items.push({ role: m.role, text: text.replace(PAGE_NOTE, ''), ...(images.length ? { images } : {}) });
     }
   }
   if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
   const pending = conv.pending ? json<Pending>(conv.pending) : null;
   return { uuid: conv.uuid, title: conv.title, messages: items, proposals: pending?.proposals ?? [] };
+}
+
+// ---------------- Images ----------------
+
+/** Up to three images per question, shrunk in the browser first (the request limit is 1 MB). */
+const MAX_IMAGES = 3;
+const MAX_IMAGE_BASE64 = 700_000;
+const imagesSchema = z
+  .array(
+    z.object({
+      mediaType: z.enum(IMAGE_TYPES),
+      data: z
+        .string()
+        .max(MAX_IMAGE_BASE64)
+        .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Base64 image data'),
+    }),
+  )
+  .max(MAX_IMAGES)
+  .optional();
+
+/** The file's first bytes must match the type it claims, so nothing else passes as an image. */
+function looksLike(mediaType: ImageType, data: string) {
+  const head = Buffer.from(data.slice(0, 24), 'base64');
+  const hex = head.toString('hex');
+  if (mediaType === 'image/png') return hex.startsWith('89504e470d0a1a0a');
+  if (mediaType === 'image/jpeg') return hex.startsWith('ffd8ff');
+  if (mediaType === 'image/gif') return head.toString('latin1', 0, 4) === 'GIF8';
+  return head.toString('latin1', 0, 4) === 'RIFF' && head.toString('latin1', 8, 12) === 'WEBP';
+}
+
+/** The person's question as stored: their images first, then the text with the page note. */
+function question(
+  body: {
+    text: string;
+    context?: { entity: string; uuid?: string };
+    images?: { mediaType: ImageType; data: string }[];
+  },
+  cfg: ConfigRow,
+): Block[] {
+  const images = body.images ?? [];
+  if (images.length && !readsImagesNow(cfg))
+    throw new AppError('VALIDATION_FAILED', 'This assistant reads text only, so images cannot be attached.');
+  if (images.some((i) => !looksLike(i.mediaType, i.data)))
+    throw new AppError('VALIDATION_FAILED', 'One of the attachments is not a PNG, JPEG, WebP or GIF image.');
+  return [
+    ...images.map((i) => ({ type: 'image' as const, mediaType: i.mediaType, data: i.data })),
+    { type: 'text', text: withContext(body.text, body.context) },
+  ];
+}
+
+/**
+ * Images reach the model with the question they came with only; earlier ones are replaced by a
+ * short note, so they are not paid for again on every later turn.
+ */
+function latestImagesOnly(messages: ChatMessage[]): ChatMessage[] {
+  let last = -1;
+  messages.forEach((m, i) => {
+    if (m.role === 'user' && m.content.some((b) => b.type === 'text')) last = i;
+  });
+  return messages.map((m, i) =>
+    i === last || !m.content.some((b) => b.type === 'image')
+      ? m
+      : {
+          ...m,
+          content: m.content.map((b) =>
+            b.type === 'image'
+              ? { type: 'text' as const, text: '(An image the person attached earlier.)' }
+              : b,
+          ),
+        },
+  );
 }
 
 // ---------------- Routes ----------------
@@ -627,7 +719,8 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     permission: 'assistant.chat.use',
     handler: async ({ user }) => {
       const cfg = await loadConfig();
-      return { name: cfg.name, ready: !!(await providerConfig(cfg)), setup: setupAllowed(cfg, user) };
+      const ready = !!(await providerConfig(cfg));
+      return { name: cfg.name, ready, setup: setupAllowed(cfg, user), vision: ready && readsImagesNow(cfg) };
     },
   })
   .add({
@@ -697,6 +790,7 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       if (body.hipaaAcknowledged !== undefined) patch.hipaa_acknowledged = body.hipaaAcknowledged;
       if (input.preset !== undefined) patch.preset = input.preset ?? null;
       if (body.setupEnabled !== undefined) patch.setup_enabled = body.setupEnabled;
+      if (body.vision !== undefined) patch.vision = body.vision;
       await db.transaction(async (trx) => {
         await trx(CONFIG).where({ id: cfg.id }).update(patch);
         // Secrets are never written to the audit log, only that they changed.
@@ -839,12 +933,17 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     body: z.object({
       text: z.string().trim().min(1).max(4000),
       /** The record the person is looking at. */
-      context: z.object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid() }).optional(),
+      /** The page on screen, as ids only: a record, or a list of one type (no uuid). */
+      context: z
+        .object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid().optional() })
+        .optional(),
+      images: imagesSchema,
     }),
     handler: async ({ req, res, ctx, user, body }) => {
       const cfg = await loadConfig();
       if (!(await providerConfig(cfg)))
         throw new AppError('NOT_FOUND', 'The assistant is not set up yet. An admin can set it up.');
+      question(body, cfg); // Refuse images the model cannot read before anything is stored.
       const uuid = newUuid();
       const [id] = await db(CONVERSATIONS).insert({ uuid, user_id: user.id, title: body.text.slice(0, 120) });
       // Conversation text stays out of the audit log; only that it exists.
@@ -854,7 +953,7 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
         entityId: id!,
         entityUuid: uuid,
       });
-      await append(id!, 'user', [{ type: 'text', text: withContext(body.text, body.context) }]);
+      await append(id!, 'user', question(body, cfg));
       return respond(req, res, 201, async () => {
         await advance({ id: id! }, cfg, ctx, user);
         return conversationDto(uuid, user);
@@ -869,19 +968,83 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     handler: ({ user, params }) => conversationDto(params.uuid, user),
   })
   .add({
+    method: 'get',
+    path: '/conversations/:uuid/images/:n',
+    permission: 'assistant.chat.use',
+    params: z.object({ uuid: z.uuid(), n: z.coerce.number().int().min(0).max(10_000) }),
+    summary: 'An image the person attached, in the order they were attached',
+    handler: async ({ res, user, params }) => {
+      const conv = await conversationFor(params.uuid, user);
+      const image = (await history(conv.id))
+        .flatMap((m) => (m.role === 'user' ? m.content : []))
+        .filter((b): b is Extract<Block, { type: 'image' }> => b.type === 'image')[params.n];
+      if (!image) throw notFound('Image');
+      res.set('Content-Type', image.mediaType);
+      res.set('Cache-Control', 'private, max-age=86400');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Content-Security-Policy', "default-src 'none'");
+      res.send(Buffer.from(image.data, 'base64'));
+    },
+  })
+  .add({
     method: 'post',
     path: '/conversations/:uuid/messages',
     permission: 'assistant.chat.use',
     params: uuidParam,
     body: z.object({
       text: z.string().trim().min(1).max(4000),
-      context: z.object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid() }).optional(),
+      /** The page on screen, as ids only: a record, or a list of one type (no uuid). */
+      context: z
+        .object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid().optional() })
+        .optional(),
+      images: imagesSchema,
     }),
     handler: async ({ req, res, ctx, user, params, body }) => {
       const conv = await conversationFor(params.uuid, user);
       if (conv.pending) throw new AppError('CONFLICT', 'Confirm or decline the proposed changes first');
-      await append(conv.id, 'user', [{ type: 'text', text: withContext(body.text, body.context) }]);
       const cfg = await loadConfig();
+      await append(conv.id, 'user', question(body, cfg));
+      return respond(req, res, 200, async () => {
+        await advance(conv, cfg, ctx, user);
+        return conversationDto(params.uuid, user);
+      });
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/conversations/:uuid/retry',
+    permission: 'assistant.chat.use',
+    params: uuidParam,
+    summary: 'Ask the last question again, as it was or edited (its answer and waiting changes are dropped)',
+    body: z.object({ text: z.string().trim().min(1).max(4000).optional() }),
+    handler: async ({ req, res, ctx, user, params, body }) => {
+      const conv = await conversationFor(params.uuid, user);
+      const rows = (await db(MESSAGES).where({ conversation_id: conv.id }).orderBy('id', 'desc')) as {
+        id: number;
+        role: string;
+        content: Block[] | string;
+      }[];
+      const last = rows.find(
+        (r) => r.role === 'user' && json<Block[]>(r.content).some((b) => b.type === 'text'),
+      );
+      if (!last) throw new AppError('CONFLICT', 'There is no question to ask again');
+      const cfg = await loadConfig();
+      await db.transaction(async (trx) => {
+        // Proposed changes never ran, so dropping them with the answer they belong to is safe.
+        await trx(MESSAGES).where({ conversation_id: conv.id }).where('id', '>', last.id).delete();
+        await trx(CONVERSATIONS).where({ id: conv.id }).update({ pending: null, updated_at: new Date() });
+        if (body.text !== undefined) {
+          // An edit keeps the question's images and the note about the page it was asked on.
+          const content = json<Block[]>(last.content).map((b) =>
+            b.type === 'text'
+              ? { type: 'text' as const, text: `${body.text}${PAGE_NOTE.exec(b.text)?.[0] ?? ''}` }
+              : b,
+          );
+          await trx(MESSAGES)
+            .where({ id: last.id })
+            .update({ content: JSON.stringify(content) });
+        }
+      });
       return respond(req, res, 200, async () => {
         await advance(conv, cfg, ctx, user);
         return conversationDto(params.uuid, user);
@@ -967,8 +1130,13 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     },
   });
 
-function withContext(text: string, context?: { entity: string; uuid: string }) {
-  return context ? `${text}\n\n(The person is looking at ${context.entity} ${context.uuid}.)` : text;
+const PAGE_NOTE = /\n\n\(The person is looking at [^)]*\)$/;
+
+function withContext(text: string, context?: { entity: string; uuid?: string }) {
+  if (!context) return text;
+  return context.uuid
+    ? `${text}\n\n(The person is looking at ${context.entity} ${context.uuid}.)`
+    : `${text}\n\n(The person is looking at the list of ${context.entity} records.)`;
 }
 
 /**
@@ -1023,7 +1191,7 @@ async function mentioning(
 
 export const assistant: ApiModule = {
   routes: () => [routes],
-  migrations: { '0001_assistant': m0001, '0002_presets': m0002 },
+  migrations: { '0001_assistant': m0001, '0002_presets': m0002, '0003_vision': m0003 },
   privacy,
   // Conversations are kept for the configured number of days (30 by default).
   start: () =>

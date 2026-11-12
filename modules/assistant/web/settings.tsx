@@ -24,6 +24,9 @@ export interface Config {
   hipaaAcknowledged: boolean;
   preset: string | null;
   setupEnabled: boolean;
+  /** Whether the model reads images; null: from the provider list (`visionDetected`). */
+  vision: boolean | null;
+  visionDetected: boolean;
   complianceProfile?: string;
 }
 
@@ -155,6 +158,7 @@ export function SettingsPanel() {
         retentionDays: d.retentionDays,
         excludedEntities: d.excludedEntities,
         hipaaAcknowledged: d.hipaaAcknowledged,
+        vision: d.vision,
         ...(apiKey ? { apiKey } : {}),
       });
     },
@@ -493,6 +497,30 @@ export function SettingsPanel() {
                 value={draft.model ?? ''}
                 onChange={(model) => set({ model })}
               />
+              <Field
+                label="Images and screenshots"
+                help={
+                  draft.vision === null
+                    ? draft.visionDetected
+                      ? 'Detected: this model reads images, so people can attach screenshots.'
+                      : 'Detected: text only. Choose "Reads images" if your model can.'
+                    : 'Set by you. Choose Automatic to follow the provider list.'
+                }
+              >
+                {(p) => (
+                  <NativeSelect
+                    {...p}
+                    value={draft.vision === null ? 'auto' : draft.vision ? 'yes' : 'no'}
+                    onChange={(e) =>
+                      set({ vision: e.target.value === 'auto' ? null : e.target.value === 'yes' })
+                    }
+                  >
+                    <option value="auto">Automatic</option>
+                    <option value="yes">Reads images</option>
+                    <option value="no">Text only</option>
+                  </NativeSelect>
+                )}
+              </Field>
             </div>
           </div>
         ) : null}

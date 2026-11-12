@@ -14,7 +14,8 @@ const ACTIVATABLE =
 
 /**
  * Global shortcuts. Keys are single characters ("c", "/", "?") or two-key sequences ("g c").
- * "mod+k" means ⌘K on macOS and Ctrl+K elsewhere. Ignored while typing in a field.
+ * "mod+k" means ⌘K on macOS and Ctrl+K elsewhere, and works while typing; the others are
+ * ignored while typing in a field.
  */
 export function useHotkeys(map: Record<string, Handler>, enabled = true) {
   const mapRef = useRef(map);
@@ -27,9 +28,11 @@ export function useHotkeys(map: Record<string, Handler>, enabled = true) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const onKey = (e: KeyboardEvent) => {
       const m = mapRef.current;
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && m['mod+k']) {
+      // ⌘ or Ctrl shortcuts ("mod+k") work even while typing, like the browser's own.
+      const mod = (e.metaKey || e.ctrlKey) && !e.altKey && m[`mod+${e.key.toLowerCase()}`];
+      if (mod) {
         e.preventDefault();
-        m['mod+k'](e);
+        mod(e);
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e)) return;

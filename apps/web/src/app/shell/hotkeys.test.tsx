@@ -57,3 +57,23 @@ describe('useHotkeys', () => {
     expect(onC).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('modifier shortcuts', () => {
+  function Mod({ onJ, onC }: { onJ: () => void; onC: () => void }) {
+    useHotkeys({ 'mod+j': onJ, c: onC });
+    return <input aria-label="Field" />;
+  }
+
+  it('run with Ctrl or ⌘, even while typing, while plain keys do not', async () => {
+    const onJ = vi.fn();
+    const onC = vi.fn();
+    render(<Mod onJ={onJ} onC={onC} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('textbox', { name: 'Field' }));
+    await user.keyboard('{Control>}j{/Control}');
+    await user.keyboard('{Meta>}j{/Meta}');
+    await user.keyboard('c');
+    expect(onJ).toHaveBeenCalledTimes(2);
+    expect(onC).not.toHaveBeenCalled();
+  });
+});

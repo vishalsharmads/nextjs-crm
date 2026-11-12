@@ -528,6 +528,113 @@ describe('assistant module', () => {
     expect(tested.body).toMatchObject({ ok: true, reply: 'ready' });
   });
 
+  it('knows whether the model reads images, from the provider list or the admin', async () => {
+    const { readsImages, findPreset } = await import('../../../modules/assistant/api/catalog');
+    expect(readsImages(findPreset('openai'), 'gpt-4o-mini')).toBe(true);
+    expect(readsImages(findPreset('deepseek'), 'deepseek-chat')).toBe(false);
+    // A server of your own: text only until an admin says otherwise.
+    let cfg = await admin.get('/m/assistant/config').expect(200);
+    expect(cfg.body).toMatchObject({ vision: null, visionDetected: false });
+    expect((await admin.get('/m/assistant/status').expect(200)).body.vision).toBe(false);
+    await admin.patch('/m/assistant/config', { vision: true }).expect(200);
+    expect((await admin.get('/m/assistant/status').expect(200)).body.vision).toBe(true);
+    await admin.patch('/m/assistant/config', { vision: null }).expect(200);
+    cfg = await admin.get('/m/assistant/config').expect(200);
+    expect(cfg.body.vision).toBeNull();
+  });
+
+  it('takes images when the model reads them, checks them, and sends each once', async () => {
+    const png =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const image = { mediaType: 'image/png', data: png };
+    // A text-only model: refused before anything is stored.
+    const refused = await admin
+      .post('/m/assistant/conversations', { text: 'Look', images: [image] })
+      .expect(422);
+    expect(refused.body.error.message).toMatch(/text only/);
+
+    await admin.patch('/m/assistant/config', { vision: true }).expect(200);
+    // Bytes that are not the image they claim to be.
+    await admin
+      .post('/m/assistant/conversations', {
+        text: 'Look',
+        images: [{ mediaType: 'image/png', data: 'aGVsbG8gd29ybGQ=' }],
+      })
+      .expect(422);
+
+    replies = [text('A tiny picture.')];
+    seen.length = 0;
+    const res = await admin
+      .post('/m/assistant/conversations', { text: 'What is this?', images: [image] })
+      .expect(201);
+    const sent = (seen[0]!.body.messages as { content: { type: string; source?: { data: string } }[] }[])[0]!;
+    expect(sent.content[0]).toMatchObject({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/png', data: png },
+    });
+    const asked = res.body.messages[0];
+    expect(asked).toMatchObject({
+      role: 'user',
+      text: 'What is this?',
+      images: [expect.stringMatching(/\/images\/0$/)],
+    });
+
+    // The person can see their image; nobody else can.
+    const file = await admin.get(asked.images[0]).expect(200);
+    expect(file.headers['content-type']).toBe('image/png');
+    const { client: other } = await clientWithRoles(['admin']);
+    await other.get(asked.images[0]).expect(404);
+
+    // The next turn does not send the earlier image again.
+    replies = [text('Sure.')];
+    seen.length = 0;
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/messages`, { text: 'And now?' })
+      .expect(200);
+    const again = JSON.stringify(seen[0]!.body.messages);
+    expect(again).not.toContain(png);
+    expect(again).toContain('An image the person attached earlier');
+    await admin.patch('/m/assistant/config', { vision: null }).expect(200);
+  });
+
+  it('asks the last question again, as it was or edited, dropping its answer', async () => {
+    replies = [text('First answer.')];
+    const res = await admin
+      .post('/m/assistant/conversations', { text: 'Old question', context: { entity: 'contact' } })
+      .expect(201);
+    replies = [text('Second answer.')];
+    seen.length = 0;
+    const again = await admin.post(`/m/assistant/conversations/${res.body.uuid}/retry`, {}).expect(200);
+    expect(again.body.messages.map((m: { text?: string }) => m.text)).toEqual([
+      'Old question',
+      'Second answer.',
+    ]);
+
+    replies = [text('Edited answer.')];
+    seen.length = 0;
+    const edited = await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/retry`, { text: 'New question' })
+      .expect(200);
+    expect(edited.body.messages.map((m: { text?: string }) => m.text)).toEqual([
+      'New question',
+      'Edited answer.',
+    ]);
+    // The edit kept the note about the page it was asked on, for the model.
+    expect(JSON.stringify(seen[0]!.body.messages)).toContain(
+      'New question\\n\\n(The person is looking at the list of contact',
+    );
+
+    // Waiting changes are dropped with the answer they belong to.
+    replies = [use('create_record', { entity: 'contact', data: { firstName: 'Never' } })];
+    const pending = await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/messages`, { text: 'Add Never' })
+      .expect(200);
+    expect(pending.body.proposals).toHaveLength(1);
+    replies = [text('Fine.')];
+    const cleared = await admin.post(`/m/assistant/conversations/${res.body.uuid}/retry`, {}).expect(200);
+    expect(cleared.body.proposals).toEqual([]);
+  });
+
   it('ranks recommended models first', async () => {
     const { rankModels } = await import('../../../modules/assistant/api/catalog');
     expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([
@@ -721,6 +828,31 @@ describe('assistant module', () => {
     expect((await db('roles').where({ id: adminRole.id }).first()).name).toBe(adminRole.name);
     expect(await db('roles').where({ key: 'all' }).first()).toBeUndefined();
     await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
+  });
+
+  it('knows the page on screen from ids only: a record, or a list', async () => {
+    await admin.patch('/m/assistant/config', { preset: 'simulated' }).expect(200);
+    const last = unique('Ctx');
+    const contact = await admin.post('/contacts', { firstName: 'Cara', lastName: last }).expect(201);
+    const one = await admin
+      .post('/m/assistant/conversations', {
+        text: 'Summarise this contact',
+        context: { entity: 'contact', uuid: contact.body.uuid },
+      })
+      .expect(201);
+    expect(one.body.messages.at(-1)).toMatchObject({ tools: ['Get a record'] });
+    expect(one.body.messages.at(-1).text).toContain(last);
+    // The question shows as asked; the page note is for the model only.
+    expect(one.body.messages[0].text).toBe('Summarise this contact');
+
+    const list = await admin
+      .post('/m/assistant/conversations', { text: 'Which need attention?', context: { entity: 'contact' } })
+      .expect(201);
+    expect(list.body.messages.at(-1).tools).toEqual(['Describe the data', 'List records']);
+    await admin
+      .patch('/m/assistant/config', { preset: null, provider: 'messages', baseUrl: base })
+      .expect(200);
+    await admin.patch('/m/assistant/config', { model: 'test-model' }).expect(200);
   });
 
   it('lets admins try configuration with simulated replies, still confirmed', async () => {
