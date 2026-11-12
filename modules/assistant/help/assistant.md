@@ -19,11 +19,18 @@ Ask questions about your records in plain words, get summaries of a record's his
 - Replies appear as they are written, with each step it takes.
 - Conversations are private to you and deleted after the number of days an admin sets.
 
+## Asking questions
+
+- Open it from the ✦ button at the top of any page. The panel sits beside the page, stays open as you move around, and can be resized by dragging its edge (or with the arrow keys).
+- It knows the page you are on: a record, or a list. **Using: …** above the message box shows which; choose ✕ to leave it out of your question.
+- **Enter** sends. **Shift+Enter** or **Ctrl+Enter** (**⌘+Enter** on a Mac) starts a new line.
+- When the model can read images, attach up to three screenshots with 📎, by pasting them, or by dropping them on the message box. They are shrunk before sending and kept with the conversation.
+
 ## Setting it up (admins)
 
 1. Open the **Settings** tab and pick an AI provider. Providers marked **Free tier** or **Free models** let you start without paying; switch on **Free to start** to see only those.
 2. Paste the provider's API key. **Get a key** opens the provider's page where you create one. The key is stored encrypted and only ever sent to that provider.
-3. Pick a model. The provider's model list loads with your key, and the recommended one (★) is chosen for you.
+3. Pick a model. The provider's model list loads with your key, and the recommended one (★) is chosen for you. **Images and screenshots** says whether it can read images; set it yourself for a server of your own.
 4. Choose **Save and test**. The assistant sends one short message to check everything works.
 
 Any other service with a compatible API (including your own) works through **Other compatible API**. Pick a server under **Start from** to fill in its address, or type your own; the API key is optional there, since servers on your own machine usually need none. **Fetch models** lists what the server offers.
