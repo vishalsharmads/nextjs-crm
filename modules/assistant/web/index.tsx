@@ -3,7 +3,21 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { ENTITY_ROUTE, recordTypePath } from '@app/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Check, Copy, History, MessageSquarePlus, Send, Sparkles, Square, Trash2, X } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  Copy,
+  Eye,
+  History,
+  MessageSquare,
+  MessageSquarePlus,
+  Search,
+  Send,
+  Sparkles,
+  Square,
+  Trash2,
+  X,
+} from 'lucide-react';
 import type { WebModule } from '@app/module-sdk';
 import { SettingsPanel } from './settings';
 import { DECISION_WORDS, thinkingWords } from './thinking';
@@ -13,7 +27,7 @@ import { formatRelative } from '@/lib/format';
 import { useBoot, useCan } from '@/app/session';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/input';
 import {
   Badge,
   ErrorState,
@@ -57,33 +71,35 @@ function AssistantPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title={name} />
-      {admin ? (
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="chat">Chat</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
-          <TabsContent value="chat" className="mt-4">
-            <Chat
-              ready={!!status.data?.ready}
-              loading={status.isPending}
-              setup={!!status.data?.setup}
-              admin
-              onSetUp={() => setTab('settings')}
-            />
-          </TabsContent>
-          <TabsContent value="settings" className="mt-4">
-            <SettingsPanel />
-          </TabsContent>
-        </Tabs>
-      ) : (
-        <Chat
-          ready={!!status.data?.ready}
-          loading={status.isPending}
-          setup={!!status.data?.setup}
-          admin={false}
-        />
-      )}
+      <div className="px-4 pb-4 md:px-6">
+        {admin ? (
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList>
+              <TabsTrigger value="chat">Chat</TabsTrigger>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
+            </TabsList>
+            <TabsContent value="chat" className="mt-4">
+              <Chat
+                ready={!!status.data?.ready}
+                loading={status.isPending}
+                setup={!!status.data?.setup}
+                admin
+                onSetUp={() => setTab('settings')}
+              />
+            </TabsContent>
+            <TabsContent value="settings" className="mt-4">
+              <SettingsPanel />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <Chat
+            ready={!!status.data?.ready}
+            loading={status.isPending}
+            setup={!!status.data?.setup}
+            admin={false}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -102,7 +118,7 @@ function Chat({
   admin: boolean;
   /** The side panel: no conversation list, the latest conversation only. */
   compact?: boolean;
-  /** The record on screen, when opened from a record page. */
+  /** What is on screen in the side panel: a record, or a list of one type (`uuid` empty). */
   record?: { entity: string; uuid: string };
   /** This person can ask the assistant to set up the workspace. */
   setup?: boolean;
@@ -131,6 +147,7 @@ function Chat({
   // What the assistant is saying right now, and the steps it is taking, while a reply streams in.
   const [live, setLive] = useState<{ text: string; steps: string[]; words: string[] } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [search, setSearch] = useState('');
   const [active, setActive] = useState<string | null>(null);
   const [text, setText] = useState(() => params.get('ask')?.slice(0, 4000) ?? '');
   const list = useQuery({
@@ -146,13 +163,28 @@ function Chat({
     queryFn: () => apiGet<Conversation>(`/m/assistant/conversations/${active}`),
     enabled: !!active,
   });
-  // `?about=contact:<uuid>` from a record page: the assistant knows what the person is looking at.
+  // The page on screen (side panel) or `?about=contact:<uuid>` from a record page: ids only, the
+  // assistant reads the rest with its tools. The person can leave it out of the next question.
   const about = params.get('about');
-  const context = record?.uuid
-    ? record
+  const onScreen = record?.entity
+    ? { entity: record.entity, ...(record.uuid ? { uuid: record.uuid } : {}) }
     : about && /^[a-z_]+:[0-9a-f-]{36}$/.test(about)
       ? { entity: about.split(':')[0]!, uuid: about.split(':')[1]! }
       : undefined;
+  const pageKey = onScreen ? `${onScreen.entity}:${onScreen.uuid ?? ''}` : '';
+  const [skipped, setSkipped] = useState('');
+  const context = onScreen && skipped !== pageKey ? onScreen : undefined;
+  const label = context ? labels[context.entity] : undefined;
+  const contextName = context
+    ? context.uuid
+      ? `This ${(label?.singular ?? 'record').toLowerCase()}`
+      : `${label?.plural ?? 'Records'} list`
+    : '';
+  const contextAsk = context
+    ? context.uuid
+      ? `Ask about this ${(label?.singular ?? 'record').toLowerCase()}…`
+      : `Ask about these ${(label?.plural ?? 'records').toLowerCase()}…`
+    : 'Ask anything about your records';
   /** Post and stream the reply: text appears as it is written, tool steps as they run. */
   const stopper = useRef<AbortController | null>(null);
   const stream = async (path: string, body: unknown, words: string[]) => {
@@ -256,6 +288,14 @@ function Chat({
     });
   };
   const bottom = useRef<HTMLDivElement>(null);
+  const composer = useRef<HTMLTextAreaElement>(null);
+  // The box grows with the question, up to its max height, and shrinks back after sending.
+  useEffect(() => {
+    const el = composer.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
   useEffect(() => {
     // A block, not an expression: newer browsers return a Promise here, which React would call as cleanup.
     bottom.current?.scrollIntoView({ block: 'end' });
@@ -295,102 +335,125 @@ function Chat({
   // What the person might ask next, offered under the latest answer.
   const next =
     last?.role === 'assistant' && last.text && !live && !proposals.length ? splitNext(last.text).next : [];
+  const q = search.trim().toLowerCase();
+  const shown = (list.data ?? []).filter(
+    (c) => !deleting.includes(c.uuid) && (!q || c.title.toLowerCase().includes(q)),
+  );
   const history = (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="border-b border-line p-2">
+        <label className="flex items-center gap-2 rounded-sm border border-line bg-canvas px-2 focus-within:border-primary">
+          <Search className="size-4 text-faint" aria-hidden />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search conversations"
+            aria-label="Search conversations"
+            className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none pointer-coarse:text-base"
+          />
+        </label>
+      </div>
       {list.isPending ? (
         <Skeleton className="m-3 h-16" />
       ) : list.isError ? (
         <ErrorState error={list.error} onRetry={() => void list.refetch()} />
-      ) : !list.data.length ? (
-        <p className="p-3 text-sm text-muted">No conversations yet.</p>
+      ) : !shown.length ? (
+        <p className="p-3 text-sm text-muted">{q ? 'No conversations match.' : 'No conversations yet.'}</p>
       ) : (
-        <ul className="max-h-[60vh] overflow-y-auto">
-          {list.data
-            .filter((c) => !deleting.includes(c.uuid))
-            .map((c) => (
-              <li key={c.uuid} className="group flex items-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActive(c.uuid);
-                    setShowHistory(false);
-                  }}
-                  className={cn(
-                    'min-w-0 flex-1 px-3 py-2 text-start text-sm hover:bg-subtle',
-                    c.uuid === active && 'bg-subtle font-medium',
-                  )}
-                >
-                  <span className="block truncate">{c.title}</span>
-                  <span className="text-xs text-faint">{formatRelative(c.updatedAt)}</span>
-                </button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Delete ${c.title}`}
-                  onClick={() => deleteLater(c.uuid)}
-                >
-                  <Trash2 />
-                </Button>
-              </li>
-            ))}
-        </ul>
+        <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+          {byDay(shown).map(([day, items]) => (
+            <section key={day} aria-label={day}>
+              <h3 className="px-3 pt-3 pb-1 text-xs font-medium text-faint">{day}</h3>
+              <ul>
+                {items.map((c) => (
+                  <li key={c.uuid} className="group flex items-center pe-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActive(c.uuid);
+                        setShowHistory(false);
+                      }}
+                      aria-current={c.uuid === active ? 'true' : undefined}
+                      className={cn(
+                        'min-w-0 flex-1 rounded-sm px-3 py-1.5 text-start text-sm transition-colors duration-150 hover:bg-subtle',
+                        c.uuid === active && 'bg-primary-soft font-medium text-ink',
+                      )}
+                    >
+                      <span className="block truncate">{c.title}</span>
+                      <span className="text-xs text-faint">{formatRelative(c.updatedAt)}</span>
+                    </button>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="opacity-60 group-hover:opacity-100 focus-visible:opacity-100"
+                      aria-label={`Delete ${c.title}`}
+                      onClick={() => deleteLater(c.uuid)}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
-    </>
+    </div>
   );
   return (
     <div
-      className={cn(compact ? '-m-4 flex min-h-0 flex-1 flex-col' : 'grid gap-4 md:grid-cols-[240px_1fr]')}
+      className={cn(
+        compact
+          ? '-m-4 flex min-h-0 flex-1 flex-col'
+          : 'grid h-[calc(100dvh-13.5rem)] min-h-[28rem] gap-4 md:grid-cols-[260px_1fr]',
+      )}
     >
       {compact ? null : (
-        <Pane padded={false} className="h-fit">
+        <section className="hidden min-h-0 flex-col rounded-md border border-line bg-surface shadow-raised md:flex">
           <div className="border-b border-line p-2">
             <Button size="sm" className="w-full" onClick={() => setActive(null)}>
               <MessageSquarePlus /> New conversation
             </Button>
           </div>
           {history}
-        </Pane>
+        </section>
       )}
       <ChatFrame compact={compact}>
-        <div className={cn('flex flex-col', compact ? 'min-h-0 flex-1' : 'min-h-[50vh]')}>
-          {compact ? (
-            <div className="flex items-center gap-1 border-b border-line px-3 py-2">
-              <Button
-                size="sm"
-                variant={showHistory ? 'subtle' : 'ghost'}
-                aria-pressed={showHistory}
-                onClick={() => setShowHistory((v) => !v)}
-              >
-                <History /> History
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="ms-auto"
-                onClick={() => {
-                  setActive(null);
-                  setShowHistory(false);
-                }}
-              >
-                <MessageSquarePlus /> New
-              </Button>
-            </div>
-          ) : null}
-          {compact && showHistory ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {/* In the side panel, and on small screens where the page hides its history column. */}
+          <div
+            className={cn('flex items-center gap-1 border-b border-line px-3 py-2', !compact && 'md:hidden')}
+          >
+            <Button
+              size="sm"
+              variant={showHistory ? 'subtle' : 'ghost'}
+              aria-pressed={showHistory}
+              onClick={() => setShowHistory((v) => !v)}
+            >
+              <History /> History
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ms-auto"
+              onClick={() => {
+                setActive(null);
+                setShowHistory(false);
+              }}
+            >
+              <MessageSquarePlus /> New
+            </Button>
+          </div>
+          {showHistory ? (
             <div className="min-h-0 flex-1 overflow-y-auto">{history}</div>
           ) : (
             <>
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
                 {!active && !send.isPending ? (
                   <Welcome
-                    suggestions={[
-                      `Which ${(labels.deal?.plural ?? '').toLowerCase()} close this month?`,
-                      context
-                        ? 'Summarise the history of this record'
-                        : `Who are my newest ${(labels.contact?.plural ?? '').toLowerCase()}?`,
-                      'What should I follow up on today?',
-                      ...(setup ? ['Set up this CRM for my business'] : []),
-                    ]}
+                    compact={compact}
+                    suggestions={suggestionsFor(context, labels, setup)}
                     onPick={(s) => send.mutate(s)}
                   />
                 ) : conv.isError ? (
@@ -515,30 +578,65 @@ function Chat({
                 ) : null}
                 <div ref={bottom} />
               </div>
-              <form onSubmit={submit} className="flex flex-wrap gap-2 border-t border-line p-3">
+              <form onSubmit={submit} className="border-t border-line p-3">
                 {context ? (
-                  <div className="basis-full">
-                    <Badge tone="outline">About this record</Badge>
+                  <div className="mb-2 flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-line bg-subtle py-0.5 ps-2 pe-0.5 text-xs text-muted">
+                      <Eye className="size-3" aria-hidden />
+                      <span>
+                        Using: <span className="font-medium text-ink">{contextName}</span>
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded-full p-0.5 hover:bg-hover"
+                        aria-label={`Leave out ${contextName.toLowerCase()}`}
+                        title="Leave this page out of the question"
+                        onClick={() => setSkipped(pageKey)}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
                   </div>
                 ) : null}
-                <Input
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Ask anything about your records"
-                  aria-label="Message"
-                  className="min-w-0 flex-1"
-                  disabled={proposals.length > 0}
-                  maxLength={4000}
-                />
-                {send.isPending || decide.isPending ? (
-                  <Button type="button" onClick={() => stopper.current?.abort()}>
-                    <Square /> Stop
-                  </Button>
-                ) : (
-                  <Button type="submit" variant="primary" disabled={!text.trim() || proposals.length > 0}>
-                    <Send /> Send
-                  </Button>
-                )}
+                <div className="flex items-end gap-2 rounded-md border border-line bg-surface p-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-soft">
+                  <Textarea
+                    ref={composer}
+                    value={text}
+                    rows={1}
+                    onChange={(e) => setText(e.target.value)}
+                    onKeyDown={(e) => {
+                      // Enter sends; Shift+Enter (or composing text in an input method) adds a line.
+                      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        e.currentTarget.form?.requestSubmit();
+                      }
+                    }}
+                    placeholder={contextAsk}
+                    aria-label="Message"
+                    aria-describedby="composer-hint"
+                    className="max-h-40 min-h-9 flex-1 resize-none border-0 bg-transparent p-1.5 shadow-none focus-visible:ring-0 focus-visible:outline-none"
+                    disabled={proposals.length > 0}
+                    maxLength={4000}
+                  />
+                  {send.isPending || decide.isPending ? (
+                    <Button type="button" size="sm" onClick={() => stopper.current?.abort()}>
+                      <Square /> Stop
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="primary"
+                      disabled={!text.trim() || proposals.length > 0}
+                      aria-label="Send"
+                    >
+                      <Send />
+                    </Button>
+                  )}
+                </div>
+                <p id="composer-hint" className="mt-1 hidden text-xs text-faint sm:block">
+                  Enter to send · Shift+Enter for a new line
+                </p>
               </form>
             </>
           )}
@@ -592,26 +690,77 @@ function Proposals({
   );
 }
 
-/** First screen of a conversation: what the assistant can do, as prompts to start with. */
-function Welcome({ suggestions, onPick }: { suggestions: string[]; onPick: (text: string) => void }) {
+type Labels = Record<string, { singular: string; plural: string } | undefined>;
+
+/** Starting questions that fit the page on screen: a record, a list, or anywhere. */
+function suggestionsFor(
+  context: { entity: string; uuid?: string } | undefined,
+  labels: Labels,
+  setup: boolean,
+): string[] {
+  const lower = (s?: string) => (s ?? '').toLowerCase();
+  const deals = lower(labels.deal?.plural) || 'deals';
+  if (context?.uuid) {
+    const one = lower(labels[context.entity]?.singular) || 'record';
+    return [
+      `Summarise this ${one}`,
+      `What should I do next on this ${one}?`,
+      `What changed on this ${one} recently?`,
+      'Draft a follow-up email',
+    ];
+  }
+  if (context) {
+    const many = lower(labels[context.entity]?.plural) || 'records';
+    return [
+      `Which ${many} need attention?`,
+      `Show my newest ${many}`,
+      `How many ${many} were added this month?`,
+      'What should I follow up on today?',
+    ];
+  }
+  return [
+    `Which ${deals} close this month?`,
+    `Who are my newest ${lower(labels.contact?.plural) || 'contacts'}?`,
+    'What should I follow up on today?',
+    ...(setup ? ['Set up this CRM for my business'] : ['Summarise my week']),
+  ];
+}
+
+/** First screen of a conversation: what the assistant can do, as questions to start with. */
+function Welcome({
+  suggestions,
+  onPick,
+  compact,
+}: {
+  suggestions: string[];
+  onPick: (text: string) => void;
+  compact: boolean;
+}) {
   return (
-    <div className="flex flex-col items-center gap-4 py-8 text-center">
+    <div className={cn('flex flex-col items-center gap-4 text-center', compact ? 'py-4' : 'py-10')}>
       <span className="ai-mark flex size-12 items-center justify-center rounded-xl shadow-raised" aria-hidden>
         <Sparkles className="size-6" />
       </span>
       <div>
         <p className="font-semibold">How can I help?</p>
-        <p className="text-sm text-muted">Ask about your records, or try one of these.</p>
+        <p className="text-sm text-muted">Ask about your records, or start with one of these.</p>
       </div>
-      <ul className="flex max-w-lg flex-wrap justify-center gap-2">
+      <ul
+        className={cn('grid w-full gap-2 text-start', compact ? 'grid-cols-1' : 'max-w-2xl sm:grid-cols-2')}
+      >
         {suggestions.map((s) => (
           <li key={s}>
             <button
               type="button"
               onClick={() => onPick(s)}
-              className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm transition-colors duration-150 hover:border-primary hover:bg-primary-soft active:scale-[0.98]"
+              className="group flex w-full items-center gap-2 rounded-md text-start border border-line bg-surface px-3 py-2.5 text-sm transition-[border-color,background-color,transform] duration-150 ease-out hover:border-primary hover:bg-primary-soft active:scale-[0.99]"
             >
-              {s}
+              <MessageSquare className="size-4 shrink-0 text-faint group-hover:text-primary" aria-hidden />
+              <span className="flex-1">{s}</span>
+              <ArrowRight
+                className="size-4 shrink-0 text-faint transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary rtl:rotate-180"
+                aria-hidden
+              />
             </button>
           </li>
         ))}
@@ -667,7 +816,7 @@ function AssistantPanel({ entity, uuid }: { entity: string; uuid: string }) {
       admin={false}
       setup={!!status.data?.setup}
       compact
-      record={uuid ? { entity, uuid } : undefined}
+      record={entity ? { entity, uuid } : undefined}
     />
   );
 }
@@ -684,7 +833,9 @@ function ChatFrame({ compact, children }: { compact: boolean; children: ReactNod
   return compact ? (
     <div className="flex min-h-0 flex-1 flex-col">{children}</div>
   ) : (
-    <Pane padded={false}>{children}</Pane>
+    <section className="flex min-h-0 flex-col rounded-md border border-line bg-surface shadow-raised">
+      {children}
+    </section>
   );
 }
 
@@ -705,6 +856,27 @@ function RotatingWords({ words }: { words: string[] }) {
       <span className="sr-only">Thinking</span>
     </>
   );
+}
+
+/** Conversations under Today, Yesterday, This week and Earlier, newest first. */
+function byDay<T extends { updatedAt: string }>(items: T[]): [string, T[]][] {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const day = 86_400_000;
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const at = new Date(item.updatedAt).getTime();
+    const name =
+      at >= start.getTime()
+        ? 'Today'
+        : at >= start.getTime() - day
+          ? 'Yesterday'
+          : at >= start.getTime() - 6 * day
+            ? 'This week'
+            : 'Earlier';
+    groups.set(name, [...(groups.get(name) ?? []), item]);
+  }
+  return [...groups.entries()];
 }
 
 /** Raised when the person stops a reply on purpose. */
