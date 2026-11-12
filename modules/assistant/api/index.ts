@@ -37,7 +37,9 @@ import {
   chatStream,
   listModels,
   WIRE_FORMATS,
+  IMAGE_TYPES,
   type Block,
+  type ImageType,
   type ChatMessage,
   type ProviderConfig,
 } from './providers';
@@ -505,7 +507,7 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
   const system = await systemPrompt(cfg, user);
   for (let step = 0; step < MAX_STEPS; step++) {
     await assertWithinCaps(cfg, user.id);
-    const messages = await history(conv.id);
+    const messages = latestImagesOnly(await history(conv.id));
     const sink = streamSink.getStore();
     if (sink?.closed()) return;
     const reply = sink
@@ -590,7 +592,8 @@ async function conversationDto(uuid: string, user: AuthUser) {
   const conv = await conversationFor(uuid, user);
   const messages = await history(conv.id);
   const defs = new Map([...toolDefs(), ...SETUP_TOOLS, ...CONFIG_TOOLS].map((t) => [t.name, t]));
-  const items: { role: 'user' | 'assistant'; text?: string; tools?: string[] }[] = [];
+  const items: { role: 'user' | 'assistant'; text?: string; tools?: string[]; images?: string[] }[] = [];
+  let imageNo = 0;
   // Steps the assistant took (tool calls, often with blank text) are gathered onto its next reply,
   // so one answer shows as one bubble instead of a row of empty ones.
   let steps: string[] = [];
@@ -623,12 +626,86 @@ async function conversationDto(uuid: string, user: AuthUser) {
       if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
       steps = [];
       // The note about the page on screen is for the model; people see their question as asked.
-      items.push({ role: m.role, text: text.replace(PAGE_NOTE, '') });
+      const images = m.content
+        .filter((b) => b.type === 'image')
+        .map(() => `/m/assistant/conversations/${conv.uuid}/images/${imageNo++}`);
+      items.push({ role: m.role, text: text.replace(PAGE_NOTE, ''), ...(images.length ? { images } : {}) });
     }
   }
   if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
   const pending = conv.pending ? json<Pending>(conv.pending) : null;
   return { uuid: conv.uuid, title: conv.title, messages: items, proposals: pending?.proposals ?? [] };
+}
+
+// ---------------- Images ----------------
+
+/** Up to three images per question, shrunk in the browser first (the request limit is 1 MB). */
+const MAX_IMAGES = 3;
+const MAX_IMAGE_BASE64 = 700_000;
+const imagesSchema = z
+  .array(
+    z.object({
+      mediaType: z.enum(IMAGE_TYPES),
+      data: z
+        .string()
+        .max(MAX_IMAGE_BASE64)
+        .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Base64 image data'),
+    }),
+  )
+  .max(MAX_IMAGES)
+  .optional();
+
+/** The file's first bytes must match the type it claims, so nothing else passes as an image. */
+function looksLike(mediaType: ImageType, data: string) {
+  const head = Buffer.from(data.slice(0, 24), 'base64');
+  const hex = head.toString('hex');
+  if (mediaType === 'image/png') return hex.startsWith('89504e470d0a1a0a');
+  if (mediaType === 'image/jpeg') return hex.startsWith('ffd8ff');
+  if (mediaType === 'image/gif') return head.toString('latin1', 0, 4) === 'GIF8';
+  return head.toString('latin1', 0, 4) === 'RIFF' && head.toString('latin1', 8, 12) === 'WEBP';
+}
+
+/** The person's question as stored: their images first, then the text with the page note. */
+function question(
+  body: {
+    text: string;
+    context?: { entity: string; uuid?: string };
+    images?: { mediaType: ImageType; data: string }[];
+  },
+  cfg: ConfigRow,
+): Block[] {
+  const images = body.images ?? [];
+  if (images.length && !readsImagesNow(cfg))
+    throw new AppError('VALIDATION_FAILED', 'This assistant reads text only, so images cannot be attached.');
+  if (images.some((i) => !looksLike(i.mediaType, i.data)))
+    throw new AppError('VALIDATION_FAILED', 'One of the attachments is not a PNG, JPEG, WebP or GIF image.');
+  return [
+    ...images.map((i) => ({ type: 'image' as const, mediaType: i.mediaType, data: i.data })),
+    { type: 'text', text: withContext(body.text, body.context) },
+  ];
+}
+
+/**
+ * Images reach the model with the question they came with only; earlier ones are replaced by a
+ * short note, so they are not paid for again on every later turn.
+ */
+function latestImagesOnly(messages: ChatMessage[]): ChatMessage[] {
+  let last = -1;
+  messages.forEach((m, i) => {
+    if (m.role === 'user' && m.content.some((b) => b.type === 'text')) last = i;
+  });
+  return messages.map((m, i) =>
+    i === last || !m.content.some((b) => b.type === 'image')
+      ? m
+      : {
+          ...m,
+          content: m.content.map((b) =>
+            b.type === 'image'
+              ? { type: 'text' as const, text: '(An image the person attached earlier.)' }
+              : b,
+          ),
+        },
+  );
 }
 
 // ---------------- Routes ----------------
@@ -860,11 +937,13 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       context: z
         .object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid().optional() })
         .optional(),
+      images: imagesSchema,
     }),
     handler: async ({ req, res, ctx, user, body }) => {
       const cfg = await loadConfig();
       if (!(await providerConfig(cfg)))
         throw new AppError('NOT_FOUND', 'The assistant is not set up yet. An admin can set it up.');
+      question(body, cfg); // Refuse images the model cannot read before anything is stored.
       const uuid = newUuid();
       const [id] = await db(CONVERSATIONS).insert({ uuid, user_id: user.id, title: body.text.slice(0, 120) });
       // Conversation text stays out of the audit log; only that it exists.
@@ -874,7 +953,7 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
         entityId: id!,
         entityUuid: uuid,
       });
-      await append(id!, 'user', [{ type: 'text', text: withContext(body.text, body.context) }]);
+      await append(id!, 'user', question(body, cfg));
       return respond(req, res, 201, async () => {
         await advance({ id: id! }, cfg, ctx, user);
         return conversationDto(uuid, user);
@@ -889,6 +968,25 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     handler: ({ user, params }) => conversationDto(params.uuid, user),
   })
   .add({
+    method: 'get',
+    path: '/conversations/:uuid/images/:n',
+    permission: 'assistant.chat.use',
+    params: z.object({ uuid: z.uuid(), n: z.coerce.number().int().min(0).max(10_000) }),
+    summary: 'An image the person attached, in the order they were attached',
+    handler: async ({ res, user, params }) => {
+      const conv = await conversationFor(params.uuid, user);
+      const image = (await history(conv.id))
+        .flatMap((m) => (m.role === 'user' ? m.content : []))
+        .filter((b): b is Extract<Block, { type: 'image' }> => b.type === 'image')[params.n];
+      if (!image) throw notFound('Image');
+      res.set('Content-Type', image.mediaType);
+      res.set('Cache-Control', 'private, max-age=86400');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Content-Security-Policy', "default-src 'none'");
+      res.send(Buffer.from(image.data, 'base64'));
+    },
+  })
+  .add({
     method: 'post',
     path: '/conversations/:uuid/messages',
     permission: 'assistant.chat.use',
@@ -899,12 +997,13 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       context: z
         .object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid().optional() })
         .optional(),
+      images: imagesSchema,
     }),
     handler: async ({ req, res, ctx, user, params, body }) => {
       const conv = await conversationFor(params.uuid, user);
       if (conv.pending) throw new AppError('CONFLICT', 'Confirm or decline the proposed changes first');
-      await append(conv.id, 'user', [{ type: 'text', text: withContext(body.text, body.context) }]);
       const cfg = await loadConfig();
+      await append(conv.id, 'user', question(body, cfg));
       return respond(req, res, 200, async () => {
         await advance(conv, cfg, ctx, user);
         return conversationDto(params.uuid, user);

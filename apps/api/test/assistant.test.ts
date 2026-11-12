@@ -543,6 +543,60 @@ describe('assistant module', () => {
     expect(cfg.body.vision).toBeNull();
   });
 
+  it('takes images when the model reads them, checks them, and sends each once', async () => {
+    const png =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const image = { mediaType: 'image/png', data: png };
+    // A text-only model: refused before anything is stored.
+    const refused = await admin
+      .post('/m/assistant/conversations', { text: 'Look', images: [image] })
+      .expect(422);
+    expect(refused.body.error.message).toMatch(/text only/);
+
+    await admin.patch('/m/assistant/config', { vision: true }).expect(200);
+    // Bytes that are not the image they claim to be.
+    await admin
+      .post('/m/assistant/conversations', {
+        text: 'Look',
+        images: [{ mediaType: 'image/png', data: 'aGVsbG8gd29ybGQ=' }],
+      })
+      .expect(422);
+
+    replies = [text('A tiny picture.')];
+    seen.length = 0;
+    const res = await admin
+      .post('/m/assistant/conversations', { text: 'What is this?', images: [image] })
+      .expect(201);
+    const sent = (seen[0]!.body.messages as { content: { type: string; source?: { data: string } }[] }[])[0]!;
+    expect(sent.content[0]).toMatchObject({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/png', data: png },
+    });
+    const asked = res.body.messages[0];
+    expect(asked).toMatchObject({
+      role: 'user',
+      text: 'What is this?',
+      images: [expect.stringMatching(/\/images\/0$/)],
+    });
+
+    // The person can see their image; nobody else can.
+    const file = await admin.get(asked.images[0]).expect(200);
+    expect(file.headers['content-type']).toBe('image/png');
+    const { client: other } = await clientWithRoles(['admin']);
+    await other.get(asked.images[0]).expect(404);
+
+    // The next turn does not send the earlier image again.
+    replies = [text('Sure.')];
+    seen.length = 0;
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/messages`, { text: 'And now?' })
+      .expect(200);
+    const again = JSON.stringify(seen[0]!.body.messages);
+    expect(again).not.toContain(png);
+    expect(again).toContain('An image the person attached earlier');
+    await admin.patch('/m/assistant/config', { vision: null }).expect(200);
+  });
+
   it('ranks recommended models first', async () => {
     const { rankModels } = await import('../../../modules/assistant/api/catalog');
     expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([

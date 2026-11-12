@@ -77,7 +77,12 @@ export type Block =
        */
       extra?: Record<string, unknown>;
     }
-  | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean };
+  | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+  /** An image the person attached (base64, without the `data:` prefix). */
+  | { type: 'image'; mediaType: ImageType; data: string };
+
+export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
+export type ImageType = (typeof IMAGE_TYPES)[number];
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -212,7 +217,7 @@ async function messagesApi(cfg: ProviderConfig, req: ChatRequest): Promise<ChatR
       model: cfg.model,
       max_tokens: 2048,
       system: req.system,
-      messages: req.messages,
+      messages: messagesWire(req.messages),
       tools: req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.schema })),
     },
   )) as {
@@ -229,6 +234,18 @@ async function messagesApi(cfg: ProviderConfig, req: ChatRequest): Promise<ChatR
 }
 
 /** The conversation in the chat completions shape (system message, tool calls, tool results). */
+/** The messages format: images become base64 image blocks; everything else goes as it is. */
+function messagesWire(messages: ChatMessage[]): unknown[] {
+  return messages.map((m) => ({
+    role: m.role,
+    content: m.content.map((b) =>
+      b.type === 'image'
+        ? { type: 'image', source: { type: 'base64', media_type: b.mediaType, data: b.data } }
+        : b,
+    ),
+  }));
+}
+
 function chatMessages(req: ChatRequest): unknown[] {
   const messages: unknown[] = [{ role: 'system', content: req.system }];
   for (const m of req.messages) {
@@ -253,10 +270,20 @@ function chatMessages(req: ChatRequest): unknown[] {
       });
       continue;
     }
+    const images = m.content.flatMap((b) =>
+      b.type === 'image'
+        ? [{ type: 'image_url', image_url: { url: `data:${b.mediaType};base64,${b.data}` } }]
+        : [],
+    );
     for (const b of m.content) {
       if (b.type === 'tool_result')
         messages.push({ role: 'tool', tool_call_id: b.tool_use_id, content: b.content });
-      if (b.type === 'text') messages.push({ role: 'user', content: b.text });
+      // A question with images goes as one message of parts: the text, then each image.
+      if (b.type === 'text')
+        messages.push({
+          role: 'user',
+          content: images.length ? [{ type: 'text', text: b.text }, ...images] : b.text,
+        });
     }
   }
   return messages;
@@ -399,7 +426,7 @@ async function messagesStream(
       max_tokens: 2048,
       stream: true,
       system: req.system,
-      messages: req.messages,
+      messages: messagesWire(req.messages),
       tools: req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.schema })),
     },
   );

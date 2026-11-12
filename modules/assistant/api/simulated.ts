@@ -33,6 +33,8 @@ interface Turn {
   question: string;
   /** The page on screen when the question was asked: a record, or a list (`uuid` empty). */
   page: { entity: string; uuid: string } | null;
+  /** Images attached to the question. */
+  images: number;
   /** Tools called since the question, oldest first, with their results. */
   calls: { name: string; input: Obj; result?: string; error?: boolean }[];
 }
@@ -58,6 +60,7 @@ function turnOf(messages: ChatMessage[]): Turn {
   return {
     question: question.replace(/\n\n\(The person is looking at [^)]*\)\s*$/, ''),
     page: rec ? { entity: rec[1]!, uuid: rec[2]! } : list ? { entity: list[1]!, uuid: '' } : null,
+    images: at < 0 ? 0 : messages[at]!.content.filter((b) => b.type === 'image').length,
     calls,
   };
 }
@@ -163,6 +166,13 @@ function decide(req: ChatRequest): Block[] {
   const types = typesFrom(turn);
 
   if (!last) {
+    if (turn.images)
+      return [
+        {
+          type: 'text',
+          text: `I received ${turn.images === 1 ? 'your image' : `your ${turn.images} images`}. Simulated replies cannot look at pictures; with a model that reads images, I would describe ${turn.images === 1 ? 'it' : 'them'} and answer your question.\n\nNext: Show my contacts | What should I follow up on today?`,
+        },
+      ];
     if (GREETING.test(turn.question))
       return [
         {
