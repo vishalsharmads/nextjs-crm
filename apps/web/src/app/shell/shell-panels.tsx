@@ -45,7 +45,12 @@ function usePageOnScreen(): { entity: string; uuid: string } {
 const WIDTH_KEY = 'shell-panel-width';
 const OPEN_KEY = 'shell-panel-open';
 const MIN_WIDTH = 320;
-const maxWidth = () => Math.max(MIN_WIDTH, Math.min(760, Math.round(window.innerWidth * 0.6)));
+/** The page beside the panel keeps at least this much room. */
+const MIN_PAGE = 520;
+const maxWidth = () => {
+  const start = document.querySelector('main')?.getBoundingClientRect().left ?? 0;
+  return Math.max(MIN_WIDTH, Math.min(760, Math.round(window.innerWidth - start - MIN_PAGE)));
+};
 const clamp = (w: number) => Math.min(maxWidth(), Math.max(MIN_WIDTH, Math.round(w)));
 
 /** Per-viewer conveniences only (which panel was open, how wide); never anything that matters. */
@@ -94,22 +99,34 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   return <PanelContext.Provider value={{ open: known, toggle, close }}>{children}</PanelContext.Provider>;
 }
 
+/** A module's own page already shows what its panel would, so the panel steps aside there. */
+function useOnModulePage() {
+  const { pathname } = useLocation();
+  const here = (
+    basePath && pathname.startsWith(basePath) ? pathname.slice(basePath.length) : pathname
+  ).replace(/^\//, '');
+  return (moduleKey: string) => here === `m/${moduleKey}` || here.startsWith(`m/${moduleKey}/`);
+}
+
 /** Top-bar buttons that open and close module side panels (for example the assistant). */
 export function ShellPanels() {
   const panels = useBoot().modules.shellPanels ?? [];
   const { open, toggle } = useContext(PanelContext);
+  const onOwnPage = useOnModulePage();
   return (
     <>
       {panels.map((p) => {
         const id = `${p.moduleKey}.${p.key}`;
         const Icon = moduleIcon(p.icon);
+        // On the module's own page the panel is not shown, so neither is the button as on.
+        const shown = open === id && !onOwnPage(p.moduleKey);
         return (
           <Button
             key={id}
-            variant={open === id ? 'subtle' : 'ghost'}
+            variant={shown ? 'subtle' : 'ghost'}
             size="icon"
             aria-label={p.title}
-            aria-pressed={open === id}
+            aria-pressed={shown}
             aria-controls="shell-panel"
             title={p.title}
             onClick={() => toggle(id)}
@@ -146,7 +163,8 @@ export function DockedPanel() {
   const wide = useWide();
   const [width, setWidth] = useState(() => clamp(Number(readStored(WIDTH_KEY)) || 420));
   const drag = useRef<{ startX: number; startW: number; rtl: boolean } | null>(null);
-  const active = panels.find((p) => `${p.moduleKey}.${p.key}` === open);
+  const onOwnPage = useOnModulePage();
+  const active = panels.find((p) => `${p.moduleKey}.${p.key}` === open && !onOwnPage(p.moduleKey));
 
   const commit = (w: number) => {
     const next = clamp(w);
