@@ -721,6 +721,7 @@ function Chat({
                     ) : null}
                     <Textarea
                       ref={composer}
+                    autoFocus={compact}
                       value={text}
                       rows={1}
                       onChange={(e) => setText(e.target.value)}
