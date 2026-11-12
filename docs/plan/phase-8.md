@@ -9,6 +9,7 @@ Admins browse, enable, configure and disable modules and integrations in the app
 | 8a | Module settings framework (API): typed `settings` fields in the manifest, encrypted secrets in `module_states.settings`, detail, settings, test-connection and upgrade routes, audit |
 | 8b | Marketplace UI: card grid with search, categories and Installed / Available / Updates tabs; detail page with Overview, Settings, Permissions and Activity |
 | 8c | Example integration (`chat-notify`), `module:new --integration`, developer guide, integration walkthrough, admin help |
+| 8g | Module catalog in a git repository: `catalog.json` lists modules at pinned tags and commit SHAs; the marketplace shows them; `module:add` brings one into the checkout for review |
 | 8e | Developer MCP server for AI coding agents: scaffold, validate and check modules in the working tree |
 | 8d | Design only: signed module bundles uploaded at run time |
 | 8f | Design only: an in-product MCP tool that generates a module on a running instance (needs 8d) |
@@ -26,8 +27,7 @@ Admins browse, enable, configure and disable modules and integrations in the app
   | `GET /modules/:key` | Detail |
   | `PATCH /modules/:key/settings` | Saves settings; audit `module.settings_changed`, with secret values replaced by `[changed]` |
   | `POST /modules/:key/test` | Runs the module's `testConnection(settings)`; provider error text never reaches people |
-  | `POST /modules/:key/upgrade` | Runs new migrations and records the manifest version |
-
+  
   All need `core.modules.manage`.
 - **Manifest.** Also gains `category` (`integration | industry | productivity | commerce`, default `productivity`) and `icon`.
 - **Assistant.** The assistant's config tools may not change module settings (`NEVER`), because they can hold credentials.
@@ -61,6 +61,18 @@ Admins browse, enable, configure and disable modules and integrations in the app
 
 - **Resources.** `docs/module-authoring.md` and `docs/integration-authoring.md`.
 - **Agent guidance.** The server's instructions repeat the module rules from AGENTS.md (tables `m_<key>_*`, imports only from `module-api`, privacy handlers, no vendor names).
+
+## Versions
+
+Startup already runs new migrations of enabled modules (`migrateEnabledModules`), so a new release is installed by deploying it. Startup also records the new `installed_version`; there is no separate upgrade route. "Update available" comes from the catalog (8g).
+
+## 8g: module catalog in a git repository
+
+- **Catalog.** One repository holds `catalog.json`: for each module, `key`, `name`, `category`, `description`, `repo`, `tag`, `sha` and `version`. Instances read it from `MODULE_CATALOG_URL` (unset: no catalog), cached for an hour, fetched through `assertSafeUrl`. The UI never names the hosting service.
+- **Marketplace.** Modules in the catalog but not in this build show as "Available from catalog" with the command a developer runs. A catalog version newer than the installed one shows "Update available".
+- **`module:add`.** `npm run module:add -- <key>` clones the catalog entry at its pinned SHA into `modules/<key>`, refusing if the tag now points elsewhere. It then runs `module_validate` and the brand check on the folder, adds the module to `installed.ts`, and leaves the change for code review. Nothing is built or enabled automatically.
+- **Private repositories.** A read token in the environment (`MODULE_CATALOG_TOKEN`), sent only to the catalog's host.
+- **Later (8d).** Signed bundles attached to the catalog's releases become the source for run-time upload.
 
 ## 8d: run-time module upload (design only)
 
