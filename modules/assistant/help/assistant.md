@@ -26,6 +26,17 @@ Ask questions about your records in plain words, get summaries of a record's his
 - **Enter** sends. **Shift+Enter** or **Ctrl+Enter** (**⌘+Enter** on a Mac) starts a new line.
 - When the model can read images, attach up to three screenshots with 📎, by pasting them, or by dropping them on the message box. They are shrunk before sending and kept with the conversation.
 
+## Numbers, charts and keeping results
+
+- Ask for totals, counts or trends ("deal value by owner this quarter") and the assistant runs a report, then answers from its result. It can show the report as a bar, line or pie chart; the chart is always drawn from the report's real numbers.
+- Under a chart: **Download as CSV**, or **Save as report** to keep it with your reports.
+- On a record page, save an answer as a note on that record with the note button beside it.
+- Steps under each answer say what was looked at, such as "List records · {{dealPluralLower}}".
+
+## Before a change runs
+
+Every change waits for you: the card shows the records it touches by name and the values it will set, with the exact change under **Details**. Choose **Confirm** or **Decline**. Changes the assistant makes are recorded in the audit log as made by the assistant; **See what it changed** in the assistant settings opens that view.
+
 ## Setting it up (admins)
 
 1. Open the **Settings** tab and pick an AI provider. Providers marked **Free tier** or **Free models** let you start without paying; switch on **Free to start** to see only those.
@@ -38,6 +49,8 @@ Any other service with a compatible API (including your own) works through **Oth
 A model server on your own machine or network (for example on `localhost`) is blocked until whoever runs {{appName}} allows its exact address on the server, as `host:port` in the `ASSISTANT_PRIVATE_HOSTS` setting (for example `ASSISTANT_PRIVATE_HOSTS=localhost:11434`). Only the addresses listed there are allowed; everything else on the private network stays out of reach. If that server uses its own certificate (for example one made with a local certificate tool), the server running {{appName}} must also trust it: set `NODE_EXTRA_CA_CERTS` to the certificate authority's file. Otherwise the assistant says the certificate is not trusted.
 
 **Trying it out without AI:** on demo and development instances the list starts with **Simulated replies (testing)**. It needs no key and uses no tokens: answers are scripted, but it still looks up your records with your permissions and asks before changing anything (try "Show my contacts" or "Create a task to call back tomorrow"). It is never offered on a live instance. A key you saved for another provider is kept for when you switch back.
+
+**Let it propose changes** is on by default; turn it off for an assistant that only looks things up and answers. Each person can ask up to 12 questions a minute (whoever runs {{appName}} can change this with `ASSISTANT_RATE_PER_MINUTE`).
 
 **Recommended for best results** suggests limits and the recommended model; **Apply** fills them in, and **Save** keeps them. Below that: the name people see (never the provider's), monthly and daily limits, how long conversations are kept, record types it must never use, and usage per person.
 
