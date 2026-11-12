@@ -1,5 +1,5 @@
 {
-  "$comment": "AI providers an admin can pick in the assistant settings. Read at run time, never bundled, so provider names stay out of the built app; this file is the one place they may appear (see AGENTS.md). recommended: model ids or id prefixes, best first. tier: free (no card needed), free_tier (free allowance), paid.",
+  "$comment": "AI providers an admin can pick in the assistant settings. Read at run time, never bundled, so provider names stay out of the built app; this file is the one place they may appear (see AGENTS.md). recommended: model ids or id prefixes, best first. tier: free (no card needed), free_tier (free allowance), paid. compatible: starting points for 'Other compatible API' (address filled in, still editable); local ones also need ASSISTANT_PRIVATE_HOSTS.",
   "providers": [
     {
       "id": "openai",
@@ -17,7 +17,9 @@
       "name": "Anthropic (Claude)",
       "format": "messages",
       "baseUrl": "https://api.anthropic.com",
-      "headers": { "anthropic-version": "2023-06-01" },
+      "headers": {
+        "anthropic-version": "2023-06-01"
+      },
       "keyUrl": "https://console.anthropic.com/settings/keys",
       "keyPrefix": "sk-ant-",
       "tier": "paid",
@@ -105,6 +107,44 @@
       "tier": "free_tier",
       "note": "Very fast open models; free allowance.",
       "recommended": ["gpt-oss-120b", "llama-3.3-70b", "qwen-3"]
+    }
+  ],
+  "compatible": [
+    {
+      "name": "Ollama",
+      "baseUrl": "http://localhost:11434/v1",
+      "local": true,
+      "note": "Open models on your own machine; no key needed."
+    },
+    {
+      "name": "LM Studio",
+      "baseUrl": "http://localhost:1234/v1",
+      "local": true,
+      "note": "Desktop app serving local models; no key needed."
+    },
+    {
+      "name": "vLLM",
+      "baseUrl": "http://localhost:8000/v1",
+      "local": true,
+      "note": "High-throughput model server you run yourself."
+    },
+    {
+      "name": "LocalAI",
+      "baseUrl": "http://localhost:8080/v1",
+      "local": true,
+      "note": "Self-hosted drop-in for the common API."
+    },
+    {
+      "name": "Together AI",
+      "baseUrl": "https://api.together.xyz/v1",
+      "local": false,
+      "note": "Hosted open models; needs a key."
+    },
+    {
+      "name": "Fireworks AI",
+      "baseUrl": "https://api.fireworks.ai/inference/v1",
+      "local": false,
+      "note": "Hosted open models; needs a key."
     }
   ]
 }

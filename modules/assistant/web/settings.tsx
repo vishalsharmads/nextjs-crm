@@ -39,6 +39,16 @@ interface Provider {
   recommended: string[];
 }
 
+/** A starting point for a compatible server: fills in the address. */
+interface Compatible {
+  name: string;
+  baseUrl: string;
+  local: boolean;
+  note: string;
+  /** False when it is on a private address the server does not allow yet. */
+  allowed: boolean;
+}
+
 interface Model {
   id: string;
   recommended: boolean;
@@ -63,10 +73,13 @@ export function SettingsPanel() {
     queryKey: [...key, 'config'],
     queryFn: () => apiGet<Config>('/m/assistant/config'),
   });
-  const providers = useQuery({
+  // One request serves both the provider list and the compatible starting points.
+  const catalog = {
     queryKey: [...key, 'providers'],
-    queryFn: () => apiGet<{ data: Provider[] }>('/m/assistant/providers').then((r) => r.data),
-  });
+    queryFn: () => apiGet<{ data: Provider[]; compatible?: Compatible[] }>('/m/assistant/providers'),
+  };
+  const providers = useQuery({ ...catalog, select: (r) => r.data });
+  const compatible = useQuery({ ...catalog, select: (r) => r.compatible ?? [] });
   const usage = useQuery({
     queryKey: [...key, 'usage'],
     queryFn: () =>
@@ -206,6 +219,8 @@ export function SettingsPanel() {
     setChoice(id);
     setTest({ state: 'idle' });
     models.reset();
+    // Almost every compatible server speaks chat completions.
+    if (id === CUSTOM && !draft?.provider) set({ provider: 'chat_completions' });
     // Start from the provider's best model; fetching the list can refine it.
     const next = providers.data?.find((p) => p.id === id);
     set({ model: next?.recommended.find((m) => !m.startsWith(':')) ?? null });
@@ -217,7 +232,8 @@ export function SettingsPanel() {
     !!apiKey && !!preset?.keyPrefix && apiKey.length > 6 && !apiKey.startsWith(preset.keyPrefix);
   const steps = [
     { label: 'Provider', done: !!choice && (choice !== CUSTOM || (!!draft.provider && !!draft.baseUrl)) },
-    { label: 'API key', done: noKey || keySaved || !!apiKey },
+    // Listed providers need a key; a compatible server of your own may not.
+    { label: 'API key', done: noKey || choice === CUSTOM || keySaved || !!apiKey },
     { label: 'Model', done: !!draft.model },
     { label: 'Connected', done: test.state === 'ok' },
   ];
@@ -352,6 +368,43 @@ export function SettingsPanel() {
                 <Textarea {...p} rows={2} value={headers} onChange={(e) => setHeaders(e.target.value)} />
               )}
             </Field>
+            {compatible.data?.length ? (
+              <div className="sm:col-span-2">
+                <p className="mb-1.5 text-xs font-medium text-muted">Start from</p>
+                <ul className="flex flex-wrap gap-1.5" aria-label="Compatible servers">
+                  {compatible.data.map((c) => (
+                    <li key={c.name}>
+                      <button
+                        type="button"
+                        className="ai-chip ai-chip-next"
+                        title={c.note}
+                        aria-pressed={draft.baseUrl === c.baseUrl}
+                        onClick={() => {
+                          set({ provider: 'chat_completions', baseUrl: c.baseUrl });
+                          models.reset();
+                        }}
+                      >
+                        {c.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {(() => {
+                  const picked = compatible.data.find((c) => c.baseUrl === draft.baseUrl);
+                  if (!picked) return null;
+                  return (
+                    <p className="mt-2 text-xs text-muted" role="status">
+                      {picked.note}{' '}
+                      {picked.allowed
+                        ? picked.local
+                          ? 'Change localhost to the machine it runs on, if that is not this server.'
+                          : ''
+                        : `This address is on your own network, so whoever runs this server must allow it first (ASSISTANT_PRIVATE_HOSTS=${new URL(picked.baseUrl).host}).`}
+                    </p>
+                  );
+                })()}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -372,7 +425,9 @@ export function SettingsPanel() {
                 help={
                   keySaved
                     ? 'A key is saved and encrypted. Paste a new one to replace it.'
-                    : 'Stored encrypted. It is only ever sent to this provider.'
+                    : choice === CUSTOM
+                      ? 'Only if the server needs one (servers on your own machine usually do not). Stored encrypted.'
+                      : 'Stored encrypted. It is only ever sent to this provider.'
                 }
               >
                 {(p) => (
@@ -413,7 +468,7 @@ export function SettingsPanel() {
                   variant="ghost"
                   onClick={() => models.mutate()}
                   loading={models.isPending}
-                  disabled={!keySaved && !apiKey}
+                  disabled={!keySaved && !apiKey && choice !== CUSTOM}
                 >
                   <RefreshCw /> {models.data ? 'Refresh' : 'Fetch models'}
                 </Button>
@@ -496,23 +551,25 @@ export function SettingsPanel() {
       ) : null}
 
       {access.isAdmin ? (
-        <Pane title="Workspace setup">
+        <Pane title="Workspace setup and configuration">
           <div className="flex items-start justify-between gap-4">
             <div className="text-sm">
               <p>
-                Let the assistant set up this workspace for your business: names, fields, pipelines, roles,
-                modules and industry presets. Only admins can use it, and every change is shown for you to
-                confirm first. Nothing you set up yourself is overwritten.
+                Let the assistant set up and configure this workspace: names, settings, branding, fields,
+                layouts, pipelines, roles, teams, automations, templates, forms, views, reports, dashboards,
+                objects, modules and industry presets. Only admins can use it, and every change is shown for
+                you to confirm first, then recorded in the audit log as made by the assistant.
               </p>
               <p className="mt-1 text-muted">
-                Off by default. Turn it off again once your workspace is set up.
+                It never deletes anything, and never touches security, compliance, users, API keys, webhooks,
+                email accounts or privacy requests. Off by default.
               </p>
             </div>
             <Switch
               checked={saved?.setupEnabled ?? false}
               onCheckedChange={(on) => toggleSetup.mutate(on)}
               disabled={toggleSetup.isPending}
-              aria-label="Let the assistant set up the workspace"
+              aria-label="Let the assistant set up and configure the workspace"
             />
           </div>
         </Pane>

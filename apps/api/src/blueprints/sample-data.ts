@@ -173,8 +173,17 @@ export async function seedSampleData(
       n++;
     }
 
-    for (const l of data.leads) {
+    // Leads with a `stage` go on the default lead pipeline when the blueprint turns that pipeline on.
+    const leadPipeline = (bp.settings as { features?: { leadPipeline?: boolean } }).features?.leadPipeline
+      ? await trx('pipelines').where({ entity: 'lead', is_default: true }).first()
+      : undefined;
+    const leadStages = leadPipeline
+      ? await trx('pipeline_stages').where({ pipeline_id: leadPipeline.id }).orderBy('sort_order')
+      : [];
+    for (const [i, l] of data.leads.entries()) {
       const phone = str(l.phone);
+      const stage = leadStages.find((s) => s.key === l.stage) ?? leadStages[0];
+      const entered = past(relativeTime(num(l.stage_days) ?? Math.min((num(l.days) ?? 0) + 1, 0), 11));
       const uuid = newUuid();
       const ownerId = owner(l);
       const [id] = await trx('leads').insert({
@@ -192,7 +201,15 @@ export async function seedSampleData(
         created_by: ownerId,
         created_at: at(l),
         custom: JSON.stringify(l.custom ?? {}),
+        ...(stage && {
+          pipeline_id: leadPipeline.id,
+          stage_id: stage.id,
+          stage_entered_at: entered,
+          position: (i + 1) * 1000,
+        }),
       });
+      if (stage)
+        await trx('lead_stage_history').insert({ lead_id: id, to_stage_id: stage.id, changed_at: entered });
       remember(refs.lead, l, id!, uuid);
       n++;
     }

@@ -106,6 +106,8 @@ const keywords = (question: string) =>
 
 const TASK =
   /\b(?:create|add|make|set up|new)\b.*\btask\b(?:\s*(?:to|for|:|called|named))?\s*(.*)|\bremind me to\s+(.*)/i;
+const CONFIGURE = /\b(configur\w*|settings?|set ?up|customi[sz]e|what can you (change|do))\b/i;
+const TAG = /\b(?:add|create|make)\b.*\btag\b\s*(?:called|named|:)?\s*["']?([^"'.?!]+)/i;
 const GREETING = /^\s*(hi|hello|hey|thanks|thank you|good (morning|afternoon|evening))\b/i;
 
 function answerList(turn: Turn, types: RecordType[]): string {
@@ -172,6 +174,20 @@ function decide(req: ChatRequest): Block[] {
         use('create_task', { subject: subject[0]!.toUpperCase() + subject.slice(1), priority: 'normal' }),
       ];
     }
+    // Configuration (admins with setup on): a tag to show the confirm step, or what can be changed.
+    const tag = TAG.exec(turn.question);
+    if (tag && has('config_change')) {
+      const name = tag[1]!.trim().slice(0, 60);
+      return [
+        use('config_change', {
+          method: 'post',
+          path: '/tags',
+          body: { name },
+          summary: `Add the tag "${name}"`,
+        }),
+      ];
+    }
+    if (CONFIGURE.test(turn.question) && has('config_overview')) return [use('config_overview', {})];
     if (has('describe_schema')) return [use('describe_schema', {})];
   }
 
@@ -193,6 +209,37 @@ function decide(req: ChatRequest): Block[] {
 
   if (last && (last.name === 'list_records' || last.name === 'search_records'))
     return [{ type: 'text', text: answerList(turn, types) }];
+
+  if (last?.name === 'config_overview') {
+    const data = parse(last.result);
+    const areas = isObj(data) && Array.isArray(data.areas) ? data.areas.filter(isObj) : [];
+    return [
+      {
+        type: 'text',
+        text: [
+          'Here is what I can configure for you, each change only after you confirm it:',
+          '',
+          ...areas.map((a) => `- **${cell(a.title)}**`),
+          '',
+          'I never delete anything, and never touch security, compliance, users, API keys, webhooks or email accounts.',
+          '',
+          '_Simulated reply for testing: no AI was used._',
+          '',
+          'Next: Add a tag called Priority | Show my contacts',
+        ].join('\n'),
+      },
+    ];
+  }
+
+  if (last?.name === 'config_change')
+    return [
+      {
+        type: 'text',
+        text: last.error
+          ? `That change was not made: ${cell(last.result)}.`
+          : 'Done: the change is made and recorded in the audit log.',
+      },
+    ];
 
   if (last?.name === 'create_task')
     return [

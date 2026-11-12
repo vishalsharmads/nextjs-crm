@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   AppError,
   allowsTestingAids,
-  assertSafeUrl,
   audit,
   escapeLike,
   callTool,
@@ -31,7 +30,9 @@ import type { Request, Response } from 'express';
 import * as m0001 from './migrations/0001_assistant';
 import * as m0002 from './migrations/0002_presets';
 import {
+  assertSafeModelUrl,
   chat,
+  modelHosts,
   chatStream,
   listModels,
   WIRE_FORMATS,
@@ -39,8 +40,9 @@ import {
   type ChatMessage,
   type ProviderConfig,
 } from './providers';
-import { findPreset, providerPresets, rankModels } from './catalog';
+import { compatibleServers, findPreset, providerPresets, rankModels } from './catalog';
 import { linkRecords, recordsIn, type RecordRef } from './links';
+import { CONFIG_PROMPT, CONFIG_TOOLS, describeChange, precheckConfigChange } from './config-tools';
 import { SETUP_PROMPT, SETUP_TOOLS } from './setup-tools';
 
 const CONFIG = 'm_assistant_config';
@@ -86,14 +88,16 @@ async function providerConfig(row: ConfigRow): Promise<ProviderConfig | null> {
     return allowsTestingAids()
       ? { provider: 'simulated', baseUrl: '', model: SIMULATED.recommended[0]!, apiKey: '', headers: {} }
       : null;
-  if (!row.provider || !row.base_url || !row.model || !row.api_key_enc) return null;
+  if (!row.provider || !row.base_url || !row.model) return null;
+  // Listed providers always need a key; a compatible server of your own may not (a local model).
+  if (!row.api_key_enc && row.preset) return null;
   const { profile } = await effectiveCompliance();
   if (profile === 'hipaa' && !row.hipaa_acknowledged) return null;
   return {
     provider: row.provider as ProviderConfig['provider'],
     baseUrl: row.base_url,
     model: row.model,
-    apiKey: decrypt(row.api_key_enc, KEY_AAD),
+    apiKey: row.api_key_enc ? decrypt(row.api_key_enc, KEY_AAD) : '',
     headers: json<Record<string, string>>(row.headers),
   };
 }
@@ -228,7 +232,15 @@ interface Pending {
   /** Results of read tools already run in this step. */
   results: Block[];
   /** Write tools waiting for the person to confirm or decline. `id` is ours, never the model's. */
-  proposals: { id: string; toolUseId: string; name: string; title: string; input: Record<string, unknown> }[];
+  proposals: {
+    id: string;
+    toolUseId: string;
+    name: string;
+    title: string;
+    input: Record<string, unknown>;
+    /** For configuration changes: what will happen, written by the server (never by the model). */
+    detail?: string;
+  }[];
 }
 
 async function conversationFor(uuid: string, user: AuthUser) {
@@ -253,7 +265,7 @@ async function append(conversationId: number, role: ChatMessage['role'], content
  * for admins, once an admin has turned setup on.
  */
 function toolsAllowed(cfg: ConfigRow, user: AuthUser): ToolDef[] {
-  return setupAllowed(cfg, user) ? [...toolDefs(), ...SETUP_TOOLS] : toolDefs();
+  return setupAllowed(cfg, user) ? [...toolDefs(), ...SETUP_TOOLS, ...CONFIG_TOOLS] : toolDefs();
 }
 
 const setupAllowed = (cfg: ConfigRow, user: AuthUser) => !!cfg.setup_enabled && user.isAdmin;
@@ -283,7 +295,20 @@ function touches(name: string, input: Record<string, unknown>): string[] {
     case 'apply_setup':
     case 'preview_preset':
     case 'add_preset':
+    case 'config_overview':
+    case 'config_schema':
+    case 'config_read':
       return []; // Workspace configuration, never records.
+    case 'config_change': {
+      // An automation acts on records of its type later, as its creator.
+      if (!String(input.path).startsWith('/automations')) return [];
+      const body = (input.body ?? {}) as { triggerEvent?: unknown; schedule?: { entity?: unknown } | null };
+      if (typeof body.triggerEvent === 'string' && body.triggerEvent.includes('.'))
+        add(body.triggerEvent.split('.')[0]);
+      add(body.schedule?.entity);
+      // An edit without its type in the change could be any automation.
+      return out.length || !String(input.path).match(/^\/automations\/./) ? out : ['*'];
+    }
     case 'list_records':
     case 'get_record':
       add(input.entity);
@@ -387,7 +412,7 @@ async function systemPrompt(cfg: ConfigRow, user: AuthUser) {
     'When you mention a record a tool returned, link it as [Its name](record:<entity>/<uuid>), with the entity key and uuid from the tool result.',
     'End each answer with one last line: "Next: " then two or three short follow-up requests the person might send, separated by " | ", written as they would ask them. Leave it out when you asked them a question.',
     ...(excludedNote(cfg) ? [excludedNote(cfg)] : []),
-    ...(setupAllowed(cfg, user) ? [SETUP_PROMPT] : []),
+    ...(setupAllowed(cfg, user) ? [SETUP_PROMPT, CONFIG_PROMPT] : []),
   ].join('\n');
 }
 
@@ -486,14 +511,20 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
     const proposals: Pending['proposals'] = [];
     for (const use of uses) {
       const def = defs.get(use.name);
+      // A change that can never run is answered now, instead of asking the person to confirm it.
+      const refused = def?.write ? await precheck(use, cfg, ctx, user) : null;
       // A tool_use must always get a result, or the conversation cannot continue.
-      if (def?.write)
+      if (refused) results.push(refused);
+      else if (def?.write)
         proposals.push({
           id: `p${proposals.length + 1}`,
           toolUseId: use.id,
           name: use.name,
           title: def.title,
           input: use.input,
+          ...(use.name === 'config_change'
+            ? { detail: describeChange(String(use.input.method), String(use.input.path), use.input.body) }
+            : {}),
         });
       else {
         streamSink.getStore()?.tool(def?.title ?? use.name);
@@ -513,11 +544,38 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
   ]);
 }
 
+/** A refusal result for a proposed change that cannot run, or null when it may be proposed. */
+async function precheck(
+  use: Extract<Block, { type: 'tool_use' }>,
+  cfg: ConfigRow,
+  ctx: RequestContext,
+  user: AuthUser,
+): Promise<Block | null> {
+  if (use.name !== 'config_change') return null;
+  const asUser: AuthUser = { ...user, via: 'assistant' };
+  try {
+    const excluded = json<string[]>(cfg.excluded_entities);
+    const hit = excluded.length ? touches(use.name, use.input) : [];
+    if (hit.some((t) => t === '*' || excluded.includes(t)))
+      throw new AppError('FORBIDDEN', 'The assistant may not use this record type');
+    await precheckConfigChange(use.input, { ctx: { ...ctx, user: asUser }, user: asUser });
+    return null;
+  } catch (err) {
+    if (!(err instanceof AppError)) throw err;
+    return {
+      type: 'tool_result',
+      tool_use_id: use.id,
+      content: JSON.stringify({ error: err.code, message: err.message, details: err.details }),
+      is_error: true,
+    };
+  }
+}
+
 /** What the web shows: text, tool activity and pending proposals (never raw tool output). */
 async function conversationDto(uuid: string, user: AuthUser) {
   const conv = await conversationFor(uuid, user);
   const messages = await history(conv.id);
-  const defs = new Map([...toolDefs(), ...SETUP_TOOLS].map((t) => [t.name, t]));
+  const defs = new Map([...toolDefs(), ...SETUP_TOOLS, ...CONFIG_TOOLS].map((t) => [t.name, t]));
   const items: { role: 'user' | 'assistant'; text?: string; tools?: string[] }[] = [];
   // Steps the assistant took (tool calls, often with blank text) are gathered onto its next reply,
   // so one answer shows as one bubble instead of a row of empty ones.
@@ -609,7 +667,7 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
         : preset
           ? { ...input, provider: preset.format, baseUrl: preset.baseUrl, headers: preset.headers }
           : input;
-      if (body.baseUrl) await assertSafeUrl(body.baseUrl, 'baseUrl');
+      if (body.baseUrl) await assertSafeModelUrl(body.baseUrl);
       const reserved = Object.keys(body.headers ?? {}).filter((h) => RESERVED_HEADERS.has(h.toLowerCase()));
       if (reserved.length)
         throw new AppError('VALIDATION_FAILED', 'These headers are set by the app', [
@@ -661,7 +719,14 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     path: '/providers',
     permission: 'assistant.settings.manage',
     summary: 'AI providers an admin can pick, with where to get a key and the recommended models',
-    handler: async () => ({ data: presets() }),
+    handler: async () => ({
+      data: presets(),
+      // Starting points for a compatible server; `allowed` says whether a local one is reachable.
+      compatible: compatibleServers().map((c) => ({
+        ...c,
+        allowed: !c.local || modelHosts().includes(new URL(c.baseUrl).host.toLowerCase()),
+      })),
+    }),
   })
   .add({
     method: 'post',
@@ -693,10 +758,10 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       const apiKey =
         body.apiKey ??
         (cfg.api_key_enc && baseUrl === cfg.base_url ? decrypt(cfg.api_key_enc, KEY_AAD) : null);
-      if (!apiKey) throw new AppError('VALIDATION_FAILED', 'Enter the API key first');
+      if (!apiKey && preset) throw new AppError('VALIDATION_FAILED', 'Enter the API key first');
       const headers =
         preset?.headers ?? (baseUrl === cfg.base_url ? json<Record<string, string>>(cfg.headers) : {});
-      const ids = await listModels({ provider, baseUrl, apiKey, headers });
+      const ids = await listModels({ provider, baseUrl, apiKey: apiKey ?? '', headers });
       return { data: rankModels(ids, preset?.recommended ?? []) };
     },
   })

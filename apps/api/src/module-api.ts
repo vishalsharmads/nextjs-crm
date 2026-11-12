@@ -4,7 +4,7 @@
  */
 import { env as appEnv, isProd as appIsProd } from './config/env';
 
-export { defineRoutes, type RouteGroup } from './http/routes';
+export { callRoute, defineRoutes, routeRegistry, type HttpMethod, type RouteGroup } from './http/routes';
 export { systemContext, type AuthUser, type RequestContext } from './http/context';
 export type { ApiModule } from './modules/types';
 export type { Migration } from './db/migrations';

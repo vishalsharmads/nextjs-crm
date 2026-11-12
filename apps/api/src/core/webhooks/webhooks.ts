@@ -48,15 +48,23 @@ function isPrivate(ip: string): boolean {
 
 /**
  * Outbound targets (webhooks, the assistant's model provider) must be https (or http in dev) and
- * must not resolve to internal addresses, unless WEBHOOKS_ALLOW_PRIVATE is set.
+ * must not resolve to internal addresses, unless WEBHOOKS_ALLOW_PRIVATE is set. `privateHosts`
+ * lists exact `host:port` pairs the server operator allowed (http and private addresses included),
+ * such as a model server on the same machine.
  */
-export async function assertSafeUrl(raw: string, path = 'url') {
+export async function assertSafeUrl(raw: string, path = 'url', opts: { privateHosts?: string[] } = {}) {
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
     throw new AppError('VALIDATION_FAILED', 'Enter a valid URL', [{ path, message: 'Invalid URL' }]);
   }
+  const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+  if (
+    (url.protocol === 'http:' || url.protocol === 'https:') &&
+    opts.privateHosts?.includes(`${url.hostname.toLowerCase()}:${port}`)
+  )
+    return;
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && env.WEBHOOKS_ALLOW_PRIVATE)) {
     throw new AppError('VALIDATION_FAILED', 'Webhook URLs must use https', [{ path, message: 'Use https' }]);
   }

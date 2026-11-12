@@ -40,6 +40,29 @@ async function withRetry(send: () => Promise<Response>): Promise<Response> {
   }
 }
 
+/**
+ * Private addresses the server operator allowed for model servers (`ASSISTANT_PRIVATE_HOSTS`,
+ * comma-separated `host:port`, such as `localhost:11434`). Admins cannot add to it.
+ */
+export function modelHosts(): string[] {
+  return (process.env.ASSISTANT_PRIVATE_HOSTS ?? '')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter((h) => /^[a-z0-9.-]+:\d{1,5}$|^\[[0-9a-f:]+\]:\d{1,5}$/.test(h));
+}
+
+/** Checked on every call too, so a host that later resolves to an internal address is refused. */
+export const assertSafeModelUrl = (url: string) =>
+  assertSafeUrl(url, 'baseUrl', { privateHosts: modelHosts() });
+
+/** The key, in the header the format expects; none when the server needs no key. */
+function authHeaders(cfg: { provider: ProviderKind; apiKey: string }): Record<string, string> {
+  if (!cfg.apiKey) return {};
+  return cfg.provider === 'messages'
+    ? { 'x-api-key': cfg.apiKey }
+    : { authorization: `Bearer ${cfg.apiKey}` };
+}
+
 /** Content in the conversation, in one shape for every provider. */
 export type Block =
   | { type: 'text'; text: string }
@@ -103,7 +126,7 @@ const MAX_RESPONSE = 2_000_000;
 
 async function post(url: string, headers: Record<string, string>, body: unknown): Promise<unknown> {
   // Checked on every call too, so a host that later resolves to an internal address is refused.
-  await assertSafeUrl(url, 'baseUrl');
+  await assertSafeModelUrl(url);
   const res = await withRetry(async () => {
     try {
       return await fetch(url, {
@@ -136,9 +159,8 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
 export async function listModels(cfg: Omit<ProviderConfig, 'model'>): Promise<string[]> {
   const url =
     cfg.provider === 'messages' ? join(cfg.baseUrl, '/v1/models?limit=1000') : join(cfg.baseUrl, '/models');
-  await assertSafeUrl(url, 'baseUrl');
-  const auth: Record<string, string> =
-    cfg.provider === 'messages' ? { 'x-api-key': cfg.apiKey } : { authorization: `Bearer ${cfg.apiKey}` };
+  await assertSafeModelUrl(url);
+  const auth: Record<string, string> = authHeaders(cfg);
   let res: Response;
   try {
     res = await fetch(url, {
@@ -185,7 +207,7 @@ const join = (base: string, path: string) => `${base.replace(/\/+$/, '')}${path}
 async function messagesApi(cfg: ProviderConfig, req: ChatRequest): Promise<ChatResult> {
   const out = (await post(
     join(cfg.baseUrl, '/v1/messages'),
-    { ...cfg.headers, 'x-api-key': cfg.apiKey },
+    { ...cfg.headers, ...authHeaders(cfg) },
     {
       model: cfg.model,
       max_tokens: 2048,
@@ -244,7 +266,7 @@ async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promis
   const messages = chatMessages(req);
   const out = (await post(
     join(cfg.baseUrl, '/chat/completions'),
-    { ...cfg.headers, authorization: `Bearer ${cfg.apiKey}` },
+    { ...cfg.headers, ...authHeaders(cfg) },
     {
       model: cfg.model,
       max_tokens: 2048,
@@ -322,7 +344,7 @@ async function* sseEvents(res: Response): AsyncGenerator<{ event: string | null;
 }
 
 async function open(url: string, headers: Record<string, string>, body: unknown): Promise<Response> {
-  await assertSafeUrl(url, 'baseUrl');
+  await assertSafeModelUrl(url);
   const res = await withRetry(async () => {
     try {
       return await fetch(url, {
@@ -371,7 +393,7 @@ async function messagesStream(
 ): Promise<ChatResult> {
   const res = await open(
     join(cfg.baseUrl, '/v1/messages'),
-    { ...cfg.headers, 'x-api-key': cfg.apiKey },
+    { ...cfg.headers, ...authHeaders(cfg) },
     {
       model: cfg.model,
       max_tokens: 2048,
@@ -431,7 +453,7 @@ async function chatCompletionsStream(
 ): Promise<ChatResult> {
   const res = await open(
     join(cfg.baseUrl, '/chat/completions'),
-    { ...cfg.headers, authorization: `Bearer ${cfg.apiKey}` },
+    { ...cfg.headers, ...authHeaders(cfg) },
     {
       model: cfg.model,
       max_tokens: 2048,

@@ -1,0 +1,1148 @@
+{
+  "$schema": "../schema.json",
+  "key": "charity-fundraising",
+  "name": "Charity fundraising agencies",
+  "version": "1.0.0",
+  "description": "Charity clients, fundraising campaigns and supporters for face-to-face and telephone fundraising agencies, from pitch to live campaign, welcome calls, quality checks and retention.",
+  "settings": {
+    "features": {
+      "leads": true
+    },
+    "general": {
+      "currency": "GBP"
+    },
+    "contacts": {
+      "sources": [
+        "Door to door",
+        "Street",
+        "Private site",
+        "Event",
+        "Telephone",
+        "Digital",
+        "Referral",
+        "Other"
+      ],
+      "lifecycleStatuses": [
+        "New sign-up",
+        "Welcomed",
+        "Active supporter",
+        "At risk",
+        "Cancelled",
+        "Charity contact"
+      ]
+    },
+    "deals": {
+      "lostReasons": [
+        "Chose another agency",
+        "Budget cut",
+        "Moved fundraising in-house",
+        "Channel paused",
+        "Compliance concerns",
+        "No response"
+      ]
+    }
+  },
+  "vocabulary": {
+    "contact": {
+      "singular": "Supporter",
+      "plural": "Supporters"
+    },
+    "organization": {
+      "singular": "Charity",
+      "plural": "Charities"
+    },
+    "deal": {
+      "singular": "Campaign",
+      "plural": "Campaigns"
+    }
+  },
+  "modules": [],
+  "objects": [
+    {
+      "key": "shift",
+      "singular": "Fundraising shift",
+      "plural": "Fundraising shifts",
+      "icon": "calendar",
+      "description": "A team’s day in the field or on the phones: where, who and how many sign-ups.",
+      "links": ["deal"]
+    }
+  ],
+  "custom_field_groups": {
+    "contact": [
+      {
+        "key": "giving",
+        "label": "Giving"
+      }
+    ],
+    "deal": [
+      {
+        "key": "campaign",
+        "label": "Campaign details"
+      }
+    ],
+    "shift": [
+      {
+        "key": "shift",
+        "label": "Shift"
+      }
+    ]
+  },
+  "custom_fields": {
+    "contact": [
+      {
+        "key": "signup_channel",
+        "label": "Sign-up channel",
+        "type": "select",
+        "group": "giving",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "door_to_door",
+            "label": "Door to door"
+          },
+          {
+            "key": "street",
+            "label": "Street"
+          },
+          {
+            "key": "private_site",
+            "label": "Private site"
+          },
+          {
+            "key": "event",
+            "label": "Event"
+          },
+          {
+            "key": "telephone",
+            "label": "Telephone"
+          },
+          {
+            "key": "digital",
+            "label": "Digital"
+          }
+        ]
+      },
+      {
+        "key": "monthly_gift",
+        "label": "Monthly gift",
+        "type": "currency",
+        "group": "giving",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "signup_date",
+        "label": "Sign-up date",
+        "type": "date",
+        "group": "giving",
+        "filterable": true
+      },
+      {
+        "key": "welcome_call",
+        "label": "Welcome call",
+        "type": "select",
+        "group": "giving",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "pending",
+            "label": "Pending"
+          },
+          {
+            "key": "completed",
+            "label": "Completed"
+          },
+          {
+            "key": "no_answer",
+            "label": "No answer"
+          },
+          {
+            "key": "declined",
+            "label": "Declined"
+          }
+        ]
+      },
+      {
+        "key": "qc_status",
+        "label": "Quality check",
+        "type": "select",
+        "group": "giving",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "pending",
+            "label": "Pending"
+          },
+          {
+            "key": "passed",
+            "label": "Passed"
+          },
+          {
+            "key": "failed",
+            "label": "Failed"
+          }
+        ]
+      },
+      {
+        "key": "gift_aid",
+        "label": "Gift Aid declared",
+        "type": "boolean",
+        "group": "giving",
+        "filterable": true
+      },
+      {
+        "key": "check_in_due",
+        "label": "Check-in call due",
+        "type": "date",
+        "group": "giving",
+        "filterable": true
+      }
+    ],
+    "deal": [
+      {
+        "key": "channel",
+        "label": "Channel",
+        "type": "select",
+        "group": "campaign",
+        "required": true,
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "face_to_face",
+            "label": "Face to face"
+          },
+          {
+            "key": "telephone",
+            "label": "Telephone"
+          },
+          {
+            "key": "digital",
+            "label": "Digital"
+          },
+          {
+            "key": "mixed",
+            "label": "Mixed"
+          }
+        ]
+      },
+      {
+        "key": "target_signups",
+        "label": "Target sign-ups",
+        "type": "number",
+        "group": "campaign",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "start_date",
+        "label": "Start date",
+        "type": "date",
+        "group": "campaign",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "end_date",
+        "label": "End date",
+        "type": "date",
+        "group": "campaign",
+        "filterable": true
+      },
+      {
+        "key": "retention_target",
+        "label": "12-month retention target (%)",
+        "type": "decimal",
+        "group": "campaign",
+        "validation": {
+          "min": 0,
+          "max": 100,
+          "scale": 1
+        }
+      }
+    ],
+    "shift": [
+      {
+        "key": "shift_date",
+        "label": "Date",
+        "type": "date",
+        "group": "shift",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "location",
+        "label": "Location",
+        "type": "text",
+        "group": "shift",
+        "show_in_list": true
+      },
+      {
+        "key": "fundraisers",
+        "label": "Fundraisers",
+        "type": "number",
+        "group": "shift",
+        "show_in_list": true
+      },
+      {
+        "key": "signups",
+        "label": "Sign-ups",
+        "type": "number",
+        "group": "shift",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "average_gift",
+        "label": "Average gift",
+        "type": "currency",
+        "group": "shift",
+        "show_in_list": true
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "campaigns",
+      "name": "Campaigns",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        {
+          "key": "enquiry",
+          "name": "Enquiry",
+          "probability": 10,
+          "rotting_days": 7
+        },
+        {
+          "key": "pitch",
+          "name": "Pitch",
+          "probability": 30,
+          "rotting_days": 14
+        },
+        {
+          "key": "proposal",
+          "name": "Proposal",
+          "probability": 50,
+          "rotting_days": 14
+        },
+        {
+          "key": "contracting",
+          "name": "Contracting",
+          "probability": 80,
+          "rotting_days": 21
+        },
+        {
+          "key": "live",
+          "name": "Live",
+          "probability": 100,
+          "is_won": true
+        },
+        {
+          "key": "lost",
+          "name": "Lost",
+          "probability": 0,
+          "is_lost": true
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "fundraiser",
+      "name": "Fundraiser",
+      "description": "Signs up supporters in the field and sees only their own sign-ups",
+      "permissions": [
+        "core.contacts.view",
+        "core.contacts.create",
+        "core.contacts.update",
+        "core.organizations.view",
+        "core.deals.view",
+        "core.activities.*",
+        "core.tags.view",
+        "core.dashboard.view",
+        "custom.shift.view"
+      ],
+      "scopes": {
+        "core.contacts": "own",
+        "core.activities": "own",
+        "core.deals": "all",
+        "core.organizations": "all",
+        "custom.shift": "all"
+      }
+    },
+    {
+      "key": "supporter_care",
+      "name": "Supporter care",
+      "description": "Makes welcome, quality-check and check-in calls to every supporter",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.view",
+        "core.deals.view",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.view",
+        "core.saved_views.share",
+        "custom.shift.*"
+      ],
+      "scopes": {
+        "*": "all"
+      }
+    },
+    {
+      "key": "account_manager",
+      "name": "Account manager",
+      "description": "Wins and runs charity campaigns, from pitch to live reporting",
+      "permissions": [
+        "core.contacts.view",
+        "core.organizations.*",
+        "core.leads.*",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.view",
+        "core.saved_views.share",
+        "custom.shift.*"
+      ],
+      "scopes": {
+        "*": "all"
+      }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "contact",
+      "context": "list",
+      "columns": [
+        "full_name",
+        "organization",
+        "lifecycle_status",
+        "cf.signup_channel",
+        "cf.monthly_gift",
+        "cf.welcome_call",
+        "cf.qc_status",
+        "owner"
+      ]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": [
+        "title",
+        "organization",
+        "stage",
+        "value",
+        "cf.channel",
+        "cf.target_signups",
+        "cf.start_date",
+        "owner"
+      ]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "pipeline_value",
+        "type": "pipeline_value",
+        "title": "Campaigns by stage",
+        "size": "lg",
+        "params": {
+          "pipeline": "campaigns"
+        }
+      },
+      {
+        "key": "starts",
+        "type": "date_window",
+        "title": "Campaigns starting in the next 30 days",
+        "size": "md",
+        "params": {
+          "entity": "deal",
+          "field": "cf.start_date",
+          "days": 30
+        }
+      },
+      {
+        "key": "checkins",
+        "type": "date_window",
+        "title": "Supporter check-ins due in the next 14 days",
+        "size": "md",
+        "params": {
+          "entity": "contact",
+          "field": "cf.check_in_due",
+          "days": 14
+        }
+      },
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      }
+    ]
+  },
+  "templates": [
+    {
+      "key": "supporter.welcome",
+      "channel": "email",
+      "name": "Welcome to new supporter",
+      "subject": "Thank you for your support",
+      "body": "<p>Hi {{contact.firstName}},</p><p>Thank you for signing up today. Your monthly gift makes a real difference, and we wanted to confirm your details and let you know what happens next.</p><p>One of our team will call you in the next few days to say thank you and answer any questions. If anything looks wrong, just reply to this email.</p>"
+    },
+    {
+      "key": "supporter.check_in",
+      "channel": "email",
+      "name": "Supporter check-in",
+      "subject": "A quick update on your impact",
+      "body": "<p>Hi {{contact.firstName}},</p><p>It has been a few months since you started giving, and we wanted to share what your support has helped achieve so far.</p><p>If you would like to change your gift or how we keep in touch, reply to this email and we will sort it out.</p>"
+    },
+    {
+      "key": "charity.campaign_report",
+      "channel": "email",
+      "name": "Weekly campaign report",
+      "subject": "Your weekly campaign report",
+      "body": "<p>Hi {{contact.firstName}},</p><p>Here is this week’s summary for your campaign: sign-ups, average gift, quality-check pass rate and welcome-call reach. Your full breakdown is attached.</p><p>Happy to talk through any of it on our next call.</p>"
+    }
+  ],
+  "sample_data": {
+    "organizations": [
+      {
+        "ref": "riverside",
+        "name": "Riverside Children’s Trust",
+        "website": "https://riverside-trust.test",
+        "industry": "Children and young people",
+        "days": -300,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "shelter",
+        "name": "Open Door Housing",
+        "website": "https://opendoorhousing.test",
+        "industry": "Homelessness",
+        "days": -260,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "wildwood",
+        "name": "Wildwood Conservation",
+        "website": "https://wildwood.test",
+        "industry": "Environment",
+        "days": -200
+      },
+      {
+        "ref": "brightsight",
+        "name": "Brightsight Foundation",
+        "website": "https://brightsight.test",
+        "industry": "Health and disability",
+        "days": -120,
+        "owner": "admin"
+      },
+      {
+        "ref": "lifeline",
+        "name": "Lifeline Water Aid",
+        "website": "https://lifelinewater.test",
+        "industry": "International development",
+        "days": -60
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "harper",
+        "first_name": "Ella",
+        "last_name": "Harper",
+        "email": "ella.harper@example.test",
+        "phone": "+44 20 7946 0390",
+        "lifecycle_status": "Charity contact",
+        "source": "Referral",
+        "organization": "riverside",
+        "custom": {},
+        "days": -290,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "osei",
+        "first_name": "Kwame",
+        "last_name": "Osei",
+        "email": "kwame.osei@example.test",
+        "phone": "+44 20 7946 0350",
+        "lifecycle_status": "Charity contact",
+        "source": "Referral",
+        "organization": "shelter",
+        "custom": {},
+        "days": -250,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "lind",
+        "first_name": "Sara",
+        "last_name": "Lind",
+        "email": "sara.lind@example.test",
+        "phone": "+44 20 7946 0210",
+        "lifecycle_status": "Charity contact",
+        "source": "Event",
+        "organization": "brightsight",
+        "custom": {},
+        "days": -110,
+        "owner": "admin"
+      },
+      {
+        "ref": "patel",
+        "first_name": "Priya",
+        "last_name": "Patel",
+        "email": "priya.patel@example.test",
+        "phone": "+44 20 7946 0101",
+        "lifecycle_status": "New sign-up",
+        "source": "Door to door",
+        "organization": "riverside",
+        "custom": {
+          "signup_channel": "door_to_door",
+          "monthly_gift": 10,
+          "signup_date": "{{date:-1}}",
+          "welcome_call": "pending",
+          "qc_status": "pending",
+          "gift_aid": true
+        },
+        "days": -1,
+        "owner": "fundraiser"
+      },
+      {
+        "ref": "murphy",
+        "first_name": "Sean",
+        "last_name": "Murphy",
+        "email": "sean.murphy@example.test",
+        "phone": "+44 20 7946 0102",
+        "lifecycle_status": "New sign-up",
+        "source": "Street",
+        "organization": "shelter",
+        "custom": {
+          "signup_channel": "street",
+          "monthly_gift": 8,
+          "signup_date": "{{date:-2}}",
+          "welcome_call": "no_answer",
+          "qc_status": "pending"
+        },
+        "days": -2,
+        "owner": "fundraiser"
+      },
+      {
+        "ref": "clarke",
+        "first_name": "Hannah",
+        "last_name": "Clarke",
+        "email": "hannah.clarke@example.test",
+        "phone": "+44 20 7946 0109",
+        "lifecycle_status": "Welcomed",
+        "source": "Private site",
+        "organization": "riverside",
+        "custom": {
+          "signup_channel": "private_site",
+          "monthly_gift": 12,
+          "signup_date": "{{date:-9}}",
+          "welcome_call": "completed",
+          "qc_status": "passed",
+          "gift_aid": true,
+          "check_in_due": "{{date:+5}}"
+        },
+        "days": -9,
+        "owner": "fundraiser"
+      },
+      {
+        "ref": "ahmed",
+        "first_name": "Yusuf",
+        "last_name": "Ahmed",
+        "email": "yusuf.ahmed@example.test",
+        "phone": "+44 20 7946 0114",
+        "lifecycle_status": "Welcomed",
+        "source": "Telephone",
+        "organization": "wildwood",
+        "custom": {
+          "signup_channel": "telephone",
+          "monthly_gift": 15,
+          "signup_date": "{{date:-14}}",
+          "welcome_call": "completed",
+          "qc_status": "passed",
+          "check_in_due": "{{date:+10}}"
+        },
+        "days": -14,
+        "owner": "supporter_care"
+      },
+      {
+        "ref": "jones",
+        "first_name": "Megan",
+        "last_name": "Jones",
+        "email": "megan.jones@example.test",
+        "phone": "+44 20 7946 0280",
+        "lifecycle_status": "Active supporter",
+        "source": "Door to door",
+        "organization": "riverside",
+        "custom": {
+          "signup_channel": "door_to_door",
+          "monthly_gift": 10,
+          "signup_date": "{{date:-180}}",
+          "welcome_call": "completed",
+          "qc_status": "passed",
+          "gift_aid": true,
+          "check_in_due": "{{date:+3}}"
+        },
+        "days": -180,
+        "owner": "fundraiser"
+      },
+      {
+        "ref": "novak",
+        "first_name": "Tomas",
+        "last_name": "Novak",
+        "email": "tomas.novak@example.test",
+        "phone": "+44 20 7946 0250",
+        "lifecycle_status": "Active supporter",
+        "source": "Event",
+        "organization": "brightsight",
+        "custom": {
+          "signup_channel": "event",
+          "monthly_gift": 20,
+          "signup_date": "{{date:-150}}",
+          "welcome_call": "completed",
+          "qc_status": "passed"
+        },
+        "days": -150,
+        "owner": "fundraiser"
+      },
+      {
+        "ref": "okafor",
+        "first_name": "Grace",
+        "last_name": "Okafor",
+        "email": "grace.okafor@example.test",
+        "phone": "+44 20 7946 0195",
+        "lifecycle_status": "Active supporter",
+        "source": "Digital",
+        "organization": "wildwood",
+        "custom": {
+          "signup_channel": "digital",
+          "monthly_gift": 5,
+          "signup_date": "{{date:-95}}",
+          "welcome_call": "completed",
+          "qc_status": "passed",
+          "gift_aid": true
+        },
+        "days": -95,
+        "owner": "supporter_care"
+      },
+      {
+        "ref": "evans",
+        "first_name": "Rhys",
+        "last_name": "Evans",
+        "email": "rhys.evans@example.test",
+        "phone": "+44 20 7946 0160",
+        "lifecycle_status": "At risk",
+        "source": "Street",
+        "organization": "shelter",
+        "custom": {
+          "signup_channel": "street",
+          "monthly_gift": 8,
+          "signup_date": "{{date:-60}}",
+          "welcome_call": "declined",
+          "qc_status": "passed",
+          "check_in_due": "{{date:+1}}"
+        },
+        "days": -60,
+        "owner": "fundraiser"
+      },
+      {
+        "ref": "silva",
+        "first_name": "Ana",
+        "last_name": "Silva",
+        "email": "ana.silva@example.test",
+        "phone": "+44 20 7946 0140",
+        "lifecycle_status": "Cancelled",
+        "source": "Door to door",
+        "organization": "riverside",
+        "custom": {
+          "signup_channel": "door_to_door",
+          "monthly_gift": 10,
+          "signup_date": "{{date:-40}}",
+          "welcome_call": "no_answer",
+          "qc_status": "failed"
+        },
+        "days": -40,
+        "owner": "fundraiser"
+      }
+    ],
+    "leads": [
+      {
+        "ref": "moss",
+        "first_name": "Daniel",
+        "last_name": "Moss",
+        "email": "daniel.moss@example.test",
+        "phone": "+44 20 7946 0201",
+        "source": "Referral",
+        "status": "new",
+        "days": 0,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "kaur",
+        "first_name": "Jasleen",
+        "last_name": "Kaur",
+        "email": "jasleen.kaur@example.test",
+        "phone": "+44 20 7946 0202",
+        "source": "Event",
+        "status": "contacted",
+        "days": -5,
+        "owner": "account_manager"
+      },
+      {
+        "ref": "bell",
+        "first_name": "Fiona",
+        "last_name": "Bell",
+        "email": "fiona.bell@example.test",
+        "phone": "+44 20 7946 0203",
+        "source": "Digital",
+        "status": "new",
+        "days": -1,
+        "owner": "admin"
+      }
+    ],
+    "deals": [
+      {
+        "ref": "lifeline_f2f",
+        "title": "Lifeline Water Aid – door-to-door pilot",
+        "organization": "lifeline",
+        "stage": "enquiry",
+        "value": 45000,
+        "days": -6,
+        "owner": "account_manager",
+        "custom": {
+          "channel": "face_to_face",
+          "target_signups": 300
+        }
+      },
+      {
+        "ref": "bright_tel",
+        "title": "Brightsight – warm calling",
+        "organization": "brightsight",
+        "contact": "lind",
+        "stage": "pitch",
+        "value": 28000,
+        "days": -20,
+        "owner": "admin",
+        "custom": {
+          "channel": "telephone",
+          "target_signups": 400,
+          "start_date": "{{date:+45}}"
+        }
+      },
+      {
+        "ref": "wild_digital",
+        "title": "Wildwood – digital acquisition",
+        "organization": "wildwood",
+        "stage": "proposal",
+        "value": 36000,
+        "days": -30,
+        "owner": "account_manager",
+        "custom": {
+          "channel": "digital",
+          "target_signups": 600,
+          "start_date": "{{date:+20}}",
+          "retention_target": 70
+        }
+      },
+      {
+        "ref": "shelter_street",
+        "title": "Open Door Housing – street fundraising",
+        "organization": "shelter",
+        "contact": "osei",
+        "stage": "contracting",
+        "value": 120000,
+        "days": -45,
+        "owner": "account_manager",
+        "custom": {
+          "channel": "face_to_face",
+          "target_signups": 900,
+          "start_date": "{{date:+14}}",
+          "end_date": "{{date:+194}}",
+          "retention_target": 65
+        }
+      },
+      {
+        "ref": "riverside_d2d",
+        "title": "Riverside – door to door 2026",
+        "organization": "riverside",
+        "contact": "harper",
+        "stage": "live",
+        "value": 210000,
+        "days": -200,
+        "stage_days": -150,
+        "owner": "account_manager",
+        "custom": {
+          "channel": "face_to_face",
+          "target_signups": 1500,
+          "start_date": "{{date:-150}}",
+          "end_date": "{{date:+215}}",
+          "retention_target": 70
+        }
+      },
+      {
+        "ref": "riverside_welcome",
+        "title": "Riverside – welcome and QC calls",
+        "organization": "riverside",
+        "contact": "harper",
+        "stage": "live",
+        "value": 18000,
+        "days": -160,
+        "stage_days": -140,
+        "owner": "admin",
+        "custom": {
+          "channel": "telephone",
+          "start_date": "{{date:-140}}"
+        }
+      },
+      {
+        "ref": "wild_events",
+        "title": "Wildwood – festival season",
+        "organization": "wildwood",
+        "stage": "pitch",
+        "value": 22000,
+        "days": -15,
+        "owner": "account_manager",
+        "custom": {
+          "channel": "face_to_face",
+          "target_signups": 350,
+          "start_date": "{{date:+60}}"
+        }
+      },
+      {
+        "ref": "bright_welcome",
+        "title": "Brightsight – welcome calls",
+        "organization": "brightsight",
+        "contact": "lind",
+        "stage": "proposal",
+        "value": 9000,
+        "days": -12,
+        "owner": "admin",
+        "custom": {
+          "channel": "telephone",
+          "start_date": "{{date:+30}}"
+        }
+      },
+      {
+        "ref": "shelter_check",
+        "title": "Open Door Housing – supporter check-ins",
+        "organization": "shelter",
+        "contact": "osei",
+        "stage": "live",
+        "value": 14000,
+        "days": -110,
+        "stage_days": -90,
+        "owner": "account_manager",
+        "custom": {
+          "channel": "telephone",
+          "start_date": "{{date:-90}}",
+          "retention_target": 75
+        }
+      },
+      {
+        "ref": "shelter_events",
+        "title": "Open Door Housing – summer events",
+        "organization": "shelter",
+        "stage": "lost",
+        "value": 30000,
+        "days": -120,
+        "stage_days": -90,
+        "lost_reason": "Budget cut",
+        "custom": {
+          "channel": "face_to_face",
+          "target_signups": 250
+        }
+      }
+    ],
+    "activities": [
+      {
+        "type": "call",
+        "related": "contact:patel",
+        "subject": "Welcome call: Priya Patel",
+        "due_days": 1,
+        "hour": 11,
+        "days": -1,
+        "owner": "supporter_care"
+      },
+      {
+        "type": "call",
+        "related": "contact:murphy",
+        "subject": "Retry welcome call (no answer)",
+        "due_days": 0,
+        "hour": 18,
+        "days": -1,
+        "owner": "supporter_care"
+      },
+      {
+        "type": "call",
+        "related": "contact:evans",
+        "subject": "Retention check-in: Rhys Evans",
+        "due_days": 1,
+        "hour": 12,
+        "days": -2,
+        "owner": "supporter_care"
+      },
+      {
+        "type": "note",
+        "related": "contact:silva",
+        "body": "<p>Quality check failed: supporter said they did not mean to set up a regular gift. Cancelled and logged; no further contact about this sign-up.</p>",
+        "days": -38,
+        "owner": "supporter_care"
+      },
+      {
+        "type": "note",
+        "related": "contact:evans",
+        "body": "<p>Declined the welcome call but kept giving. Mentioned money is tight; offer to reduce the gift rather than cancel.</p>",
+        "days": -55,
+        "owner": "supporter_care"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:bright_tel",
+        "subject": "Pitch: warm calling for lapsed supporters",
+        "due_days": 4,
+        "hour": 14,
+        "days": -10,
+        "owner": "admin"
+      },
+      {
+        "type": "task",
+        "related": "deal:wild_digital",
+        "subject": "Send digital proposal with cost per acquisition",
+        "due_days": 2,
+        "days": -3,
+        "owner": "account_manager"
+      },
+      {
+        "type": "task",
+        "related": "deal:shelter_street",
+        "subject": "Agree pitch locations and fundraiser briefing pack",
+        "due_days": 5,
+        "days": -4,
+        "owner": "account_manager"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:riverside_d2d",
+        "subject": "Monthly campaign review with charity",
+        "due_days": 6,
+        "hour": 10,
+        "days": -7,
+        "owner": "account_manager"
+      },
+      {
+        "type": "note",
+        "related": "deal:riverside_d2d",
+        "body": "<p>Month five: 1,020 sign-ups against 1,500 target, average gift £9.40, QC pass rate 96%. Charity asked for more evening shifts in the north team area.</p>",
+        "days": -6,
+        "owner": "account_manager"
+      },
+      {
+        "type": "task",
+        "related": "lead:moss",
+        "subject": "Introductory call about telephone fundraising",
+        "due_days": 1,
+        "days": 0,
+        "owner": "account_manager"
+      }
+    ],
+    "branding": {
+      "appName": "Kindline Fundraising",
+      "tagline": "Conversations that keep supporters giving",
+      "loginTitle": "Welcome to Kindline Fundraising",
+      "loginTagline": "Conversations that keep supporters giving",
+      "footerText": "Kindline Fundraising · Demo data",
+      "pdfHeader": "Kindline Fundraising",
+      "emailFromName": "Kindline Fundraising",
+      "fontFamily": "Public Sans",
+      "radius": 8,
+      "colors": {
+        "light": {
+          "primary": "#7A1F5C",
+          "accent": "#0F766E"
+        },
+        "dark": {
+          "primary": "#F0A6D3",
+          "accent": "#5EEAD4"
+        }
+      }
+    },
+    "requests": [
+      {
+        "method": "post",
+        "path": "/o/shift",
+        "body": {
+          "name": "North team – residential round",
+          "dealUuid": "{{deal:riverside_d2d}}",
+          "custom": {
+            "shift_date": "{{date:-3}}",
+            "location": "North district",
+            "fundraisers": 6,
+            "signups": 14,
+            "average_gift": 9.5
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/shift",
+        "body": {
+          "name": "East team – residential round",
+          "dealUuid": "{{deal:riverside_d2d}}",
+          "custom": {
+            "shift_date": "{{date:-2}}",
+            "location": "East district",
+            "fundraisers": 5,
+            "signups": 11,
+            "average_gift": 9
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/shift",
+        "body": {
+          "name": "North team – evening shift",
+          "dealUuid": "{{deal:riverside_d2d}}",
+          "custom": {
+            "shift_date": "{{date:-1}}",
+            "location": "North district",
+            "fundraisers": 4,
+            "signups": 9,
+            "average_gift": 10
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/shift",
+        "body": {
+          "name": "Welcome calls – week 22",
+          "dealUuid": "{{deal:riverside_welcome}}",
+          "custom": {
+            "shift_date": "{{date:-1}}",
+            "location": "Call centre",
+            "fundraisers": 3
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/shift",
+        "body": {
+          "name": "Station concourse launch day",
+          "dealUuid": "{{deal:shelter_street}}",
+          "custom": {
+            "shift_date": "{{date:14}}",
+            "location": "Central station",
+            "fundraisers": 8
+          }
+        }
+      }
+    ]
+  }
+}

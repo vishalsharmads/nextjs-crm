@@ -178,6 +178,8 @@ export async function apiStream(
   path: string,
   body: unknown,
   onEvent: (event: string, data: unknown) => void,
+  /** Stops reading (and tells the server the reader went away). */
+  signal?: AbortSignal,
 ): Promise<void> {
   const headers: Record<string, string> = {
     Accept: 'text/event-stream',
@@ -193,12 +195,14 @@ export async function apiStream(
       headers,
       credentials: 'same-origin',
       body: JSON.stringify(body),
+      signal,
     });
-  } catch {
+  } catch (err) {
+    if (signal?.aborted) throw err;
     throw new ApiError(0, 'NETWORK', 'Cannot reach the server. Check your connection and try again.');
   }
   if (!res.ok || !res.headers.get('content-type')?.includes('text/event-stream')) {
-    if (res.status === 401 && (await refreshSession())) return apiStream(path, body, onEvent);
+    if (res.status === 401 && (await refreshSession())) return apiStream(path, body, onEvent, signal);
     const err = (await res.json().catch(() => null)) as ApiErrorBody | null;
     throw new ApiError(
       res.status,

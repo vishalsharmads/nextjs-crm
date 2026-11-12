@@ -447,6 +447,53 @@ describe('assistant module', () => {
     await admin.patch('/m/assistant/config', { model: 'test-model' }).expect(200);
   });
 
+  it('offers compatible servers and works with one that needs no key', async () => {
+    const list = await admin.get('/m/assistant/providers').expect(200);
+    const local = list.body.compatible.find((c: { local: boolean }) => c.local);
+    expect(local).toMatchObject({ baseUrl: expect.stringMatching(/^http:\/\/localhost:/), allowed: false });
+
+    await admin
+      .patch('/m/assistant/config', {
+        preset: null,
+        provider: 'chat_completions',
+        baseUrl: base,
+        apiKey: null,
+      })
+      .expect(200);
+    expect((await admin.get('/m/assistant/status').expect(200)).body.ready).toBe(true);
+    replies = [{ choices: [{ message: { content: 'Local hello.' } }], usage: {} }];
+    seen.length = 0;
+    const res = await admin.post('/m/assistant/conversations', { text: 'Hi' }).expect(201);
+    expect(res.body.messages.at(-1).text).toBe('Local hello.');
+    expect(seen[0]!.headers.authorization).toBeUndefined();
+
+    await admin
+      .patch('/m/assistant/config', { provider: 'messages', baseUrl: base, apiKey: 'secret-key-123' })
+      .expect(200);
+  });
+
+  it('lets the operator allow exact private model hosts, and nothing else', async () => {
+    const { assertSafeUrl } = await import('../src/core/webhooks/webhooks');
+    const { env } = await import('../src/config/env');
+    const was = env.WEBHOOKS_ALLOW_PRIVATE;
+    env.WEBHOOKS_ALLOW_PRIVATE = false;
+    try {
+      await expect(assertSafeUrl('http://localhost:11434/v1')).rejects.toThrow();
+      await expect(
+        assertSafeUrl('http://localhost:11434/v1', 'baseUrl', { privateHosts: ['localhost:11434'] }),
+      ).resolves.toBeUndefined();
+      // Another port, or another private host, is still refused.
+      await expect(
+        assertSafeUrl('http://localhost:22/', 'baseUrl', { privateHosts: ['localhost:11434'] }),
+      ).rejects.toThrow();
+      await expect(
+        assertSafeUrl('http://169.254.169.254/', 'baseUrl', { privateHosts: ['localhost:11434'] }),
+      ).rejects.toThrow();
+    } finally {
+      env.WEBHOOKS_ALLOW_PRIVATE = was;
+    }
+  });
+
   it('lists providers and fills in format, address and headers from the one picked', async () => {
     const list = await admin.get('/m/assistant/providers').expect(200);
     const ids = list.body.data.map((p: { id: string }) => p.id);
@@ -468,8 +515,14 @@ describe('assistant module', () => {
   it('fetches chat models (saved key, saved address only) and tests the connection', async () => {
     const models = await admin.post('/m/assistant/models', {}).expect(200);
     expect(models.body.data.map((m: { id: string }) => m.id)).toEqual(['test-model', 'zeta-chat']);
-    // The saved key is never sent to another address.
-    await admin.post('/m/assistant/models', { provider: 'messages', baseUrl: `${base}/other` }).expect(422);
+    // The saved key is never sent to another address: the request goes without it, and the mock
+    // provider (which rejects requests with no key) turns it away.
+    const other = await admin
+      .post('/m/assistant/models', { provider: 'messages', baseUrl: `${base}/other` })
+      .expect(502);
+    expect(other.body.error.message).toMatch(/rejected the API key/);
+    // A listed provider still needs a key before anything is sent.
+    await admin.post('/m/assistant/models', { preset: 'openai' }).expect(422);
     replies = [text('ready')];
     const tested = await admin.post('/m/assistant/test').expect(200);
     expect(tested.body).toMatchObject({ ok: true, reply: 'ready' });
@@ -521,6 +574,178 @@ describe('assistant module', () => {
     replies = [text('Hi.')];
     await manager.post('/m/assistant/conversations', { text: 'Hello' }).expect(201);
     expect(toolNames()).not.toContain('apply_setup');
+    expect(toolNames()).not.toContain('config_change');
+    expect(toolNames()).not.toContain('config_read');
     await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
+  });
+
+  it('configures the workspace for admins through the app routes, within its guards', async () => {
+    await admin.patch('/m/assistant/config', { setupEnabled: true }).expect(200);
+    const adminRole = await db('roles').where({ key: 'admin' }).first();
+    const otherRole = await db('roles')
+      .where({ key: await createRole(['core.contacts.view']) })
+      .first();
+    const team = (await admin.post('/teams', { name: unique('Team') }).expect(201)).body;
+    const tag = unique('Cfg');
+    const change = (id: string, input: object) => ({ type: 'tool_use', id, name: 'config_change', input });
+    replies = [
+      use('config_overview', {}),
+      use('config_read', { path: '/pipelines' }),
+      use('config_read', { path: '/settings' }),
+      {
+        content: [
+          change('c1', { method: 'post', path: '/tags', body: { name: tag }, summary: `Add the ${tag} tag` }),
+          change('c2', {
+            method: 'patch',
+            path: '/settings/security',
+            body: { sessionDays: 1 },
+            summary: 'Try this',
+          }),
+          change('c3', {
+            method: 'post',
+            path: '/roles',
+            body: { key: 'all', name: 'All', permissions: ['*'] },
+            summary: 'Try this',
+          }),
+          change('c4', {
+            method: 'patch',
+            path: `/roles/${adminRole.uuid}`,
+            body: { name: 'Boss' },
+            summary: 'Try this',
+          }),
+          change('c5', { method: 'post', path: '/webhooks', body: {}, summary: 'Try this' }),
+          change('c6', {
+            method: 'post',
+            path: '/templates',
+            body: {
+              key: 'auth.password_reset',
+              channel: 'email',
+              locale: 'en',
+              subject: 's',
+              body: '<img src="https://x.test/{{{link}}}">',
+            },
+            summary: 'Try this',
+          }),
+          change('c7', {
+            method: 'put',
+            path: '/settings/branding',
+            body: { emailFromAddress: 'x@x.test' },
+            summary: 'Try this',
+          }),
+          change('c8', {
+            method: 'patch',
+            path: '/settings/commerce',
+            body: { paymentInstructions: 'Pay me' },
+            summary: 'Try this',
+          }),
+          change('c9', {
+            method: 'post',
+            path: '/automations',
+            body: {
+              name: 'Leak',
+              triggerEvent: 'contact.created',
+              actions: [{ type: 'send_email', to: 'x@x.test' }],
+            },
+            summary: 'Try this',
+          }),
+          change('c10', {
+            method: 'patch',
+            path: `/roles/${otherRole.uuid}`,
+            body: { permissions: ['core.users.manage'] },
+            summary: 'Try this',
+          }),
+          change('c11', {
+            method: 'post',
+            path: '/modules/assistant/disable',
+            body: {},
+            summary: 'Try this',
+          }),
+          change('c12', {
+            method: 'patch',
+            path: `/teams/${team.uuid}`,
+            body: { memberUuids: [] },
+            summary: 'Try this',
+          }),
+        ],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      },
+    ];
+    seen.length = 0;
+    const res = await admin.post('/m/assistant/conversations', { text: 'Tidy up the setup' }).expect(201);
+    const overview = JSON.stringify(seen[1]!.body.messages);
+    expect(overview).toContain('POST /tags');
+    expect(overview).toContain('PATCH /pipelines/:uuid');
+    for (const never of ['/settings/security', '/users', '/webhooks', '/api-keys', 'DELETE '])
+      expect(overview).not.toContain(never);
+    // Reads run on their own; every change waits for the admin.
+    expect(JSON.stringify(seen[2]!.body.messages)).toContain('\\"stages\\"');
+    expect(overview).not.toContain('/render');
+    expect(overview).not.toContain('/settings/commerce');
+    const settings = JSON.stringify((seen[3]!.body.messages as unknown[]).at(-1));
+    expect(settings).toContain('general');
+    expect(settings).not.toMatch(/security|compliance|mcp/);
+    // Only the change that can run is put to the admin; the refused ones never become questions.
+    expect(res.body.proposals).toEqual([
+      expect.objectContaining({
+        id: 'p1',
+        name: 'config_change',
+        detail: 'Add to · Saved views and tags · name',
+      }),
+    ]);
+    expect(await db('tags').where({ name: tag }).first()).toBeUndefined();
+
+    replies = [text('Done.')];
+    seen.length = 0;
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    const created = await db('tags').where({ name: tag }).first();
+    expect(created).toBeTruthy();
+    const audited = await db('audit_logs').where({ entity_id: created.id, action: 'tag.created' }).first();
+    expect(audited?.actor_type).toBe('assistant');
+    const results = JSON.stringify(seen[0]!.body.messages);
+    expect(results).toContain('may not change this');
+    expect(results).toContain('may not grant every permission');
+    expect(results).toContain('may not change the Admin role');
+    expect(results).toContain('may not use POST /webhooks');
+    for (const why of [
+      'may not change sign-in emails',
+      'may not change the sender of emails',
+      'may not create automations that send email',
+      'may not add permissions to an existing role',
+      'may not change who is in a team',
+    ])
+      expect(results).toContain(why);
+    expect(results.match(/may not change this/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(await db('automations').where({ name: 'Leak' }).first()).toBeUndefined();
+    expect((await db('roles').where({ id: adminRole.id }).first()).name).toBe(adminRole.name);
+    expect(await db('roles').where({ key: 'all' }).first()).toBeUndefined();
+    await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
+  });
+
+  it('lets admins try configuration with simulated replies, still confirmed', async () => {
+    await admin.patch('/m/assistant/config', { preset: 'simulated', setupEnabled: true }).expect(200);
+    const what = await admin
+      .post('/m/assistant/conversations', { text: 'What can you configure?' })
+      .expect(201);
+    expect(what.body.messages.at(-1).text).toContain('Pipelines and stages');
+    const name = unique('Sim tag');
+    const res = await admin
+      .post('/m/assistant/conversations', { text: `Add a tag called ${name}` })
+      .expect(201);
+    expect(res.body.proposals).toEqual([expect.objectContaining({ name: 'config_change' })]);
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    expect(await db('tags').where({ name }).first()).toBeTruthy();
+    await admin
+      .patch('/m/assistant/config', {
+        preset: null,
+        provider: 'messages',
+        baseUrl: base,
+        setupEnabled: false,
+      })
+      .expect(200);
+    await admin.patch('/m/assistant/config', { model: 'test-model' }).expect(200);
   });
 });
