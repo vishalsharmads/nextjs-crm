@@ -360,6 +360,23 @@ function touches(name: string, input: Record<string, unknown>): string[] {
 }
 
 /** Runs a tool as the person, tagged `assistant` in the audit log; errors go back to the model. */
+/** What the model should do after a tool error, so it recovers instead of guessing or looping. */
+const HINTS: Record<string, string> = {
+  VALIDATION_FAILED:
+    'Fix the input using the details (field names and formats), then call the tool again once.',
+  NOT_FOUND:
+    'It does not exist or this person cannot see it. Search for it by name instead of guessing ids; do not invent one.',
+  FORBIDDEN:
+    'This person may not do this. Tell them plainly what is not allowed; do not try another way around it.',
+  FIELD_FORBIDDEN: 'This person may not change that field. Leave it out and tell them.',
+  CONFLICT:
+    'It clashes with the current state (for example it already exists). Explain that; do not repeat the call.',
+  MODULE_DISABLED: 'That feature is turned off in this workspace. Say an admin can turn it on.',
+  QUOTA_EXCEEDED: 'A limit was reached. Tell the person; do not retry.',
+};
+const hintFor = (code: string) =>
+  HINTS[code] ?? 'Explain the problem plainly; retry only if a change to the input would fix it.';
+
 /** Longest text value passed to the model from one field. */
 const MAX_FIELD = 2_000;
 
@@ -447,8 +464,8 @@ async function runTool(
     isError = true;
     content = JSON.stringify(
       err instanceof AppError
-        ? { error: err.code, message: err.message, details: err.details }
-        : { error: 'INTERNAL' },
+        ? { error: err.code, message: err.message, details: err.details, hint: hintFor(err.code) }
+        : { error: 'INTERNAL', hint: 'Something failed on the server; say so plainly and do not retry.' },
     );
     if (!(err instanceof AppError)) logger.error({ err, tool: block.name }, 'assistant tool failed');
   }

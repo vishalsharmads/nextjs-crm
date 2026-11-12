@@ -282,6 +282,8 @@ describe('assistant module', () => {
     seen.length = 0;
     await admin.post('/m/assistant/conversations', { text: 'Deals?' }).expect(201);
     expect(JSON.stringify(seen[1]!.body.messages)).toContain('may not use this record type');
+    // The model is told how to recover, not left to guess.
+    expect(JSON.stringify(seen[1]!.body.messages)).toContain('Tell them plainly what is not allowed');
     // The model is told up front, so it can say so instead of trying.
     expect(String(seen[0]!.body.system)).toContain('kept these record types away from you: deal');
     await admin.patch('/m/assistant/config', { excludedEntities: [], userDailyTokenCap: 1 }).expect(200);
