@@ -635,6 +635,24 @@ describe('assistant module', () => {
     expect(cleared.body.proposals).toEqual([]);
   });
 
+  it('runs several lookups from one reply together, answering each in order', async () => {
+    replies = [
+      {
+        content: [
+          { type: 'tool_use', id: 'look_a', name: 'list_pipelines', input: {} },
+          { type: 'tool_use', id: 'look_b', name: 'search_records', input: { query: 'zzz-nothing' } },
+        ],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      },
+      text('Both done.'),
+    ];
+    seen.length = 0;
+    const res = await admin.post('/m/assistant/conversations', { text: 'Two things' }).expect(201);
+    expect(res.body.messages.at(-1)).toMatchObject({ text: 'Both done.' });
+    const sent = seen[1]!.body.messages as { role: string; content: { tool_use_id?: string }[] }[];
+    expect(sent.at(-1)!.content.map((b) => b.tool_use_id)).toEqual(['look_a', 'look_b']);
+  });
+
   it('ranks recommended models first', async () => {
     const { rankModels } = await import('../../../modules/assistant/api/catalog');
     expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([

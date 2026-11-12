@@ -523,14 +523,15 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
     const uses = content.filter((b): b is Extract<Block, { type: 'tool_use' }> => b.type === 'tool_use');
     if (!uses.length) return;
     const defs = new Map(toolsAllowed(cfg, user).map((t) => [t.name, t]));
-    const results: Block[] = [];
+    // Read-only lookups run side by side; their results keep the order the model asked for them.
+    const slots: (Block | Promise<Block>)[] = [];
     const proposals: Pending['proposals'] = [];
     for (const use of uses) {
       const def = defs.get(use.name);
       // A change that can never run is answered now, instead of asking the person to confirm it.
       const refused = def?.write ? await precheck(use, cfg, ctx, user) : null;
       // A tool_use must always get a result, or the conversation cannot continue.
-      if (refused) results.push(refused);
+      if (refused) slots.push(refused);
       else if (def?.write)
         proposals.push({
           id: `p${proposals.length + 1}`,
@@ -544,9 +545,10 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
         });
       else {
         streamSink.getStore()?.tool(def?.title ?? use.name);
-        results.push(await runTool(use, cfg, ctx, user));
+        slots.push(runTool(use, cfg, ctx, user));
       }
     }
+    const results = await Promise.all(slots);
     if (proposals.length) {
       await db(CONVERSATIONS)
         .where({ id: conv.id })
