@@ -608,7 +608,8 @@ async function conversationDto(uuid: string, user: AuthUser) {
     } else if (text) {
       if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
       steps = [];
-      items.push({ role: m.role, text });
+      // The note about the page on screen is for the model; people see their question as asked.
+      items.push({ role: m.role, text: text.replace(PAGE_NOTE, '') });
     }
   }
   if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
@@ -966,6 +967,8 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       });
     },
   });
+
+const PAGE_NOTE = /\n\n\(The person is looking at [^)]*\)$/;
 
 function withContext(text: string, context?: { entity: string; uuid: string }) {
   return context ? `${text}\n\n(The person is looking at ${context.entity} ${context.uuid}.)` : text;
