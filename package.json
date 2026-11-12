@@ -34,7 +34,9 @@
     "demo:reset": "npm run cli -w @app/api -- demo:reset",
     "check:brand": "node scripts/check-brand-strings.mjs",
     "prepare": "husky",
-    "mcp": "tsx apps/api/src/cli/mcp-stdio.ts"
+    "mcp": "tsx apps/api/src/cli/mcp-stdio.ts",
+    "module:add": "npm run cli -w @app/api -- module:add",
+    "module:check": "npm run cli -w @app/api -- module:check"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",

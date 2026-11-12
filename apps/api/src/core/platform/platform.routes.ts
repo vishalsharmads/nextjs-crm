@@ -15,6 +15,7 @@ import {
 } from '../../modules/registry';
 import { moduleSettingsDto, previewModuleSettings, saveModuleSettings } from '../../modules/module-settings';
 import { logger } from '../../lib/logger';
+import { catalogForMarketplace } from '../../modules/catalog';
 
 function bp(key: string) {
   if (!listBlueprintKeys().includes(key))
@@ -167,6 +168,13 @@ export const modulesRoutes = defineRoutes('/modules', ['platform'])
         })),
       };
     },
+  })
+  .add({
+    method: 'get',
+    path: '/catalog',
+    permission: 'core.modules.manage',
+    summary: 'Modules in the module catalog, compared with this build',
+    handler: () => catalogForMarketplace(),
   })
   .add({
     method: 'get',

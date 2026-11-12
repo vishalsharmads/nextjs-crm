@@ -114,6 +114,42 @@ export const moduleManifestSchema = z
     }
   });
 
+/**
+ * A module catalog (`catalog.json` in a git repository): modules that can be added to a checkout
+ * with `module:add`, each pinned to a tag and the commit it pointed at when it was listed.
+ */
+export const moduleCatalogSchema = z.object({
+  modules: z
+    .array(
+      z.object({
+        key: z.string().regex(MODULE_KEY_RE),
+        name: z.string().min(1).max(100),
+        version: z.string().regex(/^\d+\.\d+\.\d+$/),
+        description: z.string().max(500).default(''),
+        category: z.enum(MODULE_CATEGORIES).default('productivity'),
+        repo: z.url({ protocol: /^https$/ }).max(500),
+        tag: z.string().regex(/^[A-Za-z0-9._/-]{1,100}$/),
+        sha: z.string().regex(/^[0-9a-f]{40}$/),
+        /** Folder inside the repository that holds the module (`manifest.json` at its root). */
+        path: z
+          .string()
+          .regex(/^[A-Za-z0-9._/-]{0,200}$/)
+          .default(''),
+      }),
+    )
+    .max(500),
+});
+export type ModuleCatalog = z.output<typeof moduleCatalogSchema>;
+export type ModuleCatalogEntry = ModuleCatalog['modules'][number];
+
+/** Compare two `x.y.z` versions: negative when a < b. */
+export function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return (pa[i] ?? 0) - (pb[i] ?? 0);
+  return 0;
+}
+
 export type ModuleManifest = z.output<typeof moduleManifestSchema>;
 export type ModuleManifestInput = z.input<typeof moduleManifestSchema>;
 
