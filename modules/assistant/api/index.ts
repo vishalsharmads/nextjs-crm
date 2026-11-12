@@ -325,6 +325,12 @@ function touches(name: string, input: Record<string, unknown>): string[] {
       // An edit without its type in the change could be any automation.
       return out.length || !String(input.path).match(/^\/automations\/./) ? out : ['*'];
     }
+    case 'run_report':
+    case 'change_records':
+      add(input.entity);
+      return out;
+    case 'complete_task':
+      return ['activity'];
     case 'list_records':
     case 'get_record':
       add(input.entity);

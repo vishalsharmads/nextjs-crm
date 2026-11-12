@@ -691,6 +691,54 @@ describe('assistant module', () => {
     );
   });
 
+  it('reports numbers and changes several records, changes after confirmation', async () => {
+    const name = unique('Bulk');
+    const a = await admin.post('/contacts', { firstName: 'A', lastName: name }).expect(201);
+    const b = await admin.post('/contacts', { firstName: 'B', lastName: name }).expect(201);
+    replies = [use('run_report', { entity: 'contact', groupBy: 'owner', metric: 'count' }), text('Counted.')];
+    seen.length = 0;
+    await admin.post('/m/assistant/conversations', { text: 'Contacts per owner?' }).expect(201);
+    const report = JSON.stringify(seen[1]!.body.messages);
+    expect(report).toContain('\\"rows\\"');
+    expect(report).toContain('\\"total\\"');
+
+    const tag = unique('Vip');
+    replies = [
+      use('change_records', {
+        entity: 'contact',
+        uuids: [a.body.uuid, b.body.uuid],
+        action: 'add_tags',
+        tags: [tag],
+      }),
+    ];
+    const res = await admin.post('/m/assistant/conversations', { text: `Tag them ${tag}` }).expect(201);
+    expect(res.body.proposals).toEqual([expect.objectContaining({ name: 'change_records' })]);
+    expect(await db('tags').where({ name: tag }).first()).toBeUndefined();
+    replies = [text('Tagged.')];
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    const created = await db('tags').where({ name: tag }).first();
+    expect(await db('taggables').where({ tag_id: created.id, taggable_type: 'contact' })).toHaveLength(2);
+
+    const task = await admin.post('/activities', { type: 'task', subject: unique('Do') }).expect(201);
+    replies = [use('complete_task', { uuid: task.body.uuid })];
+    const done = await admin.post('/m/assistant/conversations', { text: 'Done with it' }).expect(201);
+    replies = [text('Completed.')];
+    await admin
+      .post(`/m/assistant/conversations/${done.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    expect((await db('activities').where({ uuid: task.body.uuid }).first()).completed_at).not.toBeNull();
+
+    // A report on a record type kept from the assistant is refused.
+    await admin.patch('/m/assistant/config', { excludedEntities: ['deal'] }).expect(200);
+    replies = [use('run_report', { entity: 'deal', groupBy: 'stage' }), text('No.')];
+    seen.length = 0;
+    await admin.post('/m/assistant/conversations', { text: 'Deals by stage' }).expect(201);
+    expect(JSON.stringify(seen[1]!.body.messages)).toContain('may not use this record type');
+    await admin.patch('/m/assistant/config', { excludedEntities: [] }).expect(200);
+  });
+
   it('ranks recommended models first', async () => {
     const { rankModels } = await import('../../../modules/assistant/api/catalog');
     expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([

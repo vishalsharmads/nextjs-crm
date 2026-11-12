@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { ACTIVITY_TYPES, RELATED_TYPES, entityKeySchema, listQuerySchema } from '@app/shared';
+import {
+  ACTIVITY_TYPES,
+  RELATED_TYPES,
+  entityKeySchema,
+  listQuerySchema,
+  reportDefinitionSchema,
+} from '@app/shared';
 import { defineTool } from './registry';
 import { customizableEntities, getRecordDef, recordDefs } from '../records/registry';
 import { createRecord, getRecord, getRow, listRecords, updateRecord } from '../records/service';
@@ -10,6 +16,8 @@ import { can, assertCan } from '../rbac/access';
 import { getLabels } from '../labels/labels.service';
 import { fieldLevel, getDefinitions } from '../custom-fields/definitions';
 import { getGroup } from '../settings/settings.service';
+import { runReport } from '../reports/builder';
+import { runBulk } from '../bulk/bulk.service';
 
 const entity = entityKeySchema.describe(
   'Record type key from describe_schema, e.g. "contact", "organization", "deal", "lead" or "activity"',
@@ -236,5 +244,50 @@ defineTool({
   input: z.object({ dealUuid: uuid, stageUuid: z.uuid() }),
   async handler(input, { ctx, user }) {
     return updateRecord(recordDefs.deal, ctx, user, input.dealUuid, { stageUuid: input.stageUuid });
+  },
+});
+
+defineTool({
+  name: 'run_report',
+  title: 'Run a report',
+  description:
+    'Counts, sums or averages records of one type, grouped by a field: for example deals by stage (count), deal value by owner (sum of "value"), or contacts created per month (groupBy "created_at", dateBucket "month"). Optional second grouping and filter (the list filter syntax). Use this for any number, total or chart instead of adding up listed records. Results respect what this person may see.',
+  write: false,
+  input: reportDefinitionSchema.omit({ chart: true }),
+  async handler(input, { user }) {
+    viewable(user, input.entity);
+    return runReport(input, user);
+  },
+});
+
+defineTool({
+  name: 'complete_task',
+  title: 'Complete a task',
+  description: 'Marks a task as done (or not done again with completed false).',
+  write: true,
+  input: z.object({ uuid, completed: z.boolean().default(true) }),
+  async handler(input, { ctx, user }) {
+    return updateRecord(recordDefs.activity, ctx, user, input.uuid, { completed: input.completed });
+  },
+});
+
+defineTool({
+  name: 'change_records',
+  title: 'Change several records',
+  description:
+    'Changes up to 50 records of one type at once: assign an owner (ownerUuid), add or remove tags (tags), set one field (field and value) or move deals or leads to a stage (stageUuid). Never deletes.',
+  write: true,
+  input: z.object({
+    entity,
+    uuids: z.array(z.uuid()).min(1).max(50),
+    action: z.enum(['assign', 'add_tags', 'remove_tags', 'update_field', 'move_stage']),
+    ownerUuid: z.uuid().optional(),
+    tags: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
+    field: z.string().max(80).optional(),
+    value: z.unknown().optional(),
+    stageUuid: z.uuid().optional(),
+  }),
+  async handler({ entity: key, ...input }, { ctx, user }) {
+    return runBulk(getRecordDef(key), ctx, user, input);
   },
 });
