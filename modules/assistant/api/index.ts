@@ -1012,6 +1012,47 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
   })
   .add({
     method: 'post',
+    path: '/conversations/:uuid/retry',
+    permission: 'assistant.chat.use',
+    params: uuidParam,
+    summary: 'Ask the last question again, as it was or edited (its answer and waiting changes are dropped)',
+    body: z.object({ text: z.string().trim().min(1).max(4000).optional() }),
+    handler: async ({ req, res, ctx, user, params, body }) => {
+      const conv = await conversationFor(params.uuid, user);
+      const rows = (await db(MESSAGES).where({ conversation_id: conv.id }).orderBy('id', 'desc')) as {
+        id: number;
+        role: string;
+        content: Block[] | string;
+      }[];
+      const last = rows.find(
+        (r) => r.role === 'user' && json<Block[]>(r.content).some((b) => b.type === 'text'),
+      );
+      if (!last) throw new AppError('CONFLICT', 'There is no question to ask again');
+      const cfg = await loadConfig();
+      await db.transaction(async (trx) => {
+        // Proposed changes never ran, so dropping them with the answer they belong to is safe.
+        await trx(MESSAGES).where({ conversation_id: conv.id }).where('id', '>', last.id).delete();
+        await trx(CONVERSATIONS).where({ id: conv.id }).update({ pending: null, updated_at: new Date() });
+        if (body.text !== undefined) {
+          // An edit keeps the question's images and the note about the page it was asked on.
+          const content = json<Block[]>(last.content).map((b) =>
+            b.type === 'text'
+              ? { type: 'text' as const, text: `${body.text}${PAGE_NOTE.exec(b.text)?.[0] ?? ''}` }
+              : b,
+          );
+          await trx(MESSAGES)
+            .where({ id: last.id })
+            .update({ content: JSON.stringify(content) });
+        }
+      });
+      return respond(req, res, 200, async () => {
+        await advance(conv, cfg, ctx, user);
+        return conversationDto(params.uuid, user);
+      });
+    },
+  })
+  .add({
+    method: 'post',
     path: '/conversations/:uuid/decisions',
     permission: 'assistant.chat.use',
     params: uuidParam,

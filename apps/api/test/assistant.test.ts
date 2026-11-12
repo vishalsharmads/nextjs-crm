@@ -597,6 +597,44 @@ describe('assistant module', () => {
     await admin.patch('/m/assistant/config', { vision: null }).expect(200);
   });
 
+  it('asks the last question again, as it was or edited, dropping its answer', async () => {
+    replies = [text('First answer.')];
+    const res = await admin
+      .post('/m/assistant/conversations', { text: 'Old question', context: { entity: 'contact' } })
+      .expect(201);
+    replies = [text('Second answer.')];
+    seen.length = 0;
+    const again = await admin.post(`/m/assistant/conversations/${res.body.uuid}/retry`, {}).expect(200);
+    expect(again.body.messages.map((m: { text?: string }) => m.text)).toEqual([
+      'Old question',
+      'Second answer.',
+    ]);
+
+    replies = [text('Edited answer.')];
+    seen.length = 0;
+    const edited = await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/retry`, { text: 'New question' })
+      .expect(200);
+    expect(edited.body.messages.map((m: { text?: string }) => m.text)).toEqual([
+      'New question',
+      'Edited answer.',
+    ]);
+    // The edit kept the note about the page it was asked on, for the model.
+    expect(JSON.stringify(seen[0]!.body.messages)).toContain(
+      'New question\\n\\n(The person is looking at the list of contact',
+    );
+
+    // Waiting changes are dropped with the answer they belong to.
+    replies = [use('create_record', { entity: 'contact', data: { firstName: 'Never' } })];
+    const pending = await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/messages`, { text: 'Add Never' })
+      .expect(200);
+    expect(pending.body.proposals).toHaveLength(1);
+    replies = [text('Fine.')];
+    const cleared = await admin.post(`/m/assistant/conversations/${res.body.uuid}/retry`, {}).expect(200);
+    expect(cleared.body.proposals).toEqual([]);
+  });
+
   it('ranks recommended models first', async () => {
     const { rankModels } = await import('../../../modules/assistant/api/catalog');
     expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([
