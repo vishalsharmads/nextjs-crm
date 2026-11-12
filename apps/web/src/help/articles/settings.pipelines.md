@@ -13,3 +13,9 @@ The stages {{dealPluralLower}} (and optionally {{leadPluralLower}}) move through
 - One stage can be **won** and one **lost**; moving there closes the record.
 - **Rotting days** flag records that stay in a stage too long.
 - You can have several pipelines, for example one per product line.
+
+## Removing stages and pipelines
+
+- **Remove a stage** with its bin icon. Records in it move to the stage you choose; their stage history is kept.
+- **Disable a pipeline** you no longer use (any pipeline except the default; make another one the default first). Its records move to a stage in another pipeline. A disabled pipeline disappears from boards, filters and new records; its stages and stage history are kept.
+- **Turn on** a disabled pipeline from the same page to use it again.

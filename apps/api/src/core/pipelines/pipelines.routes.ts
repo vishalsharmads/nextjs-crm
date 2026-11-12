@@ -5,6 +5,7 @@ import { db } from '../../db/knex';
 import { AppError, conflict, notFound } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
 import { audit } from '../audit/audit.service';
+import { can } from '../rbac/access';
 import { listPipelines } from './pipelines.repository';
 import { STAGED, recordStageHistory, type StagedEntity } from './stage-engine';
 
@@ -53,7 +54,13 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
     method: 'get',
     path: '/',
     permission: 'authenticated',
-    handler: async () => ({ data: await listPipelines() }),
+    query: z.object({ all: z.enum(['true', 'false']).optional() }),
+    summary: 'Active pipelines; with all=true, managers also get disabled ones',
+    handler: async ({ user, query }) => ({
+      data: await listPipelines(db, {
+        includeInactive: query.all === 'true' && can(user, 'core.pipelines.manage'),
+      }),
+    }),
   })
   .add({
     method: 'post',
@@ -119,8 +126,10 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
     params: uuidParam,
     body: toPatch(pipelineBody.omit({ stages: true, entity: true })).extend({
       active: z.boolean().optional(),
+      /** When disabling: a stage in another pipeline that receives this pipeline's records. */
+      moveTo: z.uuid().optional(),
     }),
-    handler: async ({ ctx, params, body }) => {
+    handler: async ({ ctx, user, params, body }) => {
       const p = await db('pipelines').where({ uuid: params.uuid }).first();
       if (!p) throw notFound('Pipeline');
       await db.transaction(async (trx) => {
@@ -133,14 +142,45 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
             throw conflict('Make another pipeline the default first');
           if (!body.active && p.active) {
             const { table } = STAGED[p.entity as StagedEntity];
-            const held = await trx(table).where({ pipeline_id: p.id }).whereNull('deleted_at').first('id');
-            if (held) throw conflict('Move the records on this pipeline to another one first');
+            // Lock the records so none is added or moved in between the check and the move.
+            const held = (await trx(table)
+              .where({ pipeline_id: p.id })
+              .whereNull('deleted_at')
+              .forUpdate()
+              .select('id', 'stage_id')) as { id: number; stage_id: number | null }[];
+            if (held.length) {
+              if (!body.moveTo) throw conflict('Move the records on this pipeline to another one first');
+              const target = await trx('pipeline_stages as s')
+                .join('pipelines as tp', 'tp.id', 's.pipeline_id')
+                .where({ 's.uuid': body.moveTo, 's.active': true, 'tp.active': true, 'tp.entity': p.entity })
+                .whereNot('tp.id', p.id)
+                .first('s.*');
+              if (!target) throw new AppError('STAGE_INVALID', 'Choose a stage in another active pipeline');
+              const entity = p.entity as StagedEntity;
+              await trx(table)
+                .whereIn(
+                  'id',
+                  held.map((r) => r.id),
+                )
+                .update({
+                  pipeline_id: target.pipeline_id,
+                  stage_id: target.id,
+                  stage_entered_at: new Date(),
+                  ...(entity === 'deal'
+                    ? { status: target.is_won ? 'won' : target.is_lost ? 'lost' : 'open' }
+                    : {}),
+                });
+              const byStage = new Map<number | null, number[]>();
+              for (const r of held) byStage.set(r.stage_id, [...(byStage.get(r.stage_id) ?? []), r.id]);
+              for (const [from, ids] of byStage)
+                await recordStageHistory(trx, entity, ids, from, target.id, user.id);
+            }
           }
           patch.active = body.active;
         }
         await trx('pipelines').where({ id: p.id }).update(patch);
         await audit(trx, ctx, {
-          action: 'pipeline.updated',
+          action: body.active === false ? 'pipeline.disabled' : 'pipeline.updated',
           entity: 'pipeline',
           entityId: p.id,
           entityUuid: params.uuid,

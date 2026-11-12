@@ -33,6 +33,7 @@ export async function listPipelines(
     name: p.name,
     entity: p.entity,
     isDefault: !!p.is_default,
+    active: !!p.active,
     sortOrder: p.sort_order,
     sourceBlueprint: p.source_blueprint,
     customized: !!p.customized,

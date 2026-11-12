@@ -36,8 +36,8 @@ export function PipelinesPage() {
   const t = useT();
   const qc = useQueryClient();
   const pipelines = useQuery({
-    queryKey: ['pipelines'],
-    queryFn: () => apiGet<{ data: PipelineDto[] }>('/pipelines').then((r) => r.data),
+    queryKey: ['pipelines', 'all'],
+    queryFn: () => apiGet<{ data: PipelineDto[] }>('/pipelines?all=true').then((r) => r.data),
   });
   const boot = useBoot();
   const L = labelVars(boot.labels);
@@ -83,14 +83,23 @@ export function PipelinesPage() {
                 onClick={() => setSelected(p.uuid)}
                 className={`flex items-center justify-between gap-2 rounded-sm px-3 py-2 text-start text-sm ${current?.uuid === p.uuid ? 'bg-primary-soft font-medium' : 'hover:bg-hover'}`}
               >
-                <span className="truncate">{p.name}</span>
-                {p.isDefault ? (
+                <span className={`truncate ${p.active ? '' : 'text-muted'}`}>{p.name}</span>
+                {!p.active ? (
+                  <Badge>Disabled</Badge>
+                ) : p.isDefault ? (
                   <Star className="size-3.5 shrink-0 text-primary" aria-label="Default" />
                 ) : null}
               </button>
             ))}
           </nav>
-          {current ? <PipelineEditor key={current.uuid} pipeline={current} onChanged={refresh} /> : null}
+          {current ? (
+            <PipelineEditor
+              key={current.uuid}
+              pipeline={current}
+              others={(shown ?? []).filter((p) => p.active && p.uuid !== current.uuid)}
+              onChanged={refresh}
+            />
+          ) : null}
         </div>
       )}
       {creating ? (
@@ -104,8 +113,17 @@ export function PipelinesPage() {
   );
 }
 
-function PipelineEditor({ pipeline, onChanged }: { pipeline: PipelineDto; onChanged: () => void }) {
+function PipelineEditor({
+  pipeline,
+  others,
+  onChanged,
+}: {
+  pipeline: PipelineDto;
+  others: PipelineDto[];
+  onChanged: () => void;
+}) {
   const [name, setName] = useState(pipeline.name);
+  const [disabling, setDisabling] = useState(false);
   const [stages, setStages] = useState(pipeline.stages);
   const [removing, setRemoving] = useState<StageDto | null>(null);
   const [newStage, setNewStage] = useState('');
@@ -118,6 +136,13 @@ function PipelineEditor({ pipeline, onChanged }: { pipeline: PipelineDto; onChan
   const rename = useMutation({
     mutationFn: (body: Record<string, unknown>) => apiPatch(`/pipelines/${pipeline.uuid}`, body),
     onSuccess: onChanged,
+  });
+  const turnOn = useMutation({
+    mutationFn: () => apiPatch(`/pipelines/${pipeline.uuid}`, { active: true }),
+    onSuccess: () => {
+      toast.success(`${pipeline.name} turned on`);
+      onChanged();
+    },
   });
   const reorder = useMutation({
     mutationFn: (uuids: string[]) =>
@@ -158,12 +183,21 @@ function PipelineEditor({ pipeline, onChanged }: { pipeline: PipelineDto; onChan
         />
       }
       actions={
-        pipeline.isDefault ? (
+        !pipeline.active ? (
+          <Button size="sm" loading={turnOn.isPending} onClick={() => turnOn.mutate()}>
+            Turn on
+          </Button>
+        ) : pipeline.isDefault ? (
           <Badge tone="primary">Default</Badge>
         ) : (
-          <Button size="sm" onClick={() => rename.mutate({ isDefault: true })}>
-            Make default
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => rename.mutate({ isDefault: true })}>
+              Make default
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setDisabling(true)}>
+              Disable
+            </Button>
+          </div>
         )
       }
       padded={false}
@@ -210,6 +244,19 @@ function PipelineEditor({ pipeline, onChanged }: { pipeline: PipelineDto; onChan
           <Plus /> Add stage
         </Button>
       </form>
+      {!pipeline.active ? (
+        <p className="border-b border-line bg-subtle px-3 py-2 text-sm text-muted">
+          Disabled: hidden from boards, filters and new records. Its stages and stage history are kept.
+        </p>
+      ) : null}
+      {disabling ? (
+        <DisablePipelineDialog
+          pipeline={pipeline}
+          others={others}
+          onClose={() => setDisabling(false)}
+          onDone={onChanged}
+        />
+      ) : null}
       {removing ? (
         <RemoveStageDialog
           pipeline={pipeline}
@@ -375,6 +422,61 @@ function RemoveStageDialog({
                 <option key={s.uuid} value={s.uuid}>
                   {s.name}
                 </option>
+              ))}
+            </NativeSelect>
+          )}
+        </Field>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DisablePipelineDialog({
+  pipeline,
+  others,
+  onClose,
+  onDone,
+}: {
+  pipeline: PipelineDto;
+  others: PipelineDto[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [moveTo, setMoveTo] = useState(others[0]?.stages[0]?.uuid ?? '');
+  const disable = useMutation({
+    mutationFn: () => apiPatch(`/pipelines/${pipeline.uuid}`, { active: false, moveTo: moveTo || undefined }),
+    onSuccess: () => {
+      toast.success(`${pipeline.name} disabled`);
+      onDone();
+      onClose();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not disable'),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        title={`Disable ${pipeline.name}?`}
+        description="Records on it move to the stage you choose. You can turn it back on later; its stages and history are kept."
+        footer={
+          <>
+            <Button onClick={onClose}>Cancel</Button>
+            <Button variant="danger" loading={disable.isPending} onClick={() => disable.mutate()}>
+              Disable pipeline
+            </Button>
+          </>
+        }
+      >
+        <Field label="Move records to">
+          {(p) => (
+            <NativeSelect {...p} value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
+              {others.map((o) => (
+                <optgroup key={o.uuid} label={o.name}>
+                  {o.stages.map((s) => (
+                    <option key={s.uuid} value={s.uuid}>
+                      {s.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </NativeSelect>
           )}
