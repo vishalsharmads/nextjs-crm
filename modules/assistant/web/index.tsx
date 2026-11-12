@@ -11,6 +11,7 @@ import {
   History,
   MessageSquare,
   MessageSquarePlus,
+  Paperclip,
   Search,
   Send,
   Sparkles,
@@ -22,7 +23,8 @@ import type { WebModule } from '@app/module-sdk';
 import { SettingsPanel } from './settings';
 import { DECISION_WORDS, thinkingWords } from './thinking';
 import { replyHtml, splitNext, type RecordPath } from './markdown';
-import { ApiError, apiDelete, apiGet, apiStream } from '@/lib/api';
+import { imageFiles, MAX_ATTACHMENTS, prepareImage, type Attachment } from './images';
+import { ApiError, apiDelete, apiGet, apiStream, buildUrl } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
 import { useBoot, useCan } from '@/app/session';
 import { cn } from '@/lib/cn';
@@ -51,7 +53,7 @@ interface Proposal {
 interface Conversation {
   uuid: string;
   title: string;
-  messages: { role: 'user' | 'assistant'; text?: string; tools?: string[] }[];
+  messages: { role: 'user' | 'assistant'; text?: string; tools?: string[]; images?: string[] }[];
   proposals: Proposal[];
 }
 
@@ -63,7 +65,8 @@ function AssistantPage() {
   const can = useCan();
   const status = useQuery({
     queryKey: [...key, 'status'],
-    queryFn: () => apiGet<{ name: string; ready: boolean; setup: boolean }>('/m/assistant/status'),
+    queryFn: () =>
+      apiGet<{ name: string; ready: boolean; setup: boolean; vision?: boolean }>('/m/assistant/status'),
   });
   const admin = can('assistant.settings.manage');
   const [tab, setTab] = useState('chat');
@@ -83,6 +86,7 @@ function AssistantPage() {
                 ready={!!status.data?.ready}
                 loading={status.isPending}
                 setup={!!status.data?.setup}
+                vision={!!status.data?.vision}
                 admin
                 onSetUp={() => setTab('settings')}
               />
@@ -96,6 +100,7 @@ function AssistantPage() {
             ready={!!status.data?.ready}
             loading={status.isPending}
             setup={!!status.data?.setup}
+            vision={!!status.data?.vision}
             admin={false}
           />
         )}
@@ -111,6 +116,7 @@ function Chat({
   compact = false,
   record,
   setup = false,
+  vision = false,
   onSetUp,
 }: {
   ready: boolean;
@@ -122,6 +128,8 @@ function Chat({
   record?: { entity: string; uuid: string };
   /** This person can ask the assistant to set up the workspace. */
   setup?: boolean;
+  /** The model reads images: people may attach screenshots. */
+  vision?: boolean;
   /** Open the assistant settings (admins, when it is not set up). */
   onSetUp?: () => void;
 }) {
@@ -148,6 +156,27 @@ function Chat({
   const [live, setLive] = useState<{ text: string; steps: string[]; words: string[] } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [search, setSearch] = useState('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  /** Adds pasted, dropped or picked images (shrunk first); explains why when they cannot be used. */
+  const attach = async (files: File[]) => {
+    if (!files.length) return;
+    if (!vision) {
+      toast.error('This assistant reads text only, so images cannot be attached.');
+      return;
+    }
+    const room = MAX_ATTACHMENTS - attachments.length;
+    if (room <= 0 || files.length > room) toast.error(`Attach up to ${MAX_ATTACHMENTS} images per question.`);
+    for (const file of files.slice(0, Math.max(0, room))) {
+      try {
+        const a = await prepareImage(file);
+        setAttachments((list) => (list.length < MAX_ATTACHMENTS ? [...list, a] : list));
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'The image could not be added.');
+      }
+    }
+  };
   const [active, setActive] = useState<string | null>(null);
   const [text, setText] = useState(() => params.get('ask')?.slice(0, 4000) ?? '');
   const list = useQuery({
@@ -232,24 +261,30 @@ function Chat({
     void qc.invalidateQueries({ queryKey: [...key, 'conversations'] });
   };
   const send = useMutation({
-    mutationFn: (message: string) =>
-      active
-        ? stream(
-            `/m/assistant/conversations/${active}/messages`,
-            { text: message, context },
-            thinkingWords(message, labels),
-          )
-        : stream('/m/assistant/conversations', { text: message, context }, thinkingWords(message, labels)),
+    mutationFn: ({ text: message, images = [] }: Question) => {
+      const body = {
+        text: message,
+        context,
+        ...(images.length ? { images: images.map((i) => ({ mediaType: i.mediaType, data: i.data })) } : {}),
+      };
+      return active
+        ? stream(`/m/assistant/conversations/${active}/messages`, body, thinkingWords(message, labels))
+        : stream('/m/assistant/conversations', body, thinkingWords(message, labels));
+    },
     // The question leaves the box as soon as it is sent, and comes back if sending fails.
-    onMutate: () => setText(''),
+    onMutate: () => {
+      setText('');
+      setAttachments([]);
+    },
     onSuccess: (c) => done(c),
-    onError: (err, message) => {
+    onError: (err, { text: message, images = [] }) => {
       // Stopped on purpose: the question was saved, so show the conversation as the server has it.
       if (err instanceof Stopped) {
         void qc.invalidateQueries({ queryKey: key });
         return;
       }
       setText((t) => t || message);
+      setAttachments((a) => (a.length ? a : images));
       toast.error(errorText(err));
     },
   });
@@ -328,7 +363,9 @@ function Chat({
     );
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (text.trim() && !send.isPending) send.mutate(text.trim());
+    if (send.isPending || (!text.trim() && !attachments.length)) return;
+    // An image on its own still needs a question for the model.
+    send.mutate({ text: text.trim() || 'What does this image show?', images: attachments });
   };
   const proposals = conv.data?.proposals ?? [];
   const last = conv.data?.messages.at(-1);
@@ -454,7 +491,7 @@ function Chat({
                   <Welcome
                     compact={compact}
                     suggestions={suggestionsFor(context, labels, setup)}
-                    onPick={(s) => send.mutate(s)}
+                    onPick={(s) => send.mutate({ text: s })}
                   />
                 ) : conv.isError ? (
                   <ErrorState error={conv.error} onRetry={() => void conv.refetch()} />
@@ -506,7 +543,10 @@ function Chat({
                             </div>
                           </>
                         ) : (
-                          m.text
+                          <>
+                            <BubbleImages srcs={(m.images ?? []).map((p) => buildUrl(p))} />
+                            {m.text}
+                          </>
                         )}
                       </div>
                     </div>
@@ -515,7 +555,8 @@ function Chat({
                 {send.isPending && send.variables ? (
                   <div className="anim-rise flex justify-end">
                     <div className="max-w-[85%] rounded-lg bg-primary px-3 py-2 text-sm whitespace-pre-wrap text-primary-fg">
-                      {send.variables}
+                      <BubbleImages srcs={(send.variables.images ?? []).map((i) => i.preview)} />
+                      {send.variables.text}
                     </div>
                   </div>
                 ) : null}
@@ -561,7 +602,7 @@ function Chat({
                           type="button"
                           className="ai-chip ai-chip-next"
                           disabled={send.isPending}
-                          onClick={() => send.mutate(q)}
+                          onClick={() => send.mutate({ text: q })}
                         >
                           {q}
                         </button>
@@ -598,12 +639,82 @@ function Chat({
                     </span>
                   </div>
                 ) : null}
-                <div className="flex items-end gap-2 rounded-md border border-line bg-surface p-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-soft">
+                {attachments.length ? (
+                  <ul className="mb-2 flex flex-wrap gap-2" aria-label="Attached images">
+                    {attachments.map((a, i) => (
+                      <li key={a.id} className="anim-rise relative">
+                        <img
+                          src={a.preview}
+                          alt={`Attached image ${i + 1}: ${a.name}`}
+                          className="size-16 rounded-md border border-line object-cover"
+                        />
+                        <button
+                          type="button"
+                          className="absolute -end-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-raised hover:text-ink pointer-coarse:size-7"
+                          aria-label={`Remove image ${i + 1}`}
+                          onClick={() => setAttachments((list) => list.filter((x) => x.id !== a.id))}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <div
+                  onDragOver={(e) => {
+                    if (!vision || ![...e.dataTransfer.types].includes('Files')) return;
+                    e.preventDefault();
+                    setDragging(true);
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={(e) => {
+                    if (!vision) return;
+                    e.preventDefault();
+                    setDragging(false);
+                    void attach(imageFiles(e.dataTransfer.files));
+                  }}
+                  className={cn(
+                    'flex items-end gap-2 rounded-md border border-line bg-surface p-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-soft',
+                    dragging && 'border-primary bg-primary-soft',
+                  )}
+                >
+                  {vision ? (
+                    <>
+                      <input
+                        ref={fileInput}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        multiple
+                        hidden
+                        onChange={(e) => {
+                          void attach(imageFiles(e.target.files));
+                          e.target.value = '';
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Attach images"
+                        title="Attach images, or paste a screenshot"
+                        disabled={attachments.length >= MAX_ATTACHMENTS || proposals.length > 0}
+                        onClick={() => fileInput.current?.click()}
+                      >
+                        <Paperclip />
+                      </Button>
+                    </>
+                  ) : null}
                   <Textarea
                     ref={composer}
                     value={text}
                     rows={1}
                     onChange={(e) => setText(e.target.value)}
+                    onPaste={(e) => {
+                      const files = imageFiles(e.clipboardData.files);
+                      if (!files.length) return;
+                      e.preventDefault();
+                      void attach(files);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
                       // Ctrl, Cmd or the Windows key + Enter add a line (the browser does not by itself).
@@ -636,7 +747,7 @@ function Chat({
                       type="submit"
                       size="sm"
                       variant="primary"
-                      disabled={!text.trim() || proposals.length > 0}
+                      disabled={(!text.trim() && !attachments.length) || proposals.length > 0}
                       aria-label="Send"
                     >
                       <Send />
@@ -645,6 +756,7 @@ function Chat({
                 </div>
                 <p id="composer-hint" className="mt-1 hidden text-xs text-faint sm:block">
                   Enter to send · Shift+Enter or Ctrl+Enter for a new line
+                  {vision ? ' · Paste or drop screenshots' : ''}
                 </p>
               </form>
             </>
@@ -816,7 +928,8 @@ function SetupSummary({ input }: { input: Record<string, unknown> }) {
 function AssistantPanel({ entity, uuid }: { entity: string; uuid: string }) {
   const status = useQuery({
     queryKey: [...key, 'status'],
-    queryFn: () => apiGet<{ name: string; ready: boolean; setup: boolean }>('/m/assistant/status'),
+    queryFn: () =>
+      apiGet<{ name: string; ready: boolean; setup: boolean; vision?: boolean }>('/m/assistant/status'),
   });
   return (
     <Chat
@@ -824,6 +937,7 @@ function AssistantPanel({ entity, uuid }: { entity: string; uuid: string }) {
       loading={status.isPending}
       admin={false}
       setup={!!status.data?.setup}
+      vision={!!status.data?.vision}
       compact
       record={entity ? { entity, uuid } : undefined}
     />
@@ -886,6 +1000,30 @@ function byDay<T extends { updatedAt: string }>(items: T[]): [string, T[]][] {
     groups.set(name, [...(groups.get(name) ?? []), item]);
   }
   return [...groups.entries()];
+}
+
+interface Question {
+  text: string;
+  images?: Attachment[];
+}
+
+/** Images a person attached, above their words; each opens full size in a new tab. */
+function BubbleImages({ srcs }: { srcs: string[] }) {
+  if (!srcs.length) return null;
+  return (
+    <span className="mb-1.5 flex flex-wrap justify-end gap-1.5">
+      {srcs.map((src, i) => (
+        <a key={src} href={src} target="_blank" rel="noopener noreferrer" className="block">
+          <img
+            src={src}
+            alt={`Attached image ${i + 1}`}
+            loading="lazy"
+            className="max-h-40 max-w-full rounded-md border border-primary-fg/20 object-contain"
+          />
+        </a>
+      ))}
+    </span>
+  );
 }
 
 /** Raised when the person stops a reply on purpose. */
