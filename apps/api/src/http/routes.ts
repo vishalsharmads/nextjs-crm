@@ -59,6 +59,9 @@ export interface RegisteredRoute {
 /** Global registry: the route-permission test asserts every Express route is in here. */
 export const routeRegistry: RegisteredRoute[] = [];
 
+/** Mounted routes with their handlers, in mount order, for `callRoute`. */
+const mounted: RouteDef[] = [];
+
 export type ModuleGate = (moduleKey: string) => boolean;
 let moduleGate: ModuleGate = () => true;
 export const setModuleGate = (gate: ModuleGate) => {
@@ -171,6 +174,7 @@ export function mountGroups(router: Router, groups: RouteGroup[]) {
   for (const group of groups) {
     for (const def of group.defs) {
       router[def.method](def.path, gate(def), ...(def.before ?? []), toHandler(def));
+      mounted.push(def);
       routeRegistry.push({
         method: def.method,
         path: def.path,
@@ -204,5 +208,86 @@ async function logModuleRead(def: RouteDef, req: Request, params: unknown) {
     action: 'view',
     entity: def.permission.slice(0, -'.view'.length),
     entityUuid: uuid,
+  });
+}
+
+/** Matches `/pipelines/:uuid` against `/pipelines/0190…`, returning the params. */
+function matchPath(pattern: string, path: string): Record<string, string> | null {
+  const want = pattern.split('/');
+  const got = path.split('/');
+  if (want.length !== got.length) return null;
+  const params: Record<string, string> = {};
+  for (let i = 0; i < want.length; i++) {
+    if (want[i]!.startsWith(':')) {
+      if (!got[i]) return null;
+      params[want[i]!.slice(1)] = decodeURIComponent(got[i]!);
+    } else if (want[i] !== got[i]) return null;
+  }
+  return params;
+}
+
+/** The mounted route a request would reach (static paths win, as in Express: mount order). */
+export function findRoute(
+  method: HttpMethod,
+  path: string,
+): { def: RouteDef; params: Record<string, string> } | null {
+  for (const def of mounted) {
+    if (def.method !== method) continue;
+    const params = matchPath(def.path, path);
+    if (params) return { def, params };
+  }
+  return null;
+}
+
+/**
+ * Runs a JSON route in-process as `user`, exactly as a request would: module state, permission,
+ * required 2FA, Zod validation, then the route's own handler (with its business rules and audit).
+ * Routes with their own middleware (uploads, rate limits) and routes that stream or send files are
+ * refused. For callers that act for a person inside the app, such as the assistant.
+ */
+export async function callRoute(
+  method: HttpMethod,
+  path: string,
+  input: { query?: Record<string, unknown>; body?: unknown },
+  { user, ctx }: { user: AuthUser; ctx: RequestContext },
+): Promise<unknown> {
+  const found = findRoute(method, path);
+  if (!found) throw new AppError('NOT_FOUND', `There is no ${method.toUpperCase()} ${path}`);
+  const { def } = found;
+  if (def.before?.length) throw new AppError('FORBIDDEN', 'This action is not available here');
+  if (def.moduleKey && !moduleGate(def.moduleKey))
+    throw new AppError('MODULE_DISABLED', 'This feature is not enabled');
+  checkPermission(user, def.permission);
+  if (user.mfaSetupRequired && !MFA_SETUP_ALLOWED.some((re) => re.test(def.path)))
+    throw new AppError('MFA_REQUIRED', 'Turn on two-factor authentication to continue');
+  const params = def.params ? def.params.parse(found.params) : found.params;
+  const query = def.query ? def.query.parse(input.query ?? {}) : (input.query ?? {});
+  const body = def.body ? def.body.parse(input.body ?? {}) : input.body;
+  const refuse = () => {
+    throw new AppError('FORBIDDEN', 'This action is not available here');
+  };
+  // Header calls are harmless; anything that writes a raw response is not supported in-process.
+  const res = {
+    headersSent: false,
+    locals: {},
+    set: () => res,
+    setHeader: () => res,
+    type: () => res,
+    status: () => res,
+    send: refuse,
+    json: refuse,
+    end: refuse,
+    write: refuse,
+    pipe: refuse,
+  };
+  const req = { ctx, params, query, body, headers: {}, method: method.toUpperCase(), path };
+  return def.handler({
+    req: req as unknown as Request,
+    res: res as unknown as Response,
+    ctx,
+    user,
+    params,
+    query,
+    body,
   });
 }
