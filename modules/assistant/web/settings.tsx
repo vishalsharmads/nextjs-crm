@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { Link } from 'react-router';
 import { Check, ExternalLink, KeyRound, RefreshCw, Sparkles, Star, Wand2 } from 'lucide-react';
 import { ApiError, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { useBoot } from '@/app/session';
@@ -27,6 +28,8 @@ export interface Config {
   /** Whether the model reads images; null: from the provider list (`visionDetected`). */
   vision: boolean | null;
   visionDetected: boolean;
+  /** The assistant may propose changes (off: it only looks things up and answers). */
+  allowChanges: boolean;
   complianceProfile?: string;
 }
 
@@ -159,6 +162,7 @@ export function SettingsPanel() {
         excludedEntities: d.excludedEntities,
         hipaaAcknowledged: d.hipaaAcknowledged,
         vision: d.vision,
+        allowChanges: d.allowChanges,
         ...(apiKey ? { apiKey } : {}),
       });
     },
@@ -642,6 +646,23 @@ export function SettingsPanel() {
               />
             )}
           </Field>
+        </div>
+        <div className="mt-4 flex items-start justify-between gap-4 rounded-md border border-line p-3">
+          <div className="text-sm">
+            <p className="font-medium">Let it propose changes</p>
+            <p className="text-muted">
+              Creating and updating records, notes and tasks; each still waits for the person to confirm. Off,
+              the assistant only looks things up and answers.{' '}
+              <Link to="/settings/audit?made=assistant" className="text-primary hover:underline">
+                See what it changed
+              </Link>
+            </p>
+          </div>
+          <Switch
+            checked={draft.allowChanges}
+            onCheckedChange={(on) => set({ allowChanges: on })}
+            aria-label="Let the assistant propose changes"
+          />
         </div>
         <fieldset className="mt-4 flex flex-wrap gap-4">
           <legend className="mb-2 text-xs font-medium text-muted">Never send these to the provider</legend>
