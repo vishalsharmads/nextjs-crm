@@ -51,7 +51,7 @@ import { cn } from '@/lib/cn';
 import { appUrl } from '@/lib/app-url';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Checkbox, Switch } from '@/components/ui/checkbox';
 import {
   Badge,
   ErrorState,
@@ -80,12 +80,12 @@ type InputPath = (string | number)[];
 /** What a change will do, from the server: records by name, plain values, lists item by item. */
 interface ChangePreviewDto {
   records: { entity: string; uuid: string; name: string | null }[];
-  fields: { label: string; value: string; edit?: InputPath; entity?: string }[];
+  fields: { label: string; value: string; edit?: InputPath; kind?: 'text' | 'boolean'; entity?: string }[];
   lists?: { label: string; path: InputPath; items: { label: string; detail?: string }[] }[];
 }
 /** The person's edits to one change before confirming. */
 interface ChangeEdits {
-  set?: { path: InputPath; value: string }[];
+  set?: { path: InputPath; value: string | boolean }[];
   drop?: { path: InputPath; index: number }[];
 }
 interface Conversation {
@@ -1030,17 +1030,17 @@ function Proposals({
   busy: boolean;
 }) {
   const [included, setIncluded] = useState<Record<string, boolean>>({});
-  const [texts, setTexts] = useState<Record<string, Record<string, string>>>({});
+  const [texts, setTexts] = useState<Record<string, Record<string, string | boolean>>>({});
   const [dropped, setDropped] = useState<Record<string, Record<string, number[]>>>({});
   const isIncluded = (id: string) => included[id] !== false;
   const count = proposals.filter((p) => isIncluded(p.id)).length;
   const edits = (p: Proposal): ChangeEdits => {
     const fields = p.preview?.fields ?? [];
-    const set = fields.flatMap((f) => {
+    const set = fields.flatMap((f): NonNullable<ChangeEdits['set']> => {
       const v = f.edit ? texts[p.id]?.[pathKey(f.edit)] : undefined;
-      return f.edit && v !== undefined && v.trim() && v !== f.value
-        ? [{ path: f.edit, value: v.trim() }]
-        : [];
+      if (!f.edit || v === undefined) return [];
+      if (typeof v === 'boolean') return v !== (f.value === 'Yes') ? [{ path: f.edit, value: v }] : [];
+      return v.trim() && v !== f.value ? [{ path: f.edit, value: v.trim() }] : [];
     });
     const drop = (p.preview?.lists ?? []).flatMap((l) =>
       (dropped[p.id]?.[pathKey(l.path)] ?? []).map((index) => ({ path: l.path, index })),
@@ -1405,8 +1405,8 @@ function ChangePreview({
   input: Record<string, unknown>;
   labels: Labels;
   recordPath: RecordPath;
-  texts: Record<string, string>;
-  onText: (key: string, value: string) => void;
+  texts: Record<string, string | boolean>;
+  onText: (key: string, value: string | boolean) => void;
   dropped: Record<string, number[]>;
   onToggle: (key: string, index: number, keep: boolean) => void;
   note?: string;
@@ -1443,9 +1443,15 @@ function ChangePreview({
               <Fragment key={i}>
                 <dt className="text-muted">{f.label}</dt>
                 <dd className="min-w-0 break-words text-ink">
-                  {f.edit ? (
+                  {f.edit && f.kind === 'boolean' ? (
+                    <Switch
+                      checked={(texts[k] as boolean | undefined) ?? f.value === 'Yes'}
+                      onCheckedChange={(v) => onText(k, v)}
+                      aria-label={f.label}
+                    />
+                  ) : f.edit ? (
                     <Input
-                      value={texts[k] ?? f.value}
+                      value={(texts[k] as string | undefined) ?? f.value}
                       onChange={(e) => onText(k, e.target.value)}
                       aria-label={f.label}
                       className="h-8"

@@ -898,7 +898,7 @@ const inputPath = z
   .max(8);
 const editsSchema = z.object({
   set: z
-    .array(z.object({ path: inputPath, value: z.string().max(4000) }))
+    .array(z.object({ path: inputPath, value: z.union([z.string().max(4000), z.boolean()]) }))
     .max(30)
     .optional(),
   drop: z

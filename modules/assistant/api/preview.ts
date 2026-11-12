@@ -14,8 +14,9 @@ export type InputPath = (string | number)[];
 export interface PreviewField {
   label: string;
   value: string;
-  /** The person may change this text before confirming. */
+  /** The person may change this value before confirming: text, or a yes/no switch. */
   edit?: InputPath;
+  kind?: 'text' | 'boolean';
   /** The value is a record type key: shown with the workspace's own name for it. */
   entity?: string;
 }
@@ -236,7 +237,11 @@ export function configPreview(body: unknown): Pick<Preview, 'fields' | 'lists'> 
       fields.push({
         label: humanize(k),
         value: plain(v),
-        ...(EDITABLE.has(k) && typeof v === 'string' ? { edit: path } : {}),
+        ...(typeof v === 'boolean'
+          ? { edit: path, kind: 'boolean' as const }
+          : EDITABLE.has(k) && typeof v === 'string'
+            ? { edit: path }
+            : {}),
       });
   }
   return { fields: fields.slice(0, 30), lists };
@@ -244,7 +249,7 @@ export function configPreview(body: unknown): Pick<Preview, 'fields' | 'lists'> 
 
 /** Edits the person made in the preview: new text for editable fields, items left out of lists. */
 export interface Edits {
-  set?: { path: InputPath; value: string }[];
+  set?: { path: InputPath; value: string | boolean }[];
   drop?: { path: InputPath; index: number }[];
 }
 
@@ -266,8 +271,9 @@ export function applyEdits(input: Obj, preview: Preview | undefined, edits: Edit
   for (const s of edits.set ?? []) {
     if (!editable.has(key(s.path))) throw new Error('This value cannot be changed here');
     const { parent, last } = at(s.path);
-    if (typeof (parent as Record<string | number, unknown>)[last] !== 'string')
-      throw new Error('Not a text value');
+    // A value keeps its kind: text stays text, a yes/no stays a yes/no.
+    if (typeof (parent as Record<string | number, unknown>)[last] !== typeof s.value)
+      throw new Error('This value cannot be changed that way');
     (parent as Record<string | number, unknown>)[last] = s.value;
   }
   const drops = new Map<string, number[]>();
