@@ -29,6 +29,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Request, Response } from 'express';
 import * as m0001 from './migrations/0001_assistant';
 import * as m0002 from './migrations/0002_presets';
+import * as m0003 from './migrations/0003_vision';
 import {
   assertSafeModelUrl,
   chat,
@@ -40,7 +41,7 @@ import {
   type ChatMessage,
   type ProviderConfig,
 } from './providers';
-import { compatibleServers, findPreset, providerPresets, rankModels } from './catalog';
+import { compatibleServers, findPreset, providerPresets, rankModels, readsImages } from './catalog';
 import { linkRecords, recordsIn, type RecordRef } from './links';
 import { CONFIG_PROMPT, CONFIG_TOOLS, describeChange, precheckConfigChange } from './config-tools';
 import { SETUP_PROMPT, SETUP_TOOLS } from './setup-tools';
@@ -71,7 +72,15 @@ interface ConfigRow {
   hipaa_acknowledged: number | boolean;
   preset: string | null;
   setup_enabled: number | boolean;
+  vision: number | boolean | null;
 }
+
+/** Whether the model reads images: the admin's choice, else the provider list (simulated: yes). */
+function visionAuto(row: ConfigRow) {
+  if (row.provider === 'simulated') return true;
+  return readsImages(findPreset(row.preset), row.model);
+}
+const readsImagesNow = (row: ConfigRow) => (row.vision === null ? visionAuto(row) : !!row.vision);
 
 const json = <T>(v: T | string): T => (typeof v === 'string' ? (JSON.parse(v) as T) : v);
 
@@ -147,6 +156,9 @@ const configDto = (row: ConfigRow) => ({
   hipaaAcknowledged: !!row.hipaa_acknowledged,
   preset: row.preset,
   setupEnabled: !!row.setup_enabled,
+  /** Null: decided from the provider list (`visionDetected`). */
+  vision: row.vision === null ? null : !!row.vision,
+  visionDetected: visionAuto(row),
 });
 
 /** Set by the app for every request; an admin's extra headers may not replace them. */
@@ -186,6 +198,8 @@ const configSchema = z.object({
     .nullish(),
   /** Let the assistant set up the workspace for admins (off by default; admins only). */
   setupEnabled: z.boolean().optional(),
+  /** Whether the model reads images; null lets the provider list decide. */
+  vision: z.boolean().nullable().optional(),
 });
 
 // ---------------- Usage caps ----------------
@@ -628,7 +642,8 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     permission: 'assistant.chat.use',
     handler: async ({ user }) => {
       const cfg = await loadConfig();
-      return { name: cfg.name, ready: !!(await providerConfig(cfg)), setup: setupAllowed(cfg, user) };
+      const ready = !!(await providerConfig(cfg));
+      return { name: cfg.name, ready, setup: setupAllowed(cfg, user), vision: ready && readsImagesNow(cfg) };
     },
   })
   .add({
@@ -698,6 +713,7 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       if (body.hipaaAcknowledged !== undefined) patch.hipaa_acknowledged = body.hipaaAcknowledged;
       if (input.preset !== undefined) patch.preset = input.preset ?? null;
       if (body.setupEnabled !== undefined) patch.setup_enabled = body.setupEnabled;
+      if (body.vision !== undefined) patch.vision = body.vision;
       await db.transaction(async (trx) => {
         await trx(CONFIG).where({ id: cfg.id }).update(patch);
         // Secrets are never written to the audit log, only that they changed.
@@ -1035,7 +1051,7 @@ async function mentioning(
 
 export const assistant: ApiModule = {
   routes: () => [routes],
-  migrations: { '0001_assistant': m0001, '0002_presets': m0002 },
+  migrations: { '0001_assistant': m0001, '0002_presets': m0002, '0003_vision': m0003 },
   privacy,
   // Conversations are kept for the configured number of days (30 by default).
   start: () =>

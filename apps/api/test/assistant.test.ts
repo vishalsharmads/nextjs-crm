@@ -528,6 +528,21 @@ describe('assistant module', () => {
     expect(tested.body).toMatchObject({ ok: true, reply: 'ready' });
   });
 
+  it('knows whether the model reads images, from the provider list or the admin', async () => {
+    const { readsImages, findPreset } = await import('../../../modules/assistant/api/catalog');
+    expect(readsImages(findPreset('openai'), 'gpt-4o-mini')).toBe(true);
+    expect(readsImages(findPreset('deepseek'), 'deepseek-chat')).toBe(false);
+    // A server of your own: text only until an admin says otherwise.
+    let cfg = await admin.get('/m/assistant/config').expect(200);
+    expect(cfg.body).toMatchObject({ vision: null, visionDetected: false });
+    expect((await admin.get('/m/assistant/status').expect(200)).body.vision).toBe(false);
+    await admin.patch('/m/assistant/config', { vision: true }).expect(200);
+    expect((await admin.get('/m/assistant/status').expect(200)).body.vision).toBe(true);
+    await admin.patch('/m/assistant/config', { vision: null }).expect(200);
+    cfg = await admin.get('/m/assistant/config').expect(200);
+    expect(cfg.body.vision).toBeNull();
+  });
+
   it('ranks recommended models first', async () => {
     const { rankModels } = await import('../../../modules/assistant/api/catalog');
     expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([

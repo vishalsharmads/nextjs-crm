@@ -16,6 +16,8 @@ const presetSchema = z.object({
   tier: z.enum(['free', 'free_tier', 'paid']),
   note: z.string().max(200).default(''),
   recommended: z.array(z.string().min(1).max(200)).default([]),
+  /** Model ids or id fragments that read images, matched case-insensitively. */
+  vision: z.array(z.string().min(1).max(100)).default([]),
 });
 export type ProviderPreset = z.infer<typeof presetSchema>;
 
@@ -86,3 +88,7 @@ export function rankModels(ids: string[], recommended: string[]) {
     ...ids.filter((id) => !picked.includes(id)).map((id) => ({ id, recommended: false, best: false })),
   ];
 }
+
+/** Whether a listed provider's model reads images, from the provider list. */
+export const readsImages = (preset: ProviderPreset | undefined, model: string | null) =>
+  !!preset && !!model && preset.vision.some((v) => model.toLowerCase().includes(v.toLowerCase()));

@@ -1,5 +1,5 @@
 {
-  "$comment": "AI providers an admin can pick in the assistant settings. Read at run time, never bundled, so provider names stay out of the built app; this file is the one place they may appear (see AGENTS.md). recommended: model ids or id prefixes, best first. tier: free (no card needed), free_tier (free allowance), paid. compatible: starting points for 'Other compatible API' (address filled in, still editable); local ones also need ASSISTANT_PRIVATE_HOSTS.",
+  "$comment": "AI providers an admin can pick in the assistant settings. Read at run time, never bundled, so provider names stay out of the built app; this file is the one place they may appear (see AGENTS.md). recommended: model ids or id prefixes, best first. tier: free (no card needed), free_tier (free allowance), paid. compatible: starting points for 'Other compatible API' (address filled in, still editable); local ones also need ASSISTANT_PRIVATE_HOSTS. vision: model ids or id fragments that read images (screenshots), matched case-insensitively.",
   "providers": [
     {
       "id": "openai",
@@ -10,7 +10,8 @@
       "keyPrefix": "sk-",
       "tier": "paid",
       "note": "Strong all-rounder with reliable tool use.",
-      "recommended": ["gpt-5-mini", "gpt-5", "gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini"]
+      "recommended": ["gpt-5-mini", "gpt-5", "gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini"],
+      "vision": ["gpt-4o", "gpt-4.1", "gpt-5", "o3", "o4"]
     },
     {
       "id": "anthropic",
@@ -30,7 +31,8 @@
         "claude-opus-5-5",
         "claude-sonnet",
         "claude-haiku"
-      ]
+      ],
+      "vision": ["claude"]
     },
     {
       "id": "gemini",
@@ -41,7 +43,8 @@
       "keyPrefix": "AIza",
       "tier": "free_tier",
       "note": "Generous free allowance; fast Flash models.",
-      "recommended": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-flash", "gemini-pro"]
+      "recommended": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-flash", "gemini-pro"],
+      "vision": ["gemini"]
     },
     {
       "id": "xai",
@@ -52,7 +55,8 @@
       "keyPrefix": "xai-",
       "tier": "paid",
       "note": "Fast models with tool use.",
-      "recommended": ["grok-4", "grok-3-mini", "grok-3"]
+      "recommended": ["grok-4", "grok-3-mini", "grok-3"],
+      "vision": ["grok-4", "vision"]
     },
     {
       "id": "mistral",
@@ -62,7 +66,8 @@
       "keyUrl": "https://console.mistral.ai/api-keys",
       "tier": "free_tier",
       "note": "European provider; free experiment plan.",
-      "recommended": ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest"]
+      "recommended": ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest"],
+      "vision": ["pixtral", "mistral-medium", "mistral-small"]
     },
     {
       "id": "groq",
@@ -73,7 +78,8 @@
       "keyPrefix": "gsk_",
       "tier": "free_tier",
       "note": "Very fast open models; free allowance.",
-      "recommended": ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "llama-3.1-8b-instant"]
+      "recommended": ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "llama-3.1-8b-instant"],
+      "vision": ["llama-4", "vision"]
     },
     {
       "id": "openrouter",
@@ -84,7 +90,8 @@
       "keyPrefix": "sk-or-",
       "tier": "free",
       "note": "One key for hundreds of models, including free ones (ids ending in :free).",
-      "recommended": ["meta-llama/llama-3.3-70b-instruct:free", "deepseek/deepseek-chat", ":free"]
+      "recommended": ["meta-llama/llama-3.3-70b-instruct:free", "deepseek/deepseek-chat", ":free"],
+      "vision": ["gpt-4o", "gpt-4.1", "gpt-5", "claude", "gemini", "llama-4", "vision", "vl"]
     },
     {
       "id": "deepseek",
@@ -95,7 +102,8 @@
       "keyPrefix": "sk-",
       "tier": "paid",
       "note": "Low cost per request.",
-      "recommended": ["deepseek-chat"]
+      "recommended": ["deepseek-chat"],
+      "vision": []
     },
     {
       "id": "cerebras",
@@ -106,7 +114,8 @@
       "keyPrefix": "csk-",
       "tier": "free_tier",
       "note": "Very fast open models; free allowance.",
-      "recommended": ["gpt-oss-120b", "llama-3.3-70b", "qwen-3"]
+      "recommended": ["gpt-oss-120b", "llama-3.3-70b", "qwen-3"],
+      "vision": ["llama-4"]
     }
   ],
   "compatible": [
