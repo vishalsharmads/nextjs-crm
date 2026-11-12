@@ -12,6 +12,8 @@ import {
   MessageSquare,
   MessageSquarePlus,
   Paperclip,
+  Pencil,
+  RotateCcw,
   Search,
   Send,
   Sparkles,
@@ -157,6 +159,8 @@ function Chat({
   const [live, setLive] = useState<{ text: string; steps: string[]; words: string[] } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [search, setSearch] = useState('');
+  /** The person is editing their last question in the message box. */
+  const [editing, setEditing] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -193,6 +197,9 @@ function Chat({
     queryFn: () => apiGet<Conversation>(`/m/assistant/conversations/${active}`),
     enabled: !!active,
   });
+  const messages = conv.data?.messages ?? [];
+  const lastQuestionAt = messages.findLastIndex((m) => m.role === 'user');
+  const lastQuestion = lastQuestionAt >= 0 ? messages[lastQuestionAt] : undefined;
   // The page on screen (side panel) or `?about=contact:<uuid>` from a record page: ids only, the
   // assistant reads the rest with its tools. The person can leave it out of the next question.
   const about = params.get('about');
@@ -289,6 +296,24 @@ function Chat({
       toast.error(errorText(err));
     },
   });
+  // Ask the last question again: as it was (retry) or edited (with text).
+  const again = useMutation({
+    mutationFn: (edited?: string) =>
+      stream(
+        `/m/assistant/conversations/${active}/retry`,
+        edited === undefined ? {} : { text: edited },
+        thinkingWords(edited ?? lastQuestion?.text ?? '', labels),
+      ),
+    onMutate: () => {
+      setEditing(false);
+      setText('');
+    },
+    onSuccess: (c) => done(c),
+    onError: (err) => {
+      if (err instanceof Stopped) void qc.invalidateQueries({ queryKey: key });
+      else toast.error(errorText(err));
+    },
+  });
   const decide = useMutation({
     mutationFn: (decisions: Record<string, boolean>) =>
       stream(`/m/assistant/conversations/${active}/decisions`, { decisions }, DECISION_WORDS),
@@ -364,11 +389,16 @@ function Chat({
     );
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (editing) {
+      if (text.trim() && !again.isPending) again.mutate(text.trim());
+      return;
+    }
     if (send.isPending || (!text.trim() && !attachments.length)) return;
     // An image on its own still needs a question for the model.
     send.mutate({ text: text.trim() || 'What does this image show?', images: attachments });
   };
   const proposals = conv.data?.proposals ?? [];
+  const busy = send.isPending || decide.isPending || again.isPending;
   const last = conv.data?.messages.at(-1);
   // What the person might ask next, offered under the latest answer.
   const next =
@@ -505,12 +535,31 @@ function Chat({
                     ) : conv.isError ? (
                       <ErrorState error={conv.error} onRetry={() => void conv.refetch()} />
                     ) : (
-                      conv.data?.messages.map((m, i) =>
+                      (again.isPending ? messages.slice(0, lastQuestionAt + 1) : messages).map((m, i) =>
                         m.role === 'user' ? (
-                          <div key={i} className="anim-rise flex justify-end">
+                          <div key={i} className="group anim-rise flex items-end justify-end gap-1">
+                            {i === lastQuestionAt && !busy && !proposals.length ? (
+                              <div className="flex opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+                                <Button
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  aria-label="Edit question"
+                                  title="Edit and ask again"
+                                  onClick={() => {
+                                    setEditing(true);
+                                    setText(m.text ?? '');
+                                    composer.current?.focus();
+                                  }}
+                                >
+                                  <Pencil />
+                                </Button>
+                              </div>
+                            ) : null}
                             <div className="max-w-[85%] min-w-0 rounded-lg rounded-ee-sm bg-primary px-3 py-2 text-sm whitespace-pre-wrap text-primary-fg">
                               <BubbleImages srcs={(m.images ?? []).map((p) => buildUrl(p))} />
-                              {m.text}
+                              {again.isPending && again.variables !== undefined && i === lastQuestionAt
+                                ? again.variables
+                                : m.text}
                             </div>
                           </div>
                         ) : (
@@ -545,7 +594,18 @@ function Chat({
                               </div>
                               {m.text ? (
                                 // Shown on hover or keyboard focus; always on touch screens, which cannot hover.
-                                <div className="absolute -end-9 bottom-0 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+                                <div className="absolute -end-9 bottom-0 flex flex-col opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+                                  {i === messages.length - 1 && !busy ? (
+                                    <Button
+                                      size="icon-sm"
+                                      variant="ghost"
+                                      aria-label="Ask again"
+                                      title="Ask again for a new answer"
+                                      onClick={() => again.mutate(undefined)}
+                                    >
+                                      <RotateCcw />
+                                    </Button>
+                                  ) : null}
                                   <Button
                                     size="icon-sm"
                                     variant="ghost"
@@ -562,6 +622,14 @@ function Chat({
                         ),
                       )
                     )}
+                    {lastQuestionAt === messages.length - 1 && lastQuestion && !busy && !proposals.length ? (
+                      <div className="flex items-center gap-2 ps-8 text-sm text-muted" role="status">
+                        No answer yet.
+                        <Button size="sm" variant="ghost" onClick={() => again.mutate(undefined)}>
+                          <RotateCcw /> Ask again
+                        </Button>
+                      </div>
+                    ) : null}
                     {send.isPending && send.variables ? (
                       <div className="anim-rise flex justify-end">
                         <div className="max-w-[85%] rounded-lg rounded-ee-sm bg-primary px-3 py-2 text-sm whitespace-pre-wrap text-primary-fg">
@@ -635,6 +703,24 @@ function Chat({
                   </div>
                 </div>
                 <form onSubmit={submit} className="border-t border-line p-3">
+                  {editing ? (
+                    <div className="mb-2 flex items-center gap-1 text-xs text-muted" role="status">
+                      <Pencil className="size-3" aria-hidden /> Editing your last question; its answer will be
+                      replaced.
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="ms-auto"
+                        onClick={() => {
+                          setEditing(false);
+                          setText('');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : null}
                   {context ? (
                     <div className="mb-2 flex items-center gap-1">
                       <span className="inline-flex items-center gap-1 rounded-full border border-line bg-subtle py-0.5 ps-2 pe-0.5 text-xs text-muted">
@@ -721,7 +807,7 @@ function Chat({
                     ) : null}
                     <Textarea
                       ref={composer}
-                    autoFocus={compact}
+                      autoFocus={compact}
                       value={text}
                       rows={1}
                       onChange={(e) => setText(e.target.value)}
@@ -754,7 +840,7 @@ function Chat({
                       disabled={proposals.length > 0}
                       maxLength={4000}
                     />
-                    {send.isPending || decide.isPending ? (
+                    {busy ? (
                       <Button type="button" size="sm" onClick={() => stopper.current?.abort()}>
                         <Square /> Stop
                       </Button>
