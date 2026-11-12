@@ -63,6 +63,32 @@ function authHeaders(cfg: { provider: ProviderKind; apiKey: string }): Record<st
     : { authorization: `Bearer ${cfg.apiKey}` };
 }
 
+/** TLS failures that mean this server does not trust the provider's certificate. */
+const CERT_ERRORS = new Set([
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_HAS_EXPIRED',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+]);
+
+/**
+ * Why a request never got an answer, in words an admin can act on: an untrusted certificate (a
+ * local server with its own certificate authority) reads differently from a server that is down.
+ */
+export function unreachable(err: unknown, otherwise: string) {
+  const code = (err as { cause?: { code?: string } } | null)?.cause?.code;
+  if (code && CERT_ERRORS.has(code)) {
+    logger.warn({ code }, 'AI provider certificate not trusted');
+    return new AppError(
+      'UPSTREAM_FAILED',
+      "This server does not trust the AI provider's certificate. Whoever runs it can add the certificate authority (NODE_EXTRA_CA_CERTS).",
+    );
+  }
+  return new AppError('UPSTREAM_FAILED', `The AI provider could not be reached. ${otherwise}`);
+}
+
 /** Content in the conversation, in one shape for every provider. */
 export type Block =
   | { type: 'text'; text: string }
@@ -142,8 +168,8 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
         redirect: 'manual',
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-    } catch {
-      throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
+    } catch (err) {
+      throw unreachable(err, 'Try again in a moment.');
     }
   });
   const text = await res.text();
@@ -173,8 +199,8 @@ export async function listModels(cfg: Omit<ProviderConfig, 'model'>): Promise<st
       redirect: 'manual',
       signal: AbortSignal.timeout(15_000),
     });
-  } catch {
-    throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Check the address.');
+  } catch (err) {
+    throw unreachable(err, 'Check the address.');
   }
   const text = await res.text();
   if (!res.ok || text.length > MAX_RESPONSE)
@@ -381,8 +407,8 @@ async function open(url: string, headers: Record<string, string>, body: unknown)
         redirect: 'manual',
         signal: AbortSignal.timeout(TIMEOUT_MS * 3),
       });
-    } catch {
-      throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
+    } catch (err) {
+      throw unreachable(err, 'Try again in a moment.');
     }
   });
   if (!res.ok || !res.body) {

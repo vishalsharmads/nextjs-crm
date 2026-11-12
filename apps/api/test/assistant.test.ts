@@ -681,6 +681,16 @@ describe('assistant module', () => {
     expect(fitted.meta).toEqual({ total: 200 });
   });
 
+  it('says when the provider certificate is not trusted, not just unreachable', async () => {
+    const { unreachable } = await import('../../../modules/assistant/api/providers');
+    expect(unreachable({ cause: { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' } }, 'Try again.').message).toMatch(
+      /does not trust the AI provider's certificate/,
+    );
+    expect(unreachable({ cause: { code: 'ECONNREFUSED' } }, 'Try again.').message).toBe(
+      'The AI provider could not be reached. Try again.',
+    );
+  });
+
   it('ranks recommended models first', async () => {
     const { rankModels } = await import('../../../modules/assistant/api/catalog');
     expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([
