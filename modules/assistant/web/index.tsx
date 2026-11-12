@@ -13,12 +13,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   ArrowRight,
+  BarChart3,
   Check,
   Copy,
+  Download,
   Eye,
   History,
   MessageSquare,
   MessageSquarePlus,
+  NotebookPen,
   Paperclip,
   Pencil,
   RotateCcw,
@@ -36,7 +39,8 @@ import { replyHtml, splitNext, type RecordPath } from './markdown';
 import type { ReportDefinition, ReportResultDto } from '@app/shared';
 import { ReportChart } from '@/features/reports/report-chart';
 import { imageFiles, MAX_ATTACHMENTS, prepareImage, type Attachment } from './images';
-import { ApiError, apiDelete, apiGet, apiStream, buildUrl } from '@/lib/api';
+import { download, fileName, reportCsv } from './artifacts';
+import { ApiError, apiDelete, apiGet, apiPost, apiStream, buildUrl } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
 import { useBoot, useCan } from '@/app/session';
 import { cn } from '@/lib/cn';
@@ -337,6 +341,25 @@ function Chat({
       else toast.error(errorText(err));
     },
   });
+  // Keep what the assistant made: a chart as a saved report, an answer as a note on the record.
+  const saveReport = useMutation({
+    mutationFn: (r: { name: string; definition: ReportDefinition }) =>
+      apiPost('/reports/custom', { name: r.name.slice(0, 150), shared: false, definition: r.definition }),
+    onSuccess: () => toast.success('Saved as a report'),
+    onError: (err) => toast.error(errorText(err)),
+  });
+  const noteTarget =
+    context?.uuid && ['contact', 'organization', 'deal', 'lead'].includes(context.entity)
+      ? { type: context.entity, uuid: context.uuid }
+      : null;
+  const saveNote = useMutation({
+    mutationFn: (body: string) => apiPost('/activities', { type: 'note', body, related: noteTarget }),
+    onSuccess: () => {
+      toast.success('Saved as a note');
+      void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'm' });
+    },
+    onError: (err) => toast.error(errorText(err)),
+  });
   const decide = useMutation({
     mutationFn: (decisions: Record<string, boolean>) =>
       stream(`/m/assistant/conversations/${active}/decisions`, { decisions }, DECISION_WORDS),
@@ -627,11 +650,33 @@ function Chat({
                                     className="mt-3 rounded-md border border-line bg-surface p-3"
                                     aria-label={c.title || 'Chart'}
                                   >
-                                    {c.title ? (
-                                      <figcaption className="mb-2 text-xs font-medium text-muted">
-                                        {c.title}
-                                      </figcaption>
-                                    ) : null}
+                                    <figcaption className="mb-2 flex items-center gap-1 text-xs font-medium text-muted">
+                                      <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                                      <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        aria-label="Download as CSV"
+                                        title="Download as CSV"
+                                        onClick={() =>
+                                          download(fileName(c.title, 'csv'), reportCsv(c.result))
+                                        }
+                                      >
+                                        <Download />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() =>
+                                          saveReport.mutate({
+                                            name: c.title || 'Report',
+                                            definition: c.definition,
+                                          })
+                                        }
+                                        disabled={saveReport.isPending}
+                                      >
+                                        <BarChart3 /> Save as report
+                                      </Button>
+                                    </figcaption>
                                     <ReportChart result={c.result} definition={c.definition} height={220} />
                                   </figure>
                                 ))}
@@ -648,6 +693,20 @@ function Chat({
                                       onClick={() => again.mutate(undefined)}
                                     >
                                       <RotateCcw />
+                                    </Button>
+                                  ) : null}
+                                  {noteTarget ? (
+                                    <Button
+                                      size="icon-sm"
+                                      variant="ghost"
+                                      aria-label={`Save as a note on this ${(labels[noteTarget.type]?.singular ?? 'record').toLowerCase()}`}
+                                      title="Save as a note on this record"
+                                      disabled={saveNote.isPending}
+                                      onClick={() =>
+                                        saveNote.mutate(replyHtml(splitNext(m.text!).body, () => null))
+                                      }
+                                    >
+                                      <NotebookPen />
                                     </Button>
                                   ) : null}
                                   <Button
