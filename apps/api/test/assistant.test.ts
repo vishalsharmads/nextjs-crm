@@ -230,14 +230,12 @@ describe('assistant module', () => {
     const sent = JSON.stringify(seen.at(-1)!.body.messages);
     expect(sent).not.toContain(d.body.uuid);
     expect(sent).toContain('may not use this record type');
-    // A confirmed stage move on an excluded type is still refused.
+    // A stage move on an excluded type is refused before anyone is asked to confirm it.
     replies = [use('move_deal_stage', { dealUuid: d.body.uuid, stageUuid: d.body.stage.uuid }), text('ok')];
-    const conv = await admin.post('/m/assistant/conversations', { text: 'move' }).expect(201);
     seen.length = 0;
-    await admin
-      .post(`/m/assistant/conversations/${conv.body.uuid}/decisions`, { decisions: { p1: true } })
-      .expect(200);
-    expect(JSON.stringify(seen[0]!.body.messages)).toContain('may not use this record type');
+    const conv = await admin.post('/m/assistant/conversations', { text: 'move' }).expect(201);
+    expect(conv.body.proposals).toEqual([]);
+    expect(JSON.stringify(seen[1]!.body.messages)).toContain('may not use this record type');
     await admin.patch('/m/assistant/config', { excludedEntities: [] }).expect(200);
   });
 
@@ -1048,6 +1046,38 @@ describe('assistant module', () => {
     seen.length = 0;
     await viewer.post('/m/assistant/conversations', { text: 'Contacts per owner' }).expect(201);
     expect(JSON.stringify(seen[1]!.body.messages)).toContain('FORBIDDEN');
+  });
+
+  it('keeps excluded types out of task completion and link changes', async () => {
+    await admin.patch('/m/assistant/config', { excludedEntities: ['contact'] }).expect(200);
+    const deal = await db('deals').first('uuid');
+    replies = [
+      {
+        content: [
+          { type: 'tool_use', id: 'ct1', name: 'complete_task', input: { uuid: deal.uuid } },
+          {
+            type: 'tool_use',
+            id: 'ct2',
+            name: 'change_records',
+            input: {
+              entity: 'deal',
+              uuids: [deal.uuid],
+              action: 'update_field',
+              field: 'contactUuid',
+              value: deal.uuid,
+            },
+          },
+        ],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      },
+      text('No.'),
+    ];
+    seen.length = 0;
+    const res = await admin.post('/m/assistant/conversations', { text: 'Try' }).expect(201);
+    // Refused before anyone is asked to confirm.
+    expect(res.body.proposals).toEqual([]);
+    expect(JSON.stringify(seen[1]!.body.messages).match(/may not use this record type/g)).toHaveLength(2);
+    await admin.patch('/m/assistant/config', { excludedEntities: [] }).expect(200);
   });
 
   it('lets admins try configuration with simulated replies, still confirmed', async () => {

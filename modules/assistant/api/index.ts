@@ -352,11 +352,18 @@ function touches(name: string, input: Record<string, unknown>): string[] {
       return out.length || !String(input.path).match(/^\/automations\/./) ? out : ['*'];
     }
     case 'run_report':
-    case 'change_records':
       add(input.entity);
       return out;
+    case 'change_records': {
+      add(input.entity);
+      // Setting a link field (contactUuid…) ties the records to another type.
+      const link = typeof input.field === 'string' ? LINK_FIELDS[input.field] : undefined;
+      if (link) out.push(link);
+      return out;
+    }
     case 'complete_task':
-      return ['activity'];
+      // The task it returns names the record it belongs to.
+      return ['activity', 'contact', 'organization', 'deal', 'lead'];
     case 'list_records':
     case 'get_record':
       add(input.entity);
@@ -703,21 +710,27 @@ async function precheck(
   ctx: RequestContext,
   user: AuthUser,
 ): Promise<Block | null> {
-  if (use.name !== 'config_change') return null;
   const asUser: AuthUser = { ...user, via: 'assistant' };
   try {
+    // Record types an admin kept from the assistant are refused for every change, before asking.
     const excluded = json<string[]>(cfg.excluded_entities);
     const hit = excluded.length ? touches(use.name, use.input) : [];
     if (hit.some((t) => t === '*' || excluded.includes(t)))
       throw new AppError('FORBIDDEN', 'The assistant may not use this record type');
-    await precheckConfigChange(use.input, { ctx: { ...ctx, user: asUser }, user: asUser });
+    if (use.name === 'config_change')
+      await precheckConfigChange(use.input, { ctx: { ...ctx, user: asUser }, user: asUser });
     return null;
   } catch (err) {
     if (!(err instanceof AppError)) throw err;
     return {
       type: 'tool_result',
       tool_use_id: use.id,
-      content: JSON.stringify({ error: err.code, message: err.message, details: err.details }),
+      content: JSON.stringify({
+        error: err.code,
+        message: err.message,
+        details: err.details,
+        hint: hintFor(err.code),
+      }),
       is_error: true,
     };
   }
