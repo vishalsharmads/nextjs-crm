@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Download, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,7 +7,7 @@ import { apiGet, apiPost, buildUrl } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { useCan, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
-import { Field, Input } from '@/components/ui/input';
+import { Field, Input, NativeSelect } from '@/components/ui/input';
 import {
   Badge,
   EmptyState,
@@ -36,17 +37,30 @@ interface Entry {
 interface Filters {
   action: string;
   entity: string;
+  /** Who acted: '' for anyone, or an actor type such as 'assistant'. */
+  actorType: string;
   from: string;
   to: string;
 }
 
-const EMPTY: Filters = { action: '', entity: '', from: '', to: '' };
+const EMPTY: Filters = { action: '', entity: '', actorType: '', from: '', to: '' };
+
+/** Who can act, as stored in the logs' actor type. */
+const ACTOR_TYPES: [string, string][] = [
+  ['', 'Anyone'],
+  ['user', 'People in the app'],
+  ['assistant', 'The assistant'],
+  ['mcp', 'AI clients (MCP)'],
+  ['api', 'API keys'],
+  ['system', 'The system'],
+];
 
 /** Date inputs give local calendar days; the API takes instants. */
 function toQuery(f: Filters) {
   return {
     action: f.action || undefined,
     entity: f.entity || undefined,
+    actorType: f.actorType || undefined,
     from: f.from ? new Date(`${f.from}T00:00:00`).toISOString() : undefined,
     to: f.to ? new Date(`${f.to}T23:59:59.999`).toISOString() : undefined,
   };
@@ -58,7 +72,12 @@ export function AuditPage() {
   const t = useT();
   const can = useCan();
   const [tab, setTab] = useState<'changes' | 'access'>('changes');
-  const [filters, setFilters] = useState<Filters>(EMPTY);
+  // `?made=assistant` opens the log filtered to what the assistant did (linked from its settings).
+  const [params] = useSearchParams();
+  const [filters, setFilters] = useState<Filters>(() => ({
+    ...EMPTY,
+    actorType: ACTOR_TYPES.some(([k]) => k && k === params.get('made')) ? params.get('made')! : '',
+  }));
   const verify = useMutation({
     mutationFn: () =>
       apiPost<{
@@ -99,7 +118,18 @@ export function AuditPage() {
         </div>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-5">
+        <Field label="Made by">
+          {(p) => (
+            <NativeSelect {...p} value={filters.actorType} onChange={(e) => set('actorType', e.target.value)}>
+              {ACTOR_TYPES.map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
+                </option>
+              ))}
+            </NativeSelect>
+          )}
+        </Field>
         <Field label="Action starts with">
           {(p) => (
             <Input

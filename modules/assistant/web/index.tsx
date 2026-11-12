@@ -1,16 +1,27 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ENTITY_ROUTE, recordTypePath } from '@app/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   ArrowRight,
+  BarChart3,
   Check,
   Copy,
+  Download,
   Eye,
   History,
   MessageSquare,
   MessageSquarePlus,
+  NotebookPen,
   Paperclip,
   Pencil,
   RotateCcw,
@@ -25,11 +36,15 @@ import type { WebModule } from '@app/module-sdk';
 import { SettingsPanel } from './settings';
 import { DECISION_WORDS, thinkingWords } from './thinking';
 import { replyHtml, splitNext, type RecordPath } from './markdown';
+import type { ReportDefinition, ReportResultDto } from '@app/shared';
+import { ReportChart } from '@/features/reports/report-chart';
 import { imageFiles, MAX_ATTACHMENTS, prepareImage, type Attachment } from './images';
-import { ApiError, apiDelete, apiGet, apiStream, buildUrl } from '@/lib/api';
+import { download, fileName, reportCsv } from './artifacts';
+import { ApiError, apiDelete, apiGet, apiPost, apiStream, buildUrl } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
 import { useBoot, useCan } from '@/app/session';
 import { cn } from '@/lib/cn';
+import { appUrl } from '@/lib/app-url';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import {
@@ -52,11 +67,23 @@ interface Proposal {
   input: Record<string, unknown>;
   /** Configuration changes: what will happen, written by the server. */
   detail?: string;
+  /** Other changes: the records by name and the fields as plain values, from the server. */
+  preview?: {
+    records: { entity: string; uuid: string; name: string | null }[];
+    fields: { label: string; value: string }[];
+  };
 }
 interface Conversation {
   uuid: string;
   title: string;
-  messages: { role: 'user' | 'assistant'; text?: string; tools?: string[]; images?: string[] }[];
+  messages: {
+    role: 'user' | 'assistant';
+    text?: string;
+    tools?: string[];
+    steps?: Step[];
+    images?: string[];
+    charts?: { title: string; definition: ReportDefinition; result: ReportResultDto }[];
+  }[];
   proposals: Proposal[];
 }
 
@@ -314,6 +341,25 @@ function Chat({
       else toast.error(errorText(err));
     },
   });
+  // Keep what the assistant made: a chart as a saved report, an answer as a note on the record.
+  const saveReport = useMutation({
+    mutationFn: (r: { name: string; definition: ReportDefinition }) =>
+      apiPost('/reports/custom', { name: r.name.slice(0, 150), shared: false, definition: r.definition }),
+    onSuccess: () => toast.success('Saved as a report'),
+    onError: (err) => toast.error(errorText(err)),
+  });
+  const noteTarget =
+    context?.uuid && ['contact', 'organization', 'deal', 'lead'].includes(context.entity)
+      ? { type: context.entity, uuid: context.uuid }
+      : null;
+  const saveNote = useMutation({
+    mutationFn: (body: string) => apiPost('/activities', { type: 'note', body, related: noteTarget }),
+    onSuccess: () => {
+      toast.success('Saved as a note');
+      void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'm' });
+    },
+    onError: (err) => toast.error(errorText(err)),
+  });
   const decide = useMutation({
     mutationFn: (decisions: Record<string, boolean>) =>
       stream(`/m/assistant/conversations/${active}/decisions`, { decisions }, DECISION_WORDS),
@@ -570,14 +616,21 @@ function Chat({
                                 {m.tools?.length ? (
                                   <ul
                                     className={cn(
-                                      'flex flex-wrap gap-x-2 text-xs text-faint',
+                                      'flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-faint',
                                       m.text && 'mb-1.5',
                                     )}
                                     aria-label="Steps taken"
                                   >
-                                    {m.tools.map((t) => (
-                                      <li key={t} className="inline-flex items-center gap-1">
-                                        <Check className="size-3" aria-hidden /> {t}
+                                    {(m.steps ?? m.tools.map((title): Step => ({ title }))).map((st, k) => (
+                                      <li key={k} className="inline-flex items-center gap-1">
+                                        <Check className="size-3" aria-hidden />
+                                        {st.title}
+                                        {st.entity ? (
+                                          <span className="text-muted">
+                                            · {labels[st.entity]?.plural ?? st.entity}
+                                          </span>
+                                        ) : null}
+                                        {st.query ? <span className="text-muted">· “{st.query}”</span> : null}
                                       </li>
                                     ))}
                                   </ul>
@@ -591,6 +644,42 @@ function Chat({
                                     }}
                                   />
                                 ) : null}
+                                {(m.charts ?? []).map((c, k) => (
+                                  <figure
+                                    key={k}
+                                    className="mt-3 rounded-md border border-line bg-surface p-3"
+                                    aria-label={c.title || 'Chart'}
+                                  >
+                                    <figcaption className="mb-2 flex items-center gap-1 text-xs font-medium text-muted">
+                                      <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                                      <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        aria-label="Download as CSV"
+                                        title="Download as CSV"
+                                        onClick={() =>
+                                          download(fileName(c.title, 'csv'), reportCsv(c.result))
+                                        }
+                                      >
+                                        <Download />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() =>
+                                          saveReport.mutate({
+                                            name: c.title || 'Report',
+                                            definition: c.definition,
+                                          })
+                                        }
+                                        disabled={saveReport.isPending}
+                                      >
+                                        <BarChart3 /> Save as report
+                                      </Button>
+                                    </figcaption>
+                                    <ReportChart result={c.result} definition={c.definition} height={220} />
+                                  </figure>
+                                ))}
                               </div>
                               {m.text ? (
                                 // Shown on hover or keyboard focus; always on touch screens, which cannot hover.
@@ -604,6 +693,20 @@ function Chat({
                                       onClick={() => again.mutate(undefined)}
                                     >
                                       <RotateCcw />
+                                    </Button>
+                                  ) : null}
+                                  {noteTarget ? (
+                                    <Button
+                                      size="icon-sm"
+                                      variant="ghost"
+                                      aria-label={`Save as a note on this ${(labels[noteTarget.type]?.singular ?? 'record').toLowerCase()}`}
+                                      title="Save as a note on this record"
+                                      disabled={saveNote.isPending}
+                                      onClick={() =>
+                                        saveNote.mutate(replyHtml(splitNext(m.text!).body, () => null))
+                                      }
+                                    >
+                                      <NotebookPen />
                                     </Button>
                                   ) : null}
                                   <Button
@@ -646,7 +749,13 @@ function Chat({
                             <div
                               className="rte-prose ai-reply ai-caret-md"
                               dangerouslySetInnerHTML={{
-                                __html: replyHtml(splitNext(live.text).body, recordPath),
+                                __html: replyHtml(
+                                  splitNext(live.text).body.replace(
+                                    /```chart[\s\S]*?(```|$)/g,
+                                    '_Drawing a chart…_',
+                                  ),
+                                  recordPath,
+                                ),
                               }}
                             />
                           ) : (
@@ -694,6 +803,8 @@ function Chat({
                     ) : null}
                     {proposals.length ? (
                       <Proposals
+                        labels={labels}
+                        recordPath={recordPath}
                         proposals={proposals}
                         onDecide={(d) => decide.mutate(d)}
                         busy={decide.isPending}
@@ -877,7 +988,11 @@ function Proposals({
   proposals,
   onDecide,
   busy,
+  labels,
+  recordPath,
 }: {
+  labels: Labels;
+  recordPath: RecordPath;
   proposals: Proposal[];
   onDecide: (d: Record<string, boolean>) => void;
   busy: boolean;
@@ -896,6 +1011,8 @@ function Proposals({
               <SetupSummary input={p.input} />
             ) : p.name === 'config_change' ? (
               <ConfigSummary input={p.input} detail={p.detail} />
+            ) : p.preview ? (
+              <ChangePreview preview={p.preview} input={p.input} labels={labels} recordPath={recordPath} />
             ) : (
               <pre className="mt-1 overflow-x-auto rounded bg-subtle p-2 text-xs">
                 {JSON.stringify(p.input, null, 2)}
@@ -1107,6 +1224,13 @@ function byDay<T extends { updatedAt: string }>(items: T[]): [string, T[]][] {
   return [...groups.entries()];
 }
 
+/** A step the assistant took, with the record type or search it looked at. */
+interface Step {
+  title: string;
+  entity?: string;
+  query?: string;
+}
+
 interface Question {
   text: string;
   images?: Attachment[];
@@ -1140,6 +1264,65 @@ function AssistantAvatar() {
     >
       <Sparkles className="size-3.5" />
     </span>
+  );
+}
+
+/**
+ * A proposed change people can check at a glance: the records it touches by name (each opens in
+ * a new tab), its values as a short list, and the exact change one click away.
+ */
+function ChangePreview({
+  preview,
+  input,
+  labels,
+  recordPath,
+}: {
+  preview: NonNullable<Proposal['preview']>;
+  input: Record<string, unknown>;
+  labels: Labels;
+  recordPath: RecordPath;
+}) {
+  return (
+    <div className="mt-1.5 space-y-2">
+      {preview.records.length ? (
+        <ul className="flex flex-wrap gap-1.5" aria-label="Records it changes">
+          {preview.records.map((r) => {
+            const type = labels[r.entity]?.singular ?? 'Record';
+            const to = recordPath(r.entity, r.uuid);
+            const name = r.name ?? 'A record you cannot see';
+            return (
+              <li key={`${r.entity}:${r.uuid}`}>
+                {to ? (
+                  <a href={appUrl(`/${to}`)} target="_blank" rel="noopener noreferrer" className="ai-chip">
+                    <span className="text-faint">{type}:</span> {name}
+                  </a>
+                ) : (
+                  <span className="ai-chip">
+                    <span className="text-faint">{type}:</span> {name}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      {preview.fields.length ? (
+        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 rounded-md bg-surface p-2 text-sm">
+          {preview.fields.map((f, i) => (
+            <Fragment key={i}>
+              <dt className="text-muted">{f.label}</dt>
+              <dd className="min-w-0 break-words text-ink">{f.value}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      ) : null}
+      <details className="text-xs text-muted">
+        <summary className="cursor-pointer select-none">Details</summary>
+        <pre className="mt-1 max-h-48 overflow-auto rounded bg-subtle p-2">
+          {JSON.stringify(input, null, 2)}
+        </pre>
+      </details>
+    </div>
   );
 }
 

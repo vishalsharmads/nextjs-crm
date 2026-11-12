@@ -76,6 +76,35 @@ describe('personal access tokens and MCP', () => {
     expect(denied.body.error.code).toBe(-32602);
   });
 
+  it('keeps the newer tools to the token, the permissions and the scope', async () => {
+    await enable();
+    const read = await newToken(admin, 'read');
+    for (const name of ['change_records', 'complete_task'])
+      expect((await call(read.secret, name, {})).body.error.code).toBe(-32602);
+
+    // Someone who sees only their own records cannot change, complete or count anyone else's.
+    const role = await createRole(['core.contacts.*', 'core.activities.*', 'core.reports.view'], {
+      '*': 'own',
+    });
+    const own = await loginAs(await createUser({ roleKeys: [role] }));
+    const t = await newToken(own);
+    const theirs = await admin.post('/contacts', { firstName: 'Not', lastName: unique('Yours') }).expect(201);
+    const task = await admin.post('/activities', { type: 'task', subject: unique('Not yours') }).expect(201);
+    const tag = unique('Sneak');
+    await call(t.secret, 'change_records', {
+      entity: 'contact',
+      uuids: [theirs.body.uuid],
+      action: 'add_tags',
+      tags: [tag],
+    });
+    const tagRow = await db('tags').where({ name: tag }).first();
+    if (tagRow) expect(await db('taggables').where({ tag_id: tagRow.id })).toHaveLength(0);
+    await call(t.secret, 'complete_task', { uuid: task.body.uuid });
+    expect((await db('activities').where({ uuid: task.body.uuid }).first()).completed_at).toBeNull();
+    const report = await call(t.secret, 'run_report', { entity: 'contact', groupBy: 'owner' });
+    expect(report.body.result.structuredContent.total).toBe(0);
+  });
+
   it('writes as the user, audited as mcp', async () => {
     await enable();
     const t = await newToken(admin);

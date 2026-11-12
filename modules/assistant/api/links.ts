@@ -13,9 +13,11 @@ const LINKED = ['contact', 'organization', 'lead', 'deal'];
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
 
-function nameOf(o: Obj): string | null {
+export function nameOf(o: Obj): string | null {
   const parts = [o.firstName, o.lastName].filter((p): p is string => typeof p === 'string' && !!p);
-  const name = [o.name, o.title, o.fullName].find((v): v is string => typeof v === 'string' && !!v.trim());
+  const name = [o.name, o.title, o.fullName, o.subject].find(
+    (v): v is string => typeof v === 'string' && !!v.trim(),
+  );
   return (name ?? parts.join(' ')).trim() || null;
 }
 
