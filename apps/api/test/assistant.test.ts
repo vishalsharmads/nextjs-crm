@@ -1005,6 +1005,15 @@ describe('assistant module', () => {
     await admin.patch('/m/assistant/config', { model: 'test-model' }).expect(200);
   });
 
+  it('lists what the assistant did in the audit log on its own', async () => {
+    const res = await admin.get('/audit-logs?actorType=assistant&pageSize=100').expect(200);
+    expect(res.body.data.length).toBeGreaterThan(0);
+    expect(new Set(res.body.data.map((e: { actorType: string }) => e.actorType))).toEqual(
+      new Set(['assistant']),
+    );
+    await admin.get('/audit-logs?actorType=Robert%27);--').expect(422);
+  });
+
   it('lets admins try configuration with simulated replies, still confirmed', async () => {
     await admin.patch('/m/assistant/config', { preset: 'simulated', setupEnabled: true }).expect(200);
     const what = await admin

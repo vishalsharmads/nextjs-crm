@@ -26,6 +26,11 @@ const auditFilters = z.object({
   entityUuid: z.uuid().optional(),
   action: z.string().max(64).optional(),
   actor: z.uuid().optional(),
+  /** Who made the change: a person in the app, the assistant, an MCP client, the system… */
+  actorType: z
+    .string()
+    .regex(/^[a-z_]{1,32}$/)
+    .optional(),
   ip: z.string().max(64).optional(),
   from: z.iso.datetime({ offset: true }).optional(),
   to: z.iso.datetime({ offset: true }).optional(),
@@ -42,6 +47,7 @@ function applyFilters(qb: Knex.QueryBuilder, f: Filters, table: 'a' | 'x') {
   if (f.entityUuid) qb.where(`${table}.entity_uuid`, f.entityUuid);
   if (f.action) qb.where(`${table}.action`, 'like', `${escapeLike(f.action)}%`);
   if (f.actor) qb.where('u.uuid', f.actor);
+  if (f.actorType) qb.where(`${table}.actor_type`, f.actorType);
   if (f.ip) qb.where(`${table}.ip`, f.ip);
   if (f.from) qb.where(`${table}.created_at`, '>=', new Date(f.from));
   if (f.to) qb.where(`${table}.created_at`, '<=', new Date(f.to));
@@ -349,8 +355,10 @@ export const accessLogRoutes = defineRoutes('/access-logs', ['audit'])
 
 /** Filters as recorded in the logs (without paging). */
 function filterDetail(f: Filters) {
-  const { entity, entityUuid, action, actor, ip, from, to } = f;
+  const { entity, entityUuid, action, actor, actorType, ip, from, to } = f;
   return Object.fromEntries(
-    Object.entries({ entity, entityUuid, action, actor, ip, from, to }).filter(([, v]) => v !== undefined),
+    Object.entries({ entity, entityUuid, action, actor, actorType, ip, from, to }).filter(
+      ([, v]) => v !== undefined,
+    ),
   );
 }
