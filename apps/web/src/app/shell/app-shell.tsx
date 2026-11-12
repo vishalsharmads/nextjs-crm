@@ -40,7 +40,7 @@ import { IdleTimeout } from './idle-timeout';
 import { NotificationsBell } from '@/features/notifications/notifications-bell';
 import { HelpProvider, useHelp } from '@/help/help-context';
 import { TourProvider } from '@/components/tour/tour';
-import { ShellPanels } from './shell-panels';
+import { DockedPanel, PanelProvider, ShellPanels } from './shell-panels';
 
 const COLLAPSE_KEY = 'ui.sidebarCollapsed';
 
@@ -154,39 +154,44 @@ function ShellLayout({ nav }: { nav: NavItem[] }) {
   return (
     <HelpProvider onShortcuts={() => setHelpOpen(true)}>
       <TourProvider>
-        <HelpBridge onReady={setHelpOpener} />
-        <div className="flex h-dvh overflow-hidden print:block print:h-auto print:overflow-visible">
-          <aside
-            className={cn(
-              'hidden shrink-0 flex-col border-e border-line bg-surface transition-[width] duration-150 md:flex print:hidden',
-              collapsed ? 'w-14' : 'w-60',
-            )}
-          >
-            <Sidebar nav={nav} collapsed={collapsed} onToggle={toggle} />
-          </aside>
-          <D.Root open={mobileOpen} onOpenChange={setMobileOpen}>
-            <D.Portal>
-              <D.Overlay className="anim-fade fixed inset-0 z-40 bg-overlay md:hidden" />
-              <D.Content
-                className="anim-sheet fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-line bg-surface md:hidden"
-                style={{ ['--sheet-from' as string]: '-16px' }}
-              >
-                <D.Title className="sr-only">Navigation</D.Title>
-                <D.Description className="sr-only">Navigation</D.Description>
-                <Sidebar nav={nav} collapsed={false} onNavigate={() => setMobileOpen(false)} />
-              </D.Content>
-            </D.Portal>
-          </D.Root>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar onMenu={() => setMobileOpen(true)} onHelp={() => setHelpOpen(true)} />
-            <MfaRequiredBanner />
-            <main className="min-h-0 flex-1 overflow-y-auto print:overflow-visible">
-              <Outlet />
-            </main>
+        <PanelProvider>
+          <HelpBridge onReady={setHelpOpener} />
+          <div className="flex h-dvh overflow-hidden print:block print:h-auto print:overflow-visible">
+            <aside
+              className={cn(
+                'hidden shrink-0 flex-col border-e border-line bg-surface transition-[width] duration-150 md:flex print:hidden',
+                collapsed ? 'w-14' : 'w-60',
+              )}
+            >
+              <Sidebar nav={nav} collapsed={collapsed} onToggle={toggle} />
+            </aside>
+            <D.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+              <D.Portal>
+                <D.Overlay className="anim-fade fixed inset-0 z-40 bg-overlay md:hidden" />
+                <D.Content
+                  className="anim-sheet fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-line bg-surface md:hidden"
+                  style={{ ['--sheet-from' as string]: '-16px' }}
+                >
+                  <D.Title className="sr-only">Navigation</D.Title>
+                  <D.Description className="sr-only">Navigation</D.Description>
+                  <Sidebar nav={nav} collapsed={false} onNavigate={() => setMobileOpen(false)} />
+                </D.Content>
+              </D.Portal>
+            </D.Root>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <TopBar onMenu={() => setMobileOpen(true)} onHelp={() => setHelpOpen(true)} />
+              <MfaRequiredBanner />
+              <div className="flex min-h-0 flex-1">
+                <main className="min-w-0 flex-1 overflow-y-auto print:overflow-visible">
+                  <Outlet />
+                </main>
+                <DockedPanel />
+              </div>
+            </div>
+            <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} nav={nav} />
+            <IdleTimeout />
           </div>
-          <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} nav={nav} />
-          <IdleTimeout />
-        </div>
+        </PanelProvider>
       </TourProvider>
     </HelpProvider>
   );
