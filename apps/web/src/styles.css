@@ -411,6 +411,34 @@ html.dark {
   background: linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 55%, var(--accent)));
   color: var(--primary-fg);
 }
+/* The assistant's avatar while it works: a ring turns around it and the sparkle pulses. */
+.ai-avatar-working {
+  position: relative;
+}
+.ai-avatar-working::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  border-block-start-color: var(--primary);
+  border-inline-end-color: var(--accent);
+  animation: ai-orbit 0.9s linear infinite;
+}
+.ai-avatar-working svg {
+  animation: ai-twinkle 1.6s ease-in-out infinite;
+}
+@keyframes ai-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ai-twinkle {
+  50% {
+    transform: scale(0.8) rotate(15deg);
+    opacity: 0.75;
+  }
+}
 .ai-shimmer {
   background: linear-gradient(
       90deg,

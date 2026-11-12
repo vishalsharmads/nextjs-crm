@@ -743,7 +743,7 @@ function Chat({
                     ) : null}
                     {live ? (
                       <div className="anim-rise flex gap-2" aria-busy="true">
-                        <AssistantAvatar />
+                        <AssistantAvatar working />
                         <div className="ai-surface max-w-[92%] min-w-0 rounded-lg rounded-ss-sm px-3 py-2 text-sm text-ink">
                           {live.text ? (
                             <div
@@ -1256,10 +1256,14 @@ function BubbleImages({ srcs }: { srcs: string[] }) {
 }
 
 /** Marks the assistant's side of the conversation, so replies scan apart from questions. */
-function AssistantAvatar() {
+function AssistantAvatar({ working = false }: { working?: boolean }) {
   return (
     <span
-      className="ai-mark mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full"
+      className={cn(
+        'ai-mark mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full',
+        // While a reply is being worked out: a turning ring and a gently pulsing sparkle.
+        working && 'ai-avatar-working',
+      )}
       aria-hidden
     >
       <Sparkles className="size-3.5" />
