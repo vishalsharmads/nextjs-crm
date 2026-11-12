@@ -503,6 +503,7 @@ async function systemPrompt(cfg: ConfigRow, user: AuthUser) {
     'To change data, call the write tool directly: the person sees each change and confirms it before it runs. Do not ask for permission in text first.',
     'Answer briefly, in plain language. Use Markdown: short lists, **bold** for key figures. Never show ids or uuids as text.',
     'When you mention a record a tool returned, link it as [Its name](record:<entity>/<uuid>), with the entity key and uuid from the tool result.',
+    'For numbers, totals and trends use run_report rather than adding up listed records. To show a report as a chart, add a block on its own lines: ```chart then {"report": 1, "type": "bar", "title": "Deals by stage"} then ``` ("report" is which run_report of this answer, 1 for the first; "type" is bar, line, pie or table). The chart is drawn from that report\'s real result, so never write numbers into the block.',
     'End each answer with one last line: "Next: " then two or three short follow-up requests the person might send, separated by " | ", written as they would ask them. Leave it out when you asked them a question.',
     ...(excludedNote(cfg) ? [excludedNote(cfg)] : []),
     ...(setupAllowed(cfg, user) ? [SETUP_PROMPT, CONFIG_PROMPT] : []),
@@ -666,6 +667,49 @@ async function precheck(
   }
 }
 
+const parseJson = (s: string): unknown => {
+  try {
+    return JSON.parse(s) as unknown;
+  } catch {
+    return null;
+  }
+};
+
+interface ChartDto {
+  title: string;
+  definition: Record<string, unknown>;
+  result: unknown;
+}
+
+const CHART_BLOCK = /```chart[ \t]*\n([\s\S]*?)```/g;
+const chartSpec = z.object({
+  report: z.number().int().min(1).max(20).optional(),
+  type: z.enum(['bar', 'line', 'pie', 'table']).default('bar'),
+  title: z.string().trim().max(120).optional(),
+});
+
+/**
+ * Charts the model asked for: each block names one of this answer's reports and a chart type. The
+ * numbers come from that report's real result, so a chart can never show made-up figures; a block
+ * that names no report, or is malformed, is dropped.
+ */
+export function chartsIn(text: string, reports: { input: Record<string, unknown>; result: unknown }[]) {
+  const charts: ChartDto[] = [];
+  const body = text.replace(CHART_BLOCK, (_m, raw: string) => {
+    const spec = chartSpec.safeParse(parseJson(raw.trim()));
+    const report = spec.success ? reports[(spec.data.report ?? reports.length) - 1] : undefined;
+    const result = report?.result as { rows?: unknown } | null | undefined;
+    if (spec.success && report && result && Array.isArray(result.rows))
+      charts.push({
+        title: spec.data.title ?? '',
+        definition: { ...report.input, chart: spec.data.type },
+        result,
+      });
+    return '';
+  });
+  return { body: body.replace(/\n{3,}/g, '\n\n').trim(), charts };
+}
+
 /** One step the assistant took: the tool's title and, when it says, the record type or search. */
 interface Step {
   title: string;
@@ -694,7 +738,11 @@ async function conversationDto(uuid: string, user: AuthUser) {
     /** The same steps with what each looked at (a record type, a search), for people to check. */
     steps?: Step[];
     images?: string[];
+    /** Charts the answer asked for, drawn from its run_report results (never the model's numbers). */
+    charts?: ChartDto[];
   }[] = [];
+  let reports: { input: Record<string, unknown>; result: unknown }[] = [];
+  const reportInputs = new Map<string, Record<string, unknown>>();
   let details: Step[] = [];
   let imageNo = 0;
   // Steps the assistant took (tool calls, often with blank text) are gathered onto its next reply,
@@ -706,6 +754,9 @@ async function conversationDto(uuid: string, user: AuthUser) {
   for (const m of messages) {
     for (const b of m.content) {
       if (b.type === 'tool_use') asked.set(b.id, b.input.entity);
+      if (b.type === 'tool_use' && b.name === 'run_report') reportInputs.set(b.id, b.input);
+      if (b.type === 'tool_result' && !b.is_error && reportInputs.has(b.tool_use_id))
+        reports.push({ input: reportInputs.get(b.tool_use_id)!, result: parseJson(b.content) });
       if (b.type === 'tool_result' && !b.is_error)
         refs.push(...recordsIn(b.content, asked.get(b.tool_use_id)));
     }
@@ -725,9 +776,12 @@ async function conversationDto(uuid: string, user: AuthUser) {
         ),
       ];
       if (!text || text === '…') continue;
+      const { body, charts } = chartsIn(text, reports);
+      reports = [];
       items.push({
         role: m.role,
-        text: linkRecords(text, refs),
+        text: linkRecords(body, refs),
+        ...(charts.length ? { charts } : {}),
         ...(steps.length ? { tools: [...new Set(steps)], steps: uniqueSteps(details) } : {}),
       });
       steps = [];

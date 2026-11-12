@@ -25,6 +25,8 @@ import type { WebModule } from '@app/module-sdk';
 import { SettingsPanel } from './settings';
 import { DECISION_WORDS, thinkingWords } from './thinking';
 import { replyHtml, splitNext, type RecordPath } from './markdown';
+import type { ReportDefinition, ReportResultDto } from '@app/shared';
+import { ReportChart } from '@/features/reports/report-chart';
 import { imageFiles, MAX_ATTACHMENTS, prepareImage, type Attachment } from './images';
 import { ApiError, apiDelete, apiGet, apiStream, buildUrl } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
@@ -62,6 +64,7 @@ interface Conversation {
     tools?: string[];
     steps?: Step[];
     images?: string[];
+    charts?: { title: string; definition: ReportDefinition; result: ReportResultDto }[];
   }[];
   proposals: Proposal[];
 }
@@ -604,6 +607,20 @@ function Chat({
                                     }}
                                   />
                                 ) : null}
+                                {(m.charts ?? []).map((c, k) => (
+                                  <figure
+                                    key={k}
+                                    className="mt-3 rounded-md border border-line bg-surface p-3"
+                                    aria-label={c.title || 'Chart'}
+                                  >
+                                    {c.title ? (
+                                      <figcaption className="mb-2 text-xs font-medium text-muted">
+                                        {c.title}
+                                      </figcaption>
+                                    ) : null}
+                                    <ReportChart result={c.result} definition={c.definition} height={220} />
+                                  </figure>
+                                ))}
                               </div>
                               {m.text ? (
                                 // Shown on hover or keyboard focus; always on touch screens, which cannot hover.
@@ -659,7 +676,13 @@ function Chat({
                             <div
                               className="rte-prose ai-reply ai-caret-md"
                               dangerouslySetInnerHTML={{
-                                __html: replyHtml(splitNext(live.text).body, recordPath),
+                                __html: replyHtml(
+                                  splitNext(live.text).body.replace(
+                                    /```chart[\s\S]*?(```|$)/g,
+                                    '_Drawing a chart…_',
+                                  ),
+                                  recordPath,
+                                ),
                               }}
                             />
                           ) : (

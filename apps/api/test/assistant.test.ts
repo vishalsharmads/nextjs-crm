@@ -739,6 +739,25 @@ describe('assistant module', () => {
     await admin.patch('/m/assistant/config', { excludedEntities: [] }).expect(200);
   });
 
+  it('draws charts from real report results, never from numbers the model wrote', async () => {
+    replies = [
+      use('run_report', { entity: 'contact', groupBy: 'owner' }),
+      text(
+        'Here it is.\n\n```chart\n{"report": 1, "type": "pie", "title": "Contacts by owner"}\n```\n\n```chart\n{"report": 7, "rows": [{"label": "fake", "value": 999}]}\n```',
+      ),
+    ];
+    const res = await admin.post('/m/assistant/conversations', { text: 'Chart my contacts' }).expect(201);
+    const answer = res.body.messages.at(-1);
+    expect(answer.text).toBe('Here it is.');
+    expect(answer.charts).toHaveLength(1);
+    expect(answer.charts[0]).toMatchObject({
+      title: 'Contacts by owner',
+      definition: { entity: 'contact', groupBy: 'owner', chart: 'pie' },
+      result: { rows: expect.any(Array), total: expect.any(Number) },
+    });
+    expect(JSON.stringify(answer.charts)).not.toContain('fake');
+  });
+
   it('ranks recommended models first', async () => {
     const { rankModels } = await import('../../../modules/assistant/api/catalog');
     expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([
