@@ -942,7 +942,7 @@ describe('assistant module', () => {
       expect.objectContaining({
         id: 'p1',
         name: 'config_change',
-        detail: 'Add to · Saved views and tags · name',
+        detail: 'Create a tag',
       }),
     ]);
     expect(await db('tags').where({ name: tag }).first()).toBeUndefined();
@@ -1226,7 +1226,6 @@ describe('assistant module', () => {
       },
     ]);
     expect(JSON.stringify(res.body.proposals[0])).not.toContain('\\"widgets\\"');
-    void refused;
     replies = [text('Saved.')];
     seen.length = 0;
     await admin
@@ -1272,6 +1271,56 @@ describe('assistant module', () => {
       })
       .expect(200);
     expect(JSON.stringify(seen[0]!.body.messages)).toContain('cannot be changed here');
+    await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
+  });
+
+  it('reads report changes in words and lets yes/no values be switched before confirming', async () => {
+    await admin.patch('/m/assistant/config', { setupEnabled: true }).expect(200);
+    const name = unique('Value by owner');
+    replies = [
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'rp1',
+            name: 'config_change',
+            input: {
+              method: 'post',
+              path: '/reports/custom',
+              body: {
+                name,
+                shared: true,
+                definition: { entity: 'deal', groupBy: 'owner', metric: 'sum', metricField: 'value' },
+              },
+              summary: 'Create the report',
+            },
+          },
+        ],
+        usage: {},
+      },
+    ];
+    const res = await admin.post('/m/assistant/conversations', { text: 'Report' }).expect(201);
+    const p = res.body.proposals[0];
+    expect(p.detail).toBe('Create a report');
+    expect(p.preview.fields).toEqual(
+      expect.arrayContaining([
+        { label: 'Name', value: name, edit: ['body', 'name'] },
+        { label: 'Shared', value: 'Yes', edit: ['body', 'shared'], kind: 'boolean' },
+        { label: 'Record type', value: 'deal', entity: 'deal' },
+        { label: 'Measures', value: 'Sum of value' },
+        { label: 'Grouped by', value: 'Owner' },
+      ]),
+    );
+    replies = [text('Saved.')];
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, {
+        decisions: { p1: true },
+        edits: { p1: { set: [{ path: ['body', 'shared'], value: false }] } },
+      })
+      .expect(200);
+    const saved = await db('saved_reports').where({ name }).first();
+    expect(saved).toBeTruthy();
+    expect(Boolean(saved.shared)).toBe(false);
     await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
   });
 

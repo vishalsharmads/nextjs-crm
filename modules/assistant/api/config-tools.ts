@@ -179,13 +179,47 @@ async function assertSafeChange(method: HttpMethod, path: string, body: unknown,
 }
 
 /** What the person confirms, written by the server from the route, never by the model. */
-export function describeChange(method: string, path: string, body: unknown): string {
-  const route = configRoutes().find((r) => r.method === method && patternOf(r.path).test(path));
-  const area = AREAS.find((a) => a.key === route?.area)?.title ?? 'Configuration';
-  const verb =
-    method === 'post' ? (/\/(archive|restore|enable|disable)$/.exec(path)?.[1] ?? 'Add to') : 'Change';
-  const fields = isObj(body) ? Object.keys(body).slice(0, 8) : [];
-  return `${verb[0]!.toUpperCase()}${verb.slice(1)} · ${area}${fields.length ? ` · ${fields.join(', ')}` : ''}`;
+/** What each kind of configuration is called, by the route segment that names it. */
+const NOUNS: Record<string, string> = {
+  labels: 'record names',
+  settings: 'settings',
+  branding: 'branding',
+  'custom-fields': 'custom field',
+  'custom-field-groups': 'field group',
+  layouts: 'layout',
+  pipelines: 'pipeline',
+  stages: 'stage',
+  order: 'order',
+  roles: 'role',
+  teams: 'team',
+  automations: 'automation',
+  templates: 'template',
+  forms: 'web form',
+  'saved-views': 'saved view',
+  tags: 'tag',
+  custom: 'report',
+  dashboards: 'dashboard',
+  objects: 'object',
+  modules: 'module',
+};
+
+/**
+ * What a configuration change does, in a short sentence written by the server from the route
+ * (never by the model): "Create a report", "Update a dashboard", "Turn off a module".
+ */
+export function describeChange(method: string, path: string, _body?: unknown): string {
+  const segs = path.split('/').filter((x) => x && !/^[0-9a-f-]{36}$/.test(x));
+  const action = /^(archive|restore|enable|disable)$/.exec(segs.at(-1) ?? '')?.[1];
+  const nounSeg = [...segs].reverse().find((x) => NOUNS[x] && x !== 'order') ?? segs[0] ?? '';
+  const noun = NOUNS[nounSeg] ?? 'configuration';
+  if (segs.at(-1) === 'order') return `Reorder ${noun}s`;
+  if (nounSeg === 'settings' || nounSeg === 'labels' || nounSeg === 'branding')
+    return `Update ${segs[0] === 'settings' && segs[1] && segs[1] !== 'branding' ? `${segs[1]} settings` : noun}`;
+  const a = /^[aeiou]/.test(noun) ? 'an' : 'a';
+  if (action === 'enable') return `Turn on ${a} ${noun}`;
+  if (action === 'disable') return `Turn off ${a} ${noun}`;
+  if (action) return `${action[0]!.toUpperCase()}${action.slice(1)} ${a} ${noun}`;
+  return `${method === 'post' ? 'Create' : 'Update'} ${a} ${noun}`;
 }
 
 const method = z.enum(['get', 'post', 'put', 'patch']);
