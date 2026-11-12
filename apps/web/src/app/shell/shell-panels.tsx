@@ -18,9 +18,11 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/dialog';
 import { ModulePanel } from '@/modules/loader';
+import { useHotkeys } from './hotkeys';
 import { moduleIcon } from './nav';
 
 const UUID = /^[0-9a-f-]{36}$/;
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 /**
  * What is on screen, as ids only: a record (`/deals/<uuid>`, `/o/<object>/<uuid>`,
@@ -96,6 +98,9 @@ export function PanelProvider({ children }: { children: ReactNode }) {
     writeStored(OPEN_KEY, null);
     setOpen(null);
   }, []);
+  // ⌘J / Ctrl+J opens or closes the first side panel (the assistant) from anywhere.
+  const first = panels[0] ? `${panels[0].moduleKey}.${panels[0].key}` : null;
+  useHotkeys(first ? { 'mod+j': () => toggle(first) } : {});
   return <PanelContext.Provider value={{ open: known, toggle, close }}>{children}</PanelContext.Provider>;
 }
 
@@ -128,7 +133,7 @@ export function ShellPanels() {
             aria-label={p.title}
             aria-pressed={shown}
             aria-controls="shell-panel"
-            title={p.title}
+            title={`${p.title} (${isMac ? '⌘' : 'Ctrl+'}J)`}
             onClick={() => toggle(id)}
           >
             <Icon />

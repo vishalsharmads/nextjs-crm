@@ -427,9 +427,11 @@ function ShortcutsDialog({
   onOpenChange: (o: boolean) => void;
   nav: NavItem[];
 }) {
+  const sidePanel = useBoot().modules.shellPanels?.[0];
   const t = useT();
   const rows: [string, ReactNode][] = [
     ['⌘K / Ctrl K', t('nav.search')],
+    ...(sidePanel ? ([['⌘J / Ctrl J', `Open or close ${sidePanel.title}`]] as [string, string][]) : []),
     ['/', t('nav.search')],
     ['c', `${t('common.create')}…`],
     ['j / k', 'Move down / up in lists'],
