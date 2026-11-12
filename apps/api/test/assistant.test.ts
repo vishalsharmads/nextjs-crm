@@ -1226,10 +1226,6 @@ describe('assistant module', () => {
       },
     ]);
     expect(JSON.stringify(res.body.proposals[0])).not.toContain('\\"widgets\\"');
-
-    // Only what the preview offered can be edited.
-    replies = [text('No.')];
-    const refused = await admin.post('/m/assistant/conversations', { text: 'x' });
     void refused;
     replies = [text('Saved.')];
     seen.length = 0;
@@ -1252,6 +1248,7 @@ describe('assistant module', () => {
     expect(keys).toEqual(['tasks', 'soon']);
     expect(JSON.stringify(seen[0]!.body.messages)).toContain('The person edited');
 
+    // Only what the preview offered can be edited.
     replies = [
       {
         content: [
