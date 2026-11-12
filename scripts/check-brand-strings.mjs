@@ -18,6 +18,9 @@ const targets = [
   'packages/blueprints',
   'modules',
 ];
+// Third-party names an admin chooses from (the AI provider list). Read at run time and never bundled,
+// so the build output is still checked in full. Keep this list to data files that name other companies.
+const allowedFiles = new Set(['modules/assistant/providers.json']);
 const exts = new Set(['.js', '.css', '.html', '.json', '.ts', '.tsx', '.hbs', '.txt', '.webmanifest']);
 const skipDirs = new Set(['node_modules', '.git']);
 
@@ -38,6 +41,7 @@ const hits = [];
 for (const t of targets) {
   for (const file of walk(path.join(root, t))) {
     if (!exts.has(path.extname(file)) || file.endsWith('.map')) continue;
+    if (allowedFiles.has(path.relative(root, file).split(path.sep).join('/'))) continue;
     const text = readFileSync(file, 'utf8').toLowerCase();
     for (const word of deny) {
       const idx = text.indexOf(word.toLowerCase());

@@ -1,0 +1,110 @@
+{
+  "$comment": "AI providers an admin can pick in the assistant settings. Read at run time, never bundled, so provider names stay out of the built app; this file is the one place they may appear (see AGENTS.md). recommended: model ids or id prefixes, best first. tier: free (no card needed), free_tier (free allowance), paid.",
+  "providers": [
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "format": "chat_completions",
+      "baseUrl": "https://api.openai.com/v1",
+      "keyUrl": "https://platform.openai.com/api-keys",
+      "keyPrefix": "sk-",
+      "tier": "paid",
+      "note": "Strong all-rounder with reliable tool use.",
+      "recommended": ["gpt-5-mini", "gpt-5", "gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini"]
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic (Claude)",
+      "format": "messages",
+      "baseUrl": "https://api.anthropic.com",
+      "headers": { "anthropic-version": "2023-06-01" },
+      "keyUrl": "https://console.anthropic.com/settings/keys",
+      "keyPrefix": "sk-ant-",
+      "tier": "paid",
+      "note": "Excellent at careful, multi-step work with tools.",
+      "recommended": [
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5",
+        "claude-opus-5-5",
+        "claude-sonnet",
+        "claude-haiku"
+      ]
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "format": "chat_completions",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "keyUrl": "https://aistudio.google.com/apikey",
+      "keyPrefix": "AIza",
+      "tier": "free_tier",
+      "note": "Generous free allowance; fast Flash models.",
+      "recommended": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-flash", "gemini-pro"]
+    },
+    {
+      "id": "xai",
+      "name": "xAI Grok",
+      "format": "chat_completions",
+      "baseUrl": "https://api.x.ai/v1",
+      "keyUrl": "https://console.x.ai",
+      "keyPrefix": "xai-",
+      "tier": "paid",
+      "note": "Fast models with tool use.",
+      "recommended": ["grok-4", "grok-3-mini", "grok-3"]
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral AI",
+      "format": "chat_completions",
+      "baseUrl": "https://api.mistral.ai/v1",
+      "keyUrl": "https://console.mistral.ai/api-keys",
+      "tier": "free_tier",
+      "note": "European provider; free experiment plan.",
+      "recommended": ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest"]
+    },
+    {
+      "id": "groq",
+      "name": "Groq",
+      "format": "chat_completions",
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "keyUrl": "https://console.groq.com/keys",
+      "keyPrefix": "gsk_",
+      "tier": "free_tier",
+      "note": "Very fast open models; free allowance.",
+      "recommended": ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "llama-3.1-8b-instant"]
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "format": "chat_completions",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "keyUrl": "https://openrouter.ai/keys",
+      "keyPrefix": "sk-or-",
+      "tier": "free",
+      "note": "One key for hundreds of models, including free ones (ids ending in :free).",
+      "recommended": ["meta-llama/llama-3.3-70b-instruct:free", "deepseek/deepseek-chat", ":free"]
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "format": "chat_completions",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "keyUrl": "https://platform.deepseek.com/api_keys",
+      "keyPrefix": "sk-",
+      "tier": "paid",
+      "note": "Low cost per request.",
+      "recommended": ["deepseek-chat"]
+    },
+    {
+      "id": "cerebras",
+      "name": "Cerebras",
+      "format": "chat_completions",
+      "baseUrl": "https://api.cerebras.ai/v1",
+      "keyUrl": "https://cloud.cerebras.ai",
+      "keyPrefix": "csk-",
+      "tier": "free_tier",
+      "note": "Very fast open models; free allowance.",
+      "recommended": ["gpt-oss-120b", "llama-3.3-70b", "qwen-3"]
+    }
+  ]
+}

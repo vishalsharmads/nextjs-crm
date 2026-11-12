@@ -19,9 +19,27 @@ Ask questions about your records in plain words, get summaries of a record's his
 - Replies appear as they are written, with each step it takes.
 - Conversations are private to you and deleted after the number of days an admin sets.
 
-## For admins
+## Setting it up (admins)
 
-On the assistant's **Settings** tab: the API format, address, model and key of your AI provider, the name people see, monthly and daily limits, record types it must never use, and usage per person.
+1. Open the **Settings** tab and pick an AI provider. Providers marked **Free tier** or **Free models** let you start without paying; switch on **Free to start** to see only those.
+2. Paste the provider's API key. **Get a key** opens the provider's page where you create one. The key is stored encrypted and only ever sent to that provider.
+3. Pick a model. The provider's model list loads with your key, and the recommended one (★) is chosen for you.
+4. Choose **Save and test**. The assistant sends one short message to check everything works.
+
+Any other service with a compatible API (including your own) works through **Other compatible API**.
+
+**Trying it out without AI:** on demo and development instances the list starts with **Simulated replies (testing)**. It needs no key and uses no tokens: answers are scripted, but it still looks up your records with your permissions and asks before changing anything (try "Show my contacts" or "Create a task to call back tomorrow"). It is never offered on a live instance. A key you saved for another provider is kept for when you switch back.
+
+**Recommended for best results** suggests limits and the recommended model; **Apply** fills them in, and **Save** keeps them. Below that: the name people see (never the provider's), monthly and daily limits, how long conversations are kept, record types it must never use, and usage per person.
+
+## Setting up the workspace with the assistant
+
+Admins can let the assistant set up {{appName}} for the business: rename records, add fields, pipelines and roles, turn on modules or add an industry preset. It is **off by default**; turn on **Workspace setup** in the assistant settings, then describe your business in the chat (for example "Set up this CRM for a dental clinic").
+
+- Only admins can use it, even when it is on.
+- It previews the changes first, then shows them for you to **Confirm**. Nothing changes before that.
+- It only adds what is missing. Fields, pipelines and roles that already exist are left as they are; names and settings it proposes replace yours.
+- Every change is recorded in the audit log. Turn it off again once the workspace is set up.
 
 ## Permissions
 

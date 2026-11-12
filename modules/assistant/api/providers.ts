@@ -1,9 +1,59 @@
-import { AppError, assertSafeUrl } from '@app/api/module-api';
+import { AppError, assertSafeUrl, logger } from '@app/api/module-api';
+import { simulate } from './simulated';
+
+/** The provider's own error goes to the server log only (it can name the provider); people see ours. */
+function logRefusal(status: number, body: string) {
+  logger.warn({ status, body: body.slice(0, 1000) }, 'AI provider refused the request');
+}
+
+/** What people see when the provider says no. Its own message can name it, so it stays in the log. */
+function refusal(status: number) {
+  if (status === 401 || status === 403)
+    return new AppError(
+      'UPSTREAM_FAILED',
+      'The AI provider rejected the API key. An admin can check the assistant settings.',
+    );
+  if (status === 429)
+    return new AppError(
+      'UPSTREAM_FAILED',
+      "The AI provider is busy or this model's limit is used up. Wait a minute and try again, or an admin can pick another model.",
+    );
+  return new AppError(
+    'UPSTREAM_FAILED',
+    `The AI provider returned ${status}. An admin can check the assistant settings.`,
+  );
+}
+
+/** Retries a request the provider turned away for being busy (429, 503), waiting as it asks, briefly. */
+const RETRY_WAITS_MS = [1_500, 4_000];
+const MAX_RETRY_WAIT_MS = 10_000;
+
+async function withRetry(send: () => Promise<Response>): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await send();
+    if ((res.status !== 429 && res.status !== 503) || attempt >= RETRY_WAITS_MS.length) return res;
+    const after = Number(res.headers.get('retry-after'));
+    const wait = Number.isFinite(after) && after > 0 ? after * 1000 : RETRY_WAITS_MS[attempt]!;
+    if (wait > MAX_RETRY_WAIT_MS) return res;
+    await res.body?.cancel().catch(() => undefined);
+    await new Promise((r) => setTimeout(r, wait));
+  }
+}
 
 /** Content in the conversation, in one shape for every provider. */
 export type Block =
   | { type: 'text'; text: string }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  | {
+      type: 'tool_use';
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+      /**
+       * Opaque data the provider attached to the call (chat completions `extra_content`, such as a
+       * reasoning signature) and requires back unchanged with the next request.
+       */
+      extra?: Record<string, unknown>;
+    }
   | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean };
 
 export interface ChatMessage {
@@ -41,7 +91,9 @@ export interface ProviderConfig {
  * native tool-use blocks, and the widely copied "chat completions" API. Names shown to admins are
  * these formats, never a vendor's.
  */
-export const PROVIDERS = ['messages', 'chat_completions'] as const;
+export const WIRE_FORMATS = ['messages', 'chat_completions'] as const;
+/** Plus scripted replies for testing (`simulated.ts`), picked from the provider list only. */
+export const PROVIDERS = [...WIRE_FORMATS, 'simulated'] as const;
 export type ProviderKind = (typeof PROVIDERS)[number];
 
 const TIMEOUT_MS = 60_000;
@@ -52,36 +104,80 @@ const MAX_RESPONSE = 2_000_000;
 async function post(url: string, headers: Record<string, string>, body: unknown): Promise<unknown> {
   // Checked on every call too, so a host that later resolves to an internal address is refused.
   await assertSafeUrl(url, 'baseUrl');
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify(body),
-      // Never follow redirects: the key and headers must reach only the configured address.
-      redirect: 'manual',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-  } catch {
-    throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
-  }
+  const res = await withRetry(async () => {
+    try {
+      return await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify(body),
+        // Never follow redirects: the key and headers must reach only the configured address.
+        redirect: 'manual',
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch {
+      throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
+    }
+  });
   const text = await res.text();
   if (text.length > MAX_RESPONSE)
     throw new AppError('UPSTREAM_FAILED', 'The AI provider sent a response that is too large.');
   if (!res.ok) {
-    // The provider's own message can name the provider: keep it out of what people see.
-    const status =
-      res.status === 401 || res.status === 403 ? 'rejected the API key' : `returned ${res.status}`;
-    throw new AppError(
-      'UPSTREAM_FAILED',
-      `The AI provider ${status}. An admin can check the assistant settings.`,
-    );
+    logRefusal(res.status, text);
+    throw refusal(res.status);
   }
   try {
     return JSON.parse(text) as unknown;
   } catch {
     throw new AppError('UPSTREAM_FAILED', 'The AI provider sent a response that could not be read.');
   }
+}
+
+/** Models the provider offers, read from its model list. Same address checks as chat calls. */
+export async function listModels(cfg: Omit<ProviderConfig, 'model'>): Promise<string[]> {
+  const url =
+    cfg.provider === 'messages' ? join(cfg.baseUrl, '/v1/models?limit=1000') : join(cfg.baseUrl, '/models');
+  await assertSafeUrl(url, 'baseUrl');
+  const auth: Record<string, string> =
+    cfg.provider === 'messages' ? { 'x-api-key': cfg.apiKey } : { authorization: `Bearer ${cfg.apiKey}` };
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { ...cfg.headers, ...auth },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Check the address.');
+  }
+  const text = await res.text();
+  if (!res.ok || text.length > MAX_RESPONSE)
+    throw new AppError(
+      'UPSTREAM_FAILED',
+      res.status === 401 || res.status === 403
+        ? 'The AI provider rejected the API key.'
+        : 'The AI provider did not return a model list.',
+    );
+  let ids: string[] = [];
+  try {
+    const out = JSON.parse(text) as {
+      data?: { id?: unknown }[];
+      models?: { id?: unknown; name?: unknown }[];
+    };
+    ids = (out.data ?? out.models ?? []).map((m) => (typeof m.id === 'string' ? m.id : '')).filter(Boolean);
+  } catch {
+    throw new AppError('UPSTREAM_FAILED', 'The AI provider sent a model list that could not be read.');
+  }
+  // Some providers prefix ids ("models/…"); chat models only, never embeddings, speech or images.
+  const NOT_CHAT = /embed|tts|whisper|dall-e|image|audio|moderation|realtime|transcri|rerank|guard|search/i;
+  return [...new Set(ids.map((id) => id.replace(/^models\//, '')).filter((id) => !NOT_CHAT.test(id)))]
+    .sort()
+    .slice(0, 500);
+}
+
+/** Keep a provider's per-call data only when it is a small plain object. */
+function extraOf(v: unknown): { extra?: Record<string, unknown> } {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+  return JSON.stringify(v).length <= 20_000 ? { extra: v as Record<string, unknown> } : {};
 }
 
 const join = (base: string, path: string) => `${base.replace(/\/+$/, '')}${path}`;
@@ -118,7 +214,14 @@ function chatMessages(req: ChatRequest): unknown[] {
       const text = m.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n');
       const calls = m.content.flatMap((b) =>
         b.type === 'tool_use'
-          ? [{ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input) } }]
+          ? [
+              {
+                id: b.id,
+                type: 'function',
+                function: { name: b.name, arguments: JSON.stringify(b.input) },
+                ...(b.extra ? { extra_content: b.extra } : {}),
+              },
+            ]
           : [],
       );
       messages.push({
@@ -155,7 +258,7 @@ async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promis
     choices?: {
       message?: {
         content?: string | null;
-        tool_calls?: { id: string; function: { name: string; arguments: string } }[];
+        tool_calls?: { id: string; function: { name: string; arguments: string }; extra_content?: unknown }[];
       };
     }[];
     usage?: { prompt_tokens?: number; completion_tokens?: number };
@@ -170,7 +273,7 @@ async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promis
     } catch {
       input = {};
     }
-    content.push({ type: 'tool_use', id: c.id, name: c.function.name, input });
+    content.push({ type: 'tool_use', id: c.id, name: c.function.name, input, ...extraOf(c.extra_content) });
   }
   return {
     content,
@@ -179,6 +282,7 @@ async function chatCompletionsApi(cfg: ProviderConfig, req: ChatRequest): Promis
 }
 
 export function chat(cfg: ProviderConfig, req: ChatRequest): Promise<ChatResult> {
+  if (cfg.provider === 'simulated') return simulate(req);
   return cfg.provider === 'messages' ? messagesApi(cfg, req) : chatCompletionsApi(cfg, req);
 }
 
@@ -219,25 +323,22 @@ async function* sseEvents(res: Response): AsyncGenerator<{ event: string | null;
 
 async function open(url: string, headers: Record<string, string>, body: unknown): Promise<Response> {
   await assertSafeUrl(url, 'baseUrl');
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'text/event-stream', ...headers },
-      body: JSON.stringify(body),
-      redirect: 'manual',
-      signal: AbortSignal.timeout(TIMEOUT_MS * 3),
-    });
-  } catch {
-    throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
-  }
+  const res = await withRetry(async () => {
+    try {
+      return await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'text/event-stream', ...headers },
+        body: JSON.stringify(body),
+        redirect: 'manual',
+        signal: AbortSignal.timeout(TIMEOUT_MS * 3),
+      });
+    } catch {
+      throw new AppError('UPSTREAM_FAILED', 'The AI provider could not be reached. Try again in a moment.');
+    }
+  });
   if (!res.ok || !res.body) {
-    const status =
-      res.status === 401 || res.status === 403 ? 'rejected the API key' : `returned ${res.status}`;
-    throw new AppError(
-      'UPSTREAM_FAILED',
-      `The AI provider ${status}. An admin can check the assistant settings.`,
-    );
+    logRefusal(res.status, await res.text().catch(() => ''));
+    throw refusal(res.status);
   }
   return res;
 }
@@ -344,7 +445,7 @@ async function chatCompletionsStream(
     },
   );
   let text = '';
-  const calls: { id: string; name: string; args: string }[] = [];
+  const calls: { id: string; name: string; args: string; extra?: unknown }[] = [];
   const usage = { input: 0, output: 0 };
   let finished = false;
   for await (const { data } of sseEvents(res)) {
@@ -356,7 +457,12 @@ async function chatCompletionsStream(
       choices?: {
         delta?: {
           content?: string | null;
-          tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[];
+          tool_calls?: {
+            index: number;
+            id?: string;
+            function?: { name?: string; arguments?: string };
+            extra_content?: unknown;
+          }[];
         };
       }[];
       usage?: { prompt_tokens?: number; completion_tokens?: number };
@@ -381,17 +487,26 @@ async function chatCompletionsStream(
       if (c.id) call.id = c.id;
       if (c.function?.name) call.name += c.function.name;
       if (c.function?.arguments) call.args += c.function.arguments;
+      if (c.extra_content) call.extra = c.extra_content;
     }
   }
   if (!finished) throw new AppError('UPSTREAM_FAILED', CUT_OFF);
   const content: Block[] = [];
   if (text) content.push({ type: 'text', text });
   for (const c of calls)
-    if (c) content.push({ type: 'tool_use', id: c.id, name: c.name, input: toolInput(c.args) });
+    if (c)
+      content.push({
+        type: 'tool_use',
+        id: c.id,
+        name: c.name,
+        input: toolInput(c.args),
+        ...extraOf(c.extra),
+      });
   return { content, usage };
 }
 
 /** Like `chat`, but text arrives through `on.text` as the provider produces it. */
 export function chatStream(cfg: ProviderConfig, req: ChatRequest, on: StreamHandlers): Promise<ChatResult> {
+  if (cfg.provider === 'simulated') return simulate(req, on);
   return cfg.provider === 'messages' ? messagesStream(cfg, req, on) : chatCompletionsStream(cfg, req, on);
 }
