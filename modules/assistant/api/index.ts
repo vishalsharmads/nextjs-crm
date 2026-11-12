@@ -840,7 +840,10 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     body: z.object({
       text: z.string().trim().min(1).max(4000),
       /** The record the person is looking at. */
-      context: z.object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid() }).optional(),
+      /** The page on screen, as ids only: a record, or a list of one type (no uuid). */
+      context: z
+        .object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid().optional() })
+        .optional(),
     }),
     handler: async ({ req, res, ctx, user, body }) => {
       const cfg = await loadConfig();
@@ -876,7 +879,10 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     params: uuidParam,
     body: z.object({
       text: z.string().trim().min(1).max(4000),
-      context: z.object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid() }).optional(),
+      /** The page on screen, as ids only: a record, or a list of one type (no uuid). */
+      context: z
+        .object({ entity: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/), uuid: z.uuid().optional() })
+        .optional(),
     }),
     handler: async ({ req, res, ctx, user, params, body }) => {
       const conv = await conversationFor(params.uuid, user);
@@ -970,8 +976,11 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
 
 const PAGE_NOTE = /\n\n\(The person is looking at [^)]*\)$/;
 
-function withContext(text: string, context?: { entity: string; uuid: string }) {
-  return context ? `${text}\n\n(The person is looking at ${context.entity} ${context.uuid}.)` : text;
+function withContext(text: string, context?: { entity: string; uuid?: string }) {
+  if (!context) return text;
+  return context.uuid
+    ? `${text}\n\n(The person is looking at ${context.entity} ${context.uuid}.)`
+    : `${text}\n\n(The person is looking at the list of ${context.entity} records.)`;
 }
 
 /**

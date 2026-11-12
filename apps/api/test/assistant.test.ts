@@ -723,6 +723,31 @@ describe('assistant module', () => {
     await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
   });
 
+  it('knows the page on screen from ids only: a record, or a list', async () => {
+    await admin.patch('/m/assistant/config', { preset: 'simulated' }).expect(200);
+    const last = unique('Ctx');
+    const contact = await admin.post('/contacts', { firstName: 'Cara', lastName: last }).expect(201);
+    const one = await admin
+      .post('/m/assistant/conversations', {
+        text: 'Summarise this contact',
+        context: { entity: 'contact', uuid: contact.body.uuid },
+      })
+      .expect(201);
+    expect(one.body.messages.at(-1)).toMatchObject({ tools: ['Get a record'] });
+    expect(one.body.messages.at(-1).text).toContain(last);
+    // The question shows as asked; the page note is for the model only.
+    expect(one.body.messages[0].text).toBe('Summarise this contact');
+
+    const list = await admin
+      .post('/m/assistant/conversations', { text: 'Which need attention?', context: { entity: 'contact' } })
+      .expect(201);
+    expect(list.body.messages.at(-1).tools).toEqual(['Describe the data', 'List records']);
+    await admin
+      .patch('/m/assistant/config', { preset: null, provider: 'messages', baseUrl: base })
+      .expect(200);
+    await admin.patch('/m/assistant/config', { model: 'test-model' }).expect(200);
+  });
+
   it('lets admins try configuration with simulated replies, still confirmed', async () => {
     await admin.patch('/m/assistant/config', { preset: 'simulated', setupEnabled: true }).expect(200);
     const what = await admin

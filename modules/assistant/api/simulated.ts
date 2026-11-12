@@ -31,6 +31,8 @@ const use = (name: string, input: Obj): Block => ({
 
 interface Turn {
   question: string;
+  /** The page on screen when the question was asked: a record, or a list (`uuid` empty). */
+  page: { entity: string; uuid: string } | null;
   /** Tools called since the question, oldest first, with their results. */
   calls: { name: string; input: Obj; result?: string; error?: boolean }[];
 }
@@ -51,7 +53,13 @@ function turnOf(messages: ChatMessage[]): Turn {
       }
     }
   // The note about the record on screen is for the model, not part of the question.
-  return { question: question.replace(/\n\n\(The person is looking at [^)]*\)\s*$/, ''), calls };
+  const rec = /\(The person is looking at ([a-z][a-z0-9_]*) ([0-9a-f-]{36})\.\)\s*$/.exec(question);
+  const list = /\(The person is looking at the list of ([a-z][a-z0-9_]*) records\.\)\s*$/.exec(question);
+  return {
+    question: question.replace(/\n\n\(The person is looking at [^)]*\)\s*$/, ''),
+    page: rec ? { entity: rec[1]!, uuid: rec[2]! } : list ? { entity: list[1]!, uuid: '' } : null,
+    calls,
+  };
 }
 
 const parse = (s: string | undefined): unknown => {
@@ -188,11 +196,44 @@ function decide(req: ChatRequest): Block[] {
       ];
     }
     if (CONFIGURE.test(turn.question) && has('config_overview')) return [use('config_overview', {})];
+    // On a record page, a question about "this" reads that record.
+    if (
+      turn.page?.uuid &&
+      /\b(this|it|summari[sz]e|next|changed)\b/i.test(turn.question) &&
+      has('get_record')
+    )
+      return [use('get_record', { entity: turn.page.entity, uuid: turn.page.uuid })];
     if (has('describe_schema')) return [use('describe_schema', {})];
   }
 
+  if (last?.name === 'get_record') {
+    if (last.error) return [{ type: 'text', text: `I could not read this record: ${cell(last.result)}.` }];
+    const r = parse(last.result);
+    const rec = isObj(r) ? r : {};
+    const facts = Object.entries(rec)
+      .filter(
+        ([k, v]) => !['uuid', 'custom', 'id'].includes(k) && v !== null && v !== '' && typeof v !== 'object',
+      )
+      .slice(0, 6)
+      .map(([k, v]) => `- **${k.replace(/([A-Z])/g, ' $1').toLowerCase()}**: ${cell(v)}`);
+    return [
+      {
+        type: 'text',
+        text: [
+          `Here is a summary of **${cell(nameOf(rec))}**:`,
+          '',
+          ...facts,
+          '',
+          '_Simulated reply for testing: no AI was used._',
+          '',
+          'Next: What changed on this recently? | Create a task to follow up',
+        ].join('\n'),
+      },
+    ];
+  }
+
   if (last?.name === 'describe_schema') {
-    const type = mentioned(turn.question, types);
+    const type = mentioned(turn.question, types) ?? types.find((t) => t.entity === turn.page?.entity);
     if (type && has('list_records')) return [use('list_records', { entity: type.entity, pageSize: 5 })];
     const word = keywords(turn.question);
     if (word && has('search_records')) return [use('search_records', { query: word, limit: 5 })];
