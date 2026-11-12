@@ -360,6 +360,59 @@ function touches(name: string, input: Record<string, unknown>): string[] {
 }
 
 /** Runs a tool as the person, tagged `assistant` in the audit log; errors go back to the model. */
+/** Longest text value passed to the model from one field. */
+const MAX_FIELD = 2_000;
+
+/**
+ * A tool result without what costs tokens and says nothing: empty values are dropped and very
+ * long text is shortened. Ids and every value present are kept.
+ */
+export function compact(value: unknown): unknown {
+  if (typeof value === 'string')
+    return value.length > MAX_FIELD ? `${value.slice(0, MAX_FIELD)}… (shortened)` : value;
+  if (Array.isArray(value)) return value.map(compact);
+  if (!value || typeof value !== 'object' || value instanceof Date) return value;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) {
+    const c = compact(v);
+    const empty =
+      c === null ||
+      c === undefined ||
+      c === '' ||
+      (Array.isArray(c) && !c.length) ||
+      (typeof c === 'object' &&
+        !Array.isArray(c) &&
+        !(c instanceof Date) &&
+        !Object.keys(c as object).length);
+    if (!empty) out[k] = c;
+  }
+  return out;
+}
+
+/**
+ * The result as JSON within the size limit: when a list is too long, whole rows are left out
+ * (never cut mid-row) and the model is told how many, so it can narrow the question.
+ */
+export function fitResult(value: unknown, limit = MAX_RESULT): string {
+  let json = JSON.stringify(value);
+  if (json.length <= limit || !value || typeof value !== 'object') return json;
+  const key = (['data', 'results', 'items'] as const).find((k) =>
+    Array.isArray((value as Record<string, unknown>)[k]),
+  );
+  if (!key) return json;
+  const rows = (value as Record<string, unknown[]>)[key]!;
+  let keep = rows.length;
+  while (keep > 1 && json.length > limit) {
+    keep = Math.floor(keep * 0.7);
+    json = JSON.stringify({
+      ...(value as object),
+      [key]: rows.slice(0, keep),
+      omitted: `${rows.length - keep} more rows not shown; ask a narrower question or filter`,
+    });
+  }
+  return json;
+}
+
 async function runTool(
   block: Extract<Block, { type: 'tool_use' }>,
   cfg: ConfigRow,
@@ -389,7 +442,7 @@ async function runTool(
       const found = result as { results: { type: string }[] };
       result = { results: found.results.filter((r) => !excluded.includes(r.type)) };
     }
-    content = JSON.stringify(result);
+    content = fitResult(compact(result));
   } catch (err) {
     isError = true;
     content = JSON.stringify(
@@ -399,6 +452,7 @@ async function runTool(
     );
     if (!(err instanceof AppError)) logger.error({ err, tool: block.name }, 'assistant tool failed');
   }
+  // Errors and odd shapes that are still too long are cut as a last resort.
   if (content.length > MAX_RESULT) content = `${content.slice(0, MAX_RESULT)}… (truncated)`;
   return {
     type: 'tool_result',

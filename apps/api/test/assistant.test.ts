@@ -653,6 +653,32 @@ describe('assistant module', () => {
     expect(sent.at(-1)!.content.map((b) => b.tool_use_id)).toEqual(['look_a', 'look_b']);
   });
 
+  it('sends the model lean results, cut by whole rows when too long', async () => {
+    const { compact, fitResult } = await import('../../../modules/assistant/api/index');
+    expect(
+      compact({
+        uuid: 'u1',
+        name: 'Ann',
+        email: null,
+        notes: '',
+        tags: [],
+        custom: {},
+        owner: { name: 'Bo', team: null },
+      }),
+    ).toEqual({ uuid: 'u1', name: 'Ann', owner: { name: 'Bo' } });
+    expect(String(compact('x'.repeat(5000))).length).toBeLessThan(2100);
+    const rows = Array.from({ length: 200 }, (_, i) => ({
+      uuid: `u${i}`,
+      name: `Row ${i}`,
+      note: 'y'.repeat(200),
+    }));
+    const fitted = JSON.parse(fitResult({ data: rows, meta: { total: 200 } }, 10_000));
+    expect(fitted.data.length).toBeLessThan(200);
+    expect(fitted.data.at(-1)).toMatchObject({ uuid: expect.any(String), note: expect.any(String) });
+    expect(fitted.omitted).toMatch(/more rows not shown/);
+    expect(fitted.meta).toEqual({ total: 200 });
+  });
+
   it('ranks recommended models first', async () => {
     const { rankModels } = await import('../../../modules/assistant/api/catalog');
     expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([
