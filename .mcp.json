@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "module-dev": {
+      "command": "npx",
+      "args": ["tsx", "apps/api/src/cli/dev-mcp.ts"]
+    }
+  }
+}
