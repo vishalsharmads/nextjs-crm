@@ -605,8 +605,17 @@ function Chat({
                     rows={1}
                     onChange={(e) => setText(e.target.value)}
                     onKeyDown={(e) => {
-                      // Enter sends; Shift+Enter (or composing text in an input method) adds a line.
-                      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                      if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                      // Ctrl, Cmd or the Windows key + Enter add a line (the browser does not by itself).
+                      if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        const el = e.currentTarget;
+                        el.setRangeText('\n', el.selectionStart, el.selectionEnd, 'end');
+                        setText(el.value);
+                        return;
+                      }
+                      // Enter sends; Shift+Enter adds a line on its own.
+                      if (!e.shiftKey) {
                         e.preventDefault();
                         e.currentTarget.form?.requestSubmit();
                       }
@@ -635,7 +644,7 @@ function Chat({
                   )}
                 </div>
                 <p id="composer-hint" className="mt-1 hidden text-xs text-faint sm:block">
-                  Enter to send · Shift+Enter for a new line
+                  Enter to send · Shift+Enter or Ctrl+Enter for a new line
                 </p>
               </form>
             </>
