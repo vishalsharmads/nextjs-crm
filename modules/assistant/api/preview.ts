@@ -8,10 +8,33 @@ export interface PreviewRecord {
   uuid: string;
   name: string | null;
 }
+/** Where in the change's input a value lives, for edits the person makes before confirming. */
+export type InputPath = (string | number)[];
+
+export interface PreviewField {
+  label: string;
+  value: string;
+  /** The person may change this text before confirming. */
+  edit?: InputPath;
+  /** The value is a record type key: shown with the workspace's own name for it. */
+  entity?: string;
+}
+
+/** A list in the change (widgets, fields, stages…): each item can be left out before confirming. */
+export interface PreviewList {
+  label: string;
+  path: InputPath;
+  items: { label: string; detail?: string }[];
+}
+
 export interface Preview {
   records: PreviewRecord[];
-  fields: { label: string; value: string }[];
+  fields: PreviewField[];
+  lists?: PreviewList[];
 }
+
+/** Text fields people may edit in place before confirming. */
+const EDITABLE = new Set(['name', 'title', 'label', 'subject', 'description', 'singular', 'plural']);
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -136,11 +159,128 @@ export async function previewOf(name: string, input: Obj, look: Lookups): Promis
       for (const [k, v] of Object.entries(value)) {
         if (k === 'custom' && isObj(v))
           for (const [ck, cv] of Object.entries(v)) fields.push({ label: humanize(ck), value: plain(cv) });
-        else if (!(k in LINKS) && k !== 'ownerUuid') fields.push({ label: humanize(k), value: plain(v) });
+        else if (!(k in LINKS) && k !== 'ownerUuid')
+          fields.push({
+            label: humanize(k),
+            value: plain(v),
+            ...(EDITABLE.has(k) && typeof v === 'string' ? { edit: ['data', k] } : {}),
+          });
       }
       continue;
     }
-    fields.push({ label: humanize(key), value: plain(value) });
+    fields.push({
+      label: humanize(key),
+      value: plain(value),
+      ...(EDITABLE.has(key) && typeof value === 'string' ? { edit: [key] } : {}),
+    });
   }
   return { records, fields: fields.slice(0, 30) };
+}
+
+const itemLabel = (o: Obj, i: number) =>
+  [o.title, o.name, o.label, o.key].find((v): v is string => typeof v === 'string' && !!v.trim()) ??
+  `Item ${i + 1}`;
+
+/** A short description of one item in a list: its kind and settings, never its raw JSON. */
+function itemDetail(o: Obj): string | undefined {
+  const parts: string[] = [];
+  if (typeof o.type === 'string') parts.push(o.type === 'report' ? 'Saved report' : humanize(o.type));
+  const params = isObj(o.params) ? o.params : {};
+  for (const [k, v] of Object.entries(params))
+    if (k !== 'report' && v !== null && v !== undefined && v !== '')
+      parts.push(`${humanize(k)}: ${plain(v)}`);
+  if (typeof o.size === 'string') parts.push(`${humanize(o.size)} size`);
+  return parts.length ? parts.join(' · ') : undefined;
+}
+
+/** A report definition in words: "Count of deals by stage", with the type named by the workspace. */
+function reportFields(def: Obj, base: InputPath): PreviewField[] {
+  const metric = def.metric === 'sum' ? 'Sum' : def.metric === 'avg' ? 'Average' : 'Count';
+  const of =
+    typeof def.metricField === 'string' && def.metric !== 'count'
+      ? ` of ${humanize(def.metricField).toLowerCase()}`
+      : '';
+  const out: PreviewField[] = [];
+  if (typeof def.entity === 'string')
+    out.push({ label: 'Record type', value: def.entity, entity: def.entity });
+  out.push({ label: 'Measures', value: `${metric}${of}` });
+  if (typeof def.groupBy === 'string') out.push({ label: 'Grouped by', value: humanize(def.groupBy) });
+  if (typeof def.groupBy2 === 'string') out.push({ label: 'Then by', value: humanize(def.groupBy2) });
+  if (typeof def.chart === 'string') out.push({ label: 'Shown as', value: humanize(def.chart) });
+  if (def.filter) out.push({ label: 'Filtered', value: 'Yes' });
+  void base;
+  return out;
+}
+
+/**
+ * A configuration change's body in plain terms: its text fields (names and titles editable), report
+ * definitions in words, and its lists (widgets, fields, stages) item by item, each one removable.
+ */
+export function configPreview(body: unknown): Pick<Preview, 'fields' | 'lists'> {
+  const fields: PreviewField[] = [];
+  const lists: PreviewList[] = [];
+  if (!isObj(body)) return { fields: [{ label: 'Change', value: plain(body) }], lists };
+  for (const [k, v] of Object.entries(body)) {
+    const path: InputPath = ['body', k];
+    if (k === 'definition' && isObj(v)) fields.push(...reportFields(v, path));
+    else if (Array.isArray(v) && v.some(isObj))
+      lists.push({
+        label: humanize(k),
+        path,
+        items: v.map((item, i) =>
+          isObj(item) ? { label: itemLabel(item, i), detail: itemDetail(item) } : { label: plain(item) },
+        ),
+      });
+    else if (isObj(v)) fields.push({ label: humanize(k), value: plain(v) });
+    else
+      fields.push({
+        label: humanize(k),
+        value: plain(v),
+        ...(EDITABLE.has(k) && typeof v === 'string' ? { edit: path } : {}),
+      });
+  }
+  return { fields: fields.slice(0, 30), lists };
+}
+
+/** Edits the person made in the preview: new text for editable fields, items left out of lists. */
+export interface Edits {
+  set?: { path: InputPath; value: string }[];
+  drop?: { path: InputPath; index: number }[];
+}
+
+const key = (p: InputPath) => JSON.stringify(p);
+
+/**
+ * The change's input with the person's edits, only where the preview offered them: text replaces
+ * text at an editable path, and items leave a listed array. Anything else is refused.
+ */
+export function applyEdits(input: Obj, preview: Preview | undefined, edits: Edits): Obj {
+  const editable = new Set((preview?.fields ?? []).flatMap((f) => (f.edit ? [key(f.edit)] : [])));
+  const listed = new Set((preview?.lists ?? []).map((l) => key(l.path)));
+  const out = JSON.parse(JSON.stringify(input)) as Obj;
+  const at = (path: InputPath): { parent: Obj | unknown[]; last: string | number } => {
+    let node: unknown = out;
+    for (const step of path.slice(0, -1)) node = (node as Record<string | number, unknown>)?.[step];
+    return { parent: node as Obj, last: path.at(-1)! };
+  };
+  for (const s of edits.set ?? []) {
+    if (!editable.has(key(s.path))) throw new Error('This value cannot be changed here');
+    const { parent, last } = at(s.path);
+    if (typeof (parent as Record<string | number, unknown>)[last] !== 'string')
+      throw new Error('Not a text value');
+    (parent as Record<string | number, unknown>)[last] = s.value;
+  }
+  const drops = new Map<string, number[]>();
+  for (const d of edits.drop ?? []) {
+    if (!listed.has(key(d.path))) throw new Error('This list cannot be changed here');
+    drops.set(key(d.path), [...(drops.get(key(d.path)) ?? []), d.index]);
+  }
+  for (const [k, indices] of drops) {
+    const path = JSON.parse(k) as InputPath;
+    const { parent, last } = at(path);
+    const list = (parent as Record<string | number, unknown>)[last];
+    if (!Array.isArray(list)) throw new Error('Not a list');
+    (parent as Record<string | number, unknown>)[last] = list.filter((_, i) => !indices.includes(i));
+  }
+  return out;
 }

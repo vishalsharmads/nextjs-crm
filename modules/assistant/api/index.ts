@@ -47,8 +47,8 @@ import {
 } from './providers';
 import { compatibleServers, findPreset, providerPresets, rankModels, readsImages } from './catalog';
 import { linkRecords, nameOf, recordsIn, type RecordRef } from './links';
-import { previewOf, type Preview } from './preview';
-import { CONFIG_PROMPT, CONFIG_TOOLS, describeChange, precheckConfigChange } from './config-tools';
+import { applyEdits, configPreview, previewOf, type Preview } from './preview';
+import { bodyOf, CONFIG_PROMPT, CONFIG_TOOLS, describeChange, precheckConfigChange } from './config-tools';
 import { SETUP_PROMPT, SETUP_TOOLS } from './setup-tools';
 
 const CONFIG = 'm_assistant_config';
@@ -656,12 +656,11 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
           toolUseId: use.id,
           name: use.name,
           title: def.title,
-          input: use.input,
           ...(use.name === 'config_change'
-            ? { detail: describeChange(String(use.input.method), String(use.input.path), use.input.body) }
+            ? configProposal(use.input)
             : SETUP_TOOLS.some((t) => t.name === use.name)
-              ? {}
-              : { preview: await previewOf(use.name, use.input, lookups(ctx, user)) }),
+              ? { input: use.input }
+              : { input: use.input, preview: await previewOf(use.name, use.input, lookups(ctx, user)) }),
         });
       else {
         streamSink.getStore()?.tool(def?.title ?? use.name);
@@ -680,6 +679,16 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
   await append(conv.id, 'assistant', [
     { type: 'text', text: 'I stopped here because this took too many steps. Try a narrower question.' },
   ]);
+}
+
+/** A configuration change as proposed: its body read as an object, a server-written line, a preview. */
+function configProposal(raw: Record<string, unknown>) {
+  const input: Record<string, unknown> = { ...raw, body: bodyOf(raw.body) };
+  return {
+    input,
+    detail: describeChange(String(input.method), String(input.path), input.body),
+    preview: { records: [], ...configPreview(input.body) },
+  };
 }
 
 /** Names for a change's preview, looked up as the person (only what they may see gets a name). */
@@ -882,6 +891,21 @@ async function conversationDto(uuid: string, user: AuthUser) {
   const pending = conv.pending ? json<Pending>(conv.pending) : null;
   return { uuid: conv.uuid, title: conv.title, messages: items, proposals: pending?.proposals ?? [] };
 }
+
+const inputPath = z
+  .array(z.union([z.string().max(64), z.number().int().min(0).max(1000)]))
+  .min(1)
+  .max(8);
+const editsSchema = z.object({
+  set: z
+    .array(z.object({ path: inputPath, value: z.string().max(4000) }))
+    .max(30)
+    .optional(),
+  drop: z
+    .array(z.object({ path: inputPath, index: z.number().int().min(0).max(1000) }))
+    .max(100)
+    .optional(),
+});
 
 // ---------------- Images ----------------
 
@@ -1319,7 +1343,11 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     path: '/conversations/:uuid/decisions',
     permission: 'assistant.chat.use',
     params: uuidParam,
-    body: z.object({ decisions: z.record(z.string().max(200), z.boolean()) }),
+    body: z.object({
+      decisions: z.record(z.string().max(200), z.boolean()),
+      /** Changes the person made in the preview before confirming, by proposal id. */
+      edits: z.record(z.string().max(20), editsSchema).optional(),
+    }),
     handler: async ({ req, res, ctx, user, params, body }) => {
       assertRate(user.id);
       const conv = await conversationFor(params.uuid, user);
@@ -1335,19 +1363,34 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       const cfg = await loadConfig();
       const pending = json<Pending>(claimed);
       const results = [...pending.results];
+      const notes: string[] = [];
       for (const p of pending.proposals) {
-        // Only what the person explicitly confirmed runs, with exactly the input they saw.
+        // Only what the person explicitly confirmed runs: the input they saw, with their own edits.
         const approved = body.decisions[p.id] === true;
-        if (approved)
-          results.push(
-            await runTool(
-              { type: 'tool_use', id: p.toolUseId, name: p.name, input: p.input },
-              cfg,
-              ctx,
-              user,
-            ),
-          );
-        else
+        const edits = approved ? body.edits?.[p.id] : undefined;
+        const edited = !!edits && !!(edits.set?.length || edits.drop?.length);
+        if (approved) {
+          let input = p.input;
+          let refused: Block | null = null;
+          try {
+            if (edited) input = applyEdits(p.input, p.preview, edits);
+          } catch (err) {
+            refused = {
+              type: 'tool_result',
+              tool_use_id: p.toolUseId,
+              content: JSON.stringify({ error: 'VALIDATION_FAILED', message: (err as Error).message }),
+              is_error: true,
+            };
+          }
+          const use = { type: 'tool_use' as const, id: p.toolUseId, name: p.name, input };
+          // An edited change is checked again, as when it was first proposed.
+          refused ??= edited ? await precheck(use, cfg, ctx, user) : null;
+          results.push(refused ?? (await runTool(use, cfg, ctx, user)));
+          if (edited && !refused)
+            notes.push(
+              `The person edited "${p.title}" before confirming; what ran: ${JSON.stringify(input).slice(0, 2000)}`,
+            );
+        } else
           results.push({
             type: 'tool_result',
             tool_use_id: p.toolUseId,
@@ -1359,10 +1402,11 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
           entity: 'assistant.conversation',
           entityId: conv.id,
           entityUuid: conv.uuid,
-          diff: { tool: p.name },
+          diff: { tool: p.name, ...(edited ? { edited: true } : {}) },
         });
       }
-      await append(conv.id, 'user', results);
+      // The model learns what the person changed, so it does not describe the original.
+      await append(conv.id, 'user', [...results, ...notes.map((text) => ({ type: 'text' as const, text }))]);
       return respond(req, res, 200, async () => {
         try {
           await advance(conv, cfg, ctx, user);

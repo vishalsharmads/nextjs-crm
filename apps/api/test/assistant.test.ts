@@ -771,7 +771,7 @@ describe('assistant module', () => {
     expect(res.body.proposals[0].preview).toEqual({
       records: [{ entity: 'organization', uuid: o.body.uuid, name: org }],
       fields: [
-        { label: 'Subject', value: 'Send the quote' },
+        { label: 'Subject', value: 'Send the quote', edit: ['subject'] },
         { label: 'Due at', value: '2026-12-01 09:30' },
         { label: 'Priority', value: 'high' },
       ],
@@ -1172,6 +1172,109 @@ describe('assistant module', () => {
     expect(sent).toContain('VALIDATION_FAILED');
     expect(sent).toContain('body.name');
     expect(sent).not.toContain('INTERNAL');
+    await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
+  });
+
+  it('lets the person edit a change before confirming: rename it, leave items out', async () => {
+    await admin.patch('/m/assistant/config', { setupEnabled: true }).expect(200);
+    const board = await admin
+      .post('/dashboards', {
+        name: unique('Board'),
+        widgets: [{ key: 'a', type: 'tasks_due', title: 'Tasks' }],
+      })
+      .expect(201);
+    const widgets = [
+      { key: 'tasks', type: 'tasks_due', title: 'My tasks' },
+      { key: 'win', type: 'conversion', title: 'Win rate', params: { days: 90 } },
+      {
+        key: 'soon',
+        type: 'date_window',
+        title: 'Closing soon',
+        params: { entity: 'deal', field: 'expected_close', days: 90 },
+      },
+    ];
+    replies = [
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'db1',
+            name: 'config_change',
+            input: {
+              method: 'put',
+              path: `/dashboards/${board.body.uuid}`,
+              body: JSON.stringify({ name: 'Overview', widgets }),
+              summary: 'Redesign the dashboard',
+            },
+          },
+        ],
+        usage: {},
+      },
+    ];
+    const res = await admin.post('/m/assistant/conversations', { text: 'Redesign' }).expect(201);
+    const preview = res.body.proposals[0].preview;
+    expect(preview.fields).toContainEqual({ label: 'Name', value: 'Overview', edit: ['body', 'name'] });
+    expect(preview.lists).toEqual([
+      {
+        label: 'Widgets',
+        path: ['body', 'widgets'],
+        items: [
+          { label: 'My tasks', detail: 'Tasks due' },
+          { label: 'Win rate', detail: 'Conversion · Days: 90' },
+          { label: 'Closing soon', detail: 'Date window · Entity: deal · Field: expected_close · Days: 90' },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(res.body.proposals[0])).not.toContain('\\"widgets\\"');
+
+    // Only what the preview offered can be edited.
+    replies = [text('No.')];
+    const refused = await admin.post('/m/assistant/conversations', { text: 'x' });
+    void refused;
+    replies = [text('Saved.')];
+    seen.length = 0;
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, {
+        decisions: { p1: true },
+        edits: {
+          p1: {
+            set: [{ path: ['body', 'name'], value: 'Team view' }],
+            drop: [{ path: ['body', 'widgets'], index: 1 }],
+          },
+        },
+      })
+      .expect(200);
+    const saved = await db('dashboards').where({ uuid: board.body.uuid }).first();
+    expect(saved.name).toBe('Team view');
+    const keys = (typeof saved.widgets === 'string' ? JSON.parse(saved.widgets) : saved.widgets).map(
+      (w: { key: string }) => w.key,
+    );
+    expect(keys).toEqual(['tasks', 'soon']);
+    expect(JSON.stringify(seen[0]!.body.messages)).toContain('The person edited');
+
+    replies = [
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tg9',
+            name: 'config_change',
+            input: { method: 'post', path: '/tags', body: { name: unique('E') }, summary: 'Tag' },
+          },
+        ],
+        usage: {},
+      },
+    ];
+    const other = await admin.post('/m/assistant/conversations', { text: 'tag' }).expect(201);
+    replies = [text('ok')];
+    seen.length = 0;
+    await admin
+      .post(`/m/assistant/conversations/${other.body.uuid}/decisions`, {
+        decisions: { p1: true },
+        edits: { p1: { set: [{ path: ['path'], value: '/roles' }] } },
+      })
+      .expect(200);
+    expect(JSON.stringify(seen[0]!.body.messages)).toContain('cannot be changed here');
     await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
   });
 
