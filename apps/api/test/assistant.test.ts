@@ -895,6 +895,8 @@ describe('assistant module', () => {
       .post('/m/assistant/conversations', { text: 'Which need attention?', context: { entity: 'contact' } })
       .expect(201);
     expect(list.body.messages.at(-1).tools).toEqual(['Describe the data', 'List records']);
+    // Each step says what it looked at, for the person to check.
+    expect(list.body.messages.at(-1).steps).toContainEqual({ title: 'List records', entity: 'contact' });
     await admin
       .patch('/m/assistant/config', { preset: null, provider: 'messages', baseUrl: base })
       .expect(200);

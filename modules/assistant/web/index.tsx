@@ -56,7 +56,13 @@ interface Proposal {
 interface Conversation {
   uuid: string;
   title: string;
-  messages: { role: 'user' | 'assistant'; text?: string; tools?: string[]; images?: string[] }[];
+  messages: {
+    role: 'user' | 'assistant';
+    text?: string;
+    tools?: string[];
+    steps?: Step[];
+    images?: string[];
+  }[];
   proposals: Proposal[];
 }
 
@@ -570,14 +576,21 @@ function Chat({
                                 {m.tools?.length ? (
                                   <ul
                                     className={cn(
-                                      'flex flex-wrap gap-x-2 text-xs text-faint',
+                                      'flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-faint',
                                       m.text && 'mb-1.5',
                                     )}
                                     aria-label="Steps taken"
                                   >
-                                    {m.tools.map((t) => (
-                                      <li key={t} className="inline-flex items-center gap-1">
-                                        <Check className="size-3" aria-hidden /> {t}
+                                    {(m.steps ?? m.tools.map((title): Step => ({ title }))).map((st, k) => (
+                                      <li key={k} className="inline-flex items-center gap-1">
+                                        <Check className="size-3" aria-hidden />
+                                        {st.title}
+                                        {st.entity ? (
+                                          <span className="text-muted">
+                                            · {labels[st.entity]?.plural ?? st.entity}
+                                          </span>
+                                        ) : null}
+                                        {st.query ? <span className="text-muted">· “{st.query}”</span> : null}
                                       </li>
                                     ))}
                                   </ul>
@@ -1105,6 +1118,13 @@ function byDay<T extends { updatedAt: string }>(items: T[]): [string, T[]][] {
     groups.set(name, [...(groups.get(name) ?? []), item]);
   }
   return [...groups.entries()];
+}
+
+/** A step the assistant took, with the record type or search it looked at. */
+interface Step {
+  title: string;
+  entity?: string;
+  query?: string;
 }
 
 interface Question {

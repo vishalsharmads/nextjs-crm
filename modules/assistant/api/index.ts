@@ -660,12 +660,36 @@ async function precheck(
   }
 }
 
+/** One step the assistant took: the tool's title and, when it says, the record type or search. */
+interface Step {
+  title: string;
+  entity?: string;
+  query?: string;
+}
+
+function stepOf(b: Extract<Block, { type: 'tool_use' }>, title: string): Step {
+  const entity = typeof b.input.entity === 'string' ? b.input.entity : undefined;
+  const q = b.input.query ?? b.input.q;
+  const query = typeof q === 'string' && q.trim() ? q.trim().slice(0, 60) : undefined;
+  return { title, ...(entity ? { entity } : {}), ...(query ? { query } : {}) };
+}
+
+const uniqueSteps = (steps: Step[]) => [...new Map(steps.map((s) => [JSON.stringify(s), s])).values()];
+
 /** What the web shows: text, tool activity and pending proposals (never raw tool output). */
 async function conversationDto(uuid: string, user: AuthUser) {
   const conv = await conversationFor(uuid, user);
   const messages = await history(conv.id);
   const defs = new Map([...toolDefs(), ...SETUP_TOOLS, ...CONFIG_TOOLS].map((t) => [t.name, t]));
-  const items: { role: 'user' | 'assistant'; text?: string; tools?: string[]; images?: string[] }[] = [];
+  const items: {
+    role: 'user' | 'assistant';
+    text?: string;
+    tools?: string[];
+    /** The same steps with what each looked at (a record type, a search), for people to check. */
+    steps?: Step[];
+    images?: string[];
+  }[] = [];
+  let details: Step[] = [];
   let imageNo = 0;
   // Steps the assistant took (tool calls, often with blank text) are gathered onto its next reply,
   // so one answer shows as one bubble instead of a row of empty ones.
@@ -688,16 +712,25 @@ async function conversationDto(uuid: string, user: AuthUser) {
     );
     if (m.role === 'assistant') {
       steps = [...steps, ...tools];
+      details = [
+        ...details,
+        ...m.content.flatMap((b) =>
+          b.type === 'tool_use' ? [stepOf(b, defs.get(b.name)?.title ?? b.name)] : [],
+        ),
+      ];
       if (!text || text === '…') continue;
       items.push({
         role: m.role,
         text: linkRecords(text, refs),
-        ...(steps.length ? { tools: [...new Set(steps)] } : {}),
+        ...(steps.length ? { tools: [...new Set(steps)], steps: uniqueSteps(details) } : {}),
       });
       steps = [];
+      details = [];
     } else if (text) {
-      if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
+      if (steps.length)
+        items.push({ role: 'assistant', tools: [...new Set(steps)], steps: uniqueSteps(details) });
       steps = [];
+      details = [];
       // The note about the page on screen is for the model; people see their question as asked.
       const images = m.content
         .filter((b) => b.type === 'image')
@@ -705,7 +738,8 @@ async function conversationDto(uuid: string, user: AuthUser) {
       items.push({ role: m.role, text: text.replace(PAGE_NOTE, ''), ...(images.length ? { images } : {}) });
     }
   }
-  if (steps.length) items.push({ role: 'assistant', tools: [...new Set(steps)] });
+  if (steps.length)
+    items.push({ role: 'assistant', tools: [...new Set(steps)], steps: uniqueSteps(details) });
   const pending = conv.pending ? json<Pending>(conv.pending) : null;
   return { uuid: conv.uuid, title: conv.title, messages: items, proposals: pending?.proposals ?? [] };
 }
