@@ -4,6 +4,7 @@ import {
   allowsTestingAids,
   audit,
   escapeLike,
+  callRoute,
   callTool,
   db,
   decrypt,
@@ -691,6 +692,15 @@ function lookups(ctx: RequestContext, user: AuthUser) {
     async record(entity: string, uuid: string) {
       const r = await callTool('get_record', { entity, uuid }, tc, toolDefs());
       return r && typeof r === 'object' ? nameOf(r as Record<string, unknown>) : null;
+    },
+    async person(uuid: string) {
+      // Through the users route as the person: someone who may not see users gets no name.
+      const u = (await callRoute('get', `/users/${uuid}`, {}, tc).catch(() => null)) as {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+      } | null;
+      return u ? [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || null : null;
     },
     async stage(uuid: string) {
       const r = (await callTool('list_pipelines', {}, tc, toolDefs())) as {

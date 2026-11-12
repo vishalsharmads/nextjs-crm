@@ -1080,6 +1080,53 @@ describe('assistant module', () => {
     await admin.patch('/m/assistant/config', { excludedEntities: [] }).expect(200);
   });
 
+  it('names owners, field links and note link targets in the preview', async () => {
+    const me = (await admin.get('/me').expect(200)).body;
+    const meUuid = me.uuid ?? me.user?.uuid;
+    const contact = await admin.post('/contacts', { firstName: 'Lin', lastName: unique('Link') }).expect(201);
+    const deal = await admin.post('/deals', { title: unique('Linked') }).expect(201);
+    replies = [
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'pv1',
+            name: 'change_records',
+            input: { entity: 'deal', uuids: [deal.body.uuid], action: 'assign', ownerUuid: meUuid },
+          },
+          {
+            type: 'tool_use',
+            id: 'pv2',
+            name: 'update_record',
+            input: { entity: 'deal', uuid: deal.body.uuid, data: { contactUuid: contact.body.uuid } },
+          },
+          {
+            type: 'tool_use',
+            id: 'pv3',
+            name: 'add_note',
+            input: {
+              related: { type: 'deal', uuid: deal.body.uuid },
+              body: '<p>Pay <a href="https://evil.test/pay">here</a></p>',
+            },
+          },
+        ],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      },
+    ];
+    const res = await admin.post('/m/assistant/conversations', { text: 'Do it' }).expect(201);
+    const [assign, link, note] = res.body.proposals.map((p: { preview: unknown }) => p.preview);
+    expect(assign.fields).toContainEqual({ label: 'Owner', value: expect.not.stringMatching(/^Person /) });
+    expect(link.records).toContainEqual(
+      expect.objectContaining({ entity: 'contact', name: expect.stringContaining('Lin') }),
+    );
+    expect(note.fields).toContainEqual({ label: 'Body', value: 'Pay here (https://evil.test/pay)' });
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, {
+        decisions: { p1: false, p2: false, p3: false },
+      })
+      .expect(200);
+  });
+
   it('lets admins try configuration with simulated replies, still confirmed', async () => {
     await admin.patch('/m/assistant/config', { preset: 'simulated', setupEnabled: true }).expect(200);
     const what = await admin

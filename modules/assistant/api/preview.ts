@@ -65,7 +65,9 @@ export function plain(v: unknown): string {
     const d = new Date(s);
     if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 16).replace('T', ' ');
   }
+  // Link targets stay visible, so a confirmed note cannot hide where it points.
   const text = s
+    .replace(/<a\b[^>]*\bhref\s*=\s*["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)')
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -77,6 +79,8 @@ export interface Lookups {
   record(entity: string, uuid: string): Promise<string | null>;
   /** A pipeline stage's name, or null. */
   stage(uuid: string): Promise<string | null>;
+  /** A person's name, or null when it cannot be looked up. */
+  person(uuid: string): Promise<string | null>;
 }
 
 export async function previewOf(name: string, input: Obj, look: Lookups): Promise<Preview> {
@@ -93,8 +97,15 @@ export async function previewOf(name: string, input: Obj, look: Lookups): Promis
     typeof input.related.uuid === 'string'
   )
     refs.push({ entity: input.related.type, uuid: input.related.uuid });
-  for (const [key, type] of Object.entries(LINKS))
+  // Links set at the top level or inside the record's fields both show as records.
+  const data = isObj(input.data) ? input.data : {};
+  for (const [key, type] of Object.entries(LINKS)) {
     if (typeof input[key] === 'string') refs.push({ entity: type, uuid: input[key] as string });
+    if (typeof data[key] === 'string') refs.push({ entity: type, uuid: data[key] as string });
+  }
+  // A bulk change that sets a link field names the linked record too.
+  if (typeof input.field === 'string' && LINKS[input.field] && typeof input.value === 'string')
+    refs.push({ entity: LINKS[input.field]!, uuid: input.value });
 
   const records = await Promise.all(
     refs
@@ -112,14 +123,20 @@ export async function previewOf(name: string, input: Obj, look: Lookups): Promis
       label: 'Stage',
       value: (await look.stage(input.stageUuid).catch(() => null)) ?? 'The chosen stage',
     });
-  if (typeof input.ownerUuid === 'string') fields.push({ label: 'Owner', value: 'The person chosen' });
+  // An owner shows by name (or by id when it cannot be looked up), never as a vague placeholder.
+  for (const owner of [input.ownerUuid, data.ownerUuid])
+    if (typeof owner === 'string')
+      fields.push({
+        label: 'Owner',
+        value: (await look.person(owner).catch(() => null)) ?? `Person ${owner}`,
+      });
   for (const [key, value] of Object.entries(input)) {
     if (HIDDEN.has(key) || key === 'action') continue;
     if (key === 'data' && isObj(value)) {
       for (const [k, v] of Object.entries(value)) {
         if (k === 'custom' && isObj(v))
           for (const [ck, cv] of Object.entries(v)) fields.push({ label: humanize(ck), value: plain(cv) });
-        else if (!(k in LINKS)) fields.push({ label: humanize(k), value: plain(v) });
+        else if (!(k in LINKS) && k !== 'ownerUuid') fields.push({ label: humanize(k), value: plain(v) });
       }
       continue;
     }
