@@ -33,13 +33,24 @@ const commands: Record<string, Command> = {
         plural: { type: 'string' },
         singular: { type: 'string' },
         personal: { type: 'boolean', default: false },
+        integration: { type: 'boolean', default: false },
+        name: { type: 'string' },
       },
     });
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+    if (values.integration) {
+      if (!values.key || !values.name)
+        throw new Error('Usage: module:new --integration --key=<module> --name=<Name admins see>');
+      for (const f of writeScaffold(root, { key: values.key, name: values.name, integration: true }))
+        out(`  wrote ${f}`);
+      out('Run `npm install`, restart `npm run dev`, then turn it on in Settings → Modules.');
+      return;
+    }
     if (!values.key || !values.entity || !values.plural)
       throw new Error(
-        'Usage: module:new --key=<module> --entity=<entity> --plural=<Plural> [--singular=..] [--personal]',
+        'Usage: module:new --key=<module> --entity=<entity> --plural=<Plural> [--singular=..] [--personal]\n' +
+          '   or: module:new --integration --key=<module> --name=<Name>',
       );
-    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
     const written = writeScaffold(root, {
       key: values.key,
       entity: values.entity,

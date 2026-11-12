@@ -333,6 +333,7 @@ describe('module:new scaffold', () => {
       'modules/fleet/api/index.ts',
       'modules/fleet/api/migrations/0001_vehicles.ts',
       'modules/fleet/web/index.tsx',
+      'modules/fleet/help/fleet.md',
     ]);
     const manifest = JSON.parse(files['modules/fleet/manifest.json']!);
     expect(manifest.permissions.map((p: { key: string }) => p.key)).toContain('fleet.vehicles.view');

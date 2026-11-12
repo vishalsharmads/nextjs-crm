@@ -10,6 +10,7 @@ import { env } from '../src/config/env';
 import { clearCatalogCache } from '../src/modules/catalog';
 import { addCatalogModule } from '../src/cli/module-add';
 import { checkModuleFolder } from '../src/cli/module-check';
+import { scaffoldIntegration, scaffoldModule } from '../src/cli/scaffold';
 
 const repoRoot = resolve(__dirname, '../../..');
 const sha = 'a'.repeat(40);
@@ -179,6 +180,23 @@ describe('module checks', () => {
   it('passes every module in this repository', () => {
     for (const key of ['notes-demo', 'records-demo', 'assistant', 'portal', 'invoices'])
       expect(checkModuleFolder(repoRoot, join(repoRoot, 'modules', key)), key).toEqual([]);
+  });
+
+  it('passes what module:new generates, for record types and integrations', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'scaffold-'));
+    cpSync(join(repoRoot, 'brand-denylist.txt'), join(dir, 'brand-denylist.txt'));
+    const files = {
+      ...scaffoldModule({ key: 'fleet', entity: 'vehicle', plural: 'Vehicles', personal: true }),
+      ...scaffoldIntegration({ key: 'relay-out', name: 'Relay' }),
+    };
+    for (const [p, content] of Object.entries(files)) {
+      mkdirSync(join(dir, p, '..'), { recursive: true });
+      writeFileSync(join(dir, p), content);
+    }
+    expect(checkModuleFolder(dir, join(dir, 'modules/fleet'))).toEqual([]);
+    expect(checkModuleFolder(dir, join(dir, 'modules/relay-out'))).toEqual([]);
+    expect(files['modules/relay-out/help/relay-out.md']).toContain('generated:module-settings:relay-out');
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('flags tables, imports and brand names that break the rules', () => {
