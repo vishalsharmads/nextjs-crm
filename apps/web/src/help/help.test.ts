@@ -15,6 +15,7 @@ const manifests = import.meta.glob<{
   key: string;
   permissions?: { key: string }[];
   menu_items?: { path: string }[];
+  settings?: { key: string; help?: string }[];
 }>('../../../../modules/*/manifest.json', { import: 'default', eager: true });
 
 const settingsBlock = router.slice(
@@ -74,8 +75,24 @@ describe('help articles', () => {
             [...permissions].some((p) => p.startsWith(arg ?? '')),
             `${a.id}: permissions:${arg}`,
           ).toBe(true);
+        else if (kind === 'module-settings')
+          expect(
+            Object.values(manifests).some((mf) => mf.key === arg && (mf.settings ?? []).length > 0),
+            `${a.id}: module-settings:${arg}`,
+          ).toBe(true);
         else expect(kind, a.id).toBe('tools');
       }
+  });
+
+  it('list the settings of every module that has some', () => {
+    for (const m of Object.values(manifests)) {
+      if (!(m.settings ?? []).length) continue;
+      for (const f of m.settings!) expect(f.help, `${m.key}.${f.key} has no help`).toBeTruthy();
+      expect(
+        HELP_ARTICLES.some((a) => a.html.includes(`generated:module-settings:${m.key}`)),
+        `${m.key}: add <!-- generated:module-settings:${m.key} --> to its help article`,
+      ).toBe(true);
+    }
   });
 
   it('describe every setting of every group', () => {
