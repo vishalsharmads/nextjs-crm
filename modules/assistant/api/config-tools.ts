@@ -179,13 +179,47 @@ async function assertSafeChange(method: HttpMethod, path: string, body: unknown,
 }
 
 /** What the person confirms, written by the server from the route, never by the model. */
-export function describeChange(method: string, path: string, body: unknown): string {
-  const route = configRoutes().find((r) => r.method === method && patternOf(r.path).test(path));
-  const area = AREAS.find((a) => a.key === route?.area)?.title ?? 'Configuration';
-  const verb =
-    method === 'post' ? (/\/(archive|restore|enable|disable)$/.exec(path)?.[1] ?? 'Add to') : 'Change';
-  const fields = isObj(body) ? Object.keys(body).slice(0, 8) : [];
-  return `${verb[0]!.toUpperCase()}${verb.slice(1)} · ${area}${fields.length ? ` · ${fields.join(', ')}` : ''}`;
+/** What each kind of configuration is called, by the route segment that names it. */
+const NOUNS: Record<string, string> = {
+  labels: 'record names',
+  settings: 'settings',
+  branding: 'branding',
+  'custom-fields': 'custom field',
+  'custom-field-groups': 'field group',
+  layouts: 'layout',
+  pipelines: 'pipeline',
+  stages: 'stage',
+  order: 'order',
+  roles: 'role',
+  teams: 'team',
+  automations: 'automation',
+  templates: 'template',
+  forms: 'web form',
+  'saved-views': 'saved view',
+  tags: 'tag',
+  custom: 'report',
+  dashboards: 'dashboard',
+  objects: 'object',
+  modules: 'module',
+};
+
+/**
+ * What a configuration change does, in a short sentence written by the server from the route
+ * (never by the model): "Create a report", "Update a dashboard", "Turn off a module".
+ */
+export function describeChange(method: string, path: string, _body?: unknown): string {
+  const segs = path.split('/').filter((x) => x && !/^[0-9a-f-]{36}$/.test(x));
+  const action = /^(archive|restore|enable|disable)$/.exec(segs.at(-1) ?? '')?.[1];
+  const nounSeg = [...segs].reverse().find((x) => NOUNS[x] && x !== 'order') ?? segs[0] ?? '';
+  const noun = NOUNS[nounSeg] ?? 'configuration';
+  if (segs.at(-1) === 'order') return `Reorder ${noun}s`;
+  if (nounSeg === 'settings' || nounSeg === 'labels' || nounSeg === 'branding')
+    return `Update ${segs[0] === 'settings' && segs[1] && segs[1] !== 'branding' ? `${segs[1]} settings` : noun}`;
+  const a = /^[aeiou]/.test(noun) ? 'an' : 'a';
+  if (action === 'enable') return `Turn on ${a} ${noun}`;
+  if (action === 'disable') return `Turn off ${a} ${noun}`;
+  if (action) return `${action[0]!.toUpperCase()}${action.slice(1)} ${a} ${noun}`;
+  return `${method === 'post' ? 'Create' : 'Update'} ${a} ${noun}`;
 }
 
 const method = z.enum(['get', 'post', 'put', 'patch']);
@@ -219,9 +253,22 @@ export async function precheckConfigChange(input: unknown, tc: Parameters<ToolDe
       'The tool input is not valid',
       change.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
     );
-  const { method: m, path, body } = change.data as { method: HttpMethod; path: string; body?: unknown };
+  const { method: m, path, body: raw } = change.data as { method: HttpMethod; path: string; body?: unknown };
+  const body = bodyOf(raw);
   allowed(m, path);
   await assertSafeChange(m, path, body, tc);
+  // The route's own format, checked now so a change that cannot run is never put to the person.
+  await callRoute(m, path, { body: body ?? {} }, tc, { validateOnly: true });
+}
+
+/** Models sometimes send the body as JSON text instead of an object: read it as the object. */
+export function bodyOf(body: unknown): unknown {
+  if (typeof body !== 'string') return body;
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    return body;
+  }
 }
 
 export const CONFIG_TOOLS: ToolDef[] = [
@@ -298,8 +345,9 @@ export const CONFIG_TOOLS: ToolDef[] = [
         .max(200)
         .describe('One plain sentence the admin sees, e.g. "Add a Renewal stage to the Sales pipeline"'),
     }),
-    handler: async ({ method: m, path, body }, tc) => {
+    handler: async ({ method: m, path, body: raw }, tc) => {
       if (!WRITE_METHODS.includes(m)) throw new AppError('FORBIDDEN', 'Only additions and edits are allowed');
+      const body = bodyOf(raw);
       allowed(m, path);
       await assertSafeChange(m, path, body, tc);
       const result = await callRoute(m, path, { body: body ?? {} }, tc);
@@ -313,4 +361,5 @@ export const CONFIG_PROMPT = [
   'Before a change: read the current configuration (config_read) and the format (config_schema). Send one change per config_change, with a short summary in plain words; the admin confirms each one.',
   'You cannot delete anything or touch security, compliance, users, API keys, webhooks or email accounts: say an admin can do that in Settings.',
   'Prefer the workspace setup tools (preview_setup, apply_setup) for adding many fields, pipelines or roles at once.',
+  'Bodies are JSON objects, never JSON text. For a new chart on a dashboard: create the report (POST /reports/custom with a name and a definition, as run_report takes), then PUT /dashboards/<uuid> with the full widget list, keeping the existing widgets and adding {"key": "...", "type": "report", "title": "...", "params": {"report": "<the new report uuid>"}}.',
 ].join('\n');

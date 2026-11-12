@@ -16,6 +16,10 @@ import {
   BarChart3,
   Check,
   Copy,
+  Plus,
+  Layers,
+  ListChecks,
+  Settings2,
   Download,
   Eye,
   History,
@@ -46,7 +50,8 @@ import { useBoot, useCan } from '@/app/session';
 import { cn } from '@/lib/cn';
 import { appUrl } from '@/lib/app-url';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/input';
+import { Input, Textarea } from '@/components/ui/input';
+import { Checkbox, Switch } from '@/components/ui/checkbox';
 import {
   Badge,
   ErrorState,
@@ -68,10 +73,20 @@ interface Proposal {
   /** Configuration changes: what will happen, written by the server. */
   detail?: string;
   /** Other changes: the records by name and the fields as plain values, from the server. */
-  preview?: {
-    records: { entity: string; uuid: string; name: string | null }[];
-    fields: { label: string; value: string }[];
-  };
+  preview?: ChangePreviewDto;
+}
+
+type InputPath = (string | number)[];
+/** What a change will do, from the server: records by name, plain values, lists item by item. */
+interface ChangePreviewDto {
+  records: { entity: string; uuid: string; name: string | null }[];
+  fields: { label: string; value: string; edit?: InputPath; kind?: 'text' | 'boolean'; entity?: string }[];
+  lists?: { label: string; path: InputPath; items: { label: string; detail?: string }[] }[];
+}
+/** The person's edits to one change before confirming. */
+interface ChangeEdits {
+  set?: { path: InputPath; value: string | boolean }[];
+  drop?: { path: InputPath; index: number }[];
 }
 interface Conversation {
   uuid: string;
@@ -361,8 +376,8 @@ function Chat({
     onError: (err) => toast.error(errorText(err)),
   });
   const decide = useMutation({
-    mutationFn: (decisions: Record<string, boolean>) =>
-      stream(`/m/assistant/conversations/${active}/decisions`, { decisions }, DECISION_WORDS),
+    mutationFn: (d: { decisions: Record<string, boolean>; edits?: Record<string, ChangeEdits> }) =>
+      stream(`/m/assistant/conversations/${active}/decisions`, d, DECISION_WORDS),
     onSuccess: (c) => {
       done(c);
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'm' });
@@ -806,7 +821,7 @@ function Chat({
                         labels={labels}
                         recordPath={recordPath}
                         proposals={proposals}
-                        onDecide={(d) => decide.mutate(d)}
+                        onDecide={(decisions, edits) => decide.mutate({ decisions, edits })}
                         busy={decide.isPending}
                       />
                     ) : null}
@@ -984,6 +999,23 @@ function Chat({
 }
 
 /** Each change the assistant wants to make, shown in full; nothing runs until the person confirms. */
+/** An icon for what a change does, so a list of them scans at a glance. */
+function changeIcon(name: string) {
+  if (name === 'config_change' || name === 'apply_setup' || name === 'add_preset') return Settings2;
+  if (name === 'add_note') return NotebookPen;
+  if (name === 'create_task' || name === 'complete_task') return ListChecks;
+  if (name === 'change_records') return Layers;
+  if (name.startsWith('create')) return Plus;
+  return Pencil;
+}
+
+const pathKey = (p: InputPath) => JSON.stringify(p);
+
+/**
+ * The changes the assistant proposes, each as what it will do: the records by name, the values
+ * in plain words, names and titles editable, list items that can be left out, and the person's
+ * own choice of which changes to make. Nothing runs until Confirm.
+ */
 function Proposals({
   proposals,
   onDecide,
@@ -994,42 +1026,124 @@ function Proposals({
   labels: Labels;
   recordPath: RecordPath;
   proposals: Proposal[];
-  onDecide: (d: Record<string, boolean>) => void;
+  onDecide: (d: Record<string, boolean>, edits: Record<string, ChangeEdits>) => void;
   busy: boolean;
 }) {
-  const all = (v: boolean) => Object.fromEntries(proposals.map((p) => [p.id, v]));
+  const [included, setIncluded] = useState<Record<string, boolean>>({});
+  const [texts, setTexts] = useState<Record<string, Record<string, string | boolean>>>({});
+  const [dropped, setDropped] = useState<Record<string, Record<string, number[]>>>({});
+  const isIncluded = (id: string) => included[id] !== false;
+  const count = proposals.filter((p) => isIncluded(p.id)).length;
+  const edits = (p: Proposal): ChangeEdits => {
+    const fields = p.preview?.fields ?? [];
+    const set = fields.flatMap((f): NonNullable<ChangeEdits['set']> => {
+      const v = f.edit ? texts[p.id]?.[pathKey(f.edit)] : undefined;
+      if (!f.edit || v === undefined) return [];
+      if (typeof v === 'boolean') return v !== (f.value === 'Yes') ? [{ path: f.edit, value: v }] : [];
+      return v.trim() && v !== f.value ? [{ path: f.edit, value: v.trim() }] : [];
+    });
+    const drop = (p.preview?.lists ?? []).flatMap((l) =>
+      (dropped[p.id]?.[pathKey(l.path)] ?? []).map((index) => ({ path: l.path, index })),
+    );
+    return { ...(set.length ? { set } : {}), ...(drop.length ? { drop } : {}) };
+  };
+  const confirm = () =>
+    onDecide(
+      Object.fromEntries(proposals.map((p) => [p.id, isIncluded(p.id)])),
+      Object.fromEntries(proposals.filter((p) => isIncluded(p.id)).map((p) => [p.id, edits(p)])),
+    );
   return (
     <div className="ai-surface anim-rise rounded-md p-3" role="group" aria-label="Proposed changes">
-      <p className="mb-2 text-sm font-medium">
-        Confirm {proposals.length === 1 ? 'this change' : 'these changes'}
+      <p className="mb-1 text-sm font-medium">
+        {proposals.length === 1 ? 'Check this change' : `Check these ${proposals.length} changes`}
       </p>
-      <ul className="space-y-2">
-        {proposals.map((p) => (
-          <li key={p.id} className="text-sm">
-            <p className="font-medium">{p.title}</p>
-            {p.name === 'apply_setup' || p.name === 'add_preset' ? (
-              <SetupSummary input={p.input} />
-            ) : p.name === 'config_change' ? (
-              <ConfigSummary input={p.input} detail={p.detail} />
-            ) : p.preview ? (
-              <ChangePreview preview={p.preview} input={p.input} labels={labels} recordPath={recordPath} />
-            ) : (
-              <pre className="mt-1 overflow-x-auto rounded bg-subtle p-2 text-xs">
-                {JSON.stringify(p.input, null, 2)}
-              </pre>
-            )}
-          </li>
-        ))}
+      <p className="mb-3 text-xs text-muted">Nothing changes until you confirm. You can adjust it first.</p>
+      <ul className="space-y-3">
+        {proposals.map((p) => {
+          const Icon = changeIcon(p.name);
+          const on = isIncluded(p.id);
+          return (
+            <li
+              key={p.id}
+              className={cn('rounded-md border border-line bg-surface p-3 text-sm', !on && 'opacity-60')}
+            >
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
+                  <Icon className="size-4" aria-hidden />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{p.detail ?? p.title}</p>
+                  {p.detail ? <p className="text-xs text-muted">{p.title}</p> : null}
+                </div>
+                {proposals.length > 1 ? (
+                  <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted">
+                    <Checkbox
+                      checked={on}
+                      onCheckedChange={(v) => setIncluded((s) => ({ ...s, [p.id]: !!v }))}
+                    />
+                    Include
+                  </label>
+                ) : null}
+              </div>
+              {on ? (
+                p.name === 'apply_setup' || p.name === 'add_preset' ? (
+                  <SetupSummary input={p.input} />
+                ) : p.preview ? (
+                  <ChangePreview
+                    preview={p.preview}
+                    input={p.input}
+                    labels={labels}
+                    recordPath={recordPath}
+                    texts={texts[p.id] ?? {}}
+                    onText={(k, v) => setTexts((s) => ({ ...s, [p.id]: { ...s[p.id], [k]: v } }))}
+                    dropped={dropped[p.id] ?? {}}
+                    onToggle={(k, index, keep) =>
+                      setDropped((s) => {
+                        const list = s[p.id]?.[k] ?? [];
+                        return {
+                          ...s,
+                          [p.id]: {
+                            ...s[p.id],
+                            [k]: keep ? list.filter((i) => i !== index) : [...list, index],
+                          },
+                        };
+                      })
+                    }
+                    note={typeof p.input.summary === 'string' ? p.input.summary : undefined}
+                  />
+                ) : (
+                  <Details input={p.input} />
+                )
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
-      <div className="mt-3 flex gap-2">
-        <Button variant="primary" size="sm" onClick={() => onDecide(all(true))} loading={busy}>
-          <Check /> Confirm
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button variant="primary" size="sm" onClick={confirm} loading={busy} disabled={!count}>
+          <Check /> {proposals.length > 1 ? `Confirm ${count}` : 'Confirm'}
         </Button>
-        <Button size="sm" onClick={() => onDecide(all(false))} disabled={busy}>
-          <X /> Decline
+        <Button
+          size="sm"
+          onClick={() => onDecide(Object.fromEntries(proposals.map((p) => [p.id, false])), {})}
+          disabled={busy}
+        >
+          <X /> Decline {proposals.length > 1 ? 'all' : ''}
         </Button>
       </div>
     </div>
+  );
+}
+
+/** The exact change, for people who want to see it, out of the way of everyone else. */
+function Details({ input }: { input: Record<string, unknown> }) {
+  return (
+    <details className="mt-2 text-xs text-muted">
+      <summary className="cursor-pointer select-none">Details</summary>
+      <pre className="mt-1 max-h-48 overflow-auto rounded bg-subtle p-2">
+        {JSON.stringify(input, null, 2)}
+      </pre>
+    </details>
   );
 }
 
@@ -1272,22 +1386,33 @@ function AssistantAvatar({ working = false }: { working?: boolean }) {
 }
 
 /**
- * A proposed change people can check at a glance: the records it touches by name (each opens in
- * a new tab), its values as a short list, and the exact change one click away.
+ * A proposed change people can check at a glance: the records it touches by name (each opens in a
+ * new tab), its values in plain words with names and titles editable, its lists as tick boxes, the
+ * assistant's own note labelled as such, and the exact change one click away.
  */
 function ChangePreview({
   preview,
   input,
   labels,
   recordPath,
+  texts,
+  onText,
+  dropped,
+  onToggle,
+  note,
 }: {
-  preview: NonNullable<Proposal['preview']>;
+  preview: ChangePreviewDto;
   input: Record<string, unknown>;
   labels: Labels;
   recordPath: RecordPath;
+  texts: Record<string, string | boolean>;
+  onText: (key: string, value: string | boolean) => void;
+  dropped: Record<string, number[]>;
+  onToggle: (key: string, index: number, keep: boolean) => void;
+  note?: string;
 }) {
   return (
-    <div className="mt-1.5 space-y-2">
+    <div className="mt-2 space-y-2.5">
       {preview.records.length ? (
         <ul className="flex flex-wrap gap-1.5" aria-label="Records it changes">
           {preview.records.map((r) => {
@@ -1311,21 +1436,67 @@ function ChangePreview({
         </ul>
       ) : null}
       {preview.fields.length ? (
-        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 rounded-md bg-surface p-2 text-sm">
-          {preview.fields.map((f, i) => (
-            <Fragment key={i}>
-              <dt className="text-muted">{f.label}</dt>
-              <dd className="min-w-0 break-words text-ink">{f.value}</dd>
-            </Fragment>
-          ))}
+        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] items-center gap-x-3 gap-y-1.5 text-sm">
+          {preview.fields.map((f, i) => {
+            const k = f.edit ? pathKey(f.edit) : '';
+            return (
+              <Fragment key={i}>
+                <dt className="text-muted">{f.label}</dt>
+                <dd className="min-w-0 break-words text-ink">
+                  {f.edit && f.kind === 'boolean' ? (
+                    <Switch
+                      checked={(texts[k] as boolean | undefined) ?? f.value === 'Yes'}
+                      onCheckedChange={(v) => onText(k, v)}
+                      aria-label={f.label}
+                    />
+                  ) : f.edit ? (
+                    <Input
+                      value={(texts[k] as string | undefined) ?? f.value}
+                      onChange={(e) => onText(k, e.target.value)}
+                      aria-label={f.label}
+                      className="h-8"
+                    />
+                  ) : f.entity ? (
+                    (labels[f.entity]?.plural ?? f.value)
+                  ) : (
+                    f.value
+                  )}
+                </dd>
+              </Fragment>
+            );
+          })}
         </dl>
       ) : null}
-      <details className="text-xs text-muted">
-        <summary className="cursor-pointer select-none">Details</summary>
-        <pre className="mt-1 max-h-48 overflow-auto rounded bg-subtle p-2">
-          {JSON.stringify(input, null, 2)}
-        </pre>
-      </details>
+      {(preview.lists ?? []).map((l) => {
+        const k = pathKey(l.path);
+        const out = dropped[k] ?? [];
+        return (
+          <fieldset key={k}>
+            <legend className="mb-1 text-xs font-medium text-muted">
+              {l.label} · {l.items.length - out.length} of {l.items.length} kept
+            </legend>
+            <ul className="divide-y divide-line rounded-md border border-line">
+              {l.items.map((item, i) => (
+                <li key={i}>
+                  <label className="flex cursor-pointer items-start gap-2 px-2.5 py-1.5">
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={!out.includes(i)}
+                      onCheckedChange={(v) => onToggle(k, i, !!v)}
+                    />
+                    <span className={cn('min-w-0', out.includes(i) && 'text-faint line-through')}>
+                      <span className="block">{item.label}</span>
+                      {item.detail ? <span className="block text-xs text-muted">{item.detail}</span> : null}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+        );
+      })}
+      {note ? <p className="text-xs text-muted">Assistant&apos;s note: {note}</p> : null}
+      <Details input={input} />
     </div>
   );
 }
@@ -1342,24 +1513,4 @@ async function copy(text: string) {
   } catch {
     toast.error('Could not copy. Select the text and copy it instead.');
   }
-}
-
-/**
- * A configuration change: what the server says will happen and the exact change, always visible.
- * The assistant's own words come last and are labelled as such, since a model can be misled.
- */
-function ConfigSummary({ input, detail }: { input: Record<string, unknown>; detail?: string }) {
-  const method = String(input.method ?? '').toUpperCase();
-  return (
-    <div className="mt-1 space-y-1.5">
-      {detail ? <p className="font-medium">{detail}</p> : null}
-      <p className="text-xs text-muted">
-        {method} {String(input.path ?? '')}
-      </p>
-      <pre className="max-h-48 overflow-auto rounded bg-subtle p-2 text-xs">
-        {JSON.stringify(input.body ?? {}, null, 2)}
-      </pre>
-      {input.summary ? <p className="text-xs text-muted">Assistant's note: {String(input.summary)}</p> : null}
-    </div>
-  );
 }

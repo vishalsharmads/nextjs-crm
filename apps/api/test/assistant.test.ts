@@ -771,7 +771,7 @@ describe('assistant module', () => {
     expect(res.body.proposals[0].preview).toEqual({
       records: [{ entity: 'organization', uuid: o.body.uuid, name: org }],
       fields: [
-        { label: 'Subject', value: 'Send the quote' },
+        { label: 'Subject', value: 'Send the quote', edit: ['subject'] },
         { label: 'Due at', value: '2026-12-01 09:30' },
         { label: 'Priority', value: 'high' },
       ],
@@ -942,7 +942,7 @@ describe('assistant module', () => {
       expect.objectContaining({
         id: 'p1',
         name: 'config_change',
-        detail: 'Add to · Saved views and tags · name',
+        detail: 'Create a tag',
       }),
     ]);
     expect(await db('tags').where({ name: tag }).first()).toBeUndefined();
@@ -1139,6 +1139,189 @@ describe('assistant module', () => {
     const again = await admin.post(`/m/assistant/conversations/${res.body.uuid}/retry`, {});
     expect(again.status).toBe(409);
     expect(again.body.error.message).toMatch(/already been made/);
+  });
+
+  it('takes configuration bodies sent as JSON text, and refuses invalid ones before asking', async () => {
+    await admin.patch('/m/assistant/config', { setupEnabled: true }).expect(200);
+    const tag = unique('Texted');
+    const change = (id: string, body: unknown) => ({
+      type: 'tool_use',
+      id,
+      name: 'config_change',
+      input: { method: 'post', path: '/tags', body, summary: 'Add a tag' },
+    });
+    replies = [
+      {
+        content: [change('tx1', JSON.stringify({ name: tag })), change('tx2', { colour: 'pink' })],
+        usage: {},
+      },
+      text('Done.'),
+    ];
+    seen.length = 0;
+    const res = await admin.post('/m/assistant/conversations', { text: 'Tags' }).expect(201);
+    // The text body is read as an object; the invalid one never reaches the person.
+    expect(res.body.proposals).toEqual([expect.objectContaining({ toolUseId: 'tx1' })]);
+    expect(res.body.proposals[0]).toBeDefined();
+    replies = [text('Added.')];
+    seen.length = 0;
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    expect(await db('tags').where({ name: tag }).first()).toBeTruthy();
+    const sent = JSON.stringify(seen[0]!.body.messages);
+    expect(sent).toContain('VALIDATION_FAILED');
+    expect(sent).toContain('body.name');
+    expect(sent).not.toContain('INTERNAL');
+    await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
+  });
+
+  it('lets the person edit a change before confirming: rename it, leave items out', async () => {
+    await admin.patch('/m/assistant/config', { setupEnabled: true }).expect(200);
+    const board = await admin
+      .post('/dashboards', {
+        name: unique('Board'),
+        widgets: [{ key: 'a', type: 'tasks_due', title: 'Tasks' }],
+      })
+      .expect(201);
+    const widgets = [
+      { key: 'tasks', type: 'tasks_due', title: 'My tasks' },
+      { key: 'win', type: 'conversion', title: 'Win rate', params: { days: 90 } },
+      {
+        key: 'soon',
+        type: 'date_window',
+        title: 'Closing soon',
+        params: { entity: 'deal', field: 'expected_close', days: 90 },
+      },
+    ];
+    replies = [
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'db1',
+            name: 'config_change',
+            input: {
+              method: 'put',
+              path: `/dashboards/${board.body.uuid}`,
+              body: JSON.stringify({ name: 'Overview', widgets }),
+              summary: 'Redesign the dashboard',
+            },
+          },
+        ],
+        usage: {},
+      },
+    ];
+    const res = await admin.post('/m/assistant/conversations', { text: 'Redesign' }).expect(201);
+    const preview = res.body.proposals[0].preview;
+    expect(preview.fields).toContainEqual({ label: 'Name', value: 'Overview', edit: ['body', 'name'] });
+    expect(preview.lists).toEqual([
+      {
+        label: 'Widgets',
+        path: ['body', 'widgets'],
+        items: [
+          { label: 'My tasks', detail: 'Tasks due' },
+          { label: 'Win rate', detail: 'Conversion · Days: 90' },
+          { label: 'Closing soon', detail: 'Date window · Entity: deal · Field: expected_close · Days: 90' },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(res.body.proposals[0])).not.toContain('\\"widgets\\"');
+    replies = [text('Saved.')];
+    seen.length = 0;
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, {
+        decisions: { p1: true },
+        edits: {
+          p1: {
+            set: [{ path: ['body', 'name'], value: 'Team view' }],
+            drop: [{ path: ['body', 'widgets'], index: 1 }],
+          },
+        },
+      })
+      .expect(200);
+    const saved = await db('dashboards').where({ uuid: board.body.uuid }).first();
+    expect(saved.name).toBe('Team view');
+    const keys = (typeof saved.widgets === 'string' ? JSON.parse(saved.widgets) : saved.widgets).map(
+      (w: { key: string }) => w.key,
+    );
+    expect(keys).toEqual(['tasks', 'soon']);
+    expect(JSON.stringify(seen[0]!.body.messages)).toContain('The person edited');
+
+    // Only what the preview offered can be edited.
+    replies = [
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tg9',
+            name: 'config_change',
+            input: { method: 'post', path: '/tags', body: { name: unique('E') }, summary: 'Tag' },
+          },
+        ],
+        usage: {},
+      },
+    ];
+    const other = await admin.post('/m/assistant/conversations', { text: 'tag' }).expect(201);
+    replies = [text('ok')];
+    seen.length = 0;
+    await admin
+      .post(`/m/assistant/conversations/${other.body.uuid}/decisions`, {
+        decisions: { p1: true },
+        edits: { p1: { set: [{ path: ['path'], value: '/roles' }] } },
+      })
+      .expect(200);
+    expect(JSON.stringify(seen[0]!.body.messages)).toContain('cannot be changed here');
+    await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
+  });
+
+  it('reads report changes in words and lets yes/no values be switched before confirming', async () => {
+    await admin.patch('/m/assistant/config', { setupEnabled: true }).expect(200);
+    const name = unique('Value by owner');
+    replies = [
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'rp1',
+            name: 'config_change',
+            input: {
+              method: 'post',
+              path: '/reports/custom',
+              body: {
+                name,
+                shared: true,
+                definition: { entity: 'deal', groupBy: 'owner', metric: 'sum', metricField: 'value' },
+              },
+              summary: 'Create the report',
+            },
+          },
+        ],
+        usage: {},
+      },
+    ];
+    const res = await admin.post('/m/assistant/conversations', { text: 'Report' }).expect(201);
+    const p = res.body.proposals[0];
+    expect(p.detail).toBe('Create a report');
+    expect(p.preview.fields).toEqual(
+      expect.arrayContaining([
+        { label: 'Name', value: name, edit: ['body', 'name'] },
+        { label: 'Shared', value: 'Yes', edit: ['body', 'shared'], kind: 'boolean' },
+        { label: 'Record type', value: 'deal', entity: 'deal' },
+        { label: 'Measures', value: 'Sum of value' },
+        { label: 'Grouped by', value: 'Owner' },
+      ]),
+    );
+    replies = [text('Saved.')];
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, {
+        decisions: { p1: true },
+        edits: { p1: { set: [{ path: ['body', 'shared'], value: false }] } },
+      })
+      .expect(200);
+    const saved = await db('saved_reports').where({ name }).first();
+    expect(saved).toBeTruthy();
+    expect(Boolean(saved.shared)).toBe(false);
+    await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
   });
 
   it('lets admins try configuration with simulated replies, still confirmed', async () => {
