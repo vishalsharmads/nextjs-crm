@@ -15,6 +15,10 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 
 ## Future
 
+- Integration and plugin marketplace: admins browse, install, configure and disable integrations in-app; a plugin framework with per-integration settings, permissions and audit.
+- Ready-made connectors for Zapier, Make and n8n (triggers and actions built on the existing webhooks and API keys).
+- Accounting and invoicing sync (UK and Australia first): Xero, QuickBooks Online, Sage, FreeAgent and MYOB, with two-way sync of customers, invoices and payments.
+
 - WebAuthn / passkeys as a second factor.
 - Breached-password check (k-anonymity range API) when setting a password.
 - Keep encryption keys in an external key manager (KMS or HSM) instead of the environment.
