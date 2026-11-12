@@ -219,9 +219,22 @@ export async function precheckConfigChange(input: unknown, tc: Parameters<ToolDe
       'The tool input is not valid',
       change.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
     );
-  const { method: m, path, body } = change.data as { method: HttpMethod; path: string; body?: unknown };
+  const { method: m, path, body: raw } = change.data as { method: HttpMethod; path: string; body?: unknown };
+  const body = bodyOf(raw);
   allowed(m, path);
   await assertSafeChange(m, path, body, tc);
+  // The route's own format, checked now so a change that cannot run is never put to the person.
+  await callRoute(m, path, { body: body ?? {} }, tc, { validateOnly: true });
+}
+
+/** Models sometimes send the body as JSON text instead of an object: read it as the object. */
+export function bodyOf(body: unknown): unknown {
+  if (typeof body !== 'string') return body;
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    return body;
+  }
 }
 
 export const CONFIG_TOOLS: ToolDef[] = [
@@ -298,8 +311,9 @@ export const CONFIG_TOOLS: ToolDef[] = [
         .max(200)
         .describe('One plain sentence the admin sees, e.g. "Add a Renewal stage to the Sales pipeline"'),
     }),
-    handler: async ({ method: m, path, body }, tc) => {
+    handler: async ({ method: m, path, body: raw }, tc) => {
       if (!WRITE_METHODS.includes(m)) throw new AppError('FORBIDDEN', 'Only additions and edits are allowed');
+      const body = bodyOf(raw);
       allowed(m, path);
       await assertSafeChange(m, path, body, tc);
       const result = await callRoute(m, path, { body: body ?? {} }, tc);
@@ -313,4 +327,5 @@ export const CONFIG_PROMPT = [
   'Before a change: read the current configuration (config_read) and the format (config_schema). Send one change per config_change, with a short summary in plain words; the admin confirms each one.',
   'You cannot delete anything or touch security, compliance, users, API keys, webhooks or email accounts: say an admin can do that in Settings.',
   'Prefer the workspace setup tools (preview_setup, apply_setup) for adding many fields, pipelines or roles at once.',
+  'Bodies are JSON objects, never JSON text. For a new chart on a dashboard: create the report (POST /reports/custom with a name and a definition, as run_report takes), then PUT /dashboards/<uuid> with the full widget list, keeping the existing widgets and adding {"key": "...", "type": "report", "title": "...", "params": {"report": "<the new report uuid>"}}.',
 ].join('\n');

@@ -1141,6 +1141,40 @@ describe('assistant module', () => {
     expect(again.body.error.message).toMatch(/already been made/);
   });
 
+  it('takes configuration bodies sent as JSON text, and refuses invalid ones before asking', async () => {
+    await admin.patch('/m/assistant/config', { setupEnabled: true }).expect(200);
+    const tag = unique('Texted');
+    const change = (id: string, body: unknown) => ({
+      type: 'tool_use',
+      id,
+      name: 'config_change',
+      input: { method: 'post', path: '/tags', body, summary: 'Add a tag' },
+    });
+    replies = [
+      {
+        content: [change('tx1', JSON.stringify({ name: tag })), change('tx2', { colour: 'pink' })],
+        usage: {},
+      },
+      text('Done.'),
+    ];
+    seen.length = 0;
+    const res = await admin.post('/m/assistant/conversations', { text: 'Tags' }).expect(201);
+    // The text body is read as an object; the invalid one never reaches the person.
+    expect(res.body.proposals).toEqual([expect.objectContaining({ toolUseId: 'tx1' })]);
+    expect(res.body.proposals[0]).toBeDefined();
+    replies = [text('Added.')];
+    seen.length = 0;
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    expect(await db('tags').where({ name: tag }).first()).toBeTruthy();
+    const sent = JSON.stringify(seen[0]!.body.messages);
+    expect(sent).toContain('VALIDATION_FAILED');
+    expect(sent).toContain('body.name');
+    expect(sent).not.toContain('INTERNAL');
+    await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
+  });
+
   it('lets admins try configuration with simulated replies, still confirmed', async () => {
     await admin.patch('/m/assistant/config', { preset: 'simulated', setupEnabled: true }).expect(200);
     const what = await admin

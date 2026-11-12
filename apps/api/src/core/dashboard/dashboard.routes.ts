@@ -15,7 +15,12 @@ import { runReport, visibleReport } from '../reports/builder';
 
 const widgetSchema = z.object({
   key: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
-  type: z.string().regex(/^([a-z][a-z0-9-]*:)?[a-z][a-z0-9_.-]*$/),
+  type: z
+    .string()
+    .regex(/^([a-z][a-z0-9-]*:)?[a-z][a-z0-9_.-]*$/)
+    .describe(
+      'report (params.report: a saved report uuid), pipeline_value (params.pipeline: pipeline key or uuid), tasks_due, conversion (params.days), activity_by_user (params.days), date_window (params.entity: deal, contact, organization or lead; params.field: a date field; params.days), or a module widget "<module>:<type>"',
+    ),
   title: z.string().max(100).optional(),
   size: z.enum(['sm', 'md', 'lg']).default('md'),
   params: z.record(z.string(), z.unknown()).default({}),
