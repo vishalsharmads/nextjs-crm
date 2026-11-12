@@ -24,6 +24,8 @@ import {
   Sparkles,
   BarChart3,
   type LucideIcon,
+  MessageSquare,
+  Plug,
 } from 'lucide-react';
 import type { BootstrapDto } from '@app/shared';
 import { hasPermission } from '@app/shared';
@@ -64,6 +66,8 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   'map-pin': MapPin,
   notebook: Notebook,
   package: Package,
+  plug: Plug,
+  'message-square': MessageSquare,
   receipt: Receipt,
   sparkles: Sparkles,
   ticket: Ticket,

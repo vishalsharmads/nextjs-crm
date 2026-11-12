@@ -47,7 +47,8 @@ const TasksPage = lazyPage(() => import('@/features/activities/tasks-page'), 'Ta
 const ImportPage = lazyPage(() => import('@/features/imports/import-page'), 'ImportPage');
 const DashboardPage = lazyPage(() => import('@/features/dashboard/dashboard-page'), 'DashboardPage');
 const AuditPage = lazyPage(() => import('@/features/audit/audit-page'), 'AuditPage');
-const ModulesPage = lazyPage(() => import('@/features/settings/platform-pages'), 'ModulesPage');
+const ModulesPage = lazyPage(() => import('@/features/settings/modules-pages'), 'ModulesPage');
+const ModuleDetailPage = lazyPage(() => import('@/features/settings/modules-pages'), 'ModuleDetailPage');
 const BlueprintPage = lazyPage(() => import('@/features/settings/platform-pages'), 'BlueprintPage');
 const PrivacyPage = lazyPage(() => import('@/features/privacy/privacy-page'), 'PrivacyPage');
 const DataMapPage = lazyPage(() => import('@/features/privacy/data-map-page'), 'DataMapPage');
@@ -110,6 +111,7 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'pipelines', element: <PipelinesPage /> },
   { path: 'audit', element: <AuditPage /> },
   { path: 'modules', element: <ModulesPage /> },
+  { path: 'modules/:key', element: <ModuleDetailPage /> },
   { path: 'blueprint', element: <BlueprintPage /> },
   { path: 'privacy', element: <PrivacyPage /> },
   { path: 'data-map', element: <DataMapPage /> },
