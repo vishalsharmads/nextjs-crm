@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   AppError,
   allowsTestingAids,
-  assertSafeUrl,
   audit,
   escapeLike,
   callTool,
@@ -31,7 +30,9 @@ import type { Request, Response } from 'express';
 import * as m0001 from './migrations/0001_assistant';
 import * as m0002 from './migrations/0002_presets';
 import {
+  assertSafeModelUrl,
   chat,
+  modelHosts,
   chatStream,
   listModels,
   WIRE_FORMATS,
@@ -39,7 +40,7 @@ import {
   type ChatMessage,
   type ProviderConfig,
 } from './providers';
-import { findPreset, providerPresets, rankModels } from './catalog';
+import { compatibleServers, findPreset, providerPresets, rankModels } from './catalog';
 import { linkRecords, recordsIn, type RecordRef } from './links';
 import { CONFIG_PROMPT, CONFIG_TOOLS, describeChange, precheckConfigChange } from './config-tools';
 import { SETUP_PROMPT, SETUP_TOOLS } from './setup-tools';
@@ -87,14 +88,16 @@ async function providerConfig(row: ConfigRow): Promise<ProviderConfig | null> {
     return allowsTestingAids()
       ? { provider: 'simulated', baseUrl: '', model: SIMULATED.recommended[0]!, apiKey: '', headers: {} }
       : null;
-  if (!row.provider || !row.base_url || !row.model || !row.api_key_enc) return null;
+  if (!row.provider || !row.base_url || !row.model) return null;
+  // Listed providers always need a key; a compatible server of your own may not (a local model).
+  if (!row.api_key_enc && row.preset) return null;
   const { profile } = await effectiveCompliance();
   if (profile === 'hipaa' && !row.hipaa_acknowledged) return null;
   return {
     provider: row.provider as ProviderConfig['provider'],
     baseUrl: row.base_url,
     model: row.model,
-    apiKey: decrypt(row.api_key_enc, KEY_AAD),
+    apiKey: row.api_key_enc ? decrypt(row.api_key_enc, KEY_AAD) : '',
     headers: json<Record<string, string>>(row.headers),
   };
 }
@@ -664,7 +667,7 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
         : preset
           ? { ...input, provider: preset.format, baseUrl: preset.baseUrl, headers: preset.headers }
           : input;
-      if (body.baseUrl) await assertSafeUrl(body.baseUrl, 'baseUrl');
+      if (body.baseUrl) await assertSafeModelUrl(body.baseUrl);
       const reserved = Object.keys(body.headers ?? {}).filter((h) => RESERVED_HEADERS.has(h.toLowerCase()));
       if (reserved.length)
         throw new AppError('VALIDATION_FAILED', 'These headers are set by the app', [
@@ -716,7 +719,14 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
     path: '/providers',
     permission: 'assistant.settings.manage',
     summary: 'AI providers an admin can pick, with where to get a key and the recommended models',
-    handler: async () => ({ data: presets() }),
+    handler: async () => ({
+      data: presets(),
+      // Starting points for a compatible server; `allowed` says whether a local one is reachable.
+      compatible: compatibleServers().map((c) => ({
+        ...c,
+        allowed: !c.local || modelHosts().includes(new URL(c.baseUrl).host.toLowerCase()),
+      })),
+    }),
   })
   .add({
     method: 'post',
@@ -748,10 +758,10 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
       const apiKey =
         body.apiKey ??
         (cfg.api_key_enc && baseUrl === cfg.base_url ? decrypt(cfg.api_key_enc, KEY_AAD) : null);
-      if (!apiKey) throw new AppError('VALIDATION_FAILED', 'Enter the API key first');
+      if (!apiKey && preset) throw new AppError('VALIDATION_FAILED', 'Enter the API key first');
       const headers =
         preset?.headers ?? (baseUrl === cfg.base_url ? json<Record<string, string>>(cfg.headers) : {});
-      const ids = await listModels({ provider, baseUrl, apiKey, headers });
+      const ids = await listModels({ provider, baseUrl, apiKey: apiKey ?? '', headers });
       return { data: rankModels(ids, preset?.recommended ?? []) };
     },
   })

@@ -447,6 +447,53 @@ describe('assistant module', () => {
     await admin.patch('/m/assistant/config', { model: 'test-model' }).expect(200);
   });
 
+  it('offers compatible servers and works with one that needs no key', async () => {
+    const list = await admin.get('/m/assistant/providers').expect(200);
+    const local = list.body.compatible.find((c: { local: boolean }) => c.local);
+    expect(local).toMatchObject({ baseUrl: expect.stringMatching(/^http:\/\/localhost:/), allowed: false });
+
+    await admin
+      .patch('/m/assistant/config', {
+        preset: null,
+        provider: 'chat_completions',
+        baseUrl: base,
+        apiKey: null,
+      })
+      .expect(200);
+    expect((await admin.get('/m/assistant/status').expect(200)).body.ready).toBe(true);
+    replies = [{ choices: [{ message: { content: 'Local hello.' } }], usage: {} }];
+    seen.length = 0;
+    const res = await admin.post('/m/assistant/conversations', { text: 'Hi' }).expect(201);
+    expect(res.body.messages.at(-1).text).toBe('Local hello.');
+    expect(seen[0]!.headers.authorization).toBeUndefined();
+
+    await admin
+      .patch('/m/assistant/config', { provider: 'messages', baseUrl: base, apiKey: 'secret-key-123' })
+      .expect(200);
+  });
+
+  it('lets the operator allow exact private model hosts, and nothing else', async () => {
+    const { assertSafeUrl } = await import('../src/core/webhooks/webhooks');
+    const { env } = await import('../src/config/env');
+    const was = env.WEBHOOKS_ALLOW_PRIVATE;
+    env.WEBHOOKS_ALLOW_PRIVATE = false;
+    try {
+      await expect(assertSafeUrl('http://localhost:11434/v1')).rejects.toThrow();
+      await expect(
+        assertSafeUrl('http://localhost:11434/v1', 'baseUrl', { privateHosts: ['localhost:11434'] }),
+      ).resolves.toBeUndefined();
+      // Another port, or another private host, is still refused.
+      await expect(
+        assertSafeUrl('http://localhost:22/', 'baseUrl', { privateHosts: ['localhost:11434'] }),
+      ).rejects.toThrow();
+      await expect(
+        assertSafeUrl('http://169.254.169.254/', 'baseUrl', { privateHosts: ['localhost:11434'] }),
+      ).rejects.toThrow();
+    } finally {
+      env.WEBHOOKS_ALLOW_PRIVATE = was;
+    }
+  });
+
   it('lists providers and fills in format, address and headers from the one picked', async () => {
     const list = await admin.get('/m/assistant/providers').expect(200);
     const ids = list.body.data.map((p: { id: string }) => p.id);
@@ -468,8 +515,14 @@ describe('assistant module', () => {
   it('fetches chat models (saved key, saved address only) and tests the connection', async () => {
     const models = await admin.post('/m/assistant/models', {}).expect(200);
     expect(models.body.data.map((m: { id: string }) => m.id)).toEqual(['test-model', 'zeta-chat']);
-    // The saved key is never sent to another address.
-    await admin.post('/m/assistant/models', { provider: 'messages', baseUrl: `${base}/other` }).expect(422);
+    // The saved key is never sent to another address: the request goes without it, and the mock
+    // provider (which rejects requests with no key) turns it away.
+    const other = await admin
+      .post('/m/assistant/models', { provider: 'messages', baseUrl: `${base}/other` })
+      .expect(502);
+    expect(other.body.error.message).toMatch(/rejected the API key/);
+    // A listed provider still needs a key before anything is sent.
+    await admin.post('/m/assistant/models', { preset: 'openai' }).expect(422);
     replies = [text('ready')];
     const tested = await admin.post('/m/assistant/test').expect(200);
     expect(tested.body).toMatchObject({ ok: true, reply: 'ready' });
