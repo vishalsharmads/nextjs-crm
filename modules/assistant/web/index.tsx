@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { ENTITY_ROUTE, recordTypePath } from '@app/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Check, History, MessageSquarePlus, Send, Sparkles, Trash2, X } from 'lucide-react';
+import { Check, Copy, History, MessageSquarePlus, Send, Sparkles, Square, Trash2, X } from 'lucide-react';
 import type { WebModule } from '@app/module-sdk';
 import { SettingsPanel } from './settings';
 import { DECISION_WORDS, thinkingWords } from './thinking';
@@ -31,6 +31,8 @@ interface Proposal {
   name: string;
   title: string;
   input: Record<string, unknown>;
+  /** Configuration changes: what will happen, written by the server. */
+  detail?: string;
 }
 interface Conversation {
   uuid: string;
@@ -152,28 +154,40 @@ function Chat({
       ? { entity: about.split(':')[0]!, uuid: about.split(':')[1]! }
       : undefined;
   /** Post and stream the reply: text appears as it is written, tool steps as they run. */
+  const stopper = useRef<AbortController | null>(null);
   const stream = async (path: string, body: unknown, words: string[]) => {
     setLive({ text: '', steps: [], words });
     let result: Conversation | null = null;
     let failure: string | null = null;
+    const stop = new AbortController();
+    stopper.current = stop;
     try {
-      await apiStream(path, body, (event, data) => {
-        if (event === 'text')
-          setLive((l) => ({
-            text: (l?.text ?? '') + (data as { delta: string }).delta,
-            steps: l?.steps ?? [],
-            words: l?.words ?? [],
-          }));
-        else if (event === 'tool')
-          setLive((l) => ({
-            text: l?.text ?? '',
-            steps: [...(l?.steps ?? []), (data as { title: string }).title],
-            words: l?.words ?? [],
-          }));
-        else if (event === 'done') result = data as Conversation;
-        else if (event === 'error') failure = (data as { message: string }).message;
-      });
+      await apiStream(
+        path,
+        body,
+        (event, data) => {
+          if (event === 'text')
+            setLive((l) => ({
+              text: (l?.text ?? '') + (data as { delta: string }).delta,
+              steps: l?.steps ?? [],
+              words: l?.words ?? [],
+            }));
+          else if (event === 'tool')
+            setLive((l) => ({
+              text: l?.text ?? '',
+              steps: [...(l?.steps ?? []), (data as { title: string }).title],
+              words: l?.words ?? [],
+            }));
+          else if (event === 'done') result = data as Conversation;
+          else if (event === 'error') failure = (data as { message: string }).message;
+        },
+        stop.signal,
+      );
+    } catch (err) {
+      if (stop.signal.aborted) throw new Stopped();
+      throw err;
     } finally {
+      stopper.current = null;
       setLive(null);
     }
     if (failure) throw new Error(failure);
@@ -198,6 +212,11 @@ function Chat({
     onMutate: () => setText(''),
     onSuccess: (c) => done(c),
     onError: (err, message) => {
+      // Stopped on purpose: the question was saved, so show the conversation as the server has it.
+      if (err instanceof Stopped) {
+        void qc.invalidateQueries({ queryKey: key });
+        return;
+      }
       setText((t) => t || message);
       toast.error(errorText(err));
     },
@@ -209,16 +228,33 @@ function Chat({
       done(c);
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'm' });
     },
-    onError: (err) => toast.error(errorText(err)),
+    onError: (err) => {
+      if (err instanceof Stopped) void qc.invalidateQueries({ queryKey: key });
+      else toast.error(errorText(err));
+    },
   });
   const remove = useMutation({
     mutationFn: (uuid: string) => apiDelete(`/m/assistant/conversations/${uuid}`),
-    onSuccess: (_r, uuid) => {
-      toast.success('Deleted');
-      if (uuid === active) setActive(null);
-      void qc.invalidateQueries({ queryKey: [...key, 'conversations'] });
-    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: [...key, 'conversations'] }),
+    onError: (err) => toast.error(errorText(err)),
   });
+  // A deleted conversation disappears at once and is removed for good a few seconds later, unless undone.
+  const [deleting, setDeleting] = useState<string[]>([]);
+  const deleteLater = (uuid: string) => {
+    setDeleting((d) => [...d, uuid]);
+    if (uuid === active) setActive(null);
+    const timer = setTimeout(() => remove.mutate(uuid), UNDO_MS);
+    toast.success('Deleted', {
+      duration: UNDO_MS,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timer);
+          setDeleting((d) => d.filter((x) => x !== uuid));
+        },
+      },
+    });
+  };
   const bottom = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // A block, not an expression: newer browsers return a Promise here, which React would call as cleanup.
@@ -269,32 +305,34 @@ function Chat({
         <p className="p-3 text-sm text-muted">No conversations yet.</p>
       ) : (
         <ul className="max-h-[60vh] overflow-y-auto">
-          {list.data.map((c) => (
-            <li key={c.uuid} className="group flex items-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setActive(c.uuid);
-                  setShowHistory(false);
-                }}
-                className={cn(
-                  'min-w-0 flex-1 px-3 py-2 text-start text-sm hover:bg-subtle',
-                  c.uuid === active && 'bg-subtle font-medium',
-                )}
-              >
-                <span className="block truncate">{c.title}</span>
-                <span className="text-xs text-faint">{formatRelative(c.updatedAt)}</span>
-              </button>
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={`Delete ${c.title}`}
-                onClick={() => remove.mutate(c.uuid)}
-              >
-                <Trash2 />
-              </Button>
-            </li>
-          ))}
+          {list.data
+            .filter((c) => !deleting.includes(c.uuid))
+            .map((c) => (
+              <li key={c.uuid} className="group flex items-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActive(c.uuid);
+                    setShowHistory(false);
+                  }}
+                  className={cn(
+                    'min-w-0 flex-1 px-3 py-2 text-start text-sm hover:bg-subtle',
+                    c.uuid === active && 'bg-subtle font-medium',
+                  )}
+                >
+                  <span className="block truncate">{c.title}</span>
+                  <span className="text-xs text-faint">{formatRelative(c.updatedAt)}</span>
+                </button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Delete ${c.title}`}
+                  onClick={() => deleteLater(c.uuid)}
+                >
+                  <Trash2 />
+                </Button>
+              </li>
+            ))}
         </ul>
       )}
     </>
@@ -384,13 +422,26 @@ function Chat({
                           </ul>
                         ) : null}
                         {m.text && m.role === 'assistant' ? (
-                          <div
-                            className="rte-prose ai-reply"
-                            onClick={openChip}
-                            dangerouslySetInnerHTML={{
-                              __html: replyHtml(splitNext(m.text).body, recordPath),
-                            }}
-                          />
+                          <>
+                            <div
+                              className="rte-prose ai-reply"
+                              onClick={openChip}
+                              dangerouslySetInnerHTML={{
+                                __html: replyHtml(splitNext(m.text).body, recordPath),
+                              }}
+                            />
+                            <div className="mt-1 flex justify-end">
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                aria-label="Copy answer"
+                                title="Copy answer"
+                                onClick={() => void copy(splitNext(m.text!).body)}
+                              >
+                                <Copy />
+                              </Button>
+                            </div>
+                          </>
                         ) : (
                           m.text
                         )}
@@ -479,14 +530,15 @@ function Chat({
                   disabled={proposals.length > 0}
                   maxLength={4000}
                 />
-                <Button
-                  type="submit"
-                  variant="primary"
-                  loading={send.isPending}
-                  disabled={!text.trim() || proposals.length > 0}
-                >
-                  <Send /> Send
-                </Button>
+                {send.isPending || decide.isPending ? (
+                  <Button type="button" onClick={() => stopper.current?.abort()}>
+                    <Square /> Stop
+                  </Button>
+                ) : (
+                  <Button type="submit" variant="primary" disabled={!text.trim() || proposals.length > 0}>
+                    <Send /> Send
+                  </Button>
+                )}
               </form>
             </>
           )}
@@ -518,6 +570,8 @@ function Proposals({
             <p className="font-medium">{p.title}</p>
             {p.name === 'apply_setup' || p.name === 'add_preset' ? (
               <SetupSummary input={p.input} />
+            ) : p.name === 'config_change' ? (
+              <ConfigSummary input={p.input} detail={p.detail} />
             ) : (
               <pre className="mt-1 overflow-x-auto rounded bg-subtle p-2 text-xs">
                 {JSON.stringify(p.input, null, 2)}
@@ -650,5 +704,39 @@ function RotatingWords({ words }: { words: string[] }) {
       </span>
       <span className="sr-only">Thinking</span>
     </>
+  );
+}
+
+/** Raised when the person stops a reply on purpose. */
+class Stopped extends Error {}
+
+const UNDO_MS = 5000;
+
+async function copy(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success('Copied');
+  } catch {
+    toast.error('Could not copy. Select the text and copy it instead.');
+  }
+}
+
+/**
+ * A configuration change: what the server says will happen and the exact change, always visible.
+ * The assistant's own words come last and are labelled as such, since a model can be misled.
+ */
+function ConfigSummary({ input, detail }: { input: Record<string, unknown>; detail?: string }) {
+  const method = String(input.method ?? '').toUpperCase();
+  return (
+    <div className="mt-1 space-y-1.5">
+      {detail ? <p className="font-medium">{detail}</p> : null}
+      <p className="text-xs text-muted">
+        {method} {String(input.path ?? '')}
+      </p>
+      <pre className="max-h-48 overflow-auto rounded bg-subtle p-2 text-xs">
+        {JSON.stringify(input.body ?? {}, null, 2)}
+      </pre>
+      {input.summary ? <p className="text-xs text-muted">Assistant's note: {String(input.summary)}</p> : null}
+    </div>
   );
 }

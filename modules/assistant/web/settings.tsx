@@ -496,23 +496,25 @@ export function SettingsPanel() {
       ) : null}
 
       {access.isAdmin ? (
-        <Pane title="Workspace setup">
+        <Pane title="Workspace setup and configuration">
           <div className="flex items-start justify-between gap-4">
             <div className="text-sm">
               <p>
-                Let the assistant set up this workspace for your business: names, fields, pipelines, roles,
-                modules and industry presets. Only admins can use it, and every change is shown for you to
-                confirm first. Nothing you set up yourself is overwritten.
+                Let the assistant set up and configure this workspace: names, settings, branding, fields,
+                layouts, pipelines, roles, teams, automations, templates, forms, views, reports, dashboards,
+                objects, modules and industry presets. Only admins can use it, and every change is shown for
+                you to confirm first, then recorded in the audit log as made by the assistant.
               </p>
               <p className="mt-1 text-muted">
-                Off by default. Turn it off again once your workspace is set up.
+                It never deletes anything, and never touches security, compliance, users, API keys, webhooks,
+                email accounts or privacy requests. Off by default.
               </p>
             </div>
             <Switch
               checked={saved?.setupEnabled ?? false}
               onCheckedChange={(on) => toggleSetup.mutate(on)}
               disabled={toggleSetup.isPending}
-              aria-label="Let the assistant set up the workspace"
+              aria-label="Let the assistant set up and configure the workspace"
             />
           </div>
         </Pane>

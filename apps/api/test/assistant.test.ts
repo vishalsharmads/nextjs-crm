@@ -521,6 +521,178 @@ describe('assistant module', () => {
     replies = [text('Hi.')];
     await manager.post('/m/assistant/conversations', { text: 'Hello' }).expect(201);
     expect(toolNames()).not.toContain('apply_setup');
+    expect(toolNames()).not.toContain('config_change');
+    expect(toolNames()).not.toContain('config_read');
     await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
+  });
+
+  it('configures the workspace for admins through the app routes, within its guards', async () => {
+    await admin.patch('/m/assistant/config', { setupEnabled: true }).expect(200);
+    const adminRole = await db('roles').where({ key: 'admin' }).first();
+    const otherRole = await db('roles')
+      .where({ key: await createRole(['core.contacts.view']) })
+      .first();
+    const team = (await admin.post('/teams', { name: unique('Team') }).expect(201)).body;
+    const tag = unique('Cfg');
+    const change = (id: string, input: object) => ({ type: 'tool_use', id, name: 'config_change', input });
+    replies = [
+      use('config_overview', {}),
+      use('config_read', { path: '/pipelines' }),
+      use('config_read', { path: '/settings' }),
+      {
+        content: [
+          change('c1', { method: 'post', path: '/tags', body: { name: tag }, summary: `Add the ${tag} tag` }),
+          change('c2', {
+            method: 'patch',
+            path: '/settings/security',
+            body: { sessionDays: 1 },
+            summary: 'Try this',
+          }),
+          change('c3', {
+            method: 'post',
+            path: '/roles',
+            body: { key: 'all', name: 'All', permissions: ['*'] },
+            summary: 'Try this',
+          }),
+          change('c4', {
+            method: 'patch',
+            path: `/roles/${adminRole.uuid}`,
+            body: { name: 'Boss' },
+            summary: 'Try this',
+          }),
+          change('c5', { method: 'post', path: '/webhooks', body: {}, summary: 'Try this' }),
+          change('c6', {
+            method: 'post',
+            path: '/templates',
+            body: {
+              key: 'auth.password_reset',
+              channel: 'email',
+              locale: 'en',
+              subject: 's',
+              body: '<img src="https://x.test/{{{link}}}">',
+            },
+            summary: 'Try this',
+          }),
+          change('c7', {
+            method: 'put',
+            path: '/settings/branding',
+            body: { emailFromAddress: 'x@x.test' },
+            summary: 'Try this',
+          }),
+          change('c8', {
+            method: 'patch',
+            path: '/settings/commerce',
+            body: { paymentInstructions: 'Pay me' },
+            summary: 'Try this',
+          }),
+          change('c9', {
+            method: 'post',
+            path: '/automations',
+            body: {
+              name: 'Leak',
+              triggerEvent: 'contact.created',
+              actions: [{ type: 'send_email', to: 'x@x.test' }],
+            },
+            summary: 'Try this',
+          }),
+          change('c10', {
+            method: 'patch',
+            path: `/roles/${otherRole.uuid}`,
+            body: { permissions: ['core.users.manage'] },
+            summary: 'Try this',
+          }),
+          change('c11', {
+            method: 'post',
+            path: '/modules/assistant/disable',
+            body: {},
+            summary: 'Try this',
+          }),
+          change('c12', {
+            method: 'patch',
+            path: `/teams/${team.uuid}`,
+            body: { memberUuids: [] },
+            summary: 'Try this',
+          }),
+        ],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      },
+    ];
+    seen.length = 0;
+    const res = await admin.post('/m/assistant/conversations', { text: 'Tidy up the setup' }).expect(201);
+    const overview = JSON.stringify(seen[1]!.body.messages);
+    expect(overview).toContain('POST /tags');
+    expect(overview).toContain('PATCH /pipelines/:uuid');
+    for (const never of ['/settings/security', '/users', '/webhooks', '/api-keys', 'DELETE '])
+      expect(overview).not.toContain(never);
+    // Reads run on their own; every change waits for the admin.
+    expect(JSON.stringify(seen[2]!.body.messages)).toContain('\\"stages\\"');
+    expect(overview).not.toContain('/render');
+    expect(overview).not.toContain('/settings/commerce');
+    const settings = JSON.stringify((seen[3]!.body.messages as unknown[]).at(-1));
+    expect(settings).toContain('general');
+    expect(settings).not.toMatch(/security|compliance|mcp/);
+    // Only the change that can run is put to the admin; the refused ones never become questions.
+    expect(res.body.proposals).toEqual([
+      expect.objectContaining({
+        id: 'p1',
+        name: 'config_change',
+        detail: 'Add to · Saved views and tags · name',
+      }),
+    ]);
+    expect(await db('tags').where({ name: tag }).first()).toBeUndefined();
+
+    replies = [text('Done.')];
+    seen.length = 0;
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    const created = await db('tags').where({ name: tag }).first();
+    expect(created).toBeTruthy();
+    const audited = await db('audit_logs').where({ entity_id: created.id, action: 'tag.created' }).first();
+    expect(audited?.actor_type).toBe('assistant');
+    const results = JSON.stringify(seen[0]!.body.messages);
+    expect(results).toContain('may not change this');
+    expect(results).toContain('may not grant every permission');
+    expect(results).toContain('may not change the Admin role');
+    expect(results).toContain('may not use POST /webhooks');
+    for (const why of [
+      'may not change sign-in emails',
+      'may not change the sender of emails',
+      'may not create automations that send email',
+      'may not add permissions to an existing role',
+      'may not change who is in a team',
+    ])
+      expect(results).toContain(why);
+    expect(results.match(/may not change this/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(await db('automations').where({ name: 'Leak' }).first()).toBeUndefined();
+    expect((await db('roles').where({ id: adminRole.id }).first()).name).toBe(adminRole.name);
+    expect(await db('roles').where({ key: 'all' }).first()).toBeUndefined();
+    await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
+  });
+
+  it('lets admins try configuration with simulated replies, still confirmed', async () => {
+    await admin.patch('/m/assistant/config', { preset: 'simulated', setupEnabled: true }).expect(200);
+    const what = await admin
+      .post('/m/assistant/conversations', { text: 'What can you configure?' })
+      .expect(201);
+    expect(what.body.messages.at(-1).text).toContain('Pipelines and stages');
+    const name = unique('Sim tag');
+    const res = await admin
+      .post('/m/assistant/conversations', { text: `Add a tag called ${name}` })
+      .expect(201);
+    expect(res.body.proposals).toEqual([expect.objectContaining({ name: 'config_change' })]);
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    expect(await db('tags').where({ name }).first()).toBeTruthy();
+    await admin
+      .patch('/m/assistant/config', {
+        preset: null,
+        provider: 'messages',
+        baseUrl: base,
+        setupEnabled: false,
+      })
+      .expect(200);
+    await admin.patch('/m/assistant/config', { model: 'test-model' }).expect(200);
   });
 });
