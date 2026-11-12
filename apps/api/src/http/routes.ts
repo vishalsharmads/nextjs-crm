@@ -250,6 +250,8 @@ export async function callRoute(
   path: string,
   input: { query?: Record<string, unknown>; body?: unknown },
   { user, ctx }: { user: AuthUser; ctx: RequestContext },
+  /** Check access and the input only; the handler does not run. */
+  opts: { validateOnly?: boolean } = {},
 ): Promise<unknown> {
   const found = findRoute(method, path);
   if (!found) throw new AppError('NOT_FOUND', `There is no ${method.toUpperCase()} ${path}`);
@@ -260,9 +262,21 @@ export async function callRoute(
   checkPermission(user, def.permission);
   if (user.mfaSetupRequired && !MFA_SETUP_ALLOWED.some((re) => re.test(def.path)))
     throw new AppError('MFA_REQUIRED', 'Turn on two-factor authentication to continue');
-  const params = def.params ? def.params.parse(found.params) : found.params;
-  const query = def.query ? def.query.parse(input.query ?? {}) : (input.query ?? {});
-  const body = def.body ? def.body.parse(input.body ?? {}) : input.body;
+  // Invalid input reads as it would over HTTP: which fields need attention, not a server error.
+  const parse = (schema: z.ZodType | undefined, value: unknown, where: string) => {
+    if (!schema) return value;
+    const out = schema.safeParse(value);
+    if (out.success) return out.data;
+    throw new AppError(
+      'VALIDATION_FAILED',
+      'Some fields need attention',
+      out.error.issues.map((i) => ({ path: [where, ...i.path].join('.'), message: i.message })),
+    );
+  };
+  const params = parse(def.params, found.params, 'params') as Record<string, string>;
+  const query = parse(def.query, input.query ?? {}, 'query');
+  const body = parse(def.body, input.body ?? {}, 'body');
+  if (opts.validateOnly) return undefined;
   const refuse = () => {
     throw new AppError('FORBIDDEN', 'This action is not available here');
   };
