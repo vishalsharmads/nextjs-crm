@@ -1127,6 +1127,20 @@ describe('assistant module', () => {
       .expect(200);
   });
 
+  it('does not ask again once a change from the answer has run', async () => {
+    replies = [
+      use('create_record', { entity: 'contact', data: { firstName: 'Once', lastName: unique('Only') } }),
+    ];
+    const res = await admin.post('/m/assistant/conversations', { text: 'Add Once' }).expect(201);
+    replies = [text('Added.')];
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, { decisions: { p1: true } })
+      .expect(200);
+    const again = await admin.post(`/m/assistant/conversations/${res.body.uuid}/retry`, {});
+    expect(again.status).toBe(409);
+    expect(again.body.error.message).toMatch(/already been made/);
+  });
+
   it('lets admins try configuration with simulated replies, still confirmed', async () => {
     await admin.patch('/m/assistant/config', { preset: 'simulated', setupEnabled: true }).expect(200);
     const what = await admin

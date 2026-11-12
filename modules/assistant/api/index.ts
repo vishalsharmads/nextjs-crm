@@ -1278,6 +1278,19 @@ const routes = defineRoutes('/m/assistant', ['assistant'], 'assistant')
         (r) => r.role === 'user' && json<Block[]>(r.content).some((b) => b.type === 'text'),
       );
       if (!last) throw new AppError('CONFLICT', 'There is no question to ask again');
+      // A change from this answer already ran: asking again could make it twice.
+      const writes = new Set(
+        [...toolDefs(), ...SETUP_TOOLS, ...CONFIG_TOOLS].filter((t) => t.write).map((t) => t.name),
+      );
+      const after = rows.filter((r) => r.id > last.id).flatMap((r) => json<Block[]>(r.content));
+      const changeIds = new Set(
+        after.flatMap((b) => (b.type === 'tool_use' && writes.has(b.name) ? [b.id] : [])),
+      );
+      if (after.some((b) => b.type === 'tool_result' && changeIds.has(b.tool_use_id) && !b.is_error))
+        throw new AppError(
+          'CONFLICT',
+          'A change from this answer has already been made, so it cannot be asked again. Ask a new question instead.',
+        );
       const cfg = await loadConfig();
       await db.transaction(async (trx) => {
         // Proposed changes never ran, so dropping them with the answer they belong to is safe.
