@@ -1,0 +1,1594 @@
+{
+  "$schema": "../schema.json",
+  "key": "software-saas",
+  "name": "Software and SaaS companies",
+  "version": "1.0.0",
+  "description": "Inbound leads, accounts, opportunities, subscriptions, support tickets and feature requests for software and SaaS companies, from first sign-up to renewal.",
+  "settings": {
+    "features": {
+      "leads": true,
+      "leadPipeline": true
+    },
+    "general": {
+      "currency": "USD"
+    },
+    "contacts": {
+      "sources": [
+        "Website",
+        "Free trial",
+        "Webinar",
+        "Content download",
+        "Partner",
+        "Outbound",
+        "Event",
+        "Referral",
+        "Other"
+      ],
+      "lifecycleStatuses": ["Prospect", "Trial user", "Customer", "Champion", "Churned", "Partner"]
+    },
+    "deals": {
+      "lostReasons": [
+        "Chose a competitor",
+        "No budget",
+        "Missing feature",
+        "Built in-house",
+        "Timing",
+        "Security review failed",
+        "No response"
+      ]
+    }
+  },
+  "vocabulary": {
+    "organization": {
+      "singular": "Account",
+      "plural": "Accounts"
+    },
+    "deal": {
+      "singular": "Opportunity",
+      "plural": "Opportunities"
+    }
+  },
+  "modules": [],
+  "objects": [
+    {
+      "key": "subscription",
+      "singular": "Subscription",
+      "plural": "Subscriptions",
+      "icon": "credit-card",
+      "description": "Plans an account pays for: seats, recurring revenue and renewal date.",
+      "links": ["organization", "deal"]
+    },
+    {
+      "key": "support_ticket",
+      "singular": "Support ticket",
+      "plural": "Support tickets",
+      "icon": "life-buoy",
+      "description": "Customer issues, their priority and where they stand.",
+      "links": ["organization", "contact"]
+    },
+    {
+      "key": "feature_request",
+      "singular": "Feature request",
+      "plural": "Feature requests",
+      "icon": "clipboard-list",
+      "description": "Product ideas from customers and prospects, with the revenue asking for them.",
+      "links": ["organization"]
+    }
+  ],
+  "custom_field_groups": {
+    "organization": [
+      {
+        "key": "firmographics",
+        "label": "Company profile"
+      }
+    ],
+    "lead": [
+      {
+        "key": "qualification",
+        "label": "Qualification"
+      }
+    ],
+    "deal": [
+      {
+        "key": "opportunity",
+        "label": "Opportunity details"
+      }
+    ],
+    "subscription": [
+      {
+        "key": "billing",
+        "label": "Billing"
+      }
+    ],
+    "support_ticket": [
+      {
+        "key": "triage",
+        "label": "Triage"
+      }
+    ],
+    "feature_request": [
+      {
+        "key": "product",
+        "label": "Product"
+      }
+    ]
+  },
+  "custom_fields": {
+    "organization": [
+      {
+        "key": "company_size",
+        "label": "Company size",
+        "type": "select",
+        "group": "firmographics",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "s1_50",
+            "label": "1–50"
+          },
+          {
+            "key": "s51_200",
+            "label": "51–200"
+          },
+          {
+            "key": "s201_1000",
+            "label": "201–1,000"
+          },
+          {
+            "key": "s1000_plus",
+            "label": "1,000+"
+          }
+        ]
+      },
+      {
+        "key": "tier",
+        "label": "Customer tier",
+        "type": "select",
+        "group": "firmographics",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "prospect",
+            "label": "Prospect"
+          },
+          {
+            "key": "smb",
+            "label": "SMB"
+          },
+          {
+            "key": "mid_market",
+            "label": "Mid-market"
+          },
+          {
+            "key": "enterprise",
+            "label": "Enterprise"
+          }
+        ]
+      },
+      {
+        "key": "health",
+        "label": "Health score",
+        "type": "select",
+        "group": "firmographics",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "healthy",
+            "label": "Healthy"
+          },
+          {
+            "key": "watch",
+            "label": "Watch"
+          },
+          {
+            "key": "at_risk",
+            "label": "At risk"
+          }
+        ]
+      }
+    ],
+    "lead": [
+      {
+        "key": "lead_score",
+        "label": "Lead score",
+        "type": "number",
+        "group": "qualification",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "use_case",
+        "label": "Use case",
+        "type": "text",
+        "group": "qualification"
+      },
+      {
+        "key": "team_size",
+        "label": "Team size",
+        "type": "number",
+        "group": "qualification",
+        "filterable": true
+      },
+      {
+        "key": "trial_started",
+        "label": "Trial started",
+        "type": "date",
+        "group": "qualification",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ],
+    "deal": [
+      {
+        "key": "deal_type",
+        "label": "Type",
+        "type": "select",
+        "group": "opportunity",
+        "required": true,
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "new_business",
+            "label": "New business"
+          },
+          {
+            "key": "expansion",
+            "label": "Expansion"
+          },
+          {
+            "key": "renewal",
+            "label": "Renewal"
+          }
+        ]
+      },
+      {
+        "key": "plan",
+        "label": "Plan",
+        "type": "select",
+        "group": "opportunity",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "starter",
+            "label": "Starter"
+          },
+          {
+            "key": "growth",
+            "label": "Growth"
+          },
+          {
+            "key": "enterprise",
+            "label": "Enterprise"
+          }
+        ]
+      },
+      {
+        "key": "seats",
+        "label": "Seats",
+        "type": "number",
+        "group": "opportunity",
+        "filterable": true
+      },
+      {
+        "key": "term_months",
+        "label": "Term (months)",
+        "type": "number",
+        "group": "opportunity"
+      },
+      {
+        "key": "competitor",
+        "label": "Main competitor",
+        "type": "text",
+        "group": "opportunity"
+      },
+      {
+        "key": "close_date",
+        "label": "Target close date",
+        "type": "date",
+        "group": "opportunity",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ],
+    "subscription": [
+      {
+        "key": "plan",
+        "label": "Plan",
+        "type": "select",
+        "group": "billing",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "starter",
+            "label": "Starter"
+          },
+          {
+            "key": "growth",
+            "label": "Growth"
+          },
+          {
+            "key": "enterprise",
+            "label": "Enterprise"
+          }
+        ]
+      },
+      {
+        "key": "status",
+        "label": "Status",
+        "type": "select",
+        "group": "billing",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "trialing",
+            "label": "Trialing"
+          },
+          {
+            "key": "active",
+            "label": "Active"
+          },
+          {
+            "key": "past_due",
+            "label": "Past due"
+          },
+          {
+            "key": "cancelled",
+            "label": "Cancelled"
+          }
+        ]
+      },
+      {
+        "key": "seats",
+        "label": "Seats",
+        "type": "number",
+        "group": "billing",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "mrr",
+        "label": "Monthly recurring revenue",
+        "type": "currency",
+        "group": "billing",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "renewal_date",
+        "label": "Renewal date",
+        "type": "date",
+        "group": "billing",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ],
+    "support_ticket": [
+      {
+        "key": "priority",
+        "label": "Priority",
+        "type": "select",
+        "group": "triage",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "low",
+            "label": "Low"
+          },
+          {
+            "key": "normal",
+            "label": "Normal"
+          },
+          {
+            "key": "high",
+            "label": "High"
+          },
+          {
+            "key": "urgent",
+            "label": "Urgent"
+          }
+        ]
+      },
+      {
+        "key": "status",
+        "label": "Status",
+        "type": "select",
+        "group": "triage",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "open",
+            "label": "Open"
+          },
+          {
+            "key": "waiting",
+            "label": "Waiting on customer"
+          },
+          {
+            "key": "escalated",
+            "label": "Escalated to engineering"
+          },
+          {
+            "key": "resolved",
+            "label": "Resolved"
+          }
+        ]
+      },
+      {
+        "key": "area",
+        "label": "Product area",
+        "type": "select",
+        "group": "triage",
+        "filterable": true,
+        "options": [
+          {
+            "key": "billing",
+            "label": "Billing"
+          },
+          {
+            "key": "integrations",
+            "label": "Integrations"
+          },
+          {
+            "key": "reporting",
+            "label": "Reporting"
+          },
+          {
+            "key": "sso",
+            "label": "Sign-in and SSO"
+          },
+          {
+            "key": "api",
+            "label": "API"
+          }
+        ]
+      }
+    ],
+    "feature_request": [
+      {
+        "key": "status",
+        "label": "Status",
+        "type": "select",
+        "group": "product",
+        "filterable": true,
+        "show_in_list": true,
+        "options": [
+          {
+            "key": "new",
+            "label": "New"
+          },
+          {
+            "key": "planned",
+            "label": "Planned"
+          },
+          {
+            "key": "in_progress",
+            "label": "In progress"
+          },
+          {
+            "key": "shipped",
+            "label": "Shipped"
+          },
+          {
+            "key": "declined",
+            "label": "Declined"
+          }
+        ]
+      },
+      {
+        "key": "votes",
+        "label": "Votes",
+        "type": "number",
+        "group": "product",
+        "filterable": true,
+        "show_in_list": true
+      },
+      {
+        "key": "arr_impact",
+        "label": "Revenue asking for it",
+        "type": "currency",
+        "group": "product",
+        "filterable": true,
+        "show_in_list": true
+      }
+    ]
+  },
+  "pipelines": [
+    {
+      "key": "sales",
+      "name": "Sales",
+      "entity": "deal",
+      "is_default": true,
+      "stages": [
+        {
+          "key": "discovery",
+          "name": "Discovery",
+          "probability": 10,
+          "color": "blue",
+          "rotting_days": 10
+        },
+        {
+          "key": "demo",
+          "name": "Demo",
+          "probability": 25,
+          "color": "teal",
+          "rotting_days": 10
+        },
+        {
+          "key": "trial",
+          "name": "Trial / proof of concept",
+          "probability": 40,
+          "color": "violet",
+          "rotting_days": 21
+        },
+        {
+          "key": "proposal",
+          "name": "Proposal",
+          "probability": 60,
+          "color": "amber",
+          "rotting_days": 14
+        },
+        {
+          "key": "negotiation",
+          "name": "Negotiation and security review",
+          "probability": 80,
+          "color": "orange",
+          "rotting_days": 21
+        },
+        {
+          "key": "won",
+          "name": "Closed won",
+          "probability": 100,
+          "color": "green",
+          "is_won": true
+        },
+        {
+          "key": "lost",
+          "name": "Closed lost",
+          "probability": 0,
+          "color": "red",
+          "is_lost": true
+        }
+      ]
+    },
+    {
+      "key": "lead_qualification",
+      "name": "Lead qualification",
+      "entity": "lead",
+      "is_default": true,
+      "stages": [
+        {
+          "key": "new",
+          "name": "New",
+          "color": "blue",
+          "rotting_days": 2
+        },
+        {
+          "key": "engaged",
+          "name": "Engaged",
+          "color": "teal",
+          "rotting_days": 7
+        },
+        {
+          "key": "mql",
+          "name": "Marketing qualified",
+          "color": "violet",
+          "rotting_days": 5
+        },
+        {
+          "key": "meeting",
+          "name": "Meeting booked",
+          "color": "amber",
+          "rotting_days": 7
+        },
+        {
+          "key": "sql",
+          "name": "Sales qualified",
+          "color": "green",
+          "is_won": true
+        },
+        {
+          "key": "disqualified",
+          "name": "Disqualified",
+          "color": "red",
+          "is_lost": true
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "sdr",
+      "name": "Sales development rep",
+      "description": "Works inbound and outbound leads and books meetings for account executives",
+      "permissions": [
+        "core.leads.*",
+        "core.contacts.view",
+        "core.contacts.create",
+        "core.contacts.update",
+        "core.organizations.view",
+        "core.organizations.create",
+        "core.deals.view",
+        "core.activities.*",
+        "core.tags.view",
+        "core.dashboard.view"
+      ],
+      "scopes": {
+        "core.leads": "own",
+        "core.activities": "own",
+        "core.contacts": "all",
+        "core.organizations": "all",
+        "core.deals": "all"
+      }
+    },
+    {
+      "key": "account_executive",
+      "name": "Account executive",
+      "description": "Runs their own opportunities from discovery to signature",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.leads.view",
+        "core.deals.*",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.view",
+        "custom.subscription.view",
+        "custom.feature_request.*",
+        "custom.support_ticket.view"
+      ],
+      "scopes": {
+        "core.deals": "own",
+        "core.activities": "own",
+        "core.contacts": "all",
+        "core.organizations": "all",
+        "core.leads": "all",
+        "custom.subscription": "all",
+        "custom.feature_request": "all",
+        "custom.support_ticket": "all"
+      }
+    },
+    {
+      "key": "customer_success",
+      "name": "Customer success",
+      "description": "Owns onboarding, renewals, support escalations and account health",
+      "permissions": [
+        "core.contacts.*",
+        "core.organizations.*",
+        "core.deals.view",
+        "core.deals.create",
+        "core.deals.update",
+        "core.activities.*",
+        "core.tags.*",
+        "core.files.*",
+        "core.dashboard.view",
+        "core.saved_views.share",
+        "custom.subscription.*",
+        "custom.support_ticket.*",
+        "custom.feature_request.*"
+      ],
+      "scopes": {
+        "*": "all"
+      }
+    }
+  ],
+  "layouts": [
+    {
+      "entity": "lead",
+      "context": "list",
+      "columns": [
+        "full_name",
+        "company_name",
+        "stage",
+        "cf.lead_score",
+        "cf.trial_started",
+        "source",
+        "owner"
+      ]
+    },
+    {
+      "entity": "organization",
+      "context": "list",
+      "columns": ["name", "cf.tier", "cf.company_size", "cf.health", "owner"]
+    },
+    {
+      "entity": "deal",
+      "context": "list",
+      "columns": [
+        "title",
+        "organization",
+        "stage",
+        "value",
+        "cf.deal_type",
+        "cf.plan",
+        "cf.close_date",
+        "owner"
+      ]
+    }
+  ],
+  "dashboard": {
+    "name": "Overview",
+    "widgets": [
+      {
+        "key": "pipeline_value",
+        "type": "pipeline_value",
+        "title": "Opportunities by stage",
+        "size": "lg",
+        "params": {
+          "pipeline": "sales"
+        }
+      },
+      {
+        "key": "closing",
+        "type": "date_window",
+        "title": "Opportunities closing in the next 30 days",
+        "size": "md",
+        "params": {
+          "entity": "deal",
+          "field": "cf.close_date",
+          "days": 30,
+          "status": "open"
+        }
+      },
+      {
+        "key": "conversion",
+        "type": "conversion",
+        "title": "Win rate (90 days)",
+        "size": "sm",
+        "params": {
+          "days": 90
+        }
+      },
+      {
+        "key": "tasks_due",
+        "type": "tasks_due",
+        "title": "My tasks due",
+        "size": "md"
+      },
+      {
+        "key": "activity_by_user",
+        "type": "activity_by_user",
+        "title": "Team activity (30 days)",
+        "size": "md",
+        "params": {
+          "days": 30
+        }
+      }
+    ]
+  },
+  "templates": [
+    {
+      "key": "sales.trial_follow_up",
+      "channel": "email",
+      "name": "Trial follow-up",
+      "subject": "How is your trial going?",
+      "body": "<p>Hi {{contact.firstName}},</p><p>You are a few days into your trial, so I wanted to check in. Teams that get the most out of it usually connect one integration and invite two colleagues in the first week.</p><p>Want a 20-minute walkthrough tailored to your use case? Reply with a time that suits you.</p>"
+    },
+    {
+      "key": "sales.demo_recap",
+      "channel": "email",
+      "name": "Demo recap",
+      "subject": "Recap and next steps from today’s demo",
+      "body": "<p>Hi {{contact.firstName}},</p><p>Thanks for your time today. As promised, here is a summary of what we covered, the questions we still owe you answers on, and the proposed next step.</p><p>Let me know if anyone else on your team should join the next session.</p>"
+    },
+    {
+      "key": "success.renewal_notice",
+      "channel": "email",
+      "name": "Renewal reminder",
+      "subject": "Your subscription renews soon",
+      "body": "<p>Hi {{contact.firstName}},</p><p>Your subscription is coming up for renewal. Before then, it is worth a short review of seats, usage and anything on your roadmap we should know about.</p><p>Reply to book a renewal call.</p>"
+    }
+  ],
+  "help": {
+    "settings.pipelines": "This workspace has two pipelines: **Sales** for opportunities, and **Lead qualification** for leads, from new sign-up to sales qualified. A lead that reaches *Sales qualified* is ready to convert into a contact, an account and an opportunity."
+  },
+  "sample_data": {
+    "organizations": [
+      {
+        "ref": "northwind",
+        "name": "Northwind Logistics",
+        "website": "https://northwind-logistics.test",
+        "industry": "Logistics",
+        "days": -320,
+        "owner": "customer_success",
+        "custom": {
+          "company_size": "s201_1000",
+          "tier": "mid_market",
+          "health": "healthy"
+        }
+      },
+      {
+        "ref": "bluepeak",
+        "name": "Bluepeak Health",
+        "website": "https://bluepeak-health.test",
+        "industry": "Healthcare",
+        "days": -280,
+        "owner": "customer_success",
+        "custom": {
+          "company_size": "s1000_plus",
+          "tier": "enterprise",
+          "health": "watch"
+        }
+      },
+      {
+        "ref": "lumen",
+        "name": "Lumen Studio",
+        "website": "https://lumenstudio.test",
+        "industry": "Design agency",
+        "days": -210,
+        "owner": "customer_success",
+        "custom": {
+          "company_size": "s1_50",
+          "tier": "smb",
+          "health": "at_risk"
+        }
+      },
+      {
+        "ref": "quarry",
+        "name": "Quarry Financial",
+        "website": "https://quarryfinancial.test",
+        "industry": "Financial services",
+        "days": -40,
+        "owner": "account_executive",
+        "custom": {
+          "company_size": "s1000_plus",
+          "tier": "prospect"
+        }
+      },
+      {
+        "ref": "tidewater",
+        "name": "Tidewater Retail",
+        "website": "https://tidewater-retail.test",
+        "industry": "Retail",
+        "days": -25,
+        "owner": "account_executive",
+        "custom": {
+          "company_size": "s201_1000",
+          "tier": "prospect"
+        }
+      },
+      {
+        "ref": "orbit",
+        "name": "Orbit Robotics",
+        "website": "https://orbitrobotics.test",
+        "industry": "Manufacturing",
+        "days": -12,
+        "owner": "account_executive",
+        "custom": {
+          "company_size": "s51_200",
+          "tier": "prospect"
+        }
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "reyes",
+        "first_name": "Maria",
+        "last_name": "Reyes",
+        "email": "maria.reyes@example.test",
+        "phone": "+1 415 555 0118",
+        "job_title": "VP Operations",
+        "organization": "northwind",
+        "lifecycle_status": "Champion",
+        "source": "Webinar",
+        "custom": {},
+        "days": -318,
+        "owner": "customer_success"
+      },
+      {
+        "ref": "chen",
+        "first_name": "David",
+        "last_name": "Chen",
+        "email": "david.chen@example.test",
+        "phone": "+1 415 555 0175",
+        "job_title": "Director of IT",
+        "organization": "bluepeak",
+        "lifecycle_status": "Customer",
+        "source": "Outbound",
+        "custom": {},
+        "days": -275,
+        "owner": "customer_success"
+      },
+      {
+        "ref": "ward",
+        "first_name": "Olivia",
+        "last_name": "Ward",
+        "email": "olivia.ward@example.test",
+        "phone": "+1 415 555 0170",
+        "job_title": "Head of Security",
+        "organization": "bluepeak",
+        "lifecycle_status": "Customer",
+        "source": "Outbound",
+        "custom": {},
+        "days": -270,
+        "owner": "customer_success"
+      },
+      {
+        "ref": "fox",
+        "first_name": "Leo",
+        "last_name": "Fox",
+        "email": "leo.fox@example.test",
+        "phone": "+1 415 555 0105",
+        "job_title": "Founder",
+        "organization": "lumen",
+        "lifecycle_status": "Customer",
+        "source": "Free trial",
+        "custom": {},
+        "days": -205,
+        "owner": "customer_success"
+      },
+      {
+        "ref": "brooks",
+        "first_name": "Nina",
+        "last_name": "Brooks",
+        "email": "nina.brooks@example.test",
+        "phone": "+1 415 555 0138",
+        "job_title": "CTO",
+        "organization": "quarry",
+        "lifecycle_status": "Prospect",
+        "source": "Event",
+        "custom": {},
+        "days": -38,
+        "owner": "account_executive"
+      },
+      {
+        "ref": "ito",
+        "first_name": "Ken",
+        "last_name": "Ito",
+        "email": "ken.ito@example.test",
+        "phone": "+1 415 555 0120",
+        "job_title": "Procurement manager",
+        "organization": "quarry",
+        "lifecycle_status": "Prospect",
+        "source": "Event",
+        "custom": {},
+        "days": -20,
+        "owner": "account_executive"
+      },
+      {
+        "ref": "silva",
+        "first_name": "Rafael",
+        "last_name": "Silva",
+        "email": "rafael.silva@example.test",
+        "phone": "+1 415 555 0124",
+        "job_title": "Head of eCommerce",
+        "organization": "tidewater",
+        "lifecycle_status": "Trial user",
+        "source": "Free trial",
+        "custom": {},
+        "days": -24,
+        "owner": "account_executive"
+      },
+      {
+        "ref": "grant",
+        "first_name": "Emma",
+        "last_name": "Grant",
+        "email": "emma.grant@example.test",
+        "phone": "+1 415 555 0111",
+        "job_title": "Engineering manager",
+        "organization": "orbit",
+        "lifecycle_status": "Prospect",
+        "source": "Partner",
+        "custom": {},
+        "days": -11,
+        "owner": "account_executive"
+      }
+    ],
+    "leads": [
+      {
+        "ref": "park",
+        "first_name": "Jisoo",
+        "last_name": "Park",
+        "email": "jisoo.park@example.test",
+        "phone": "+1 415 555 0150",
+        "company_name": "Harbor Analytics",
+        "job_title": "Data lead",
+        "source": "Free trial",
+        "status": "new",
+        "stage": "new",
+        "days": 0,
+        "owner": "sdr",
+        "custom": {
+          "lead_score": 35,
+          "trial_started": "{{date:0}}"
+        }
+      },
+      {
+        "ref": "adams",
+        "first_name": "Tom",
+        "last_name": "Adams",
+        "email": "tom.adams@example.test",
+        "phone": "+1 415 555 0151",
+        "company_name": "Ridgeway Legal",
+        "job_title": "IT manager",
+        "source": "Website",
+        "status": "new",
+        "stage": "new",
+        "days": -1,
+        "owner": "sdr",
+        "custom": {
+          "lead_score": 20
+        }
+      },
+      {
+        "ref": "haddad",
+        "first_name": "Layla",
+        "last_name": "Haddad",
+        "email": "layla.haddad@example.test",
+        "phone": "+1 415 555 0154",
+        "company_name": "Cobalt Games",
+        "job_title": "Producer",
+        "source": "Webinar",
+        "status": "contacted",
+        "stage": "engaged",
+        "days": -4,
+        "owner": "sdr",
+        "custom": {
+          "lead_score": 48,
+          "team_size": 25
+        }
+      },
+      {
+        "ref": "novak",
+        "first_name": "Petra",
+        "last_name": "Novak",
+        "email": "petra.novak@example.test",
+        "phone": "+1 415 555 0156",
+        "company_name": "Summit Clinics",
+        "job_title": "Operations director",
+        "source": "Content download",
+        "status": "contacted",
+        "stage": "engaged",
+        "days": -6,
+        "owner": "sdr",
+        "custom": {
+          "lead_score": 52
+        }
+      },
+      {
+        "ref": "king",
+        "first_name": "Marcus",
+        "last_name": "King",
+        "email": "marcus.king@example.test",
+        "phone": "+1 415 555 0158",
+        "company_name": "Ferro Manufacturing",
+        "job_title": "Plant IT lead",
+        "source": "Free trial",
+        "status": "contacted",
+        "stage": "mql",
+        "days": -8,
+        "owner": "sdr",
+        "custom": {
+          "lead_score": 71,
+          "team_size": 60,
+          "trial_started": "{{date:-8}}",
+          "use_case": "Replace spreadsheets for supplier tracking"
+        }
+      },
+      {
+        "ref": "rossi",
+        "first_name": "Giulia",
+        "last_name": "Rossi",
+        "email": "giulia.rossi@example.test",
+        "phone": "+1 415 555 0160",
+        "company_name": "Atlas Travel",
+        "job_title": "COO",
+        "source": "Partner",
+        "status": "qualified",
+        "stage": "meeting",
+        "days": -10,
+        "owner": "sdr",
+        "custom": {
+          "lead_score": 80,
+          "team_size": 120,
+          "use_case": "Customer onboarding across five regions"
+        }
+      },
+      {
+        "ref": "obi",
+        "first_name": "Chidi",
+        "last_name": "Obi",
+        "email": "chidi.obi@example.test",
+        "phone": "+1 415 555 0165",
+        "company_name": "Kestrel Energy",
+        "job_title": "Head of Digital",
+        "source": "Outbound",
+        "status": "qualified",
+        "stage": "sql",
+        "days": -15,
+        "owner": "sdr",
+        "custom": {
+          "lead_score": 88,
+          "team_size": 300
+        }
+      },
+      {
+        "ref": "moore",
+        "first_name": "Sam",
+        "last_name": "Moore",
+        "email": "sam.moore@example.test",
+        "phone": "+1 415 555 0159",
+        "company_name": "Personal project",
+        "job_title": "Student",
+        "source": "Website",
+        "status": "unqualified",
+        "stage": "disqualified",
+        "days": -9,
+        "owner": "sdr",
+        "custom": {
+          "lead_score": 5
+        }
+      }
+    ],
+    "deals": [
+      {
+        "ref": "orbit_new",
+        "title": "Orbit Robotics – Growth plan",
+        "organization": "orbit",
+        "contact": "grant",
+        "stage": "discovery",
+        "value": 18000,
+        "days": -10,
+        "owner": "account_executive",
+        "custom": {
+          "deal_type": "new_business",
+          "plan": "growth",
+          "seats": 40,
+          "term_months": 12,
+          "close_date": "{{date:+45}}"
+        }
+      },
+      {
+        "ref": "tidewater_trial",
+        "title": "Tidewater Retail – trial to Growth",
+        "organization": "tidewater",
+        "contact": "silva",
+        "stage": "trial",
+        "value": 32000,
+        "days": -24,
+        "stage_days": -9,
+        "owner": "account_executive",
+        "custom": {
+          "deal_type": "new_business",
+          "plan": "growth",
+          "seats": 75,
+          "term_months": 12,
+          "close_date": "{{date:+21}}"
+        }
+      },
+      {
+        "ref": "quarry_ent",
+        "title": "Quarry Financial – Enterprise",
+        "organization": "quarry",
+        "contact": "brooks",
+        "stage": "negotiation",
+        "value": 145000,
+        "days": -38,
+        "stage_days": -6,
+        "owner": "account_executive",
+        "custom": {
+          "deal_type": "new_business",
+          "plan": "enterprise",
+          "seats": 400,
+          "term_months": 36,
+          "competitor": "Incumbent on-premise tool",
+          "close_date": "{{date:+14}}"
+        }
+      },
+      {
+        "ref": "northwind_exp",
+        "title": "Northwind – add 60 seats",
+        "organization": "northwind",
+        "contact": "reyes",
+        "stage": "proposal",
+        "value": 21600,
+        "days": -12,
+        "owner": "customer_success",
+        "custom": {
+          "deal_type": "expansion",
+          "plan": "growth",
+          "seats": 60,
+          "term_months": 12,
+          "close_date": "{{date:+10}}"
+        }
+      },
+      {
+        "ref": "bluepeak_renew",
+        "title": "Bluepeak Health – annual renewal",
+        "organization": "bluepeak",
+        "contact": "chen",
+        "stage": "demo",
+        "value": 96000,
+        "days": -20,
+        "owner": "customer_success",
+        "custom": {
+          "deal_type": "renewal",
+          "plan": "enterprise",
+          "seats": 250,
+          "term_months": 12,
+          "close_date": "{{date:+40}}"
+        }
+      },
+      {
+        "ref": "northwind_won",
+        "title": "Northwind Logistics – Growth plan",
+        "organization": "northwind",
+        "contact": "reyes",
+        "stage": "won",
+        "value": 43200,
+        "days": -330,
+        "stage_days": -318,
+        "owner": "account_executive",
+        "custom": {
+          "deal_type": "new_business",
+          "plan": "growth",
+          "seats": 120,
+          "term_months": 12
+        }
+      },
+      {
+        "ref": "bluepeak_won",
+        "title": "Bluepeak Health – Enterprise",
+        "organization": "bluepeak",
+        "contact": "chen",
+        "stage": "won",
+        "value": 96000,
+        "days": -300,
+        "stage_days": -276,
+        "owner": "account_executive",
+        "custom": {
+          "deal_type": "new_business",
+          "plan": "enterprise",
+          "seats": 250,
+          "term_months": 12
+        }
+      },
+      {
+        "ref": "quarry_pilot",
+        "title": "Quarry Financial – analytics add-on",
+        "organization": "quarry",
+        "contact": "ito",
+        "stage": "discovery",
+        "value": 24000,
+        "days": -6,
+        "owner": "account_executive",
+        "custom": {
+          "deal_type": "new_business",
+          "plan": "enterprise",
+          "seats": 400,
+          "term_months": 12,
+          "close_date": "{{date:+75}}"
+        }
+      },
+      {
+        "ref": "lumen_downgrade",
+        "title": "Lumen Studio – renewal on Starter",
+        "organization": "lumen",
+        "contact": "fox",
+        "stage": "proposal",
+        "value": 2880,
+        "days": -5,
+        "owner": "customer_success",
+        "custom": {
+          "deal_type": "renewal",
+          "plan": "starter",
+          "seats": 12,
+          "term_months": 12,
+          "close_date": "{{date:+12}}"
+        }
+      },
+      {
+        "ref": "tidewater_lost",
+        "title": "Tidewater Retail – Starter pilot",
+        "organization": "tidewater",
+        "stage": "lost",
+        "value": 6000,
+        "days": -150,
+        "stage_days": -120,
+        "lost_reason": "Timing",
+        "owner": "account_executive",
+        "custom": {
+          "deal_type": "new_business",
+          "plan": "starter",
+          "seats": 25
+        }
+      },
+      {
+        "ref": "cobalt_lost",
+        "title": "Cobalt Games – Starter",
+        "stage": "lost",
+        "value": 4800,
+        "days": -90,
+        "stage_days": -60,
+        "lost_reason": "Missing feature",
+        "owner": "account_executive",
+        "custom": {
+          "deal_type": "new_business",
+          "plan": "starter",
+          "seats": 20
+        }
+      }
+    ],
+    "activities": [
+      {
+        "type": "call",
+        "related": "lead:park",
+        "subject": "Call new trial sign-up within an hour",
+        "due_days": 0,
+        "hour": 15,
+        "days": 0,
+        "owner": "sdr"
+      },
+      {
+        "type": "task",
+        "related": "lead:king",
+        "subject": "Send integration guide for supplier data import",
+        "due_days": 1,
+        "days": -2,
+        "owner": "sdr"
+      },
+      {
+        "type": "meeting",
+        "related": "lead:rossi",
+        "subject": "Discovery call with account executive",
+        "due_days": 2,
+        "hour": 16,
+        "days": -3,
+        "owner": "sdr"
+      },
+      {
+        "type": "note",
+        "related": "lead:obi",
+        "body": "<p>Budget approved for this quarter, 300 users across three business units. Wants single sign-on and an audit log. Handing over to sales.</p>",
+        "days": -2,
+        "owner": "sdr"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:quarry_ent",
+        "subject": "Security review with the customer’s infosec team",
+        "due_days": 3,
+        "hour": 14,
+        "days": -5,
+        "owner": "account_executive"
+      },
+      {
+        "type": "task",
+        "related": "deal:quarry_ent",
+        "subject": "Return completed security questionnaire",
+        "due_days": 1,
+        "days": -4,
+        "owner": "account_executive"
+      },
+      {
+        "type": "note",
+        "related": "deal:quarry_ent",
+        "body": "<p>Legal redlines on the data processing agreement are minor. Procurement is pushing for a 36-month term in exchange for a price lock.</p>",
+        "days": -3,
+        "owner": "account_executive"
+      },
+      {
+        "type": "call",
+        "related": "deal:tidewater_trial",
+        "subject": "Mid-trial check-in: usage and blockers",
+        "due_days": 1,
+        "hour": 11,
+        "days": -2,
+        "owner": "account_executive"
+      },
+      {
+        "type": "meeting",
+        "related": "deal:bluepeak_renew",
+        "subject": "Quarterly business review before renewal",
+        "due_days": 6,
+        "hour": 10,
+        "days": -8,
+        "owner": "customer_success"
+      },
+      {
+        "type": "note",
+        "related": "contact:fox",
+        "body": "<p>Usage down 40% in the last month after two designers left. Offer a plan downgrade rather than risk churn.</p>",
+        "days": -5,
+        "owner": "customer_success"
+      },
+      {
+        "type": "task",
+        "related": "deal:northwind_exp",
+        "subject": "Send expansion quote for 60 additional seats",
+        "due_days": 0,
+        "days": -1,
+        "owner": "customer_success"
+      }
+    ],
+    "branding": {
+      "appName": "Stackline Software",
+      "tagline": "From first sign-up to renewal",
+      "loginTitle": "Welcome to Stackline Software",
+      "loginTagline": "From first sign-up to renewal",
+      "footerText": "Stackline Software · Demo data",
+      "pdfHeader": "Stackline Software",
+      "emailFromName": "Stackline Software",
+      "fontFamily": "IBM Plex Sans",
+      "radius": 8,
+      "colors": {
+        "light": {
+          "primary": "#4338CA",
+          "accent": "#0E7490"
+        },
+        "dark": {
+          "primary": "#A5B4FC",
+          "accent": "#67E8F9"
+        }
+      }
+    },
+    "requests": [
+      {
+        "method": "post",
+        "path": "/o/subscription",
+        "body": {
+          "name": "Northwind – Growth (120 seats)",
+          "organizationUuid": "{{organization:northwind}}",
+          "dealUuid": "{{deal:northwind_won}}",
+          "custom": {
+            "plan": "growth",
+            "status": "active",
+            "seats": 120,
+            "mrr": 3600,
+            "renewal_date": "{{date:+35}}"
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/subscription",
+        "body": {
+          "name": "Bluepeak – Enterprise (250 seats)",
+          "organizationUuid": "{{organization:bluepeak}}",
+          "dealUuid": "{{deal:bluepeak_won}}",
+          "custom": {
+            "plan": "enterprise",
+            "status": "active",
+            "seats": 250,
+            "mrr": 8000,
+            "renewal_date": "{{date:+64}}"
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/subscription",
+        "body": {
+          "name": "Lumen Studio – Starter (12 seats)",
+          "organizationUuid": "{{organization:lumen}}",
+          "custom": {
+            "plan": "starter",
+            "status": "past_due",
+            "seats": 12,
+            "mrr": 240,
+            "renewal_date": "{{date:+12}}"
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/subscription",
+        "body": {
+          "name": "Tidewater – trial",
+          "organizationUuid": "{{organization:tidewater}}",
+          "dealUuid": "{{deal:tidewater_trial}}",
+          "custom": {
+            "plan": "growth",
+            "status": "trialing",
+            "seats": 75,
+            "renewal_date": "{{date:+7}}"
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/support-ticket",
+        "body": {
+          "name": "SSO login loop for some users",
+          "organizationUuid": "{{organization:bluepeak}}",
+          "contactUuid": "{{contact:ward}}",
+          "custom": {
+            "priority": "urgent",
+            "status": "escalated",
+            "area": "sso"
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/support-ticket",
+        "body": {
+          "name": "Invoice shows wrong seat count",
+          "organizationUuid": "{{organization:lumen}}",
+          "contactUuid": "{{contact:fox}}",
+          "custom": {
+            "priority": "high",
+            "status": "open",
+            "area": "billing"
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/support-ticket",
+        "body": {
+          "name": "Webhook retries after timeout",
+          "organizationUuid": "{{organization:northwind}}",
+          "contactUuid": "{{contact:reyes}}",
+          "custom": {
+            "priority": "normal",
+            "status": "waiting",
+            "area": "api"
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/support-ticket",
+        "body": {
+          "name": "Export dashboard to PDF",
+          "organizationUuid": "{{organization:northwind}}",
+          "contactUuid": "{{contact:reyes}}",
+          "custom": {
+            "priority": "low",
+            "status": "resolved",
+            "area": "reporting"
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/feature-request",
+        "body": {
+          "name": "Audit log export to SIEM",
+          "organizationUuid": "{{organization:quarry}}",
+          "custom": {
+            "status": "planned",
+            "votes": 14,
+            "arr_impact": 145000
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/feature-request",
+        "body": {
+          "name": "Custom roles per workspace",
+          "organizationUuid": "{{organization:bluepeak}}",
+          "custom": {
+            "status": "in_progress",
+            "votes": 22,
+            "arr_impact": 96000
+          }
+        }
+      },
+      {
+        "method": "post",
+        "path": "/o/feature-request",
+        "body": {
+          "name": "Native mobile app",
+          "organizationUuid": "{{organization:northwind}}",
+          "custom": {
+            "status": "new",
+            "votes": 9,
+            "arr_impact": 43200
+          }
+        }
+      }
+    ]
+  }
+}

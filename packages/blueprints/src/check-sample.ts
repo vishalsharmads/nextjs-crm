@@ -89,6 +89,15 @@ export function checkSampleData(bp: Blueprint, moduleDeps: Record<string, string
       problems.push(`${where}: lost reason "${d.lost_reason}" is not in settings.deals.lostReasons`);
   }
 
+  const leadPipeline =
+    bp.pipelines.find((p) => p.entity === 'lead' && p.is_default) ??
+    bp.pipelines.find((p) => p.entity === 'lead');
+  const leadStages = new Set((leadPipeline?.stages ?? []).map((s) => s.key));
+  for (const l of data.leads) {
+    if (l.stage !== undefined && !leadStages.has(String(l.stage)))
+      problems.push(`lead "${String(l.ref)}": unknown stage "${String(l.stage)}"`);
+  }
+
   for (const [i, a] of data.activities.entries()) {
     const where = `activity #${i + 1}`;
     if (!['note', 'task', 'call', 'meeting'].includes(String(a.type ?? 'note')))

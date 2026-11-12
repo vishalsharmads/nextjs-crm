@@ -48,6 +48,12 @@ describe('blueprint catalog', () => {
 describe('sample data rules', () => {
   const base = () => structuredClone(loadBlueprint('coworking'));
 
+  it('flags lead stages missing from the lead pipeline', () => {
+    const bp = structuredClone(loadBlueprint('software-saas'));
+    bp.sample_data!.leads[0]!.stage = 'nowhere';
+    expect(checkSampleData(bp)).toContain('lead "park": unknown stage "nowhere"');
+  });
+
   it('flags bad date placeholders and references outside requests', () => {
     const bp = base();
     bp.sample_data!.contacts[0]!.custom = { start: '{{datetime:+1@25}}', who: '{{contact:amara}}' };
