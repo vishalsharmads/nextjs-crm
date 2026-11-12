@@ -6,7 +6,15 @@ import { AppError } from '../../lib/errors';
 import { audit } from '../audit/audit.service';
 import { applyBlueprint } from '../../blueprints/applier';
 import { exportBlueprint } from '../../blueprints/exporter';
-import { disableModule, enableModule, enabledModuleKeys, loadModules } from '../../modules/registry';
+import {
+  disableModule,
+  enableModule,
+  enabledModuleKeys,
+  getModule,
+  loadModules,
+} from '../../modules/registry';
+import { moduleSettingsDto, previewModuleSettings, saveModuleSettings } from '../../modules/module-settings';
+import { logger } from '../../lib/logger';
 
 function bp(key: string) {
   if (!listBlueprintKeys().includes(key))
@@ -37,6 +45,7 @@ function contents(b: Blueprint) {
   };
 }
 
+const keyParams = z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{1,63}$/) });
 const modeQuery = z.object({ mode: z.enum(['primary', 'add']).default('primary') });
 
 export const blueprintsRoutes = defineRoutes('/blueprints', ['platform'])
@@ -90,7 +99,7 @@ export const blueprintsRoutes = defineRoutes('/blueprints', ['platform'])
     method: 'post',
     path: '/:key/preview',
     permission: 'core.blueprints.manage',
-    params: z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{1,63}$/) }),
+    params: keyParams,
     query: modeQuery,
     summary: 'Dry run: what applying this blueprint would change',
     handler: async ({ ctx, user, params, query }) =>
@@ -100,7 +109,7 @@ export const blueprintsRoutes = defineRoutes('/blueprints', ['platform'])
     method: 'post',
     path: '/:key/apply',
     permission: 'core.blueprints.manage',
-    params: z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{1,63}$/) }),
+    params: keyParams,
     query: modeQuery,
     summary: 'Apply a blueprint; mode=add adds a second preset as if an admin made the changes',
     handler: async ({ ctx, user, params, query }) =>
@@ -147,6 +156,9 @@ export const modulesRoutes = defineRoutes('/modules', ['platform'])
           version: m.version,
           description: m.description,
           status: m.status,
+          category: m.category,
+          icon: m.icon,
+          hasSettings: m.settings.length > 0,
           dependsOn: m.depends_on,
           enabled: enabled.has(m.key),
           installedVersion: (states.get(m.key)?.installed_version as string | null) ?? null,
@@ -157,10 +169,104 @@ export const modulesRoutes = defineRoutes('/modules', ['platform'])
     },
   })
   .add({
+    method: 'get',
+    path: '/:key',
+    permission: 'core.modules.manage',
+    params: keyParams,
+    handler: async ({ params }) => {
+      const mod = getModule(params.key);
+      if (!mod) throw new AppError('NOT_FOUND', 'Module not found');
+      const m = mod.manifest;
+      const enabled = new Set(enabledModuleKeys());
+      const state = await db('module_states').where({ module_key: m.key }).first('installed_version');
+      const names = new Map(loadModules().map(({ manifest }) => [manifest.key, manifest.name]));
+      return {
+        key: m.key,
+        name: m.name,
+        version: m.version,
+        description: m.description,
+        status: m.status,
+        category: m.category,
+        icon: m.icon,
+        enabled: enabled.has(m.key),
+        installedVersion: (state?.installed_version as string | null | undefined) ?? null,
+        dependsOn: m.depends_on.map((key) => ({
+          key,
+          name: names.get(key) ?? key,
+          enabled: enabled.has(key),
+        })),
+        dependents: loadModules()
+          .filter(({ manifest }) => manifest.depends_on.includes(m.key))
+          .map(({ manifest }) => ({
+            key: manifest.key,
+            name: manifest.name,
+            enabled: enabled.has(manifest.key),
+          })),
+        permissions: m.permissions,
+        menuItems: m.menu_items.map((i) => ({ label: i.label, path: i.path })),
+        canTest: !!mod.api?.testConnection,
+        settings: await moduleSettingsDto(m.key),
+      };
+    },
+  })
+  .add({
+    method: 'patch',
+    path: '/:key/settings',
+    permission: 'core.modules.manage',
+    params: keyParams,
+    body: z.record(z.string(), z.unknown()),
+    handler: async ({ ctx, params, body }) => {
+      if (!getModule(params.key)) throw new AppError('NOT_FOUND', 'Module not found');
+      await db.transaction(async (trx) => {
+        const diff = await saveModuleSettings(trx, params.key, body);
+        if (Object.keys(diff).length)
+          await audit(trx, ctx, {
+            action: 'module.settings_changed',
+            entity: 'module',
+            diff: { key: params.key, changes: diff },
+          });
+      });
+      return moduleSettingsDto(params.key);
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/:key/test',
+    permission: 'core.modules.manage',
+    params: keyParams,
+    body: z.record(z.string(), z.unknown()).default({}),
+    handler: async ({ ctx, params, body }) => {
+      const mod = getModule(params.key);
+      if (!mod?.api?.testConnection) throw new AppError('NOT_FOUND', 'This module has no connection to test');
+      const settings = await previewModuleSettings(params.key, body);
+      let result: { ok: boolean; message: string };
+      try {
+        result = { ok: true, ...(await mod.api.testConnection(settings)) };
+      } catch (err) {
+        // Only messages written for people pass through; anything else is logged, not shown.
+        if (!(err instanceof AppError))
+          logger.warn({ err, module: params.key }, 'module connection test failed');
+        result = {
+          ok: false,
+          message:
+            err instanceof AppError
+              ? err.message
+              : 'The connection failed. Check the settings and try again.',
+        };
+      }
+      await audit(db, ctx, {
+        action: 'module.connection_tested',
+        entity: 'module',
+        diff: { key: params.key, ok: result.ok },
+      });
+      return result;
+    },
+  })
+  .add({
     method: 'post',
     path: '/:key/enable',
     permission: 'core.modules.manage',
-    params: z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{1,63}$/) }),
+    params: keyParams,
     handler: async ({ ctx, params }) => {
       const result = await enableModule(params.key);
       await audit(db, ctx, {
@@ -175,7 +281,7 @@ export const modulesRoutes = defineRoutes('/modules', ['platform'])
     method: 'post',
     path: '/:key/disable',
     permission: 'core.modules.manage',
-    params: z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{1,63}$/) }),
+    params: keyParams,
     handler: async ({ ctx, params }) => {
       if (!loadModules().some((m) => m.manifest.key === params.key))
         throw new AppError('NOT_FOUND', 'Module not found');

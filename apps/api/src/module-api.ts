@@ -44,6 +44,7 @@ export { userRefs, iso } from './core/records/hydrate';
 export { escapeLike } from './core/records/filters';
 export { userIdFromRef } from './core/records/hydrate';
 export { isModuleEnabled } from './modules/registry';
+export { getModuleSettings } from './modules/module-settings';
 export { sendMail } from './lib/mailer';
 export { getBranding } from './core/settings/settings.service';
 export { randomToken, sha256 } from './lib/crypto';

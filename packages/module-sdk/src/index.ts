@@ -3,6 +3,37 @@ import { PERMISSION_KEY_RE } from '@app/shared';
 
 export const MODULE_KEY_RE = /^[a-z][a-z0-9-]{1,63}$/;
 
+/** Keys of module settings fields (same rule as custom field keys). */
+export const MODULE_SETTING_KEY_RE = /^[a-z][a-z0-9_]{0,48}$/;
+
+export const MODULE_CATEGORIES = ['integration', 'industry', 'productivity', 'commerce'] as const;
+export type ModuleCategory = (typeof MODULE_CATEGORIES)[number];
+
+/**
+ * One field an admin fills in on the module's Settings tab. `secret` values are stored encrypted
+ * and never leave the API; `help` is required because it is shown under the field and in help.
+ */
+export const moduleSettingFieldSchema = z
+  .object({
+    key: z.string().regex(MODULE_SETTING_KEY_RE),
+    type: z.enum(['string', 'secret', 'boolean', 'select', 'number', 'url']),
+    label: z.string().min(1).max(80),
+    help: z.string().min(1).max(300),
+    required: z.boolean().default(false),
+    default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+    options: z
+      .array(z.object({ value: z.string().min(1).max(64), label: z.string().min(1).max(80) }))
+      .optional(),
+  })
+  .superRefine((f, ctx) => {
+    if (f.type === 'select' && !f.options?.length)
+      ctx.addIssue({ code: 'custom', message: `Setting ${f.key} needs options`, path: ['options'] });
+    if (f.type === 'secret' && f.default !== undefined)
+      ctx.addIssue({ code: 'custom', message: `Secret ${f.key} cannot have a default`, path: ['default'] });
+  });
+
+export type ModuleSettingField = z.output<typeof moduleSettingFieldSchema>;
+
 export const moduleManifestSchema = z
   .object({
     key: z.string().regex(MODULE_KEY_RE),
@@ -26,7 +57,10 @@ export const moduleManifestSchema = z
         }),
       )
       .default([]),
-    settings_schema: z.record(z.string(), z.unknown()).default({}),
+    category: z.enum(MODULE_CATEGORIES).default('productivity'),
+    /** Icon key from the curated map in the web shell (`app/shell/nav.ts`). */
+    icon: z.string().max(40).default('box'),
+    settings: z.array(moduleSettingFieldSchema).max(30).default([]),
     migrations_dir: z.string().optional(),
     api_entry: z.string().optional(),
     web_entry: z.string().optional(),
@@ -66,6 +100,9 @@ export const moduleManifestSchema = z
       .default([]),
   })
   .superRefine((m, ctx) => {
+    const keys = m.settings.map((f) => f.key);
+    if (new Set(keys).size !== keys.length)
+      ctx.addIssue({ code: 'custom', message: 'Setting keys must be unique', path: ['settings'] });
     for (const p of m.permissions) {
       if (!p.key.startsWith(`${m.key}.`)) {
         ctx.addIssue({

@@ -107,6 +107,14 @@ export async function migrateEnabledModules(conn: Db = db): Promise<string[]> {
     for (const name of await migrateModule(db, m.manifest.key, m.api.migrations))
       applied.push(`${m.manifest.key}:${name}`);
   }
+  // A new release of an enabled module is now installed: record its version.
+  for (const m of loadModules()) {
+    if (enabled.has(m.manifest.key))
+      await conn('module_states')
+        .where({ module_key: m.manifest.key })
+        .whereNot({ installed_version: m.manifest.version })
+        .update({ installed_version: m.manifest.version });
+  }
   return applied;
 }
 

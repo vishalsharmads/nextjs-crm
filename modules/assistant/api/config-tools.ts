@@ -50,6 +50,8 @@ const NEVER = [
   /^\/settings\/commerce(\/|$)/,
   // Turning the assistant off from inside a conversation (an admin can in Settings).
   /^\/modules\/assistant\/disable$/,
+  // Module settings can hold credentials, and a connection test calls out to another service.
+  /^\/modules\/[^/]+\/(settings|test)$/,
   /\/reveal$/,
   /\/export$/,
   /\/preview$/,
