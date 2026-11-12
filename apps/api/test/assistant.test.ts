@@ -758,6 +758,31 @@ describe('assistant module', () => {
     expect(JSON.stringify(answer.charts)).not.toContain('fake');
   });
 
+  it('shows a proposed change readably: records by name, plain values', async () => {
+    const org = unique('Previewco');
+    const o = await admin.post('/organizations', { name: org }).expect(201);
+    replies = [
+      use('create_task', {
+        subject: 'Send <b>the</b> quote',
+        dueAt: '2026-12-01T09:30:00Z',
+        priority: 'high',
+        related: { type: 'organization', uuid: o.body.uuid },
+      }),
+    ];
+    const res = await admin.post('/m/assistant/conversations', { text: 'Remind me' }).expect(201);
+    expect(res.body.proposals[0].preview).toEqual({
+      records: [{ entity: 'organization', uuid: o.body.uuid, name: org }],
+      fields: [
+        { label: 'Subject', value: 'Send the quote' },
+        { label: 'Due at', value: '2026-12-01 09:30' },
+        { label: 'Priority', value: 'high' },
+      ],
+    });
+    await admin
+      .post(`/m/assistant/conversations/${res.body.uuid}/decisions`, { decisions: { p1: false } })
+      .expect(200);
+  });
+
   it('ranks recommended models first', async () => {
     const { rankModels } = await import('../../../modules/assistant/api/catalog');
     expect(rankModels(['a-large', 'b-mini-2', 'b-mini', 'c'], ['b-mini', 'x', 'a-'])).toEqual([

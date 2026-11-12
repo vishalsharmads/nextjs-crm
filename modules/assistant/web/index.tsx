@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ENTITY_ROUTE, recordTypePath } from '@app/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,6 +40,7 @@ import { ApiError, apiDelete, apiGet, apiStream, buildUrl } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
 import { useBoot, useCan } from '@/app/session';
 import { cn } from '@/lib/cn';
+import { appUrl } from '@/lib/app-url';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import {
@@ -54,6 +63,11 @@ interface Proposal {
   input: Record<string, unknown>;
   /** Configuration changes: what will happen, written by the server. */
   detail?: string;
+  /** Other changes: the records by name and the fields as plain values, from the server. */
+  preview?: {
+    records: { entity: string; uuid: string; name: string | null }[];
+    fields: { label: string; value: string }[];
+  };
 }
 interface Conversation {
   uuid: string;
@@ -730,6 +744,8 @@ function Chat({
                     ) : null}
                     {proposals.length ? (
                       <Proposals
+                        labels={labels}
+                        recordPath={recordPath}
                         proposals={proposals}
                         onDecide={(d) => decide.mutate(d)}
                         busy={decide.isPending}
@@ -913,7 +929,11 @@ function Proposals({
   proposals,
   onDecide,
   busy,
+  labels,
+  recordPath,
 }: {
+  labels: Labels;
+  recordPath: RecordPath;
   proposals: Proposal[];
   onDecide: (d: Record<string, boolean>) => void;
   busy: boolean;
@@ -932,6 +952,8 @@ function Proposals({
               <SetupSummary input={p.input} />
             ) : p.name === 'config_change' ? (
               <ConfigSummary input={p.input} detail={p.detail} />
+            ) : p.preview ? (
+              <ChangePreview preview={p.preview} input={p.input} labels={labels} recordPath={recordPath} />
             ) : (
               <pre className="mt-1 overflow-x-auto rounded bg-subtle p-2 text-xs">
                 {JSON.stringify(p.input, null, 2)}
@@ -1183,6 +1205,65 @@ function AssistantAvatar() {
     >
       <Sparkles className="size-3.5" />
     </span>
+  );
+}
+
+/**
+ * A proposed change people can check at a glance: the records it touches by name (each opens in
+ * a new tab), its values as a short list, and the exact change one click away.
+ */
+function ChangePreview({
+  preview,
+  input,
+  labels,
+  recordPath,
+}: {
+  preview: NonNullable<Proposal['preview']>;
+  input: Record<string, unknown>;
+  labels: Labels;
+  recordPath: RecordPath;
+}) {
+  return (
+    <div className="mt-1.5 space-y-2">
+      {preview.records.length ? (
+        <ul className="flex flex-wrap gap-1.5" aria-label="Records it changes">
+          {preview.records.map((r) => {
+            const type = labels[r.entity]?.singular ?? 'Record';
+            const to = recordPath(r.entity, r.uuid);
+            const name = r.name ?? 'A record you cannot see';
+            return (
+              <li key={`${r.entity}:${r.uuid}`}>
+                {to ? (
+                  <a href={appUrl(`/${to}`)} target="_blank" rel="noopener noreferrer" className="ai-chip">
+                    <span className="text-faint">{type}:</span> {name}
+                  </a>
+                ) : (
+                  <span className="ai-chip">
+                    <span className="text-faint">{type}:</span> {name}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      {preview.fields.length ? (
+        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 rounded-md bg-surface p-2 text-sm">
+          {preview.fields.map((f, i) => (
+            <Fragment key={i}>
+              <dt className="text-muted">{f.label}</dt>
+              <dd className="min-w-0 break-words text-ink">{f.value}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      ) : null}
+      <details className="text-xs text-muted">
+        <summary className="cursor-pointer select-none">Details</summary>
+        <pre className="mt-1 max-h-48 overflow-auto rounded bg-subtle p-2">
+          {JSON.stringify(input, null, 2)}
+        </pre>
+      </details>
+    </div>
   );
 }
 

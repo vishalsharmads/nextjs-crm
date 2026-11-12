@@ -44,7 +44,8 @@ import {
   type ProviderConfig,
 } from './providers';
 import { compatibleServers, findPreset, providerPresets, rankModels, readsImages } from './catalog';
-import { linkRecords, recordsIn, type RecordRef } from './links';
+import { linkRecords, nameOf, recordsIn, type RecordRef } from './links';
+import { previewOf, type Preview } from './preview';
 import { CONFIG_PROMPT, CONFIG_TOOLS, describeChange, precheckConfigChange } from './config-tools';
 import { SETUP_PROMPT, SETUP_TOOLS } from './setup-tools';
 
@@ -256,6 +257,8 @@ interface Pending {
     input: Record<string, unknown>;
     /** For configuration changes: what will happen, written by the server (never by the model). */
     detail?: string;
+    /** What the change will do, readable: records by name and plain field values. */
+    preview?: Preview;
   }[];
 }
 
@@ -619,7 +622,9 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
           input: use.input,
           ...(use.name === 'config_change'
             ? { detail: describeChange(String(use.input.method), String(use.input.path), use.input.body) }
-            : {}),
+            : SETUP_TOOLS.some((t) => t.name === use.name)
+              ? {}
+              : { preview: await previewOf(use.name, use.input, lookups(ctx, user)) }),
         });
       else {
         streamSink.getStore()?.tool(def?.title ?? use.name);
@@ -638,6 +643,28 @@ async function advanceNow(conv: { id: number }, cfg: ConfigRow, ctx: RequestCont
   await append(conv.id, 'assistant', [
     { type: 'text', text: 'I stopped here because this took too many steps. Try a narrower question.' },
   ]);
+}
+
+/** Names for a change's preview, looked up as the person (only what they may see gets a name). */
+function lookups(ctx: RequestContext, user: AuthUser) {
+  const tc = {
+    ctx: { ...ctx, user: { ...user, via: 'assistant' as const } },
+    user: { ...user, via: 'assistant' as const },
+  };
+  return {
+    async record(entity: string, uuid: string) {
+      const r = await callTool('get_record', { entity, uuid }, tc, toolDefs());
+      return r && typeof r === 'object' ? nameOf(r as Record<string, unknown>) : null;
+    },
+    async stage(uuid: string) {
+      const r = (await callTool('list_pipelines', {}, tc, toolDefs())) as {
+        pipelines?: { name: string; stages?: { uuid: string; name: string }[] }[];
+      };
+      for (const p of r.pipelines ?? [])
+        for (const s of p.stages ?? []) if (s.uuid === uuid) return `${s.name} (${p.name})`;
+      return null;
+    },
+  };
 }
 
 /** A refusal result for a proposed change that cannot run, or null when it may be proposed. */
