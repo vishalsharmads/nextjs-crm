@@ -1041,6 +1041,15 @@ describe('assistant module', () => {
     }
   });
 
+  it('runs reports only for people who may view reports', async () => {
+    const role = await createRole(['assistant.chat.use', 'core.contacts.view']);
+    const viewer = await loginAs(await createUser({ roleKeys: [role] }));
+    replies = [use('run_report', { entity: 'contact', groupBy: 'owner' }), text('No.')];
+    seen.length = 0;
+    await viewer.post('/m/assistant/conversations', { text: 'Contacts per owner' }).expect(201);
+    expect(JSON.stringify(seen[1]!.body.messages)).toContain('FORBIDDEN');
+  });
+
   it('lets admins try configuration with simulated replies, still confirmed', async () => {
     await admin.patch('/m/assistant/config', { preset: 'simulated', setupEnabled: true }).expect(200);
     const what = await admin

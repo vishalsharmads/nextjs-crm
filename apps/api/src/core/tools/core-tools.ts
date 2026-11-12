@@ -255,6 +255,8 @@ defineTool({
   write: false,
   input: reportDefinitionSchema.omit({ chart: true }),
   async handler(input, { user }) {
+    // The same permission as the report builder, plus viewing the record type.
+    assertCan(user, 'core.reports.view');
     viewable(user, input.entity);
     return runReport(input, user);
   },
