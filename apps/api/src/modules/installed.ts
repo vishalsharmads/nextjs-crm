@@ -25,6 +25,8 @@ import assistant from '../../../../modules/assistant/manifest.json' with { type:
 import { assistant as assistantApi } from '../../../../modules/assistant/api';
 import recordsDemo from '../../../../modules/records-demo/manifest.json' with { type: 'json' };
 import { recordsDemo as recordsDemoApi } from '../../../../modules/records-demo/api';
+import chatNotify from '../../../../modules/chat-notify/manifest.json' with { type: 'json' };
+import { chatNotify as chatNotifyApi } from '../../../../modules/chat-notify/api';
 
 /**
  * Modules compiled into this build. Adding a module means adding it here (a test checks that
@@ -44,4 +46,5 @@ export const installedModuleSources: InstalledModuleSource[] = [
   { manifest: assets, api: assetsApi },
   { manifest: coworkingCheckins, api: coworkingCheckinsApi },
   { manifest: recordsDemo, api: recordsDemoApi },
+  { manifest: chatNotify, api: chatNotifyApi },
 ];

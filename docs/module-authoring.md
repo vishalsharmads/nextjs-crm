@@ -170,3 +170,18 @@ Write for the people using the page: what it is for, what they can do, step by s
 1. Add the module to `apps/api/src/modules/installed.ts` (a test fails if a manifest folder is not listed).
 2. `npm install` to link the workspace package.
 3. Enable it in **Settings → Modules**, or list it in a blueprint's `modules`.
+
+## Integrations
+
+A module that connects to another service has its own guide: [integration-authoring.md](integration-authoring.md). Generate one with `module:new --integration --key=<key> --name="<Name>"`.
+
+## Release checklist
+
+- [ ] `npm run module:check -- <key>` passes: manifest, help article, imports only from `@app/api/module-api`, tables named `m_<key>_*`, no `child_process` or `eval`, no brand names.
+- [ ] Every settings field has `help`, and the help article has `<!-- generated:module-settings:<key> -->` if there are settings.
+- [ ] Personal data reaches export and erasure (`PrivacyHandler`), and outbound calls skip restricted people.
+- [ ] Mutations write audit rows; record types emit created/updated/deleted.
+- [ ] The version in `manifest.json` is raised; new tables come in new migrations (committed ones are immutable).
+- [ ] Tests, `npm run typecheck`, `npm run lint` and `npm run check:brand` pass.
+
+AI coding agents can do the same checks through the developer MCP server (`npm run mcp:dev`); see "AI coding agents" in [ai-agents.md](ai-agents.md).

@@ -19,6 +19,7 @@ export { registerModuleWidget } from './modules/widgets';
 export { notify } from './core/notifications/notifications.service';
 export { getGroup as getSettingsGroup } from './core/settings/settings.service';
 export { emit, onEvent, type DomainEvent } from './core/events/events';
+export { eventTouchesRestricted } from './core/privacy/privacy.service';
 export { enqueue, registerJob, every } from './lib/jobs';
 export { scopeAllows } from './core/rbac/access';
 export {

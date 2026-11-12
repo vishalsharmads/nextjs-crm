@@ -1,0 +1,41 @@
+{
+  "key": "chat-notify",
+  "name": "Chat notifications",
+  "version": "1.0.0",
+  "status": "available",
+  "category": "integration",
+  "icon": "message-square",
+  "description": "Posts a short message to a team chat channel when deals are won, new deals or leads arrive, or tickets come in. Works with any chat service that accepts incoming webhooks.",
+  "depends_on": [],
+  "permissions": [],
+  "menu_items": [],
+  "api_entry": "api/index.ts",
+  "settings": [
+    {
+      "key": "webhook_url",
+      "type": "secret",
+      "label": "Incoming webhook address",
+      "help": "The address your chat service gives you when you add an incoming webhook to a channel. It works like a password, so it is stored encrypted.",
+      "required": true
+    },
+    {
+      "key": "events",
+      "type": "select",
+      "label": "What to post",
+      "help": "Which events send a message to the channel.",
+      "default": "won",
+      "options": [
+        { "value": "won", "label": "Won deals" },
+        { "value": "deals", "label": "New and won deals" },
+        { "value": "all", "label": "New leads, new and won deals, and new tickets" }
+      ]
+    },
+    {
+      "key": "include_titles",
+      "type": "boolean",
+      "label": "Include record titles",
+      "help": "Add the deal or ticket title to each message. Leave off if the channel is shared outside your team. Names of people are never sent.",
+      "default": false
+    }
+  ]
+}
