@@ -1,5 +1,7 @@
 # Phase 8: integrations and module marketplace
 
+Status: 8a, 8b, 8c, 8e and 8g are built. 8d and 8f are designs, not built.
+
 Admins browse, enable, configure and disable modules and integrations in the app. Developers (and their AI coding agents) build custom modules against a documented contract. Modules stay compiled into the release; uploading a module to a running instance is designed here (8d, 8f) and built later.
 
 ## Milestones
