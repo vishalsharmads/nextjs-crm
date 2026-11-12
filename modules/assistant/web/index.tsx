@@ -33,6 +33,7 @@ import { Textarea } from '@/components/ui/input';
 import {
   Badge,
   ErrorState,
+  Kbd,
   PageHeader,
   Pane,
   Skeleton,
@@ -398,13 +399,13 @@ function Chat({
       ) : !shown.length ? (
         <p className="p-3 text-sm text-muted">{q ? 'No conversations match.' : 'No conversations yet.'}</p>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+        <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-gutter:stable]">
           {byDay(shown).map(([day, items]) => (
             <section key={day} aria-label={day}>
               <h3 className="px-3 pt-3 pb-1 text-xs font-medium text-faint">{day}</h3>
               <ul>
                 {items.map((c) => (
-                  <li key={c.uuid} className="group flex items-center pe-1">
+                  <li key={c.uuid} className="group relative">
                     <button
                       type="button"
                       onClick={() => {
@@ -413,18 +414,19 @@ function Chat({
                       }}
                       aria-current={c.uuid === active ? 'true' : undefined}
                       className={cn(
-                        'min-w-0 flex-1 rounded-sm px-3 py-1.5 text-start text-sm transition-colors duration-150 hover:bg-subtle',
-                        c.uuid === active && 'bg-primary-soft font-medium text-ink',
+                        'block w-full rounded-sm py-1.5 ps-3 pe-10 text-start text-sm transition-colors duration-150 hover:bg-subtle',
+                        c.uuid === active && 'bg-primary-soft font-medium text-ink hover:bg-primary-soft',
                       )}
                     >
                       <span className="block truncate">{c.title}</span>
-                      <span className="text-xs text-faint">{formatRelative(c.updatedAt)}</span>
+                      <span className="text-xs font-normal text-faint">{formatRelative(c.updatedAt)}</span>
                     </button>
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      className="opacity-60 group-hover:opacity-100 focus-visible:opacity-100"
+                      className="absolute end-1 top-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
                       aria-label={`Delete ${c.title}`}
+                      title="Delete"
                       onClick={() => deleteLater(c.uuid)}
                     >
                       <Trash2 />
@@ -439,330 +441,346 @@ function Chat({
     </div>
   );
   return (
-    <div
-      className={cn(
-        compact
-          ? '-m-4 flex min-h-0 flex-1 flex-col'
-          : 'grid h-[calc(100dvh-13.5rem)] min-h-[28rem] gap-4 md:grid-cols-[260px_1fr]',
-      )}
-    >
-      {compact ? null : (
-        <section className="hidden min-h-0 flex-col rounded-md border border-line bg-surface shadow-raised md:flex">
-          <div className="border-b border-line p-2">
-            <Button size="sm" className="w-full" onClick={() => setActive(null)}>
-              <MessageSquarePlus /> New conversation
-            </Button>
-          </div>
-          {history}
-        </section>
-      )}
-      <ChatFrame compact={compact}>
-        <div className="flex min-h-0 flex-1 flex-col">
-          {/* In the side panel, and on small screens where the page hides its history column. */}
-          <div
-            className={cn('flex items-center gap-1 border-b border-line px-3 py-2', !compact && 'md:hidden')}
-          >
-            <Button
-              size="sm"
-              variant={showHistory ? 'subtle' : 'ghost'}
-              aria-pressed={showHistory}
-              onClick={() => setShowHistory((v) => !v)}
+    // Measures the room the chat has, so its layout follows that rather than the window.
+    <div className={compact ? 'contents' : '@container'}>
+      <div
+        className={cn(
+          compact
+            ? '-m-4 flex min-h-0 flex-1 flex-col'
+            : // Laid out by the room it has (a docked panel can take some), not by the window.
+              'grid h-[calc(100dvh-13.5rem)] min-h-[28rem] gap-4 @3xl:grid-cols-[260px_1fr]',
+        )}
+      >
+        {compact ? null : (
+          <section className="hidden min-h-0 flex-col rounded-md border border-line bg-surface shadow-raised @3xl:flex">
+            <div className="border-b border-line p-2">
+              <Button variant="primary" className="w-full" onClick={() => setActive(null)}>
+                <MessageSquarePlus /> New conversation
+              </Button>
+            </div>
+            {history}
+          </section>
+        )}
+        <ChatFrame compact={compact}>
+          <div className="flex min-h-0 flex-1 flex-col">
+            {/* In the side panel, and on small screens where the page hides its history column. */}
+            <div
+              className={cn(
+                'flex items-center gap-1 border-b border-line px-2 py-1',
+                !compact && '@3xl:hidden',
+              )}
             >
-              <History /> History
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ms-auto"
-              onClick={() => {
-                setActive(null);
-                setShowHistory(false);
-              }}
-            >
-              <MessageSquarePlus /> New
-            </Button>
-          </div>
-          {showHistory ? (
-            <div className="min-h-0 flex-1 overflow-y-auto">{history}</div>
-          ) : (
-            <>
-              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
-                {!active && !send.isPending ? (
-                  <Welcome
-                    compact={compact}
-                    suggestions={suggestionsFor(context, labels, setup)}
-                    onPick={(s) => send.mutate({ text: s })}
-                  />
-                ) : conv.isError ? (
-                  <ErrorState error={conv.error} onRetry={() => void conv.refetch()} />
-                ) : (
-                  conv.data?.messages.map((m, i) => (
-                    <div
-                      key={i}
-                      className={cn('anim-rise flex', m.role === 'user' ? 'justify-end' : 'justify-start')}
-                    >
-                      <div
-                        className={cn(
-                          'min-w-0 rounded-lg px-3 py-2 text-sm',
-                          m.role === 'user'
-                            ? 'max-w-[85%] bg-primary whitespace-pre-wrap text-primary-fg'
-                            : 'max-w-[92%] bg-subtle text-ink',
-                        )}
-                      >
-                        {m.tools?.length ? (
-                          <ul
-                            className={cn('flex flex-wrap gap-x-2 text-xs text-faint', m.text && 'mb-1.5')}
-                            aria-label="Steps taken"
-                          >
-                            {m.tools.map((t) => (
-                              <li key={t} className="inline-flex items-center gap-1">
-                                <Check className="size-3" aria-hidden /> {t}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                        {m.text && m.role === 'assistant' ? (
-                          <>
+              <Button
+                size="sm"
+                variant={showHistory ? 'subtle' : 'ghost'}
+                aria-pressed={showHistory}
+                onClick={() => setShowHistory((v) => !v)}
+              >
+                <History /> History
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ms-auto"
+                onClick={() => {
+                  setActive(null);
+                  setShowHistory(false);
+                }}
+              >
+                <MessageSquarePlus /> New
+              </Button>
+            </div>
+            {showHistory ? (
+              <div className="min-h-0 flex-1 overflow-y-auto">{history}</div>
+            ) : (
+              <>
+                <div className="min-h-0 flex-1 overflow-y-auto p-4" aria-live="polite">
+                  <div className={cn('space-y-3', !compact && 'mx-auto w-full max-w-3xl')}>
+                    {!active && !send.isPending ? (
+                      <Welcome
+                        compact={compact}
+                        suggestions={suggestionsFor(context, labels, setup)}
+                        onPick={(s) => send.mutate({ text: s })}
+                      />
+                    ) : conv.isError ? (
+                      <ErrorState error={conv.error} onRetry={() => void conv.refetch()} />
+                    ) : (
+                      conv.data?.messages.map((m, i) =>
+                        m.role === 'user' ? (
+                          <div key={i} className="anim-rise flex justify-end">
+                            <div className="max-w-[85%] min-w-0 rounded-lg rounded-ee-sm bg-primary px-3 py-2 text-sm whitespace-pre-wrap text-primary-fg">
+                              <BubbleImages srcs={(m.images ?? []).map((p) => buildUrl(p))} />
+                              {m.text}
+                            </div>
+                          </div>
+                        ) : (
+                          <div key={i} className="group anim-rise flex gap-2">
+                            <AssistantAvatar />
+                            <div className="relative max-w-[calc(100%-4rem)] min-w-0">
+                              <div className="rounded-lg rounded-ss-sm bg-subtle px-3 py-2 text-sm text-ink">
+                                {m.tools?.length ? (
+                                  <ul
+                                    className={cn(
+                                      'flex flex-wrap gap-x-2 text-xs text-faint',
+                                      m.text && 'mb-1.5',
+                                    )}
+                                    aria-label="Steps taken"
+                                  >
+                                    {m.tools.map((t) => (
+                                      <li key={t} className="inline-flex items-center gap-1">
+                                        <Check className="size-3" aria-hidden /> {t}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : null}
+                                {m.text ? (
+                                  <div
+                                    className="rte-prose ai-reply"
+                                    onClick={openChip}
+                                    dangerouslySetInnerHTML={{
+                                      __html: replyHtml(splitNext(m.text).body, recordPath),
+                                    }}
+                                  />
+                                ) : null}
+                              </div>
+                              {m.text ? (
+                                // Shown on hover or keyboard focus; always on touch screens, which cannot hover.
+                                <div className="absolute -end-9 bottom-0 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+                                  <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    aria-label="Copy answer"
+                                    title="Copy answer"
+                                    onClick={() => void copy(splitNext(m.text!).body)}
+                                  >
+                                    <Copy />
+                                  </Button>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        ),
+                      )
+                    )}
+                    {send.isPending && send.variables ? (
+                      <div className="anim-rise flex justify-end">
+                        <div className="max-w-[85%] rounded-lg rounded-ee-sm bg-primary px-3 py-2 text-sm whitespace-pre-wrap text-primary-fg">
+                          <BubbleImages srcs={(send.variables.images ?? []).map((i) => i.preview)} />
+                          {send.variables.text}
+                        </div>
+                      </div>
+                    ) : null}
+                    {live ? (
+                      <div className="anim-rise flex gap-2" aria-busy="true">
+                        <AssistantAvatar />
+                        <div className="ai-surface max-w-[92%] min-w-0 rounded-lg rounded-ss-sm px-3 py-2 text-sm text-ink">
+                          {live.text ? (
                             <div
-                              className="rte-prose ai-reply"
-                              onClick={openChip}
+                              className="rte-prose ai-reply ai-caret-md"
                               dangerouslySetInnerHTML={{
-                                __html: replyHtml(splitNext(m.text).body, recordPath),
+                                __html: replyHtml(splitNext(live.text).body, recordPath),
                               }}
                             />
-                            <div className="mt-1 flex justify-end">
-                              <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                aria-label="Copy answer"
-                                title="Copy answer"
-                                onClick={() => void copy(splitNext(m.text!).body)}
-                              >
-                                <Copy />
-                              </Button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <BubbleImages srcs={(m.images ?? []).map((p) => buildUrl(p))} />
-                            {m.text}
-                          </>
-                        )}
+                          ) : (
+                            <span className="inline-flex items-center gap-2">
+                              <span className="ai-dots inline-flex gap-1" aria-hidden>
+                                <span />
+                                <span />
+                                <span />
+                              </span>
+                              <RotatingWords words={live.words} />
+                            </span>
+                          )}
+                          {live.steps.length ? (
+                            <ul className="mt-2 flex flex-wrap gap-1">
+                              {live.steps.map((step, i) => (
+                                <li key={i} className="anim-rise">
+                                  <Badge tone="outline">
+                                    <Check className="size-3" aria-hidden /> {step}
+                                  </Badge>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  ))
-                )}
-                {send.isPending && send.variables ? (
-                  <div className="anim-rise flex justify-end">
-                    <div className="max-w-[85%] rounded-lg bg-primary px-3 py-2 text-sm whitespace-pre-wrap text-primary-fg">
-                      <BubbleImages srcs={(send.variables.images ?? []).map((i) => i.preview)} />
-                      {send.variables.text}
-                    </div>
-                  </div>
-                ) : null}
-                {live ? (
-                  <div className="anim-rise flex justify-start" aria-busy="true">
-                    <div className="ai-surface max-w-[92%] min-w-0 rounded-lg px-3 py-2 text-sm text-ink">
-                      {live.text ? (
-                        <div
-                          className="rte-prose ai-reply ai-caret-md"
-                          dangerouslySetInnerHTML={{
-                            __html: replyHtml(splitNext(live.text).body, recordPath),
-                          }}
-                        />
-                      ) : (
-                        <span className="inline-flex items-center gap-2">
-                          <span className="ai-dots inline-flex gap-1" aria-hidden>
-                            <span />
-                            <span />
-                            <span />
-                          </span>
-                          <RotatingWords words={live.words} />
-                        </span>
-                      )}
-                      {live.steps.length ? (
-                        <ul className="mt-2 flex flex-wrap gap-1">
-                          {live.steps.map((step, i) => (
-                            <li key={i} className="anim-rise">
-                              <Badge tone="outline">
-                                <Check className="size-3" aria-hidden /> {step}
-                              </Badge>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-                {next.length ? (
-                  <ul className="anim-rise flex flex-wrap gap-1.5" aria-label="Suggested next questions">
-                    {next.map((q) => (
-                      <li key={q}>
-                        <button
-                          type="button"
-                          className="ai-chip ai-chip-next"
-                          disabled={send.isPending}
-                          onClick={() => send.mutate({ text: q })}
-                        >
-                          {q}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                {proposals.length ? (
-                  <Proposals
-                    proposals={proposals}
-                    onDecide={(d) => decide.mutate(d)}
-                    busy={decide.isPending}
-                  />
-                ) : null}
-                <div ref={bottom} />
-              </div>
-              <form onSubmit={submit} className="border-t border-line p-3">
-                {context ? (
-                  <div className="mb-2 flex items-center gap-1">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-line bg-subtle py-0.5 ps-2 pe-0.5 text-xs text-muted">
-                      <Eye className="size-3" aria-hidden />
-                      <span>
-                        Using: <span className="font-medium text-ink">{contextName}</span>
-                      </span>
-                      <button
-                        type="button"
-                        className="rounded-full p-0.5 hover:bg-hover"
-                        aria-label={`Leave out ${contextName.toLowerCase()}`}
-                        title="Leave this page out of the question"
-                        onClick={() => setSkipped(pageKey)}
+                    ) : null}
+                    {next.length ? (
+                      <ul
+                        className="anim-rise flex flex-wrap gap-1.5 ps-8"
+                        aria-label="Suggested next questions"
                       >
-                        <X className="size-3" />
-                      </button>
-                    </span>
+                        {next.map((q) => (
+                          <li key={q}>
+                            <button
+                              type="button"
+                              className="ai-chip ai-chip-next"
+                              disabled={send.isPending}
+                              onClick={() => send.mutate({ text: q })}
+                            >
+                              {q}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {proposals.length ? (
+                      <Proposals
+                        proposals={proposals}
+                        onDecide={(d) => decide.mutate(d)}
+                        busy={decide.isPending}
+                      />
+                    ) : null}
+                    <div ref={bottom} />
                   </div>
-                ) : null}
-                {attachments.length ? (
-                  <ul className="mb-2 flex flex-wrap gap-2" aria-label="Attached images">
-                    {attachments.map((a, i) => (
-                      <li key={a.id} className="anim-rise relative">
-                        <img
-                          src={a.preview}
-                          alt={`Attached image ${i + 1}: ${a.name}`}
-                          className="size-16 rounded-md border border-line object-cover"
-                        />
+                </div>
+                <form onSubmit={submit} className="border-t border-line p-3">
+                  {context ? (
+                    <div className="mb-2 flex items-center gap-1">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-line bg-subtle py-0.5 ps-2 pe-0.5 text-xs text-muted">
+                        <Eye className="size-3" aria-hidden />
+                        <span>
+                          Using: <span className="font-medium text-ink">{contextName}</span>
+                        </span>
                         <button
                           type="button"
-                          className="absolute -end-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-raised hover:text-ink pointer-coarse:size-7"
-                          aria-label={`Remove image ${i + 1}`}
-                          onClick={() => setAttachments((list) => list.filter((x) => x.id !== a.id))}
+                          className="rounded-full p-0.5 hover:bg-hover"
+                          aria-label={`Leave out ${contextName.toLowerCase()}`}
+                          title="Leave this page out of the question"
+                          onClick={() => setSkipped(pageKey)}
                         >
                           <X className="size-3" />
                         </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                <div
-                  onDragOver={(e) => {
-                    if (!vision || ![...e.dataTransfer.types].includes('Files')) return;
-                    e.preventDefault();
-                    setDragging(true);
-                  }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={(e) => {
-                    if (!vision) return;
-                    e.preventDefault();
-                    setDragging(false);
-                    void attach(imageFiles(e.dataTransfer.files));
-                  }}
-                  className={cn(
-                    'flex items-end gap-2 rounded-md border border-line bg-surface p-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-soft',
-                    dragging && 'border-primary bg-primary-soft',
-                  )}
-                >
-                  {vision ? (
-                    <>
-                      <input
-                        ref={fileInput}
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp,image/gif"
-                        multiple
-                        hidden
-                        onChange={(e) => {
-                          void attach(imageFiles(e.target.files));
-                          e.target.value = '';
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        aria-label="Attach images"
-                        title="Attach images, or paste a screenshot"
-                        disabled={attachments.length >= MAX_ATTACHMENTS || proposals.length > 0}
-                        onClick={() => fileInput.current?.click()}
-                      >
-                        <Paperclip />
-                      </Button>
-                    </>
+                      </span>
+                    </div>
                   ) : null}
-                  <Textarea
-                    ref={composer}
-                    value={text}
-                    rows={1}
-                    onChange={(e) => setText(e.target.value)}
-                    onPaste={(e) => {
-                      const files = imageFiles(e.clipboardData.files);
-                      if (!files.length) return;
+                  {attachments.length ? (
+                    <ul className="mb-2 flex flex-wrap gap-2" aria-label="Attached images">
+                      {attachments.map((a, i) => (
+                        <li key={a.id} className="anim-rise relative">
+                          <img
+                            src={a.preview}
+                            alt={`Attached image ${i + 1}: ${a.name}`}
+                            className="size-16 rounded-md border border-line object-cover"
+                          />
+                          <button
+                            type="button"
+                            className="absolute -end-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-raised hover:text-ink pointer-coarse:size-7"
+                            aria-label={`Remove image ${i + 1}`}
+                            onClick={() => setAttachments((list) => list.filter((x) => x.id !== a.id))}
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <div
+                    onDragOver={(e) => {
+                      if (!vision || ![...e.dataTransfer.types].includes('Files')) return;
                       e.preventDefault();
-                      void attach(files);
+                      setDragging(true);
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
-                      // Ctrl, Cmd or the Windows key + Enter add a line (the browser does not by itself).
-                      if (e.ctrlKey || e.metaKey) {
-                        e.preventDefault();
-                        const el = e.currentTarget;
-                        el.setRangeText('\n', el.selectionStart, el.selectionEnd, 'end');
-                        setText(el.value);
-                        return;
-                      }
-                      // Enter sends; Shift+Enter adds a line on its own.
-                      if (!e.shiftKey) {
-                        e.preventDefault();
-                        e.currentTarget.form?.requestSubmit();
-                      }
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => {
+                      if (!vision) return;
+                      e.preventDefault();
+                      setDragging(false);
+                      void attach(imageFiles(e.dataTransfer.files));
                     }}
-                    placeholder={contextAsk}
-                    aria-label="Message"
-                    aria-describedby="composer-hint"
-                    className="max-h-40 min-h-9 flex-1 resize-none border-0 bg-transparent p-1.5 shadow-none focus-visible:ring-0 focus-visible:outline-none"
-                    disabled={proposals.length > 0}
-                    maxLength={4000}
-                  />
-                  {send.isPending || decide.isPending ? (
-                    <Button type="button" size="sm" onClick={() => stopper.current?.abort()}>
-                      <Square /> Stop
-                    </Button>
-                  ) : (
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="primary"
-                      disabled={(!text.trim() && !attachments.length) || proposals.length > 0}
-                      aria-label="Send"
-                    >
-                      <Send />
-                    </Button>
+                    className={cn(
+                      'flex items-end gap-1 rounded-md border border-line bg-surface p-1 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-soft',
+                      dragging && 'border-primary bg-primary-soft',
+                    )}
+                  >
+                    {vision ? (
+                      <>
+                        <input
+                          ref={fileInput}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          multiple
+                          hidden
+                          onChange={(e) => {
+                            void attach(imageFiles(e.target.files));
+                            e.target.value = '';
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          aria-label="Attach images"
+                          title="Attach images, or paste a screenshot"
+                          disabled={attachments.length >= MAX_ATTACHMENTS || proposals.length > 0}
+                          onClick={() => fileInput.current?.click()}
+                        >
+                          <Paperclip />
+                        </Button>
+                      </>
+                    ) : null}
+                    <Textarea
+                      ref={composer}
+                      value={text}
+                      rows={1}
+                      onChange={(e) => setText(e.target.value)}
+                      onPaste={(e) => {
+                        const files = imageFiles(e.clipboardData.files);
+                        if (!files.length) return;
+                        e.preventDefault();
+                        void attach(files);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                        // Ctrl, Cmd or the Windows key + Enter add a line (the browser does not by itself).
+                        if (e.ctrlKey || e.metaKey) {
+                          e.preventDefault();
+                          const el = e.currentTarget;
+                          el.setRangeText('\n', el.selectionStart, el.selectionEnd, 'end');
+                          setText(el.value);
+                          return;
+                        }
+                        // Enter sends; Shift+Enter adds a line on its own.
+                        if (!e.shiftKey) {
+                          e.preventDefault();
+                          e.currentTarget.form?.requestSubmit();
+                        }
+                      }}
+                      placeholder={contextAsk}
+                      aria-label="Message"
+                      aria-describedby={compact ? undefined : 'composer-hint'}
+                      className="max-h-40 min-h-9 flex-1 resize-none border-0 bg-transparent px-1.5 py-2 leading-5 shadow-none focus-visible:ring-0 focus-visible:outline-none"
+                      disabled={proposals.length > 0}
+                      maxLength={4000}
+                    />
+                    {send.isPending || decide.isPending ? (
+                      <Button type="button" size="sm" onClick={() => stopper.current?.abort()}>
+                        <Square /> Stop
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="primary"
+                        disabled={(!text.trim() && !attachments.length) || proposals.length > 0}
+                        aria-label="Send"
+                      >
+                        <Send />
+                      </Button>
+                    )}
+                  </div>
+                  {compact ? null : (
+                    <p id="composer-hint" className="mt-1.5 hidden text-xs text-faint @xl:block">
+                      <Kbd>Enter</Kbd> to send · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> for a new line
+                      {vision ? ' · paste or drop screenshots' : ''}
+                    </p>
                   )}
-                </div>
-                <p id="composer-hint" className="mt-1 hidden text-xs text-faint sm:block">
-                  Enter to send · Shift+Enter or Ctrl+Enter for a new line
-                  {vision ? ' · Paste or drop screenshots' : ''}
-                </p>
-              </form>
-            </>
-          )}
-        </div>
-      </ChatFrame>
+                </form>
+              </>
+            )}
+          </div>
+        </ChatFrame>
+      </div>
     </div>
   );
 }
@@ -1022,6 +1040,18 @@ function BubbleImages({ srcs }: { srcs: string[] }) {
           />
         </a>
       ))}
+    </span>
+  );
+}
+
+/** Marks the assistant's side of the conversation, so replies scan apart from questions. */
+function AssistantAvatar() {
+  return (
+    <span
+      className="ai-mark mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full"
+      aria-hidden
+    >
+      <Sparkles className="size-3.5" />
     </span>
   );
 }
