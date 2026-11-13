@@ -5,6 +5,7 @@ import { newUuid } from '../../lib/ids';
 import { audit } from '../audit/audit.service';
 import { getGroup } from '../settings/settings.service';
 import { copyChecklist } from './checklist';
+import { endOfStage, recordStageHistory } from '../pipelines/stage-engine';
 
 type Row = Record<string, unknown> & { id: number };
 
@@ -43,8 +44,23 @@ export async function spawnNextOccurrence(
     .whereNull('deleted_at')
     .first()) as Row | undefined;
   if (existing) return null;
+  // With task statuses, the next occurrence starts open on the same pipeline.
+  const firstOpen = a.pipeline_id
+    ? await trx('pipeline_stages')
+        .where({ pipeline_id: a.pipeline_id, active: true, is_won: false, is_lost: false })
+        .orderBy('sort_order')
+        .first('id')
+    : undefined;
   const uuid = newUuid();
   const [id] = await trx('activities').insert({
+    ...(firstOpen
+      ? {
+          pipeline_id: a.pipeline_id,
+          stage_id: firstOpen.id,
+          stage_entered_at: now,
+          position: await endOfStage(trx, 'activity', firstOpen.id as number),
+        }
+      : {}),
     uuid,
     type: a.type,
     subject: a.subject,
@@ -69,6 +85,15 @@ export async function spawnNextOccurrence(
     updated_by: a.updated_by,
   });
   await copyChecklist(a.id, id as number, trx);
+  if (firstOpen)
+    await recordStageHistory(
+      trx,
+      'activity',
+      [id as number],
+      null,
+      firstOpen.id as number,
+      a.updated_by as number,
+    );
   await audit(trx, ctx, {
     action: 'activity.created',
     entity: 'activity',

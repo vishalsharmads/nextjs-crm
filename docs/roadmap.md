@@ -16,6 +16,9 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 
 ## Future
 
+- Task statuses in blueprints (seed a task pipeline per industry); exports leave them out for now.
+- Comments on deals, contacts and other records (tasks have them since phase 9).
+- Task dependencies (blocked by) and time tracking on tasks.
 - Ready-made connectors for Zapier, Make and n8n (triggers and actions built on the existing webhooks and API keys).
 - Accounting and invoicing sync (UK and Australia first): Xero, QuickBooks Online, Sage, FreeAgent and MYOB, with two-way sync of customers, invoices and payments.
 

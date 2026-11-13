@@ -8,6 +8,7 @@ related: records.tasks, records.calendar
 
 One task, call or meeting on its own page.
 
+- **Status** appears when task statuses are on; choosing the done status completes the task.
 - Change the subject, type, due date, priority or assignee in place. Each change saves on its own and appears in the history.
 - Write a longer description and save it.
 - **Complete** marks it done; **Reopen** brings it back to your list.

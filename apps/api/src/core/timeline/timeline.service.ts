@@ -136,7 +136,7 @@ export async function recordTimeline(
     }
   }
 
-  if ((entity === 'deal' || entity === 'lead') && want('stage')) {
+  if ((entity === 'deal' || entity === 'lead' || entity === 'activity') && want('stage')) {
     const { history, fk } = STAGED[entity as StagedEntity];
     const moves = await db(`${history} as h`)
       .leftJoin('pipeline_stages as f', 'f.id', 'h.from_stage_id')

@@ -63,7 +63,11 @@ export async function exportBlueprint(knex: Knex, opts: { key?: string; version?
   }));
 
   const pipelines = [];
-  for (const p of await knex('pipelines').where({ active: true }).orderBy('sort_order')) {
+  // Task statuses (entity 'activity') are workspace settings, not part of a blueprint.
+  for (const p of await knex('pipelines')
+    .where({ active: true })
+    .whereIn('entity', ['deal', 'lead'])
+    .orderBy('sort_order')) {
     const stages = await knex('pipeline_stages')
       .where({ pipeline_id: p.id, active: true })
       .orderBy('sort_order');

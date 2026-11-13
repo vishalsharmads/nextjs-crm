@@ -18,6 +18,7 @@ import {
   customContext,
   dateField,
   ownerField,
+  relationField,
   selectField,
   textField,
   timestampsFields,
@@ -25,6 +26,8 @@ import {
 import { iso, userIdFromRef, userRefs } from '../records/hydrate';
 import { checklistCounts } from './checklist-counts';
 import { spawnNextOccurrence } from './recurrence';
+import { taskStageColumns } from './task-stage';
+import { recordStageHistory } from '../pipelines/stage-engine';
 
 type Row = Record<string, unknown> & { id: number };
 
@@ -128,6 +131,7 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
     assignee: ownerField('activities', 'assignee_id'),
     owner: ownerField('activities'),
     related_type: selectField('activities.related_type'),
+    stage: relationField('activities', 'stage_id', 'pipeline_stages', 'sort_order'),
     ...timestampsFields('activities'),
   },
   async toRow(input, { user, conn, existing }) {
@@ -166,15 +170,27 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
       // Notes are complete the moment they are written.
       if (row.type === 'note') row.completed_at = new Date();
     }
+    Object.assign(row, await taskStageColumns(conn, input, row, existing));
     return row;
   },
-  async afterWrite(id, input, { conn, ctx, existing }, op) {
-    // Completing a recurring task through an edit creates the next one, like the Complete action.
-    if (op === 'update' && input.completed === true && existing && !existing.completed_at)
+  async afterWrite(id, _input, { user, conn, ctx, existing }, op) {
+    const now = await conn('activities').where({ id }).first('stage_id', 'completed_at');
+    if (now?.stage_id && (existing?.stage_id ?? null) !== now.stage_id)
+      await recordStageHistory(
+        conn,
+        'activity',
+        [id],
+        (existing?.stage_id as number | undefined) ?? null,
+        now.stage_id,
+        user.id,
+      );
+    // Completing a recurring task through an edit (or a move to the done stage) creates the next one.
+    if (op === 'update' && existing && !existing.completed_at && now?.completed_at)
       await spawnNextOccurrence(conn, ctx, id);
   },
   async toDtos(rows, { user, conn }) {
-    const [users, cf, checklists] = await Promise.all([
+    const stageIds = [...new Set(rows.map((r) => r.stage_id).filter(Boolean))] as number[];
+    const [users, cf, checklists, stages] = await Promise.all([
       userRefs(
         rows.flatMap((r) => [r.assignee_id as number, r.owner_id as number]),
         conn,
@@ -184,7 +200,11 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
         rows.map((r) => r.id),
         conn,
       ),
+      stageIds.length
+        ? (conn('pipeline_stages').whereIn('id', stageIds) as Promise<Record<string, unknown>[]>)
+        : Promise.resolve([] as Record<string, unknown>[]),
     ]);
+    const stageOf = new Map(stages.map((s) => [s.id as number, s]));
     const related = new Map<string, { uuid: string; title: string }>();
     for (const type of Object.keys(RELATED_TABLE) as RelatedType[]) {
       const ids = rows.filter((r) => r.related_type === type).map((r) => r.related_id as number);
@@ -218,6 +238,19 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
         createdAt: iso(r.created_at)!,
         updatedAt: iso(r.updated_at)!,
         overdue: !r.completed_at && !!r.due_at && new Date(r.due_at as string).getTime() < now,
+        stage: (() => {
+          const st = stageOf.get(r.stage_id as number);
+          return st
+            ? {
+                uuid: st.uuid as string,
+                key: st.key as string,
+                name: st.name as string,
+                color: (st.color as string | null) ?? null,
+                isWon: !!st.is_won,
+                isLost: !!st.is_lost,
+              }
+            : null;
+        })(),
         recurrence: parseRecurrence(r.recurrence),
         checklist: checklists.get(r.id) ?? { done: 0, total: 0 },
       };

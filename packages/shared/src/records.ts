@@ -152,6 +152,8 @@ export interface ActivityDto {
   createdAt: string;
   updatedAt: string;
   overdue: boolean;
+  /** Status stage when the task pipeline is on. */
+  stage: LeadStageRef | null;
   /** How the task repeats; completing it creates the next occurrence. */
   recurrence: Recurrence | null;
   /** Checklist progress; total 0 when the task has no checklist. */
@@ -305,6 +307,8 @@ export const activityInputSchema = z.object({
   related: z.object({ type: z.enum(RELATED_TYPES), uuid: z.uuid() }).nullish(),
   reminderAt: isoDateTime,
   recurrence: recurrenceSchema.nullish(),
+  pipelineUuid: z.uuid().optional(),
+  stageUuid: z.uuid().optional(),
   completed: z.boolean().optional(),
   custom: customInput,
 });

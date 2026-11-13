@@ -8,7 +8,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { fromLocalInput, toLocalInput } from '@/lib/format';
 import { qk } from '@/lib/query-keys';
 import { useBranding } from '@/app/branding';
-import { useCan, useLabel, useT } from '@/app/session';
+import { useCan, useLabel, usePipelines, useT } from '@/app/session';
 import { setDocumentTitle } from '@/theme/apply';
 import { Button } from '@/components/ui/button';
 import { Input, NativeSelect } from '@/components/ui/input';
@@ -167,6 +167,11 @@ export function TaskPage() {
       </header>
       <div className="grid flex-1 lg:grid-cols-[minmax(320px,400px)_1fr]">
         <aside className="border-b border-line bg-surface p-4 md:p-6 lg:border-e lg:border-b-0">
+          {a.stage ? (
+            <Row label="Status">
+              <StatusSelect task={a} disabled={!editable} />
+            </Row>
+          ) : null}
           <Row label="Type">
             <NativeSelect
               aria-label="Type"
@@ -309,5 +314,35 @@ function RelatedValue({ related }: { related: NonNullable<ActivityDto['related']
     <Link to={`/${ENTITY_ROUTE[related.type]}/${related.uuid}`} className="text-primary hover:underline">
       {label.singular}: {related.title}
     </Link>
+  );
+}
+
+/** Status picker when task statuses are on; the done status completes the task. */
+function StatusSelect({ task, disabled }: { task: ActivityDto; disabled: boolean }) {
+  const qc = useQueryClient();
+  const pipelines = usePipelines('activity');
+  const stages = pipelines.find((p) => p.stages.some((s) => s.uuid === task.stage?.uuid))?.stages ?? [];
+  const move = useMutation({
+    mutationFn: (stageUuid: string) => apiPatch<ActivityDto>(`/activities/${task.uuid}/stage`, { stageUuid }),
+    onSuccess: (a) => {
+      qc.setQueryData(qk.record('activities', task.uuid), a);
+      void qc.invalidateQueries({ queryKey: ['records', 'activities'] });
+      void qc.invalidateQueries({ queryKey: ['activities'] });
+      toast.success(`Moved to ${a.stage?.name ?? ''}`);
+    },
+  });
+  return (
+    <NativeSelect
+      aria-label="Status"
+      value={task.stage?.uuid ?? ''}
+      disabled={disabled || move.isPending}
+      onChange={(e) => move.mutate(e.target.value)}
+    >
+      {stages.map((s) => (
+        <option key={s.uuid} value={s.uuid}>
+          {s.name}
+        </option>
+      ))}
+    </NativeSelect>
   );
 }

@@ -14,4 +14,5 @@ Your to-do list: tasks, calls and meetings, grouped into **Overdue**, **Today**,
 - **Select** several tasks with the square boxes to complete them or move them to tomorrow or next week in one go.
 - **Filter** by type and priority. If you can see other people's tasks, switch between your own and your team's (or everyone's).
 - **Keyboard**: `j` and `k` move through the list, `x` completes or reopens, `Enter` opens the task.
+- **Board**: when task statuses are on, switch to **Board** to drag tasks between statuses such as To do, In progress, Waiting and Done. Dropping a task on Done completes it.
 - Open a task to edit it, add a checklist, set a reminder or repeat, and discuss it in comments.

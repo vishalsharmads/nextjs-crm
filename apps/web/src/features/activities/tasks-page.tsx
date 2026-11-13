@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AlarmClock, CalendarClock, CheckSquare, Flag, MoreHorizontal, Plus, X } from 'lucide-react';
-import type { ActivityDto, ListResponse } from '@app/shared';
+import type { ActivityDto, FilterCondition, ListResponse } from '@app/shared';
 import { apiGet, apiPatch, apiPost } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative, fromLocalInput } from '@/lib/format';
@@ -19,6 +19,7 @@ import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/compo
 import { Badge, EmptyState, ErrorState, PageHeader, Skeleton } from '@/components/ui/misc';
 import { ACTIVITY_ICON, useToggleActivity } from './activity-components';
 import { ChecklistProgress } from './task-checklist';
+import { PipelineBoard } from '@/features/pipelines/pipeline-board';
 
 type Tab = 'open' | 'done';
 type Who = 'mine' | 'all';
@@ -56,6 +57,16 @@ export function snoozeTarget(kind: 'tomorrow' | 'nextWeek', now = new Date()): s
   else d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); // next Monday
   d.setHours(9, 0, 0, 0);
   return d.toISOString();
+}
+
+function baseConditions(who: Who, type: string, priority: string): FilterCondition[] {
+  return [
+    ...(who === 'mine' ? [{ field: 'assignee', op: 'in' as const, value: ['@me'] }] : []),
+    type
+      ? { field: 'type', op: 'in' as const, value: [type] }
+      : { field: 'type', op: 'nin' as const, value: ['note', 'email'] },
+    ...(priority ? [{ field: 'priority', op: 'in' as const, value: [priority] }] : []),
+  ];
 }
 
 function useTaskList(tab: Tab, who: Who, type: string, priority: string) {
@@ -263,6 +274,9 @@ export function TasksPage() {
   const qc = useQueryClient();
   const { branding } = useBranding();
   const [tab, setTab] = useState<Tab>('open');
+  const statuses = useBoot().settings.features.taskPipeline;
+  const [layout, setLayout] = useState<'list' | 'board'>('list');
+  const board = statuses && layout === 'board';
   const [who, setWho] = useState<Who>('mine');
   const [type, setType] = useState('');
   const [priority, setPriority] = useState('');
@@ -380,190 +394,240 @@ export function TasksPage() {
           ) : null
         }
       >
-        <div role="tablist" className="flex gap-1">
-          {(
-            [
-              ['open', 'Open'],
-              ['done', 'Done'],
-            ] as const
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              role="tab"
-              aria-selected={tab === k}
-              onClick={() => setTab(k)}
-              className={cn(
-                '-mb-px border-b-2 px-3 py-2 text-sm',
-                tab === k ? 'border-primary font-medium' : 'border-transparent text-muted hover:text-ink',
-              )}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex items-end gap-1">
+          <div role="tablist" className="flex gap-1">
+            {(
+              [
+                ['open', 'Open'],
+                ['done', 'Done'],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                role="tab"
+                aria-selected={tab === k}
+                onClick={() => setTab(k)}
+                className={cn(
+                  '-mb-px border-b-2 px-3 py-2 text-sm',
+                  tab === k ? 'border-primary font-medium' : 'border-transparent text-muted hover:text-ink',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {statuses ? (
+            <div role="group" aria-label="Layout" className="ms-auto flex items-center gap-1 pb-1">
+              {(['list', 'board'] as const).map((l) => (
+                <Button
+                  key={l}
+                  size="sm"
+                  variant={layout === l ? 'secondary' : 'ghost'}
+                  aria-pressed={layout === l}
+                  onClick={() => setLayout(l)}
+                >
+                  {l === 'list' ? 'List' : 'Board'}
+                </Button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </PageHeader>
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-3 px-4 py-4 md:px-6">
-        {editable && tab === 'open' ? (
-          <form
-            className="flex flex-wrap gap-2 rounded-md border border-line bg-surface p-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (subject.trim()) create.mutate();
-            }}
-          >
-            <Input
-              ref={addRef}
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Add a task… (press C)"
-              aria-label="New task"
-              className="min-w-48 flex-1"
+      {board ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex flex-wrap items-center gap-2 px-4 pt-3 md:px-6">
+            {scope !== 'own' ? (
+              <NativeSelect
+                aria-label="Whose tasks"
+                value={who}
+                onChange={(e) => setWho(e.target.value as Who)}
+                className="w-auto"
+              >
+                <option value="mine">Assigned to me</option>
+                <option value="all">{scope === 'team' ? 'My team' : 'Everyone'}</option>
+              </NativeSelect>
+            ) : null}
+          </div>
+          <div className="min-h-0 flex-1">
+            <PipelineBoard
+              entity="activity"
+              pipelineUuid={null}
+              q=""
+              conditions={baseConditions(who, type, priority)}
+              onOpen={(uuid) => navigate(`/tasks/${uuid}`)}
             />
-            <Input
-              type="datetime-local"
-              value={due}
-              onChange={(e) => setDue(e.target.value)}
-              aria-label="Due"
-              className="w-auto"
-            />
-            <Button type="submit" disabled={!subject.trim()} loading={create.isPending}>
-              Add
-            </Button>
-          </form>
-        ) : null}
-        <div className="flex flex-wrap items-center gap-2">
-          {scope !== 'own' ? (
-            <NativeSelect
-              aria-label="Whose tasks"
-              value={who}
-              onChange={(e) => setWho(e.target.value as Who)}
-              className="w-auto"
-            >
-              <option value="mine">Assigned to me</option>
-              <option value="all">{scope === 'team' ? 'My team' : 'Everyone'}</option>
-            </NativeSelect>
-          ) : null}
-          <NativeSelect
-            aria-label="Type"
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="w-auto"
-          >
-            <option value="">All types</option>
-            <option value="task">Tasks</option>
-            <option value="call">Calls</option>
-            <option value="meeting">Meetings</option>
-          </NativeSelect>
-          <NativeSelect
-            aria-label="Priority"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-            className="w-auto"
-          >
-            <option value="">Any priority</option>
-            <option value="high">High</option>
-            <option value="normal">Normal</option>
-            <option value="low">Low</option>
-          </NativeSelect>
-          {total ? <span className="ms-auto text-xs text-muted tabular">{total} total</span> : null}
+          </div>
         </div>
-        {selected.size ? (
-          <div
-            role="toolbar"
-            aria-label="Selected tasks"
-            className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 shadow-raised"
-          >
-            <span className="text-sm font-medium">{selected.size} selected</span>
-            {tab === 'open' ? (
+      ) : (
+        <>
+          <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-3 px-4 py-4 md:px-6">
+            {editable && tab === 'open' ? (
+              <form
+                className="flex flex-wrap gap-2 rounded-md border border-line bg-surface p-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (subject.trim()) create.mutate();
+                }}
+              >
+                <Input
+                  ref={addRef}
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Add a task… (press C)"
+                  aria-label="New task"
+                  className="min-w-48 flex-1"
+                />
+                <Input
+                  type="datetime-local"
+                  value={due}
+                  onChange={(e) => setDue(e.target.value)}
+                  aria-label="Due"
+                  className="w-auto"
+                />
+                <Button type="submit" disabled={!subject.trim()} loading={create.isPending}>
+                  Add
+                </Button>
+              </form>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              {scope !== 'own' ? (
+                <NativeSelect
+                  aria-label="Whose tasks"
+                  value={who}
+                  onChange={(e) => setWho(e.target.value as Who)}
+                  className="w-auto"
+                >
+                  <option value="mine">Assigned to me</option>
+                  <option value="all">{scope === 'team' ? 'My team' : 'Everyone'}</option>
+                </NativeSelect>
+              ) : null}
+              <NativeSelect
+                aria-label="Type"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="w-auto"
+              >
+                <option value="">All types</option>
+                <option value="task">Tasks</option>
+                <option value="call">Calls</option>
+                <option value="meeting">Meetings</option>
+              </NativeSelect>
+              <NativeSelect
+                aria-label="Priority"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                className="w-auto"
+              >
+                <option value="">Any priority</option>
+                <option value="high">High</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+              </NativeSelect>
+              {total ? <span className="ms-auto text-xs text-muted tabular">{total} total</span> : null}
+            </div>
+            {selected.size ? (
+              <div
+                role="toolbar"
+                aria-label="Selected tasks"
+                className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 shadow-raised"
+              >
+                <span className="text-sm font-medium">{selected.size} selected</span>
+                {tab === 'open' ? (
+                  <>
+                    <Button
+                      size="sm"
+                      loading={bulkComplete.isPending}
+                      onClick={() => bulkComplete.mutate([...selected])}
+                    >
+                      <CheckSquare /> Complete
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        reschedule.mutate({ tasks: selectedTasks, to: snoozeTarget('tomorrow') });
+                        setSelected(new Set());
+                      }}
+                    >
+                      <AlarmClock /> Tomorrow
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        reschedule.mutate({ tasks: selectedTasks, to: snoozeTarget('nextWeek') });
+                        setSelected(new Set());
+                      }}
+                    >
+                      <AlarmClock /> Next week
+                    </Button>
+                  </>
+                ) : null}
+                <Button size="sm" variant="ghost" className="ms-auto" onClick={() => setSelected(new Set())}>
+                  Clear
+                </Button>
+              </div>
+            ) : null}
+            {q.isPending ? (
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-48" />
+              </div>
+            ) : q.isError ? (
+              <ErrorState error={q.error} onRetry={() => q.refetch()} />
+            ) : !items.length ? (
+              <EmptyState
+                icon={<CheckSquare />}
+                title={tab === 'done' ? 'Nothing completed yet' : 'You are all caught up'}
+                description={
+                  tab === 'done'
+                    ? undefined
+                    : type || priority
+                      ? 'Nothing matches these filters.'
+                      : 'Add a task above, or from any record so it stays linked to it.'
+                }
+              />
+            ) : (
               <>
-                <Button
-                  size="sm"
-                  loading={bulkComplete.isPending}
-                  onClick={() => bulkComplete.mutate([...selected])}
-                >
-                  <CheckSquare /> Complete
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    reschedule.mutate({ tasks: selectedTasks, to: snoozeTarget('tomorrow') });
-                    setSelected(new Set());
-                  }}
-                >
-                  <AlarmClock /> Tomorrow
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    reschedule.mutate({ tasks: selectedTasks, to: snoozeTarget('nextWeek') });
-                    setSelected(new Set());
-                  }}
-                >
-                  <AlarmClock /> Next week
-                </Button>
+                {groups.map(([g, list]) => (
+                  <section key={g} aria-label={g === 'done' ? 'Done' : GROUP_LABEL[g]}>
+                    <h2
+                      className={cn(
+                        'mb-1 flex items-center gap-2 text-xs font-semibold',
+                        g === 'overdue' ? 'text-accent' : 'text-muted',
+                      )}
+                    >
+                      {g === 'done' ? 'Completed' : GROUP_LABEL[g]}
+                      <span className="tabular font-normal">{list.length}</span>
+                    </h2>
+                    <ul className="divide-y divide-line overflow-hidden rounded-md border border-line bg-surface">
+                      {list.map((a) => (
+                        <TaskRow
+                          key={a.uuid}
+                          a={a}
+                          active={flat[cursor]?.uuid === a.uuid}
+                          selected={selected.has(a.uuid)}
+                          onSelect={(v) => select(a.uuid, v)}
+                          showAssignee={who === 'all'}
+                          editable={editable}
+                          onReschedule={(to) => reschedule.mutate({ tasks: [a], to })}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+                {q.hasNextPage ? (
+                  <Button
+                    variant="ghost"
+                    loading={q.isFetchingNextPage}
+                    onClick={() => void q.fetchNextPage()}
+                  >
+                    Load more
+                  </Button>
+                ) : null}
               </>
-            ) : null}
-            <Button size="sm" variant="ghost" className="ms-auto" onClick={() => setSelected(new Set())}>
-              Clear
-            </Button>
+            )}
           </div>
-        ) : null}
-        {q.isPending ? (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-48" />
-          </div>
-        ) : q.isError ? (
-          <ErrorState error={q.error} onRetry={() => q.refetch()} />
-        ) : !items.length ? (
-          <EmptyState
-            icon={<CheckSquare />}
-            title={tab === 'done' ? 'Nothing completed yet' : 'You are all caught up'}
-            description={
-              tab === 'done'
-                ? undefined
-                : type || priority
-                  ? 'Nothing matches these filters.'
-                  : 'Add a task above, or from any record so it stays linked to it.'
-            }
-          />
-        ) : (
-          <>
-            {groups.map(([g, list]) => (
-              <section key={g} aria-label={g === 'done' ? 'Done' : GROUP_LABEL[g]}>
-                <h2
-                  className={cn(
-                    'mb-1 flex items-center gap-2 text-xs font-semibold',
-                    g === 'overdue' ? 'text-accent' : 'text-muted',
-                  )}
-                >
-                  {g === 'done' ? 'Completed' : GROUP_LABEL[g]}
-                  <span className="tabular font-normal">{list.length}</span>
-                </h2>
-                <ul className="divide-y divide-line overflow-hidden rounded-md border border-line bg-surface">
-                  {list.map((a) => (
-                    <TaskRow
-                      key={a.uuid}
-                      a={a}
-                      active={flat[cursor]?.uuid === a.uuid}
-                      selected={selected.has(a.uuid)}
-                      onSelect={(v) => select(a.uuid, v)}
-                      showAssignee={who === 'all'}
-                      editable={editable}
-                      onReschedule={(to) => reschedule.mutate({ tasks: [a], to })}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ))}
-            {q.hasNextPage ? (
-              <Button variant="ghost" loading={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
-                Load more
-              </Button>
-            ) : null}
-          </>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }

@@ -2,15 +2,32 @@ import type { Db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
 
 /** Records that move through pipeline stages. Each has a history table with `<entity>_id`. */
-export type StagedEntity = 'deal' | 'lead';
+export type StagedEntity = 'deal' | 'lead' | 'activity';
 
 export const STAGED: Record<StagedEntity, { table: string; history: string; fk: string }> = {
   deal: { table: 'deals', history: 'deal_stage_history', fk: 'deal_id' },
   lead: { table: 'leads', history: 'lead_stage_history', fk: 'lead_id' },
+  activity: { table: 'activities', history: 'activity_stage_history', fk: 'activity_id' },
 };
 
 type Row = Record<string, unknown>;
 export type StageRow = Row & { id: number; is_won: number | boolean; is_lost: number | boolean };
+
+/**
+ * Columns that follow a stage's outcome when records are moved in bulk: a deal's status, a task's
+ * completion (the done stage is the pipeline's won stage).
+ */
+export function outcomeColumns(conn: Db, entity: StagedEntity, target: StageRow): Record<string, unknown> {
+  if (entity === 'deal') return { status: target.is_won ? 'won' : target.is_lost ? 'lost' : 'open' };
+  if (entity === 'activity')
+    return {
+      completed_at: target.is_won
+        ? // Keep the original completion time of tasks that were already done.
+          conn.raw('COALESCE(completed_at, CURRENT_TIMESTAMP)')
+        : null,
+    };
+  return {};
+}
 
 export async function defaultPipeline(conn: Db, entity: StagedEntity) {
   return (

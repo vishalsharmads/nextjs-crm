@@ -7,7 +7,7 @@ import { newUuid } from '../../lib/ids';
 import { audit } from '../audit/audit.service';
 import { can } from '../rbac/access';
 import { listPipelines } from './pipelines.repository';
-import { STAGED, recordStageHistory, type StagedEntity } from './stage-engine';
+import { STAGED, outcomeColumns, recordStageHistory, type StageRow, type StagedEntity } from './stage-engine';
 
 const uuidParam = z.object({ uuid: z.uuid() });
 const stageBody = z.object({
@@ -24,7 +24,7 @@ const stageBody = z.object({
 });
 const pipelineBody = z.object({
   name: z.string().trim().min(1).max(100),
-  entity: z.enum(['deal', 'lead']).default('deal'),
+  entity: z.enum(['deal', 'lead', 'activity']).default('deal'),
   isDefault: z.boolean().default(false),
   stages: z.array(stageBody).min(2).max(30).optional(),
 });
@@ -166,9 +166,7 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
                   pipeline_id: target.pipeline_id,
                   stage_id: target.id,
                   stage_entered_at: new Date(),
-                  ...(entity === 'deal'
-                    ? { status: target.is_won ? 'won' : target.is_lost ? 'lost' : 'open' }
-                    : {}),
+                  ...outcomeColumns(trx, entity, target as StageRow),
                 });
               const byStage = new Map<number | null, number[]>();
               for (const r of held) byStage.set(r.stage_id, [...(byStage.get(r.stage_id) ?? []), r.id]);
@@ -333,9 +331,7 @@ export const pipelinesRoutes = defineRoutes('/pipelines', ['pipelines'])
             .update({
               stage_id: target.id,
               stage_entered_at: new Date(),
-              ...(entity === 'deal'
-                ? { status: target.is_won ? 'won' : target.is_lost ? 'lost' : 'open' }
-                : {}),
+              ...outcomeColumns(trx, entity, target as StageRow),
             });
           await recordStageHistory(trx, entity, ids, s.id, target.id, user.id);
         }

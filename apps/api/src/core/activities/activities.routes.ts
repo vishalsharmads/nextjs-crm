@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RELATED_TYPES, type ActivityDto } from '@app/shared';
+import { RELATED_TYPES, dealMoveSchema, type ActivityDto } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
 import { db } from '../../db/knex';
 import { audit } from '../audit/audit.service';
@@ -11,6 +11,15 @@ import { activitiesDef } from './activities.def';
 import { activityCommentRoutes } from './comments';
 import { checklistRoutes } from './checklist';
 import { spawnNextOccurrence } from './recurrence';
+import { stageForCompletion } from './task-stage';
+import { boardQuerySchema, loadBoard, moveToStage } from '../pipelines/board';
+import { endOfStage, publicStageChanges, recordStageHistory } from '../pipelines/stage-engine';
+import { getGroup } from '../settings/settings.service';
+import { notFound } from '../../lib/errors';
+
+async function assertTaskPipeline() {
+  if (!(await getGroup('features')).taskPipeline) throw notFound('Task statuses');
+}
 
 async function setCompleted(
   ctx: Parameters<typeof audit>[1],
@@ -20,9 +29,32 @@ async function setCompleted(
 ): Promise<ActivityDto> {
   const row = await db.transaction(async (trx) => {
     const a = await getRow(activitiesDef, user, uuid, trx, { forUpdate: true });
+    // With task statuses on, completing moves the task to the done stage and reopening moves it back.
+    const stage = a.pipeline_id
+      ? await stageForCompletion(trx, a.pipeline_id as number, done, (a.stage_id as number | null) ?? null)
+      : null;
     await trx('activities')
       .where({ id: a.id })
-      .update({ completed_at: done ? new Date() : null, updated_by: user.id });
+      .update({
+        completed_at: done ? ((a.completed_at as Date | null) ?? new Date()) : null,
+        updated_by: user.id,
+        ...(stage
+          ? {
+              stage_id: stage.id,
+              stage_entered_at: new Date(),
+              position: await endOfStage(trx, 'activity', stage.id),
+            }
+          : {}),
+      });
+    if (stage)
+      await recordStageHistory(
+        trx,
+        'activity',
+        [a.id],
+        (a.stage_id as number | null) ?? null,
+        stage.id,
+        user.id,
+      );
     await audit(trx, ctx, {
       action: 'activity.updated',
       entity: 'activity',
@@ -49,6 +81,63 @@ export const activitiesRoutes = [
   activityCommentRoutes,
   checklistRoutes,
   defineRoutes('/activities', ['activities'])
+    .add({
+      method: 'get',
+      path: '/board',
+      permission: 'core.activities.view',
+      summary: 'Tasks grouped by status for the board (task statuses feature)',
+      query: boardQuerySchema,
+      handler: async ({ user, query }) => {
+        await assertTaskPipeline();
+        return loadBoard(activitiesDef, 'activity', user, query);
+      },
+    })
+    .add({
+      method: 'patch',
+      path: '/:uuid/stage',
+      permission: 'core.activities.update',
+      params: uuidParam,
+      body: dealMoveSchema,
+      summary: 'Move a task to a status (and position within it); the done status completes it',
+      handler: async ({ ctx, user, params, body }): Promise<ActivityDto> => {
+        await assertTaskPipeline();
+        let spawned: Record<string, unknown> | null = null;
+        let completedNow = false;
+        const updated = await moveToStage(
+          activitiesDef,
+          'activity',
+          ctx,
+          user,
+          params.uuid,
+          body,
+          async (stage, trx) => {
+            const row = await trx('activities').where({ uuid: params.uuid }).first('id', 'completed_at');
+            if (stage.is_won && !row.completed_at) {
+              completedNow = true;
+              spawned = await spawnNextOccurrence(trx, ctx, row.id as number);
+              return { completed_at: new Date() };
+            }
+            return stage.is_won ? {} : { completed_at: null };
+          },
+        );
+        const [dto] = await activitiesDef.toDtos([updated.row], { user, conn: db });
+        const payload = dto as unknown as Record<string, unknown>;
+        if (updated.stageChange)
+          await emitRecordEvent(
+            activitiesDef,
+            'updated',
+            payload,
+            user,
+            await publicStageChanges(db, { stage_id: updated.stageChange }),
+          );
+        if (completedNow) await emitRecordEvent(activitiesDef, 'completed', payload, user);
+        if (spawned) {
+          const [next] = await activitiesDef.toDtos([spawned], { user, conn: db });
+          await emitRecordEvent(activitiesDef, 'created', next as unknown as Record<string, unknown>, user);
+        }
+        return dto!;
+      },
+    })
     .add({
       method: 'get',
       path: '/for',

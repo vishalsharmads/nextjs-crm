@@ -24,7 +24,7 @@ export interface StageDto {
 export interface PipelineDto {
   uuid: string;
   name: string;
-  entity: 'deal' | 'lead' | 'ticket';
+  entity: 'deal' | 'lead' | 'ticket' | 'activity';
   isDefault: boolean;
   /** False once disabled: hidden from boards, pickers and new records; history keeps it. */
   active: boolean;

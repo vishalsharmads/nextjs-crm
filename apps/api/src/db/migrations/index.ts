@@ -24,6 +24,7 @@ import * as m0022 from './0022_oauth_families';
 import * as m0023 from './0023_activity_comments';
 import * as m0024 from './0024_activity_checklists';
 import * as m0025 from './0025_activity_recurrence';
+import * as m0026 from './0026_task_pipeline';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -57,4 +58,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0023_activity_comments': m0023,
   '0024_activity_checklists': m0024,
   '0025_activity_recurrence': m0025,
+  '0026_task_pipeline': m0026,
 };

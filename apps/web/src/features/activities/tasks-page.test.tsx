@@ -52,13 +52,17 @@ describe('groupTasks', () => {
   });
 });
 
+const features = { taskPipeline: false };
 vi.mock('@/app/session', () => ({
-  useBoot: () => ({ me: { uuid: 'me' } }),
+  useBoot: () => ({ me: { uuid: 'me' }, settings: { features } }),
   useCan: () => () => true,
   useScope: () => 'team',
   useT: () => (k: string) => (k === 'nav.tasks' ? 'My work' : k),
 }));
 vi.mock('@/app/branding', () => ({ useBranding: () => ({ branding: { appName: 'CRM' } }) }));
+vi.mock('@/features/pipelines/pipeline-board', () => ({
+  PipelineBoard: () => <div>Status board</div>,
+}));
 vi.mock('@/app/shell/command-palette', () => ({ usePaletteCommands: () => undefined }));
 vi.mock('@/components/ui/misc', async (orig) => ({
   ...(await orig<typeof Misc>()),
@@ -102,5 +106,20 @@ describe('my work page', () => {
     expect(screen.getByLabelText('New task')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Whose tasks' })).toHaveTextContent('My team');
     expect(screen.getByRole('button', { name: 'Reschedule Task late' })).toBeInTheDocument();
+  });
+
+  it('switches to a status board when task statuses are on', async () => {
+    features.taskPipeline = true;
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <TasksPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await screen.findByRole('region', { name: 'Overdue' });
+    screen.getByRole('button', { name: 'Board' }).click();
+    expect(await screen.findByText('Status board')).toBeInTheDocument();
+    features.taskPipeline = false;
   });
 });
