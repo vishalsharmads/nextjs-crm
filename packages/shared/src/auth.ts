@@ -56,6 +56,8 @@ export interface MeDto {
   roles: { key: string; name: string }[];
   /** Guided tours this person finished or dismissed, so they are not offered again. */
   toursSeen: string[];
+  /** Personal notification choices. */
+  notifications: NotificationPrefs;
 }
 
 /** Effective access for the current user, used by the UI to show/hide affordances. */
@@ -76,4 +78,11 @@ export interface SessionDto {
   createdAt: string;
   lastUsedAt: string;
   current: boolean;
+}
+
+export interface NotificationPrefs {
+  /** Mirror notifications by email (assignments, mentions, reminders). */
+  email: boolean;
+  /** One email each morning with tasks due today and overdue. */
+  taskDigest: boolean;
 }

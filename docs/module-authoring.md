@@ -119,6 +119,34 @@ The page renders at `/m/<key>/…`, inside the app shell, as its own lazy-loaded
 - Rich text: use `RichTextEditor` from `@/components/editor/rich-text-editor` (`mode="document"` adds tables, dividers and page breaks) and render stored HTML inside `.rte-prose`. Sanitize it on the server with `sanitizeDocumentHtml`. For templates, list your placeholders from an API route built on `mergeFieldGroups()` and pass them as `mergeFields`.
 - Uploads: put `uploadSingle()` in `before`, after a middleware that checks access, so files are never parsed for callers who may not upload. Store them with `storeFile()` against a core record.
 
+## Settings
+
+A module that needs configuration (an address, a token, a limit) declares fields in its manifest instead of building its own settings table. Admins fill them in at Settings → Modules → the module → Settings.
+
+```json
+"category": "integration",
+"icon": "plug",
+"settings": [
+  { "key": "endpoint", "type": "url", "label": "Endpoint", "help": "Where events are sent.", "required": true },
+  { "key": "token", "type": "secret", "label": "Token", "help": "Sent with each request." },
+  { "key": "batch", "type": "number", "label": "Batch size", "help": "Events per request.", "default": 10 }
+]
+```
+
+- **Field types:** `string`, `secret`, `boolean`, `select` (needs `options`), `number` and `url` (http or https).
+- **Keys** match `^[a-z][a-z0-9_]{0,48}$`.
+- **`help`** is required; it shows under the field.
+- **Reading values:** call `getModuleSettings('<key>')` from `@app/api/module-api`. You get the values with defaults applied and secrets decrypted. Never return them from a route.
+- **Secrets** are encrypted at rest, re-encrypted by `crypto:rotate`, shown to admins only as "Saved", and recorded in audit as `[changed]`. A secret cannot have a default.
+- **`category`** is one of `integration`, `industry`, `productivity` or `commerce`. It groups the module in the marketplace.
+- **Test connection.** To add a Test connection button, export `testConnection(settings)` from the `ApiModule`.
+  - It receives the unsaved form values laid over the saved ones.
+  - Check outbound addresses with `assertSafeUrl` first.
+  - Throw `AppError('UPSTREAM_FAILED', '<message for people>')`. Any other error is logged and replaced with a generic message.
+- **Versions.** A new release of an enabled module is installed by deploying it. Startup runs its new migrations and records the version.
+
+`modules/notes-demo` shows all of this.
+
 ## Help
 
 Each module page needs a help article in `modules/<key>/help/<name>.md`; the web test fails without one. Front matter:
@@ -142,3 +170,18 @@ Write for the people using the page: what it is for, what they can do, step by s
 1. Add the module to `apps/api/src/modules/installed.ts` (a test fails if a manifest folder is not listed).
 2. `npm install` to link the workspace package.
 3. Enable it in **Settings → Modules**, or list it in a blueprint's `modules`.
+
+## Integrations
+
+A module that connects to another service has its own guide: [integration-authoring.md](integration-authoring.md). Generate one with `module:new --integration --key=<key> --name="<Name>"`.
+
+## Release checklist
+
+- [ ] `npm run module:check -- <key>` passes: manifest, help article, imports only from `@app/api/module-api`, tables named `m_<key>_*`, no `child_process` or `eval`, no brand names.
+- [ ] Every settings field has `help`, and the help article has `<!-- generated:module-settings:<key> -->` if there are settings.
+- [ ] Personal data reaches export and erasure (`PrivacyHandler`), and outbound calls skip restricted people.
+- [ ] Mutations write audit rows; record types emit created/updated/deleted.
+- [ ] The version in `manifest.json` is raised; new tables come in new migrations (committed ones are immutable).
+- [ ] Tests, `npm run typecheck`, `npm run lint` and `npm run check:brand` pass.
+
+AI coding agents can do the same checks through the developer MCP server (`npm run mcp:dev`); see "AI coding agents" in [ai-agents.md](ai-agents.md).

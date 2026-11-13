@@ -17,6 +17,8 @@ Invoices with line items, payments and overdue tracking. Accepted quotes convert
 - **Payments**: record full or part payments; overdue invoices are flagged.
 - **Void** an unpaid invoice instead of deleting it. Print or save as PDF, and share through the client portal.
 
+- An **Invoices** tab on each {{dealLower}} and {{organizationLower}} page lists the invoices linked to it, with what is still outstanding.
+
 ## Permissions
 
 <!-- generated:permissions:invoices. -->

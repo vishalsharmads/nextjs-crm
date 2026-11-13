@@ -47,6 +47,44 @@ The `assistant` module adds an in-app chat, opened from the top bar on any page 
 
 The assistant runs the same tools as MCP clients, as the signed-in person: their permissions, record scope and field visibility apply, hidden fields are never sent and sensitive values stay masked. Read tools run on their own. Every change (create, update, note, task, stage move) is shown to the person, who confirms or declines it; confirmed changes are audited with actor type `assistant`. Conversation text is not written to the audit log. Each conversation is visible only to the person who started it. Usage per person per month is on the Settings tab. Conversations that mention a person (by id or email, in any letter case) are exported for access requests and deleted on erasure. Starting and deleting a conversation, and each confirmed or declined change, are audited without the conversation text. One conversation step runs per person at a time, so usage caps are not overshot by parallel requests; providers that report no usage are charged an estimate.
 
+## Modules and the module catalog
+
+Optional features and integrations are modules. Admins turn them on or off and fill in their settings at Settings → Modules. Secrets are encrypted and never shown again. To build one, see [module-authoring.md](module-authoring.md) and [integration-authoring.md](integration-authoring.md).
+
+A **module catalog** lists modules kept in other git repositories, each pinned to a tag and the commit that tag pointed at.
+
+- **`MODULE_CATALOG_URL`.** The address of the catalog's `catalog.json`; leave it unset for no catalog. It must be https and public, and redirects are not followed.
+- **`MODULE_CATALOG_TOKEN`.** A read token for a private catalog, sent only to that address.
+
+Admins see catalog modules under **Available from the catalog**, and newer versions of installed ones under **Updates**. Instances never download or run catalog code. A developer adds a module to the checkout with:
+
+```
+npm run module:add -- <key> [--catalog=<url or file>] [--update]
+npm run module:check [<key> ...]
+```
+
+`module:add` refuses a tag that no longer points at the pinned commit. It then checks the module rules: manifest, folder name, help article, imports only from `@app/api/module-api`, tables named `m_<key>_*`, no `child_process` or `eval`, and no brand names. It copies the module into `modules/<key>` and lists it in `installed.ts`. Review the change, commit it, and the module ships with the next release.
+
+`catalog.json`:
+
+```json
+{
+  "modules": [
+    {
+      "key": "fleet-log",
+      "name": "Fleet log",
+      "version": "1.0.0",
+      "description": "Vehicles and their trips",
+      "category": "industry",
+      "repo": "https://code.example.com/acme/fleet-log.git",
+      "tag": "v1.0.0",
+      "sha": "<40-character commit>",
+      "path": ""
+    }
+  ]
+}
+```
+
 ## Webhooks
 
 **Settings → Webhooks.** Choose events (or all). Each delivery is a `POST` with a JSON body:

@@ -6,8 +6,14 @@
   "description": "Reference module: workspace-wide pinned notes. Shows the full module contract (permissions, menu, migrations, API, web page, dashboard widget).",
   "depends_on": [],
   "permissions": [
-    { "key": "notes-demo.notes.view", "description": "View pinned notes" },
-    { "key": "notes-demo.notes.manage", "description": "Create and delete pinned notes" }
+    {
+      "key": "notes-demo.notes.view",
+      "description": "View pinned notes"
+    },
+    {
+      "key": "notes-demo.notes.manage",
+      "description": "Create and delete pinned notes"
+    }
   ],
   "menu_items": [
     {
@@ -22,5 +28,33 @@
   "migrations_dir": "api/migrations",
   "api_entry": "api/index.ts",
   "web_entry": "web/index.tsx",
-  "dashboard_widgets": [{ "type": "notes-demo.latest", "title": "Latest pinned notes" }]
+  "dashboard_widgets": [
+    {
+      "type": "notes-demo.latest",
+      "title": "Latest pinned notes"
+    }
+  ],
+  "category": "productivity",
+  "icon": "notebook",
+  "settings": [
+    {
+      "key": "widget_count",
+      "type": "number",
+      "label": "Notes on the dashboard",
+      "help": "How many of the latest notes the dashboard widget shows.",
+      "default": 5
+    },
+    {
+      "key": "share_url",
+      "type": "url",
+      "label": "Share address",
+      "help": "An outside address that receives a copy of each new note. Leave empty to keep notes inside the workspace."
+    },
+    {
+      "key": "share_token",
+      "type": "secret",
+      "label": "Share token",
+      "help": "Sent with each copy so the receiving service knows it came from this workspace."
+    }
+  ]
 }

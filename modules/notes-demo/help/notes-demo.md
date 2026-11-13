@@ -15,3 +15,7 @@ A small example module: notes pinned for the whole workspace, with a dashboard w
 ## Permissions
 
 <!-- generated:permissions:notes-demo. -->
+
+## Settings
+
+<!-- generated:module-settings:notes-demo -->

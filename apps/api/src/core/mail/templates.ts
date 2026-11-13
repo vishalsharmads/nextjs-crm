@@ -22,6 +22,11 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<string, { name: string; subject: st
     subject: '{{title}}',
     body: '<p>{{title}}</p>{{#if body}}<p>{{body}}</p>{{/if}}{{#if link}}<p><a class="button" href="{{link}}">Open</a></p>{{/if}}',
   },
+  'tasks.digest': {
+    name: 'Daily task digest',
+    subject: 'Your day: {{count}} due',
+    body: '<p>Hi {{user.firstName}},</p>{{#if overdue.length}}<p><strong>Overdue</strong></p><ul>{{#each overdue}}<li><a href="{{link}}">{{subject}}</a></li>{{/each}}</ul>{{/if}}{{#if today.length}}<p><strong>Due today</strong></p><ul>{{#each today}}<li><a href="{{link}}">{{subject}}</a> · {{time}}</li>{{/each}}</ul>{{/if}}<p><a class="button" href="{{tasksLink}}">Open my work</a></p><p>You get this email because you turned on the daily digest in your profile.</p>',
+  },
   'activity.reminder': {
     name: 'Activity reminder',
     subject: 'Reminder: {{subject}}',

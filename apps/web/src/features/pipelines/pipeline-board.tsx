@@ -20,8 +20,9 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
-import { AlertTriangle } from 'lucide-react';
-import type { DealDto, FilterCondition, LeadDto } from '@app/shared';
+import { AlertTriangle, MoreHorizontal } from 'lucide-react';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
+import type { ActivityDto, DealDto, FilterCondition, LeadDto } from '@app/shared';
 import { apiGet, apiPatch } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { cn } from '@/lib/cn';
@@ -33,8 +34,8 @@ import { LostReasonDialog } from '@/features/deals/lost-reason-dialog';
 import type { StageMove } from '@/features/deals/stage-move';
 import { useNavigate } from 'react-router';
 
-export type BoardEntity = 'deal' | 'lead';
-type BoardRecord = DealDto | LeadDto;
+export type BoardEntity = 'deal' | 'lead' | 'activity';
+type BoardRecord = DealDto | LeadDto | ActivityDto;
 
 export interface Column {
   stage: {
@@ -57,10 +58,14 @@ interface Board {
 }
 type BoardResponse = {
   pipeline: Board['pipeline'];
-  columns: (Omit<Column, 'records'> & { deals?: DealDto[]; leads?: LeadDto[] })[];
+  columns: (Omit<Column, 'records'> & { deals?: DealDto[]; leads?: LeadDto[]; records?: ActivityDto[] })[];
 };
 
-const ROUTE: Record<BoardEntity, 'deals' | 'leads'> = { deal: 'deals', lead: 'leads' };
+const ROUTE: Record<BoardEntity, 'deals' | 'leads' | 'activities'> = {
+  deal: 'deals',
+  lead: 'leads',
+  activity: 'activities',
+};
 
 const moveRecord = (entity: BoardEntity, v: StageMove) =>
   apiPatch<BoardRecord>(`/${ROUTE[entity]}/${v.uuid}/stage`, v);
@@ -100,7 +105,10 @@ export function PipelineBoard({
         filter: params.filter,
       }).then((b): Board => ({
         pipeline: b.pipeline,
-        columns: b.columns.map(({ deals, leads, ...c }) => ({ ...c, records: deals ?? leads ?? [] })),
+        columns: b.columns.map(({ deals, leads, records, ...c }) => ({
+          ...c,
+          records: deals ?? leads ?? records ?? [],
+        })),
       })),
   });
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -174,6 +182,7 @@ export function PipelineBoard({
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['records', route] });
+      if (entity === 'activity') void qc.invalidateQueries({ queryKey: ['activities'] });
     },
   });
 
@@ -197,6 +206,13 @@ export function PipelineBoard({
     const beforeUuid =
       overIndex > 0 ? siblings[overIndex - 1]?.uuid : overIndex === -1 ? siblings.at(-1)?.uuid : undefined;
     if (column.stage.uuid === fromStage && overId === deal.uuid) return;
+    moveTo(deal, column, beforeUuid, afterUuid);
+  };
+
+  /** Move a card to a column (drag or the card's menu); a lost deal asks for a reason first. */
+  const moveTo = (deal: BoardRecord, column: Column, beforeUuid?: string, afterUuid?: string) => {
+    if (!deal.stage) return;
+    const fromStage = deal.stage.uuid;
     if (
       entity === 'deal' &&
       column.stage.isLost &&
@@ -256,6 +272,8 @@ export function PipelineBoard({
           <BoardColumn
             key={c.stage.uuid}
             column={c}
+            stages={board.data.columns}
+            onMoveTo={(record, target) => moveTo(record, target)}
             onOpen={onOpen}
             disabled={!canMove}
             dragging={!!activeId}
@@ -293,12 +311,17 @@ export function PipelineBoard({
 
 export function BoardColumn({
   column,
+  stages,
+  onMoveTo,
   onOpen,
   disabled,
   dragging,
   settledId,
 }: {
   column: Column;
+  /** Every column, for the card's "Move to" menu. */
+  stages?: Column[];
+  onMoveTo?: (record: BoardRecord, column: Column) => void;
   onOpen: (uuid: string) => void;
   disabled: boolean;
   /** A card is being dragged somewhere on the board. */
@@ -334,6 +357,8 @@ export function BoardColumn({
             <SortableCard
               key={d.uuid}
               record={d}
+              moveTargets={disabled ? [] : (stages ?? []).filter((c) => c.stage.uuid !== column.stage.uuid)}
+              onMoveTo={(target) => onMoveTo?.(d, target)}
               onOpen={onOpen}
               disabled={disabled}
               settled={settledId === d.uuid}
@@ -353,12 +378,16 @@ export function BoardColumn({
 
 function SortableCard({
   record,
+  moveTargets,
+  onMoveTo,
   onOpen,
   disabled,
   settled,
   instant,
 }: {
   record: BoardRecord;
+  moveTargets: Column[];
+  onMoveTo: (column: Column) => void;
   onOpen: (uuid: string) => void;
   disabled: boolean;
   settled: boolean;
@@ -372,11 +401,33 @@ function SortableCard({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition: instant ? 'none' : transition }}
-      className={cn(isDragging && 'opacity-40')}
+      className={cn('group relative', isDragging && 'opacity-40')}
       {...attributes}
       {...listeners}
     >
       <RecordCard record={record} onOpen={() => onOpen(record.uuid)} settled={settled} />
+      {moveTargets.length ? (
+        <Menu>
+          <MenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Move to stage"
+              onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              className="absolute end-1.5 top-1.5 rounded-sm p-1 text-muted opacity-0 group-hover:opacity-100 hover:bg-hover hover:text-ink focus-visible:opacity-100 pointer-coarse:opacity-100"
+            >
+              <MoreHorizontal className="size-4" />
+            </button>
+          </MenuTrigger>
+          <MenuContent>
+            {moveTargets.map((c) => (
+              <MenuItem key={c.stage.uuid} onSelect={() => onMoveTo(c)}>
+                <StageDot color={c.stage.color} /> Move to {c.stage.name}
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </Menu>
+      ) : null}
     </div>
   );
 }
@@ -392,6 +443,8 @@ function RecordCard({
   overlay?: boolean;
   settled?: boolean;
 }) {
+  if ('subject' in record)
+    return <TaskCard task={record} onOpen={onOpen} overlay={overlay} settled={settled} />;
   if (!('title' in record))
     return <LeadCard lead={record} onOpen={onOpen} overlay={overlay} settled={settled} />;
   const deal = record;
@@ -458,6 +511,47 @@ function LeadCard({
           ) : null}
           {lead.convertedAt ? <span>Converted</span> : null}
           {lead.owner ? <Avatar name={lead.owner.name} size="sm" /> : null}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function TaskCard({
+  task,
+  onOpen,
+  overlay,
+  settled,
+}: {
+  task: ActivityDto;
+  onOpen?: () => void;
+  overlay?: boolean;
+  settled?: boolean;
+}) {
+  const when = task.type === 'meeting' ? task.startAt : task.dueAt;
+  return (
+    <article
+      onClick={onOpen}
+      onKeyDown={(e) => e.key === 'Enter' && onOpen?.()}
+      className={cn(
+        'cursor-grab rounded-md border border-line bg-surface p-2.5 text-sm hover:border-line-strong',
+        overlay && 'cursor-grabbing shadow-xl',
+        task.overdue && 'border-s-2 border-s-accent',
+        settled && 'anim-settle',
+      )}
+    >
+      <p className={cn('line-clamp-2 font-medium', task.completedAt && 'text-muted line-through')}>
+        {task.subject}
+      </p>
+      {task.related ? <p className="mt-0.5 truncate text-xs text-muted">{task.related.title}</p> : null}
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted">
+        <span className={cn('truncate', task.overdue && 'text-accent')}>
+          {when ? formatDate(when) : ''}
+          {task.checklist?.total ? ` · ${task.checklist.done}/${task.checklist.total}` : ''}
+        </span>
+        <span className="flex items-center gap-1.5">
+          {task.priority === 'high' ? <span className="text-accent">High</span> : null}
+          {task.assignee ? <Avatar name={task.assignee.name} size="sm" /> : null}
         </span>
       </div>
     </article>

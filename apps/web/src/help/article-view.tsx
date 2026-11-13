@@ -14,10 +14,18 @@ import { useCan } from '@/app/session';
 import type { HelpArticle } from './registry';
 
 /** Module permissions, read from the manifests so module help lists them too. */
-const manifests = import.meta.glob<{ key: string; permissions?: { key: string; description: string }[] }>(
-  '../../../../modules/*/manifest.json',
-  { import: 'default', eager: true },
-);
+const manifests = import.meta.glob<{
+  key: string;
+  permissions?: { key: string; description: string }[];
+  settings?: {
+    key: string;
+    label: string;
+    help: string;
+    type: string;
+    default?: unknown;
+    required?: boolean;
+  }[];
+}>('../../../../modules/*/manifest.json', { import: 'default', eager: true });
 const ALL_PERMISSIONS = [
   ...CORE_PERMISSIONS,
   ...Object.values(manifests).flatMap((m) => m.permissions ?? []),
@@ -98,6 +106,7 @@ function Generated({
     return <SettingsTable group={arg as SettingsGroup} vars={vars} />;
   if (kind === 'permissions') return <PermissionsTable prefix={arg ?? ''} />;
   if (kind === 'tools') return <ToolsTable />;
+  if (kind === 'module-settings' && arg) return <ModuleSettingsTable moduleKey={arg} />;
   return null;
 }
 
@@ -167,6 +176,46 @@ function SettingsTable({ group, vars }: { group: SettingsGroup; vars: Record<str
               </tr>
             );
           })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const SETTING_TYPES: Record<string, string> = {
+  string: 'Text',
+  secret: 'Secret (stored encrypted, never shown again)',
+  boolean: 'On or off',
+  select: 'Choice',
+  number: 'Number',
+  url: 'Web address',
+};
+
+/** A module's settings fields, from its manifest (the same list the Settings tab renders). */
+function ModuleSettingsTable({ moduleKey }: { moduleKey: string }) {
+  const fields = Object.values(manifests).find((m) => m.key === moduleKey)?.settings ?? [];
+  if (!fields.length) return null;
+  return (
+    <div className="my-3 overflow-x-auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Setting</th>
+            <th>Type</th>
+            <th>What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          {fields.map((f) => (
+            <tr key={f.key}>
+              <td>
+                {f.label}
+                {f.required ? ' (required)' : ''}
+              </td>
+              <td>{SETTING_TYPES[f.type] ?? f.type}</td>
+              <td>{f.help}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

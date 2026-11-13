@@ -19,6 +19,7 @@ export { registerModuleWidget } from './modules/widgets';
 export { notify } from './core/notifications/notifications.service';
 export { getGroup as getSettingsGroup } from './core/settings/settings.service';
 export { emit, onEvent, type DomainEvent } from './core/events/events';
+export { eventTouchesRestricted } from './core/privacy/privacy.service';
 export { enqueue, registerJob, every } from './lib/jobs';
 export { scopeAllows } from './core/rbac/access';
 export {
@@ -44,6 +45,7 @@ export { userRefs, iso } from './core/records/hydrate';
 export { escapeLike } from './core/records/filters';
 export { userIdFromRef } from './core/records/hydrate';
 export { isModuleEnabled } from './modules/registry';
+export { getModuleSettings } from './modules/module-settings';
 export { sendMail } from './lib/mailer';
 export { getBranding } from './core/settings/settings.service';
 export { randomToken, sha256 } from './lib/crypto';

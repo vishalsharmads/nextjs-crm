@@ -32,6 +32,8 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { StageDot } from '@/components/data/stage-color';
 import { SettingsPage } from './layout';
 
+type PipelineEntity = 'deal' | 'lead' | 'activity';
+
 export function PipelinesPage() {
   const t = useT();
   const qc = useQueryClient();
@@ -42,16 +44,21 @@ export function PipelinesPage() {
   const boot = useBoot();
   const L = labelVars(boot.labels);
   const leadPipelines = boot.settings.features.leads && boot.settings.features.leadPipeline;
-  const [entity, setEntity] = useState<'deal' | 'lead'>('deal');
+  const taskPipelines = boot.settings.features.taskPipeline;
+  const [chosen, setEntity] = useState<PipelineEntity>('deal');
+  // A tab whose feature was turned off falls back to deals.
+  const entity: PipelineEntity =
+    (chosen === 'lead' && !leadPipelines) || (chosen === 'activity' && !taskPipelines) ? 'deal' : chosen;
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const shown = pipelines.data?.filter((p) => p.entity === (leadPipelines ? entity : 'deal'));
+  const shown = pipelines.data?.filter((p) => p.entity === entity);
   const current = shown?.find((p) => p.uuid === selected) ?? shown?.[0];
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['pipelines'] });
     void qc.invalidateQueries({ queryKey: bootstrapKey });
     void qc.invalidateQueries({ queryKey: ['records', 'deals'] });
     void qc.invalidateQueries({ queryKey: ['records', 'leads'] });
+    void qc.invalidateQueries({ queryKey: ['records', 'activities'] });
   };
   return (
     <SettingsPage
@@ -63,11 +70,12 @@ export function PipelinesPage() {
         </Button>
       }
     >
-      {leadPipelines ? (
-        <Tabs value={entity} onValueChange={(v) => (setEntity(v as 'deal' | 'lead'), setSelected(null))}>
+      {leadPipelines || taskPipelines ? (
+        <Tabs value={entity} onValueChange={(v) => (setEntity(v as PipelineEntity), setSelected(null))}>
           <TabsList>
             <TabsTrigger value="deal">{L.dealPlural}</TabsTrigger>
-            <TabsTrigger value="lead">{L.leadPlural}</TabsTrigger>
+            {leadPipelines ? <TabsTrigger value="lead">{L.leadPlural}</TabsTrigger> : null}
+            {taskPipelines ? <TabsTrigger value="activity">Task statuses</TabsTrigger> : null}
           </TabsList>
         </Tabs>
       ) : null}
@@ -104,7 +112,7 @@ export function PipelinesPage() {
       )}
       {creating ? (
         <NewPipelineDialog
-          entity={leadPipelines ? entity : 'deal'}
+          entity={entity}
           onClose={() => setCreating(false)}
           onCreated={(uuid) => (refresh(), setSelected(uuid))}
         />
@@ -491,7 +499,7 @@ function NewPipelineDialog({
   onClose,
   onCreated,
 }: {
-  entity: 'deal' | 'lead';
+  entity: PipelineEntity;
   onClose: () => void;
   onCreated: (uuid: string) => void;
 }) {

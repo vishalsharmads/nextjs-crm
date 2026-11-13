@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/input';
 import { Badge, Pane, Skeleton } from '@/components/ui/misc';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/checkbox';
 import { SettingsPage } from './layout';
 import { AccessTokens, ConnectedApps } from './ai-clients';
 
@@ -19,6 +20,7 @@ export function ProfilePage() {
   return (
     <SettingsPage title={t('settings.profile')}>
       <ProfileForm />
+      <NotificationsForm />
       <PasswordForm />
       <TwoFactor />
       <Sessions />
@@ -54,6 +56,50 @@ function ProfileForm() {
           </Button>
         </div>
       </form>
+    </Pane>
+  );
+}
+
+/** Personal notification choices: email copies and the morning task digest. */
+function NotificationsForm() {
+  const { me } = useBoot();
+  const qc = useQueryClient();
+  const prefs = me.notifications ?? { email: true, taskDigest: false };
+  const save = useMutation({
+    mutationFn: (notifications: Partial<typeof prefs>) => apiPatch('/me', { notifications }),
+    onSuccess: () => {
+      toast.success('Saved');
+      void qc.invalidateQueries({ queryKey: bootstrapKey });
+    },
+  });
+  const row = (key: keyof typeof prefs, label: string, help: string) => (
+    <label className="flex items-start justify-between gap-4 py-2">
+      <span>
+        <span className="block text-sm font-medium">{label}</span>
+        <span className="block text-sm text-muted">{help}</span>
+      </span>
+      <Switch
+        aria-label={label}
+        checked={prefs[key]}
+        disabled={save.isPending}
+        onCheckedChange={(v) => save.mutate({ [key]: v })}
+      />
+    </label>
+  );
+  return (
+    <Pane title="Notifications">
+      <div className="divide-y divide-line">
+        {row(
+          'email',
+          'Email me a copy',
+          'Assignments, mentions and reminders also arrive by email. They always appear under the bell.',
+        )}
+        {row(
+          'taskDigest',
+          'Daily digest',
+          'Each morning, one email with your tasks due today and anything overdue.',
+        )}
+      </div>
     </Pane>
   );
 }

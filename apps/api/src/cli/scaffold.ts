@@ -183,6 +183,171 @@ export default mod;
     [`${dir}/api/index.ts`]: api,
     [`${dir}/api/migrations/0001_${resourceKey}.ts`]: migration,
     [`${dir}/web/index.tsx`]: web,
+    [`${dir}/help/${o.key}.md`]: helpArticle({
+      key: o.key,
+      title: plural,
+      route: `/m/${o.key}/${route}, /m/${o.key}/${route}/*`,
+      permission: `${resource}.view`,
+      body: `Keep ${plural.toLowerCase()} with custom fields, saved views, search, import and export.\n\n## Permissions\n\n<!-- generated:permissions:${o.key}. -->`,
+    }),
+  };
+}
+
+function helpArticle(a: { key: string; title: string; route: string; permission: string; body: string }) {
+  return `---
+id: module.${a.key}
+title: ${a.title}
+area: Modules
+route: ${a.route}
+permission: ${a.permission}
+module: ${a.key}
+related: settings.modules
+---
+
+${a.body}
+`;
+}
+
+export interface IntegrationOptions {
+  /** Module key, e.g. `chat-relay`. */
+  key: string;
+  /** Name admins see, e.g. `Chat relay`. */
+  name: string;
+}
+
+/**
+ * Files of a new integration: settings fields (an address and a secret token), a connection test,
+ * an event handler that queues a background job, and a help article with the settings table.
+ */
+export function scaffoldIntegration(o: IntegrationOptions): Record<string, string> {
+  if (!MODULE_KEY_RE.test(o.key)) throw new Error('--key must be lowercase letters, digits and hyphens');
+  if (!o.name.trim()) throw new Error('Pass --name=<Name admins see>');
+  const dir = `modules/${o.key}`;
+  const apiName = camel(o.key);
+  const manifest = {
+    key: o.key,
+    name: o.name.trim(),
+    version: '1.0.0',
+    status: 'available',
+    category: 'integration',
+    icon: 'plug',
+    description: `Sends record events from this workspace to ${o.name.trim()}.`,
+    depends_on: [],
+    permissions: [],
+    menu_items: [],
+    api_entry: 'api/index.ts',
+    settings: [
+      {
+        key: 'endpoint',
+        type: 'url',
+        label: 'Address',
+        help: 'Where events are sent. Must be https and reachable from the internet.',
+        required: true,
+      },
+      {
+        key: 'token',
+        type: 'secret',
+        label: 'Token',
+        help: 'Sent with each request so the other service knows it came from this workspace. Stored encrypted.',
+      },
+      {
+        key: 'send_deals',
+        type: 'boolean',
+        label: 'Send won deals',
+        help: 'Send an event when a deal is won.',
+        default: true,
+      },
+    ],
+  };
+
+  const api = `import {
+  AppError,
+  assertSafeUrl,
+  enqueue,
+  eventTouchesRestricted,
+  getModuleSettings,
+  isModuleEnabled,
+  onEvent,
+  registerJob,
+  type ApiModule,
+} from '@app/api/module-api';
+
+/**
+ * ${o.name.trim()}: sends chosen record events to another service.
+ * Settings are declared in manifest.json and read with getModuleSettings (secrets decrypted).
+ * Events are queued as jobs so a slow service never slows down saving a record.
+ * See docs/integration-authoring.md.
+ */
+
+const KEY = '${o.key}';
+const JOB = '${o.key}.send';
+
+async function send(settings: Record<string, string | number | boolean>, body: Record<string, unknown>) {
+  const url = String(settings.endpoint ?? '');
+  await assertSafeUrl(url, 'endpoint');
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(settings.token ? { authorization: \`Bearer \${String(settings.token)}\` } : {}),
+      },
+      body: JSON.stringify(body),
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    // Never pass the other service's own error text on to people.
+    throw new AppError('UPSTREAM_FAILED', 'The service could not be reached.');
+  }
+  if (!res.ok) throw new AppError('UPSTREAM_FAILED', \`The service answered \${res.status}.\`);
+}
+
+onEvent(async (e) => {
+  if (!isModuleEnabled(KEY)) return;
+  const settings = await getModuleSettings(KEY);
+  if (!settings.endpoint) return;
+  if (e.type !== 'deal.won' || settings.send_deals !== true) return;
+  // Nothing about a person whose processing is restricted leaves the workspace.
+  if (await eventTouchesRestricted(e)) return;
+  // Send ids and what happened, not personal data. Add fields only when the service needs them.
+  await enqueue(JOB, { event: e.type, entity: e.entity, uuid: e.uuid, at: e.at });
+});
+
+registerJob(JOB, async (job) => {
+  if (!isModuleEnabled(KEY)) return;
+  await send(await getModuleSettings(KEY), job.payload);
+});
+
+export const ${apiName}: ApiModule = {
+  testConnection: async (settings) => {
+    if (!settings.endpoint) throw new AppError('UPSTREAM_FAILED', 'Add the address first.');
+    await send(settings, { event: 'test' });
+    return { message: 'The service accepted a test event.' };
+  },
+};
+`;
+
+  const pkg = {
+    name: `@app/module-${o.key}`,
+    version: '1.0.0',
+    private: true,
+    type: 'module',
+    dependencies: { '@app/api': '*', '@app/module-sdk': '*' },
+  };
+
+  return {
+    [`${dir}/manifest.json`]: `${JSON.stringify(manifest, null, 2)}\n`,
+    [`${dir}/package.json`]: `${JSON.stringify(pkg, null, 2)}\n`,
+    [`${dir}/api/index.ts`]: api,
+    [`${dir}/help/${o.key}.md`]: helpArticle({
+      key: o.key,
+      title: o.name.trim(),
+      route: `/settings/modules/${o.key}`,
+      permission: 'core.modules.manage',
+      body: `Sends events from {{appName}} to ${o.name.trim()}.\n\n## Set it up\n\nTurn the module on, open **Settings**, fill in the address and token, then choose **Test connection**.\n\n## Settings\n\n<!-- generated:module-settings:${o.key} -->`,
+    }),
   };
 }
 
@@ -199,9 +364,12 @@ export function addToInstalled(source: string, key: string): string {
 }
 
 /** Write a scaffolded module under `root`. Refuses to overwrite an existing module folder. */
-export function writeScaffold(root: string, o: ScaffoldOptions): string[] {
+export function writeScaffold(
+  root: string,
+  o: ScaffoldOptions | (IntegrationOptions & { integration: true }),
+): string[] {
   if (existsSync(join(root, 'modules', o.key))) throw new Error(`modules/${o.key} already exists`);
-  const files = scaffoldModule(o);
+  const files = 'integration' in o ? scaffoldIntegration(o) : scaffoldModule(o);
   for (const [path, content] of Object.entries(files)) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);

@@ -94,6 +94,7 @@ const profileSchema = z.object({
   lastName: z.string().trim().max(100).optional(),
   locale: z.string().max(10).nullable().optional(),
   timezone: z.string().max(64).nullable().optional(),
+  notifications: z.object({ email: z.boolean().optional(), taskDigest: z.boolean().optional() }).optional(),
 });
 
 export async function getMe(userId: number): Promise<MeDto> {
@@ -113,6 +114,10 @@ export async function getMe(userId: number): Promise<MeDto> {
     recoveryCodesLeft: u.totp_enabled ? await auth.unusedRecoveryCodeCount(userId) : 0,
     roles: roles.map((r) => ({ key: r.key, name: r.name })),
     toursSeen: prefsOf(u.preferences).toursSeen ?? [],
+    notifications: {
+      email: prefsOf(u.preferences).emailNotifications !== false,
+      taskDigest: prefsOf(u.preferences).taskDigest === true,
+    },
   };
 }
 
@@ -128,9 +133,21 @@ export const meRoutes = defineRoutes('/me', ['me'])
     body: profileSchema,
     handler: async ({ ctx, user, body }) => {
       await db.transaction(async (trx) => {
+        let preferences: string | undefined;
+        if (body.notifications) {
+          const row = await trx('users').where({ id: user.id }).forUpdate().first('preferences');
+          const prefs = prefsOf(row?.preferences);
+          const n = body.notifications;
+          preferences = JSON.stringify({
+            ...prefs,
+            ...(n.email !== undefined ? { emailNotifications: n.email } : {}),
+            ...(n.taskDigest !== undefined ? { taskDigest: n.taskDigest } : {}),
+          });
+        }
         await trx('users')
           .where({ id: user.id })
           .update({
+            ...(preferences !== undefined ? { preferences } : {}),
             ...(body.firstName !== undefined ? { first_name: body.firstName } : {}),
             ...(body.lastName !== undefined ? { last_name: body.lastName } : {}),
             ...(body.locale !== undefined ? { locale: body.locale } : {}),

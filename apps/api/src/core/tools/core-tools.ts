@@ -4,6 +4,7 @@ import {
   RELATED_TYPES,
   entityKeySchema,
   listQuerySchema,
+  recurrenceSchema,
   reportDefinitionSchema,
 } from '@app/shared';
 import { defineTool } from './registry';
@@ -18,6 +19,8 @@ import { fieldLevel, getDefinitions } from '../custom-fields/definitions';
 import { getGroup } from '../settings/settings.service';
 import { runReport } from '../reports/builder';
 import { runBulk } from '../bulk/bulk.service';
+import { addComment, listComments } from '../activities/comments';
+import { addChecklistItem, listChecklist } from '../activities/checklist';
 
 const entity = entityKeySchema.describe(
   'Record type key from describe_schema, e.g. "contact", "organization", "deal", "lead" or "activity"',
@@ -202,20 +205,105 @@ defineTool({
   },
 });
 
+const taskFields = {
+  dueAt: z.iso.datetime({ offset: true }).nullish().describe('When it is due (ISO 8601 with offset)'),
+  priority: z.enum(['low', 'normal', 'high']).optional(),
+  assigneeUuid: z.uuid().nullish().describe('Person to assign (user id); defaults to the caller'),
+  reminderAt: z.iso
+    .datetime({ offset: true })
+    .nullish()
+    .describe('When to remind the assignee, usually some time before dueAt'),
+  recurrence: recurrenceSchema
+    .nullish()
+    .describe(
+      'Repeat rule, e.g. {"freq":"weekly","byWeekday":[1]} for every Monday. Completing it creates the next one. null stops repeating.',
+    ),
+};
+
 defineTool({
   name: 'create_task',
   title: 'Create a task',
   description:
-    'Creates a task, optionally due at a time and linked to a record. It is assigned to the person.',
+    'Creates a task, optionally due at a time, linked to a record, with a reminder, a repeat rule and checklist items. It is assigned to the person unless assigneeUuid says otherwise.',
   write: true,
   input: z.object({
     subject: z.string().trim().min(1).max(255),
-    dueAt: z.iso.datetime({ offset: true }).optional(),
-    priority: z.enum(['low', 'normal', 'high']).default('normal'),
+    ...taskFields,
     related: related.optional(),
+    checklist: z
+      .array(z.string().trim().min(1).max(500))
+      .max(50)
+      .optional()
+      .describe('Checklist items, in order'),
+  }),
+  async handler({ checklist, ...input }, { ctx, user }) {
+    const task = (await createRecord(recordDefs.activity, ctx, user, { type: 'task', ...input })) as {
+      uuid: string;
+    };
+    for (const label of checklist ?? []) await addChecklistItem(ctx, user, task.uuid, label);
+    return checklist?.length ? getRecord(recordDefs.activity, user, task.uuid) : task;
+  },
+});
+
+defineTool({
+  name: 'update_task',
+  title: 'Change a task',
+  description:
+    'Changes a task, call or meeting: subject, due date, priority, assignee, reminder, repeat rule or status (stageUuid, when task statuses are on; stage ids come from list_pipelines).',
+  write: true,
+  input: z.object({
+    uuid,
+    subject: z.string().trim().min(1).max(255).optional(),
+    ...taskFields,
+    stageUuid: z.uuid().optional(),
+  }),
+  async handler({ uuid: id, ...input }, { ctx, user }) {
+    return updateRecord(recordDefs.activity, ctx, user, id, input);
+  },
+});
+
+defineTool({
+  name: 'get_task',
+  title: 'Read a task',
+  description: 'Returns a task with its checklist and comments.',
+  write: false,
+  input: z.object({ uuid }),
+  async handler(input, { ctx, user }) {
+    const task = await getRecord(recordDefs.activity, user, input.uuid, ctx);
+    const [checklist, comments] = await Promise.all([
+      listChecklist(user, input.uuid),
+      listComments(user, input.uuid),
+    ]);
+    return { ...(task as object), checklistItems: checklist, comments };
+  },
+});
+
+defineTool({
+  name: 'add_task_comment',
+  title: 'Comment on a task',
+  description:
+    'Adds a comment to a task. Mention people by user id to notify them; only people who can see the task are notified.',
+  write: true,
+  input: z.object({
+    uuid,
+    body: z.string().trim().min(1).max(20_000).describe('Plain text or simple HTML'),
+    mentions: z.array(z.uuid()).max(20).default([]),
   }),
   async handler(input, { ctx, user }) {
-    return createRecord(recordDefs.activity, ctx, user, { type: 'task', ...input });
+    assertCan(user, 'core.activities.update');
+    return addComment(ctx, user, input.uuid, { body: input.body, mentions: input.mentions });
+  },
+});
+
+defineTool({
+  name: 'add_checklist_item',
+  title: 'Add a checklist item',
+  description: 'Adds an item to the end of a task’s checklist.',
+  write: true,
+  input: z.object({ uuid, label: z.string().trim().min(1).max(500) }),
+  async handler(input, { ctx, user }) {
+    assertCan(user, 'core.activities.update');
+    return addChecklistItem(ctx, user, input.uuid, input.label);
   },
 });
 

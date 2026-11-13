@@ -16,7 +16,9 @@ const ICON = {
   merged: GitMerge,
 } as const;
 
-function fieldLabel(config: EntityConfig, key: string) {
+type TimelineConfig = Pick<EntityConfig, 'route' | 'fields'>;
+
+function fieldLabel(config: TimelineConfig, key: string) {
   const k = key.startsWith('custom.') ? `cf.${key.slice(7)}` : key;
   const byInput = config.fields.find(
     (f) => f.input && f.input.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`) === key,
@@ -35,7 +37,7 @@ function fmt(v: unknown) {
   return String(v);
 }
 
-export function Timeline({ config, uuid }: { config: EntityConfig; uuid: string }) {
+export function Timeline({ config, uuid }: { config: TimelineConfig; uuid: string }) {
   const q = useQuery({
     queryKey: qk.timeline(config.route, uuid),
     queryFn: () =>

@@ -73,6 +73,11 @@ export const SETTINGS_HELP: { [G in SettingsGroup]: HelpFor<(typeof SETTINGS_GRO
       description:
         'Move {{leadPluralLower}} through stages on a board, like {{dealPluralLower}}. Needs {{leadPluralLower}} on.',
     },
+    taskPipeline: {
+      label: 'Task statuses',
+      description:
+        'Give tasks, calls and meetings statuses (such as To do, In progress, Waiting, Done) and a board. Reaching the done stage completes them.',
+    },
   },
   deals: {
     lostReasons: {

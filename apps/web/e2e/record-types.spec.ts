@@ -11,8 +11,14 @@ async function signIn(page: Page) {
 test('a module record type gets list, form, detail and search pages', async ({ page }) => {
   await signIn(page);
   await page.goto('/settings/modules');
-  const toggle = page.getByRole('switch', { name: 'Sample records enabled' });
-  if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click();
+  // The marketplace lists turned-on modules under Turned on and the rest under Available.
+  const toggle = page.getByRole('switch', { name: 'Sample records turned on' });
+  await page.getByRole('tab', { name: /Turned on/ }).click();
+  if (!(await toggle.count())) {
+    await page.getByRole('tab', { name: /Available/ }).click();
+    await toggle.click();
+    await page.getByRole('tab', { name: /Turned on/ }).click();
+  }
   await expect(toggle).toHaveAttribute('aria-checked', 'true');
 
   // The module has only record types, so it opens on the first one.

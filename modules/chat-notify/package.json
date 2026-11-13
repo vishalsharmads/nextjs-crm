@@ -1,0 +1,10 @@
+{
+  "name": "@app/module-chat-notify",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@app/api": "*",
+    "@app/module-sdk": "*"
+  }
+}

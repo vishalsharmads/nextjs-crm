@@ -8,6 +8,8 @@ import { allCustomEntities, entityTable } from '../custom-fields/definitions';
 import { reencryptValue } from '../records/custom';
 import { totpAad } from '../auth/auth.service';
 import { fileAad } from '../files/files.service';
+import { getModule } from '../../modules/registry';
+import { clearModuleSettingsCache, secretAad } from '../../modules/module-settings';
 
 const ENC = 'enc:';
 
@@ -82,6 +84,38 @@ export async function rotateKeys(): Promise<RotationReport> {
       }
     }
   }
+
+  // Module settings: secret fields inside the settings JSON.
+  for (const { module_key: key } of await db('module_states').whereNotNull('settings').select('module_key')) {
+    const secrets = (getModule(key as string)?.manifest.settings ?? []).filter((f) => f.type === 'secret');
+    if (!secrets.length) continue;
+    try {
+      await db.transaction(async (trx) => {
+        const row = await trx('module_states').where({ module_key: key }).forUpdate().first('settings');
+        const raw: unknown = row?.settings;
+        const values = (typeof raw === 'string' ? JSON.parse(raw) : (raw ?? {})) as Record<string, unknown>;
+        let changed = false;
+        for (const f of secrets) {
+          const v = values[f.key];
+          if (typeof v !== 'string' || isCurrent(v)) continue;
+          values[f.key] = encrypt(
+            decrypt(v, secretAad(key as string, f.key)),
+            secretAad(key as string, f.key),
+          );
+          changed = true;
+        }
+        if (!changed) return;
+        await trx('module_states')
+          .where({ module_key: key })
+          .update({ settings: JSON.stringify(values) });
+        bump(report.done, 'module_states.settings');
+      });
+    } catch (err) {
+      logger.error({ err, module: key }, 'could not re-encrypt module settings');
+      bump(report.failed, 'module_states.settings');
+    }
+  }
+  clearModuleSettingsCache();
 
   for (const entity of allCustomEntities()) {
     const table = entityTable(entity);

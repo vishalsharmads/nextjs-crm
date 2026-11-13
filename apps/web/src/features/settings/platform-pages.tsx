@@ -4,79 +4,13 @@ import { toast } from 'sonner';
 import { Download, Upload } from 'lucide-react';
 import { ApiError, apiGet, apiPost, buildUrl } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
-import { bootstrapKey, useBoot, useT } from '@/app/session';
+import { useBoot, useT } from '@/app/session';
 import { labelVars } from '@/lib/labels';
 import { Button } from '@/components/ui/button';
 import { Badge, Pane, Skeleton } from '@/components/ui/misc';
-import { Switch } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { SettingsPage } from './layout';
-
-// ---------------- Modules ----------------
-
-interface ModuleRow {
-  key: string;
-  name: string;
-  version: string;
-  description: string;
-  status: 'available' | 'stub';
-  dependsOn: string[];
-  enabled: boolean;
-}
-
-export function ModulesPage() {
-  const t = useT();
-  const qc = useQueryClient();
-  const modules = useQuery({
-    queryKey: ['modules'],
-    queryFn: () => apiGet<{ data: ModuleRow[] }>('/modules').then((r) => r.data),
-  });
-  const toggle = useMutation({
-    mutationFn: ({ key, on }: { key: string; on: boolean }) =>
-      apiPost(`/modules/${key}/${on ? 'enable' : 'disable'}`),
-    onSuccess: (_r, v) => {
-      toast.success(v.on ? 'Module turned on' : 'Module turned off. Its data is kept.');
-      void qc.invalidateQueries({ queryKey: ['modules'] });
-      void qc.invalidateQueries({ queryKey: bootstrapKey });
-    },
-  });
-  return (
-    <SettingsPage
-      title={t('settings.modules')}
-      description="Optional features for your industry. Turning a module off hides it; its data stays until you turn it back on."
-    >
-      <Pane padded={false}>
-        {modules.isPending ? (
-          <Skeleton className="m-4 h-24" />
-        ) : (
-          <ul className="divide-y divide-line">
-            {modules.data?.map((m) => (
-              <li key={m.key} className="flex items-start gap-4 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 text-sm font-medium">
-                    {m.name} <span className="text-xs font-normal text-faint">v{m.version}</span>
-                    {m.status === 'stub' ? <Badge>Coming soon</Badge> : null}
-                  </p>
-                  <p className="mt-0.5 text-sm text-muted">{m.description}</p>
-                  {m.dependsOn.length ? (
-                    <p className="mt-0.5 text-xs text-faint">Needs: {m.dependsOn.join(', ')}</p>
-                  ) : null}
-                </div>
-                <Switch
-                  checked={m.enabled}
-                  disabled={m.status === 'stub' || toggle.isPending}
-                  onCheckedChange={(on) => toggle.mutate({ key: m.key, on })}
-                  aria-label={`${m.name} enabled`}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </Pane>
-    </SettingsPage>
-  );
-}
 
 // ---------------- Blueprint ----------------
 

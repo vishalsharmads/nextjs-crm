@@ -136,6 +136,8 @@
     "leadsToggleHelp": "Qualify {{leadPluralLower}} separately before they become {{contactPluralLower}}. Turn this off to qualify inside the {{dealLower}} pipeline instead.",
     "leadPipelineToggle": "{{lead}} pipeline",
     "leadPipelineToggleHelp": "Move {{leadPluralLower}} through stages on a board, like {{dealPluralLower}}. Turning it on adds a starter pipeline you can edit under Pipelines.",
+    "taskPipelineToggle": "Task statuses",
+    "taskPipelineToggleHelp": "Give tasks, calls and meetings statuses and a board. Turning it on adds To do, In progress, Waiting and Done, which you can edit under Pipelines. Reaching Done completes a task.",
     "sources": "Sources",
     "sourcesHelp": "Where {{contactPluralLower}} and {{leadPluralLower}} come from. Used for attribution reports.",
     "lifecycle": "Lifecycle statuses",

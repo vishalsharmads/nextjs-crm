@@ -3,11 +3,16 @@ id: records.tasks
 title: Tasks
 area: Records
 route: /tasks
-related: records.calendar
+related: records.task-detail, records.calendar
 ---
 
-Your to-do list: tasks assigned to you, ordered by due date, with overdue ones first.
+Your to-do list: tasks, calls and meetings, grouped into **Overdue**, **Today**, **Upcoming** and **No date**. **Done** lists what was completed, newest first.
 
-- Tick a task to complete it.
-- Add a task from here, or from any record so it stays linked to that record.
-- Reminders arrive as notifications before a task is due.
+- **Add a task** in the bar at the top (press `c` from anywhere on the page). Give it a due date there or later. Tasks added from a record stay linked to that record.
+- **Tick** the round box to complete a task; the toast lets you undo. Completing a repeating task creates its next occurrence.
+- **Reschedule** from a task's ⋯ menu: tomorrow, next Monday, a date you pick, or no date. Undo puts the old date back.
+- **Select** several tasks with the square boxes to complete them or move them to tomorrow or next week in one go.
+- **Filter** by type and priority. If you can see other people's tasks, switch between your own and your team's (or everyone's).
+- **Keyboard**: `j` and `k` move through the list, `x` completes or reopens, `Enter` opens the task.
+- **Board**: when task statuses are on, switch to **Board** to drag tasks between statuses such as To do, In progress, Waiting and Done. Dropping a task on Done completes it.
+- Open a task to edit it, add a checklist, set a reminder or repeat, and discuss it in comments.

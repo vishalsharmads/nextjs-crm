@@ -6,10 +6,22 @@
   "description": "Priced proposals with line items, linked to deals, that customers can accept.",
   "depends_on": ["products"],
   "permissions": [
-    { "key": "quotes.quotes.view", "description": "View quotes" },
-    { "key": "quotes.quotes.create", "description": "Create quotes" },
-    { "key": "quotes.quotes.update", "description": "Edit, send and record responses to quotes" },
-    { "key": "quotes.quotes.delete", "description": "Delete quotes" }
+    {
+      "key": "quotes.quotes.view",
+      "description": "View quotes"
+    },
+    {
+      "key": "quotes.quotes.create",
+      "description": "Create quotes"
+    },
+    {
+      "key": "quotes.quotes.update",
+      "description": "Edit, send and record responses to quotes"
+    },
+    {
+      "key": "quotes.quotes.delete",
+      "description": "Delete quotes"
+    }
   ],
   "menu_items": [
     {
@@ -21,8 +33,29 @@
       "order": 41
     }
   ],
-  "labels": { "quote": { "singular": "Quote", "plural": "Quotes" } },
+  "labels": {
+    "quote": {
+      "singular": "Quote",
+      "plural": "Quotes"
+    }
+  },
   "migrations_dir": "api/migrations",
   "api_entry": "api/index.ts",
-  "web_entry": "web/index.tsx"
+  "web_entry": "web/index.tsx",
+  "record_panels": [
+    {
+      "key": "quotes-deal",
+      "entity": "deal",
+      "title": "Quotes",
+      "permission": "quotes.quotes.view",
+      "order": 20
+    },
+    {
+      "key": "quotes-organization",
+      "entity": "organization",
+      "title": "Quotes",
+      "permission": "quotes.quotes.view",
+      "order": 20
+    }
+  ]
 }

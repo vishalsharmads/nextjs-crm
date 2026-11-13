@@ -57,6 +57,10 @@ const schema = z.object({
   REDIS_URL: z.string().default(''),
   /** Allow webhook URLs that resolve to private/loopback addresses (development only). */
   WEBHOOKS_ALLOW_PRIVATE: bool.default(false),
+  /** Address of a module catalog (`catalog.json`); unset means no catalog. */
+  MODULE_CATALOG_URL: z.url({ protocol: /^https?$/ }).optional(),
+  /** Read token for a private catalog, sent only to the catalog's own address. */
+  MODULE_CATALOG_TOKEN: z.string().min(1).optional(),
   /** Requests per minute per IP for the API (sign-in has its own, stricter limit). */
   AUTH_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(5).max(10_000).default(20),
   API_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(60).max(1_000_000).default(600),

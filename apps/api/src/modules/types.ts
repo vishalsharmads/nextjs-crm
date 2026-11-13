@@ -17,6 +17,13 @@ export interface ApiModule {
    * automations and audit.
    */
   recordTypes?: ResourceDef[];
+  /**
+   * Check the module's settings against the outside service (Settings → Modules → Test connection).
+   * Receives the values being saved merged over the stored ones, secrets decrypted. Throw an
+   * `AppError('UPSTREAM_FAILED', …)` with a message for people; never pass a provider's own error text on.
+   * Check outbound URLs with `assertSafeUrl` first.
+   */
+  testConnection?: (settings: Record<string, string | number | boolean>) => Promise<{ message: string }>;
 }
 
 export interface InstalledModuleSource {

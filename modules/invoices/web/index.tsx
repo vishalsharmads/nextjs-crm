@@ -706,6 +706,62 @@ function ReceivablesWidget({ data }: { data: unknown }) {
   );
 }
 
+/** Invoices tab on deal and organization pages: what was billed, paid and still owed. */
+function InvoicesPanel({ entity, uuid }: { entity: string; uuid: string }) {
+  const list = useQuery({
+    queryKey: ['m', 'invoices', 'panel', entity, uuid],
+    queryFn: () =>
+      apiGet<{ data: Invoice[]; meta: { total: number } }>(BASE, {
+        [entity === 'deal' ? 'dealUuid' : 'organizationUuid']: uuid,
+        pageSize: 50,
+      }),
+  });
+  if (list.isPending) return <Skeleton className="h-24" />;
+  if (list.isError) return <ErrorState error={list.error} onRetry={() => void list.refetch()} />;
+  const rows = list.data.data;
+  if (!rows.length)
+    return (
+      <EmptyState
+        icon={<Receipt />}
+        title="No invoices yet"
+        description="Invoices linked to this record will appear here."
+      />
+    );
+  // Totals per currency: documents in different currencies are never added together.
+  const owed = new Map<string, number>();
+  for (const i of rows)
+    if (i.status !== 'void' && i.status !== 'draft')
+      owed.set(i.currency, (owed.get(i.currency) ?? 0) + i.balanceDue);
+  return (
+    <div className="flex flex-col gap-2">
+      {[...owed].some(([, v]) => v > 0) ? (
+        <p className="text-sm text-muted">
+          Outstanding:{' '}
+          <span className="tabular font-medium text-ink">
+            {[...owed]
+              .filter(([, v]) => v > 0)
+              .map(([c, v]) => formatMoney(v, c))
+              .join(' · ')}
+          </span>
+        </p>
+      ) : null}
+      <ul className="divide-y divide-line rounded-md border border-line bg-surface">
+        {rows.map((i) => (
+          <li key={i.uuid} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+            <Link to={`${BASE}/${i.uuid}`} className="min-w-0 truncate font-medium hover:underline">
+              {i.number} · {i.title}
+            </Link>
+            <span className="flex shrink-0 items-center gap-3">
+              <span className="tabular">{formatMoney(i.total, i.currency)}</span>
+              <InvoiceStatus invoice={i} />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 const invoicesModule: WebModule = {
   key: 'invoices',
   routes: [
@@ -715,6 +771,10 @@ const invoicesModule: WebModule = {
     { path: ':uuid/edit', element: <InvoiceEditor /> },
   ],
   widgets: { 'invoices.receivables': (p) => <ReceivablesWidget data={p.data} /> },
+  panels: {
+    'invoices-deal': (p) => <InvoicesPanel {...p} />,
+    'invoices-organization': (p) => <InvoicesPanel {...p} />,
+  },
 };
 
 export default invoicesModule;

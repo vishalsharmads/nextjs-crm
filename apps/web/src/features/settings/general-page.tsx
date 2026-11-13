@@ -157,6 +157,7 @@ function FeaturesForm({ initial }: { initial: FeatureSettings }) {
   const save = useSaveGroup('features');
   const [leads, setLeads] = useState(initial.leads);
   const [leadPipeline, setLeadPipeline] = useState(initial.leadPipeline);
+  const [taskPipeline, setTaskPipeline] = useState(initial.taskPipeline);
   return (
     <Pane title="Features">
       <label className="flex items-start justify-between gap-4">
@@ -187,6 +188,19 @@ function FeaturesForm({ initial }: { initial: FeatureSettings }) {
           />
         </label>
       ) : null}
+      <label className="mt-4 flex items-start justify-between gap-4 border-t border-line pt-4">
+        <span>
+          <span className="block text-sm font-medium">{t('settings.taskPipelineToggle')}</span>
+          <span className="block text-sm text-muted">{t('settings.taskPipelineToggleHelp')}</span>
+        </span>
+        <Switch
+          checked={taskPipeline}
+          onCheckedChange={(v) => {
+            setTaskPipeline(v);
+            save.mutate({ taskPipeline: v });
+          }}
+        />
+      </label>
     </Pane>
   );
 }

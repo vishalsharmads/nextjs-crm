@@ -6,6 +6,8 @@ import { migrateCore, rollbackCore } from '../db/migrate';
 import { installCore, markInstalled } from './install';
 import { runDoctor } from './doctor';
 import { writeScaffold } from './scaffold';
+import { addCatalogModule, loadCatalog } from './module-add';
+import { checkModuleFolder } from './module-check';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hashPassword, validatePassword } from '../core/auth/auth.service';
@@ -31,13 +33,24 @@ const commands: Record<string, Command> = {
         plural: { type: 'string' },
         singular: { type: 'string' },
         personal: { type: 'boolean', default: false },
+        integration: { type: 'boolean', default: false },
+        name: { type: 'string' },
       },
     });
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+    if (values.integration) {
+      if (!values.key || !values.name)
+        throw new Error('Usage: module:new --integration --key=<module> --name=<Name admins see>');
+      for (const f of writeScaffold(root, { key: values.key, name: values.name, integration: true }))
+        out(`  wrote ${f}`);
+      out('Run `npm install`, restart `npm run dev`, then turn it on in Settings → Modules.');
+      return;
+    }
     if (!values.key || !values.entity || !values.plural)
       throw new Error(
-        'Usage: module:new --key=<module> --entity=<entity> --plural=<Plural> [--singular=..] [--personal]',
+        'Usage: module:new --key=<module> --entity=<entity> --plural=<Plural> [--singular=..] [--personal]\n' +
+          '   or: module:new --integration --key=<module> --name=<Name>',
       );
-    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
     const written = writeScaffold(root, {
       key: values.key,
       entity: values.entity,
@@ -47,6 +60,49 @@ const commands: Record<string, Command> = {
     });
     for (const f of written) out(`  wrote ${f}`);
     out('Restart `npm run dev`, then enable the module in Settings → Modules.');
+  },
+
+  async 'module:check'(args) {
+    const { positionals } = parseArgs({ args, allowPositionals: true });
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+    const { readdirSync } = await import('node:fs');
+    const keys = positionals.length ? positionals : readdirSync(resolve(root, 'modules'));
+    let failed = 0;
+    for (const key of keys) {
+      const problems = checkModuleFolder(root, resolve(root, 'modules', key));
+      if (!problems.length) continue;
+      failed++;
+      out(`${key}:`);
+      for (const p of problems) out(`  - ${p}`);
+    }
+    if (failed) throw new Error(`${failed} module(s) need changes`);
+    out(`Checked ${keys.length} module(s): no problems.`);
+  },
+
+  async 'module:add'(args) {
+    const { values, positionals } = parseArgs({
+      args,
+      allowPositionals: true,
+      options: { catalog: { type: 'string' }, update: { type: 'boolean', default: false } },
+    });
+    const key = positionals[0];
+    const source = values.catalog ?? env.MODULE_CATALOG_URL;
+    if (!key || !source)
+      throw new Error(
+        'Usage: module:add <key> [--catalog=<url or file>] [--update]  (or set MODULE_CATALOG_URL)',
+      );
+    const entry = (await loadCatalog(source, env.MODULE_CATALOG_TOKEN)).find((e) => e.key === key);
+    if (!entry) throw new Error(`"${key}" is not in the catalog`);
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+    const { dir, problems } = addCatalogModule({ root, entry, update: values.update });
+    if (problems.length) {
+      for (const p of problems) out(`  - ${p}`);
+      throw new Error(`${entry.name} ${entry.version} does not meet the module rules; nothing was added`);
+    }
+    out(`Added ${entry.name} ${entry.version} (${entry.sha.slice(0, 12)}) to ${dir}.`);
+    out(
+      'Review the change and commit it. Run `npm install`, restart, then turn it on in Settings → Modules.',
+    );
   },
 
   async 'db:migrate'() {

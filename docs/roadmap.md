@@ -12,10 +12,15 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 | 5     | Compliance readiness: profiles with enforced floors, access logging, data subject rights and consent, retention, encryption of sensitive data ([overview](compliance/overview.md))                                                                                                                                                                                                    | Done                           |
 | 6     | Gap closing ([plan](plan/phase-6.md)): quick wins, UI polish, rich text, records engine for modules, admin-defined objects, tool layer and MCP, assistant module (streamed, in a side panel), sales reports, delayed and scheduled automations, report builder with pivots and currency conversion, dashboard editing, object-to-object links, deal line items, OAuth for MCP clients | Done                           |
 | 7     | In-app help: page help sheet (ⓘ and `?`), knowledge base at `/help`, articles for every page and module with generated setting tables, blueprint help notes, guided tours                                                                                                                                                                                                             | Done                           |
+| 8     | Integrations and module marketplace ([plan](plan/phase-8.md)): module settings with encrypted secrets, marketplace UI, example integration, `module:new --integration`, module catalog in a git repository with `module:add` and `module:check`, developer MCP server for AI coding agents. Run-time upload and in-product generation are design only                                 | Done                           |
 
 ## Future
 
-- Integration and plugin marketplace: admins browse, install, configure and disable integrations in-app; a plugin framework with per-integration settings, permissions and audit.
+- Per-event notification choices (assignments, mentions, reminders separately) beyond the email and digest switches.
+- Email thread view and reply in thread; connect a mailbox by signing in; record-level sharing; field visibility for core columns; rule-based lead scoring; branching in automations; email sequences (from the phase 9 review).
+- Task statuses in blueprints (seed a task pipeline per industry); exports leave them out for now.
+- Comments on deals, contacts and other records (tasks have them since phase 9).
+- Task dependencies (blocked by) and time tracking on tasks.
 - Ready-made connectors for Zapier, Make and n8n (triggers and actions built on the existing webhooks and API keys).
 - Accounting and invoicing sync (UK and Australia first): Xero, QuickBooks Online, Sage, FreeAgent and MYOB, with two-way sync of customers, invoices and payments.
 

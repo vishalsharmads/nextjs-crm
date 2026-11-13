@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { DndContext } from '@dnd-kit/core';
 import type { DealDto } from '@app/shared';
 
@@ -67,5 +68,28 @@ describe('BoardColumn', () => {
     renderColumn({ deals: [deal('d1', 'Fable office'), deal('d2', 'Northwind desks')], settledId: 'd2' });
     expect(screen.getByText('Northwind desks').closest('article')).toHaveClass('anim-settle');
     expect(screen.getByText('Fable office').closest('article')).not.toHaveClass('anim-settle');
+  });
+
+  it('moves a card to another stage from its menu', async () => {
+    const onMoveTo = vi.fn();
+    const won = { ...stage, uuid: 's2', key: 'won', name: 'Signed', isWon: true };
+    const column = { stage, count: 1, total: 0, records: [deal('d1', 'Fable office')] };
+    const target = { stage: won, count: 0, total: 0, records: [] };
+    render(
+      <DndContext>
+        <BoardColumn
+          column={column}
+          stages={[column, target]}
+          onMoveTo={onMoveTo}
+          onOpen={() => undefined}
+          disabled={false}
+          dragging={false}
+          settledId={null}
+        />
+      </DndContext>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Move to stage' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Move to Signed/ }));
+    expect(onMoveTo).toHaveBeenCalledWith(column.records[0], target);
   });
 });

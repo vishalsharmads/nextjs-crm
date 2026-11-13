@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import {
+  AppError,
+  assertSafeUrl,
   audit,
   db,
   defineRoutes,
+  getModuleSettings,
   newUuid,
   notFound,
   registerModuleWidget,
@@ -65,11 +68,20 @@ const routes = defineRoutes('/m/notes-demo/notes', ['notes-demo'], 'notes-demo')
     },
   });
 
-registerModuleWidget('notes-demo.latest', async () => ({
-  notes: await db('m_notes_demo_notes').orderBy('id', 'desc').limit(5).select('uuid', 'title'),
-}));
+registerModuleWidget('notes-demo.latest', async () => {
+  const { widget_count } = await getModuleSettings('notes-demo');
+  const limit = Math.min(Math.max(Number(widget_count) || 5, 1), 20);
+  return { notes: await db('m_notes_demo_notes').orderBy('id', 'desc').limit(limit).select('uuid', 'title') };
+});
 
 export const notesDemo: ApiModule = {
   routes: () => [routes],
   migrations: { '0001_notes': m0001 },
+  // Reference only: checks the settings without calling out. A real integration would send a test request.
+  testConnection: async (settings) => {
+    if (!settings.share_url) throw new AppError('UPSTREAM_FAILED', 'Add a share address first.');
+    await assertSafeUrl(String(settings.share_url), 'share_url');
+    if (!settings.share_token) throw new AppError('UPSTREAM_FAILED', 'Add a share token first.');
+    return { message: 'The share address and token look right.' };
+  },
 };

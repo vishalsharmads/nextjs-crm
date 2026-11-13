@@ -6,11 +6,26 @@
   "description": "Invoices with line items, payments and overdue tracking. Accepted quotes convert in one click.",
   "depends_on": ["products"],
   "permissions": [
-    { "key": "invoices.invoices.view", "description": "View invoices" },
-    { "key": "invoices.invoices.create", "description": "Create invoices" },
-    { "key": "invoices.invoices.update", "description": "Edit, issue and void invoices" },
-    { "key": "invoices.invoices.delete", "description": "Delete draft invoices" },
-    { "key": "invoices.payments.manage", "description": "Record and remove payments" }
+    {
+      "key": "invoices.invoices.view",
+      "description": "View invoices"
+    },
+    {
+      "key": "invoices.invoices.create",
+      "description": "Create invoices"
+    },
+    {
+      "key": "invoices.invoices.update",
+      "description": "Edit, issue and void invoices"
+    },
+    {
+      "key": "invoices.invoices.delete",
+      "description": "Delete draft invoices"
+    },
+    {
+      "key": "invoices.payments.manage",
+      "description": "Record and remove payments"
+    }
   ],
   "menu_items": [
     {
@@ -23,11 +38,38 @@
     }
   ],
   "labels": {
-    "invoice": { "singular": "Invoice", "plural": "Invoices" },
-    "payment": { "singular": "Payment", "plural": "Payments" }
+    "invoice": {
+      "singular": "Invoice",
+      "plural": "Invoices"
+    },
+    "payment": {
+      "singular": "Payment",
+      "plural": "Payments"
+    }
   },
   "migrations_dir": "api/migrations",
   "api_entry": "api/index.ts",
   "web_entry": "web/index.tsx",
-  "dashboard_widgets": [{ "type": "invoices.receivables", "title": "Outstanding invoices" }]
+  "dashboard_widgets": [
+    {
+      "type": "invoices.receivables",
+      "title": "Outstanding invoices"
+    }
+  ],
+  "record_panels": [
+    {
+      "key": "invoices-deal",
+      "entity": "deal",
+      "title": "Invoices",
+      "permission": "invoices.invoices.view",
+      "order": 30
+    },
+    {
+      "key": "invoices-organization",
+      "entity": "organization",
+      "title": "Invoices",
+      "permission": "invoices.invoices.view",
+      "order": 30
+    }
+  ]
 }

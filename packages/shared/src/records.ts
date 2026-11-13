@@ -1,4 +1,5 @@
 import { toPatch } from './patch';
+import { recurrenceSchema, type Recurrence } from './recurrence';
 import { z } from 'zod';
 import {
   ACTIVITY_TYPES,
@@ -151,6 +152,12 @@ export interface ActivityDto {
   createdAt: string;
   updatedAt: string;
   overdue: boolean;
+  /** Status stage when the task pipeline is on. */
+  stage: LeadStageRef | null;
+  /** How the task repeats; completing it creates the next occurrence. */
+  recurrence: Recurrence | null;
+  /** Checklist progress; total 0 when the task has no checklist. */
+  checklist: { done: number; total: number };
 }
 
 // ---------- Inputs (shared by API validation and web forms) ----------
@@ -299,6 +306,9 @@ export const activityInputSchema = z.object({
   assigneeUuid: userRef,
   related: z.object({ type: z.enum(RELATED_TYPES), uuid: z.uuid() }).nullish(),
   reminderAt: isoDateTime,
+  recurrence: recurrenceSchema.nullish(),
+  pipelineUuid: z.uuid().optional(),
+  stageUuid: z.uuid().optional(),
   completed: z.boolean().optional(),
   custom: customInput,
 });
@@ -310,6 +320,36 @@ export const activityCreateSchema = activityInputSchema.refine(
   },
 );
 export const activityPatchSchema = toPatch(activityInputSchema);
+
+/** A comment on a task, call or meeting. `mentions` are the users notified, by uuid. */
+export interface ActivityCommentDto {
+  uuid: string;
+  body: string;
+  author: UserRef | null;
+  mentions: UserRef[];
+  createdAt: string;
+  editedAt: string | null;
+  /** The viewer wrote it (or is an admin), so may edit and delete it. */
+  canEdit: boolean;
+}
+export const activityCommentSchema = z.object({
+  body: z.string().trim().min(1).max(20_000),
+  mentions: z.array(z.uuid()).max(20).default([]),
+});
+export interface ChecklistItemDto {
+  uuid: string;
+  label: string;
+  done: boolean;
+  doneAt: string | null;
+  doneBy: UserRef | null;
+}
+export const checklistItemSchema = z.object({ label: z.string().trim().min(1).max(500) });
+export const checklistItemPatchSchema = z.object({
+  label: z.string().trim().min(1).max(500).optional(),
+  done: z.boolean().optional(),
+});
+export const checklistOrderSchema = z.object({ uuids: z.array(z.uuid()).min(1).max(200) });
+export const activityCommentPatchSchema = z.object({ body: z.string().trim().min(1).max(20_000) });
 
 export const BULK_ACTIONS = [
   'delete',

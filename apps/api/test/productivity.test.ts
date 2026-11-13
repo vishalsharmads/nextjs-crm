@@ -212,6 +212,10 @@ describe('dashboard, audit and notifications', () => {
       'activity.assigned',
       'activity.reminder',
     ]);
+    // Both open the task itself.
+    const links = list.body.data.map((n: { link: string }) => n.link);
+    expect(new Set(links).size).toBe(1);
+    expect(links[0]).toMatch(/^\/tasks\/[0-9a-f-]{36}$/);
     await c.post('/notifications/read-all').expect(204);
     expect((await c.get('/notifications/unread-count')).body.count).toBe(0);
     await new Promise((r) => setTimeout(r, 50));

@@ -11,8 +11,15 @@ import {
   Users,
   Mail,
   Flag,
+  Repeat,
 } from 'lucide-react';
-import { ENTITY_ROUTE, type ActivityDto, type ActivityType, type RelatedType } from '@app/shared';
+import {
+  ENTITY_ROUTE,
+  describeRecurrence,
+  type ActivityDto,
+  type ActivityType,
+  type RelatedType,
+} from '@app/shared';
 import { apiGet, apiPost } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { cn } from '@/lib/cn';
@@ -25,6 +32,7 @@ import { useSavedReplies } from '@/components/editor/use-templates';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge, EmptyState, Skeleton } from '@/components/ui/misc';
 import { UserPicker } from '@/components/fields/pickers';
+import { ChecklistProgress } from './task-checklist';
 
 export const ACTIVITY_ICON: Record<ActivityType, typeof StickyNote> = {
   note: StickyNote,
@@ -121,9 +129,12 @@ export function ActivityItem({ a, showRelated }: { a: ActivityDto; showRelated?:
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           {a.type !== 'note' ? (
-            <span className={cn('text-sm font-medium', done && 'text-muted line-through')}>
+            <Link
+              to={`/tasks/${a.uuid}`}
+              className={cn('text-sm font-medium hover:underline', done && 'text-muted line-through')}
+            >
               {a.subject || TYPE_LABEL[a.type]}
-            </span>
+            </Link>
           ) : null}
           {when ? (
             <span className={cn('flex items-center gap-1 text-xs', a.overdue ? 'text-accent' : 'text-muted')}>
@@ -136,6 +147,12 @@ export function ActivityItem({ a, showRelated }: { a: ActivityDto; showRelated?:
               <Flag className="size-3" /> High
             </Badge>
           ) : null}
+          {a.recurrence ? (
+            <span className="text-muted" title={describeRecurrence(a.recurrence)}>
+              <Repeat className="size-3" aria-label={describeRecurrence(a.recurrence)} />
+            </span>
+          ) : null}
+          {a.checklist?.total ? <ChecklistProgress checklist={a.checklist} /> : null}
           {showRelated && a.related ? <RelatedLink related={a.related} /> : null}
         </div>
         {a.body ? (

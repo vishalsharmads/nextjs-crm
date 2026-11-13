@@ -3,7 +3,9 @@ import { env } from '../../config/env';
 import { logger } from '../../lib/logger';
 import { newUuid } from '../../lib/ids';
 import { sendTemplatedEmail } from '../mail/templates';
-import { effectiveCompliance } from '../settings/settings.service';
+import { hasPermission, wallClock, zonedTime } from '@app/shared';
+import { loadAccess } from '../rbac/access';
+import { effectiveCompliance, getGroup } from '../settings/settings.service';
 
 export interface NotifyInput {
   type: string;
@@ -80,23 +82,79 @@ export async function sendDueReminders(now = new Date()): Promise<number> {
       type: 'activity.reminder',
       title: `Reminder: ${a.subject || a.type}`,
       body: a.due_at ? `Due ${new Date(a.due_at).toUTCString()}` : null,
-      link: await activityLink(a.related_type, a.related_id),
+      link: `/tasks/${a.uuid as string}`,
       email: true,
     });
   }
   return due.length;
 }
 
-const ROUTE: Record<string, { table: string; route: string }> = {
-  contact: { table: 'contacts', route: 'contacts' },
-  organization: { table: 'organizations', route: 'organizations' },
-  deal: { table: 'deals', route: 'deals' },
-  lead: { table: 'leads', route: 'leads' },
-};
+const DIGEST_HOUR = 8;
 
-async function activityLink(type: string | null, id: number | null): Promise<string> {
-  const meta = type ? ROUTE[type] : undefined;
-  if (!meta || !id) return '/tasks';
-  const row = await db(meta.table).where({ id }).first('uuid');
-  return row ? `/${meta.route}/${row.uuid}` : '/tasks';
+/**
+ * Each morning (08:00 workspace time or later), email people who turned the digest on a list of
+ * their open tasks due today and overdue. Runs often; each person is claimed once per local date
+ * with a conditional update, so concurrent workers and restarts never send twice. Skipped in the
+ * minimal-email compliance mode, because the list names tasks and records.
+ */
+export async function sendTaskDigests(now = new Date()): Promise<number> {
+  if ((await effectiveCompliance()).notificationEmailMinimal) return 0;
+  const { timezone } = await getGroup('general');
+  const tz = timezone || 'UTC';
+  const local = wallClock(now, tz);
+  if (local.hh < DIGEST_HOUR) return 0;
+  const today = `${local.y}-${String(local.m).padStart(2, '0')}-${String(local.d).padStart(2, '0')}`;
+  const endOfDay = zonedTime({ ...local, hh: 23, mm: 59 }, tz);
+  const users = await db('users')
+    .where({ status: 'active' })
+    .whereNull('deleted_at')
+    .whereRaw("JSON_EXTRACT(preferences, '$.taskDigest') = CAST('true' AS JSON)")
+    .select('id', 'email', 'first_name');
+  let sent = 0;
+  for (const u of users) {
+    const claimed = await db('users')
+      .where({ id: u.id })
+      .whereRaw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(preferences, '$.taskDigestSent')), '') <> ?", [today])
+      .update({
+        preferences: db.raw("JSON_SET(COALESCE(preferences, JSON_OBJECT()), '$.taskDigestSent', ?)", [today]),
+      });
+    if (!claimed) continue;
+    // Only people who may still see tasks get their subjects by email.
+    const access = await loadAccess(u.id as number);
+    if (!access.isAdmin && !hasPermission(access.permissions, 'core.activities.view')) continue;
+    const rows = await db('activities')
+      .where({ assignee_id: u.id })
+      .whereNull('deleted_at')
+      .whereNull('completed_at')
+      .whereNot('type', 'note')
+      .whereNotNull('due_at')
+      .where('due_at', '<=', endOfDay)
+      .orderBy('due_at')
+      .limit(50)
+      .select('uuid', 'subject', 'type', 'due_at');
+    if (!rows.length) continue;
+    const startOfDay = zonedTime({ ...local, hh: 0, mm: 0 }, tz);
+    const item = (r: (typeof rows)[number]) => ({
+      subject: r.subject || r.type,
+      link: `${env.APP_URL}/tasks/${r.uuid}`,
+      time: new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' }).format(
+        new Date(r.due_at),
+      ),
+    });
+    const overdue = rows.filter((r) => new Date(r.due_at) < startOfDay).map(item);
+    const dueToday = rows.filter((r) => new Date(r.due_at) >= startOfDay).map(item);
+    try {
+      await sendTemplatedEmail('tasks.digest', u.email, {
+        user: { firstName: u.first_name },
+        count: rows.length,
+        overdue,
+        today: dueToday,
+        tasksLink: `${env.APP_URL}/tasks`,
+      });
+      sent++;
+    } catch (err) {
+      logger.warn({ err }, 'Task digest email failed');
+    }
+  }
+  return sent;
 }
