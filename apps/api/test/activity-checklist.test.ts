@@ -29,7 +29,7 @@ describe('task checklists', () => {
       .where({ entity_uuid: task.body.uuid, action: 'activity.checklist_changed' })
       .count('* as n')
       .first();
-    expect(Number(audited?.n)).toBe(4);
+    expect(Number(audited?.n)).toBe(5); // add ×2, tick, reorder, remove
   });
 
   it('hides checklists on tasks outside the caller’s scope', async () => {

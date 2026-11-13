@@ -133,6 +133,11 @@ async function eraseCoreTraces(
     // Discussion on the person's activities goes too (deleting activities cascades to it).
     if (activityIds.length)
       add('activityComments', await trx('activity_comments').whereIn('activity_id', activityIds).delete());
+    if (activityIds.length)
+      add(
+        'activityChecklistItems',
+        await trx('activity_checklist_items').whereIn('activity_id', activityIds).delete(),
+      );
     // Subjects ("Call with Jane") and outcomes identify the person as much as the notes do.
     add(
       'activities',
@@ -371,6 +376,17 @@ export async function exportSubject(
             )
             .orderBy('id')
             .select('uuid', 'body', 'created_at', 'edited_at')
+        : [],
+    ),
+    activityChecklist: plain(
+      activities.length
+        ? await db('activity_checklist_items')
+            .whereIn(
+              'activity_id',
+              activities.map((a) => a.id),
+            )
+            .orderBy(['activity_id', 'position'])
+            .select('uuid', 'label', 'done_at', 'created_at')
         : [],
     ),
     emails: plain(

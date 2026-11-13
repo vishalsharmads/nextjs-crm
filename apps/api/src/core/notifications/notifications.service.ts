@@ -3,7 +3,8 @@ import { env } from '../../config/env';
 import { logger } from '../../lib/logger';
 import { newUuid } from '../../lib/ids';
 import { sendTemplatedEmail } from '../mail/templates';
-import { wallClock, zonedTime } from '@app/shared';
+import { hasPermission, wallClock, zonedTime } from '@app/shared';
+import { loadAccess } from '../rbac/access';
 import { effectiveCompliance, getGroup } from '../settings/settings.service';
 
 export interface NotifyInput {
@@ -118,6 +119,9 @@ export async function sendTaskDigests(now = new Date()): Promise<number> {
         preferences: db.raw("JSON_SET(COALESCE(preferences, JSON_OBJECT()), '$.taskDigestSent', ?)", [today]),
       });
     if (!claimed) continue;
+    // Only people who may still see tasks get their subjects by email.
+    const access = await loadAccess(u.id as number);
+    if (!access.isAdmin && !hasPermission(access.permissions, 'core.activities.view')) continue;
     const rows = await db('activities')
       .where({ assignee_id: u.id })
       .whereNull('deleted_at')

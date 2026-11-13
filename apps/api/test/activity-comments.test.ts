@@ -69,11 +69,13 @@ describe('activity comments', () => {
       .post('/activities', { type: 'task', subject: 'Call', related: { type: 'contact', uuid: c.body.uuid } })
       .expect(201);
     await client.post(`/activities/${task.body.uuid}/comments`, { body: 'About Erase Me' }).expect(201);
+    await client.post(`/activities/${task.body.uuid}/checklist`, { label: 'Call Erase Me' }).expect(201);
     const id = (await db('activities').where({ uuid: task.body.uuid }).first('id')).id;
     const count = async () =>
       Number((await db('activity_comments').where({ activity_id: id }).count('* as n').first())?.n);
     expect(await count()).toBe(1);
     await client.post(`/privacy/contact/${c.body.uuid}/anonymize`).expect(200);
     expect(await count()).toBe(0);
+    expect(await db('activity_checklist_items').where({ activity_id: id }).first()).toBeUndefined();
   });
 });

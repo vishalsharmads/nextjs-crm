@@ -179,7 +179,7 @@ export const checklistRoutes = defineRoutes('/activities', ['activities'])
     permission: 'core.activities.update',
     params: uuidParam,
     body: checklistOrderSchema,
-    handler: async ({ user, params, body }) => {
+    handler: async ({ ctx, user, params, body }) => {
       const rows = await db.transaction(async (trx) => {
         const activity = await getRow(activitiesDef, user, params.uuid, trx, { forUpdate: true });
         const items = await listRows(activity.id, trx);
@@ -188,6 +188,7 @@ export const checklistRoutes = defineRoutes('/activities', ['activities'])
           throw new AppError('VALIDATION_FAILED', 'Send every item of this checklist exactly once');
         for (const [position, uuid] of body.uuids.entries())
           await trx('activity_checklist_items').where({ uuid }).update({ position });
+        await log(trx, ctx, activity, { order: { from: items.map((i) => i.uuid), to: body.uuids } });
         return listRows(activity.id, trx);
       });
       return { data: await toDtos(rows) };
