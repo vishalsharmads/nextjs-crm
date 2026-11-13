@@ -1,4 +1,5 @@
 import { toPatch } from './patch';
+import { recurrenceSchema, type Recurrence } from './recurrence';
 import { z } from 'zod';
 import {
   ACTIVITY_TYPES,
@@ -151,6 +152,8 @@ export interface ActivityDto {
   createdAt: string;
   updatedAt: string;
   overdue: boolean;
+  /** How the task repeats; completing it creates the next occurrence. */
+  recurrence: Recurrence | null;
   /** Checklist progress; total 0 when the task has no checklist. */
   checklist: { done: number; total: number };
 }
@@ -301,6 +304,7 @@ export const activityInputSchema = z.object({
   assigneeUuid: userRef,
   related: z.object({ type: z.enum(RELATED_TYPES), uuid: z.uuid() }).nullish(),
   reminderAt: isoDateTime,
+  recurrence: recurrenceSchema.nullish(),
   completed: z.boolean().optional(),
   custom: customInput,
 });

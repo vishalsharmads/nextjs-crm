@@ -20,6 +20,7 @@ import { Timeline } from '@/features/records/timeline';
 import { ACTIVITY_ICON } from './activity-components';
 import { TaskComments } from './task-comments';
 import { TaskChecklist } from './task-checklist';
+import { ReminderControl, RepeatControl, reminderOffset } from './task-schedule';
 
 export const TASK_TYPE_LABEL: Record<Exclude<ActivityType, 'note' | 'email'>, string> = {
   task: 'Task',
@@ -44,7 +45,7 @@ export function useTaskPatch(uuid: string) {
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[7rem_1fr] items-center gap-2 py-1.5 text-sm">
+    <div className="grid grid-cols-[7rem_1fr] items-start gap-2 py-1.5 text-sm [&>span]:pt-2">
       <span className="text-muted">{label}</span>
       <div className="min-w-0">{children}</div>
     </div>
@@ -189,8 +190,35 @@ export function TaskPage() {
               key={when ?? 'none'}
               onBlur={(e) => {
                 const v = fromLocalInput(e.target.value);
-                if (v !== when) patch.mutate({ [whenField]: v });
+                if (v === when) return;
+                // A preset reminder ("1 hour before") moves with the due time.
+                const offset = reminderOffset(when, a.reminderAt);
+                const reminder =
+                  offset !== 'none' && offset !== 'custom'
+                    ? {
+                        reminderAt: v
+                          ? new Date(new Date(v).getTime() - Number(offset) * 60_000).toISOString()
+                          : null,
+                      }
+                    : {};
+                patch.mutate({ [whenField]: v, ...reminder });
               }}
+            />
+          </Row>
+          <Row label="Remind me">
+            <ReminderControl
+              dueAt={when}
+              reminderAt={a.reminderAt}
+              disabled={!editable}
+              onChange={(reminderAt) => patch.mutate({ reminderAt })}
+            />
+          </Row>
+          <Row label="Repeat">
+            <RepeatControl
+              key={JSON.stringify(a.recurrence)}
+              value={a.recurrence}
+              disabled={!editable}
+              onChange={(recurrence) => patch.mutate({ recurrence })}
             />
           </Row>
           <Row label="Priority">

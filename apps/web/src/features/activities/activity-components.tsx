@@ -11,8 +11,15 @@ import {
   Users,
   Mail,
   Flag,
+  Repeat,
 } from 'lucide-react';
-import { ENTITY_ROUTE, type ActivityDto, type ActivityType, type RelatedType } from '@app/shared';
+import {
+  ENTITY_ROUTE,
+  describeRecurrence,
+  type ActivityDto,
+  type ActivityType,
+  type RelatedType,
+} from '@app/shared';
 import { apiGet, apiPost } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { cn } from '@/lib/cn';
@@ -139,6 +146,11 @@ export function ActivityItem({ a, showRelated }: { a: ActivityDto; showRelated?:
             <Badge tone="accent">
               <Flag className="size-3" /> High
             </Badge>
+          ) : null}
+          {a.recurrence ? (
+            <span className="text-muted" title={describeRecurrence(a.recurrence)}>
+              <Repeat className="size-3" aria-label={describeRecurrence(a.recurrence)} />
+            </span>
           ) : null}
           {a.checklist?.total ? <ChecklistProgress checklist={a.checklist} /> : null}
           {showRelated && a.related ? <RelatedLink related={a.related} /> : null}

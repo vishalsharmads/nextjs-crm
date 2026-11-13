@@ -1,5 +1,12 @@
 import sanitizeHtml from 'sanitize-html';
-import { activityCreateSchema, activityPatchSchema, type ActivityDto, type RelatedType } from '@app/shared';
+import {
+  activityCreateSchema,
+  activityPatchSchema,
+  recurrenceSchema,
+  type ActivityDto,
+  type Recurrence,
+  type RelatedType,
+} from '@app/shared';
 import type { Db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
 import type { AuthUser } from '../../http/context';
@@ -17,8 +24,15 @@ import {
 } from '../records/common';
 import { iso, userIdFromRef, userRefs } from '../records/hydrate';
 import { checklistCounts } from './checklist-counts';
+import { spawnNextOccurrence } from './recurrence';
 
 type Row = Record<string, unknown> & { id: number };
+
+function parseRecurrence(v: unknown): Recurrence | null {
+  if (!v) return null;
+  const parsed = recurrenceSchema.safeParse(typeof v === 'string' ? JSON.parse(v) : v);
+  return parsed.success ? parsed.data : null;
+}
 
 export const RELATED_TABLE: Record<RelatedType, { table: string; title: string }> = {
   contact: { table: 'contacts', title: 'full_name' },
@@ -141,6 +155,8 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
         input.related as { type: RelatedType; uuid: string } | null | undefined,
       )),
     });
+    if (input.recurrence !== undefined)
+      row.recurrence = input.recurrence ? JSON.stringify(input.recurrence) : null;
     if (input.completed !== undefined)
       row.completed_at = input.completed ? (existing?.completed_at ?? new Date()) : null;
     if (input.reminderAt !== undefined) row.reminded_at = null;
@@ -151,6 +167,11 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
       if (row.type === 'note') row.completed_at = new Date();
     }
     return row;
+  },
+  async afterWrite(id, input, { conn, ctx, existing }, op) {
+    // Completing a recurring task through an edit creates the next one, like the Complete action.
+    if (op === 'update' && input.completed === true && existing && !existing.completed_at)
+      await spawnNextOccurrence(conn, ctx, id);
   },
   async toDtos(rows, { user, conn }) {
     const [users, cf, checklists] = await Promise.all([
@@ -197,6 +218,7 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
         createdAt: iso(r.created_at)!,
         updatedAt: iso(r.updated_at)!,
         overdue: !r.completed_at && !!r.due_at && new Date(r.due_at as string).getTime() < now,
+        recurrence: parseRecurrence(r.recurrence),
         checklist: checklists.get(r.id) ?? { done: 0, total: 0 },
       };
     });

@@ -19,3 +19,4 @@ export * from './tokens';
 export * from './reports';
 export * from './report-builder';
 export * from './settings-help';
+export * from './recurrence';

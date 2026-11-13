@@ -10,6 +10,7 @@ import { recordDefs } from '../records/registry';
 import { activitiesDef } from './activities.def';
 import { activityCommentRoutes } from './comments';
 import { checklistRoutes } from './checklist';
+import { spawnNextOccurrence } from './recurrence';
 
 async function setCompleted(
   ctx: Parameters<typeof audit>[1],
@@ -29,11 +30,17 @@ async function setCompleted(
       entityUuid: uuid,
       diff: { completed: { from: !done, to: done } },
     });
-    return trx('activities').where({ id: a.id }).first();
+    // Completing a recurring task creates the next one (only when it was open).
+    const spawned = done && !a.completed_at ? await spawnNextOccurrence(trx, ctx, a.id) : null;
+    return { row: await trx('activities').where({ id: a.id }).first(), spawned };
   });
-  const [dto] = await activitiesDef.toDtos([row], { user, conn: db });
+  const [dto] = await activitiesDef.toDtos([row.row], { user, conn: db });
   if (done)
     await emitRecordEvent(activitiesDef, 'completed', dto as unknown as Record<string, unknown>, user);
+  if (row.spawned) {
+    const [next] = await activitiesDef.toDtos([row.spawned], { user, conn: db });
+    await emitRecordEvent(activitiesDef, 'created', next as unknown as Record<string, unknown>, user);
+  }
   return dto!;
 }
 

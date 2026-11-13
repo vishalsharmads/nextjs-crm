@@ -13,6 +13,11 @@ One task, call or meeting on its own page.
 - **Complete** marks it done; **Reopen** brings it back to your list.
 - The record it belongs to is linked on the left.
 
+## Reminders and repeats
+
+- **Remind me** sends a notification (and an email, if you get notification emails) before the task is due. Moving the due date moves the reminder with it.
+- **Repeat** makes the task recurring: daily, weekly (on chosen days), monthly or yearly, every so many periods. When you complete it, the next one is created with the same details, assignee and an unticked checklist. Occurrences already in the past are skipped. Repeats follow the workspace time zone, so "9:00 every Monday" stays 9:00 across clock changes.
+
 ## Checklist
 
 - Break the work into steps under **Checklist**. Tick items as you go; the progress bar and the count in lists show how far along it is.
