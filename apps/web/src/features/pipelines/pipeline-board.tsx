@@ -401,35 +401,33 @@ function SortableCard({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition: instant ? 'none' : transition }}
-      className={cn(isDragging && 'opacity-40')}
+      className={cn('group relative', isDragging && 'opacity-40')}
       {...attributes}
       {...listeners}
     >
-      <div className="group relative">
-        <RecordCard record={record} onOpen={() => onOpen(record.uuid)} settled={settled} />
-        {moveTargets.length ? (
-          <Menu>
-            <MenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="Move to stage"
-                onPointerDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                className="absolute end-1.5 top-1.5 rounded-sm p-1 text-muted opacity-0 group-hover:opacity-100 hover:bg-hover hover:text-ink focus-visible:opacity-100 pointer-coarse:opacity-100"
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
-            </MenuTrigger>
-            <MenuContent>
-              {moveTargets.map((c) => (
-                <MenuItem key={c.stage.uuid} onSelect={() => onMoveTo(c)}>
-                  <StageDot color={c.stage.color} /> Move to {c.stage.name}
-                </MenuItem>
-              ))}
-            </MenuContent>
-          </Menu>
-        ) : null}
-      </div>
+      <RecordCard record={record} onOpen={() => onOpen(record.uuid)} settled={settled} />
+      {moveTargets.length ? (
+        <Menu>
+          <MenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Move to stage"
+              onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              className="absolute end-1.5 top-1.5 rounded-sm p-1 text-muted opacity-0 group-hover:opacity-100 hover:bg-hover hover:text-ink focus-visible:opacity-100 pointer-coarse:opacity-100"
+            >
+              <MoreHorizontal className="size-4" />
+            </button>
+          </MenuTrigger>
+          <MenuContent>
+            {moveTargets.map((c) => (
+              <MenuItem key={c.stage.uuid} onSelect={() => onMoveTo(c)}>
+                <StageDot color={c.stage.color} /> Move to {c.stage.name}
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </Menu>
+      ) : null}
     </div>
   );
 }
