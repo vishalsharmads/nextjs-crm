@@ -1,5 +1,7 @@
 # Writing a module
 
+New to modules? Start with [module-development.md](module-development.md), the start-to-finish guide from idea to catalog submission.
+
 Modules add industry features that need their own tables and screens (bookings, tickets, invoices). They are compiled into the build and turned on or off per instance at runtime. Turning a module off hides it; its data stays.
 
 There are two reference modules. Use `modules/records-demo` for a record type that behaves like contacts or deals, and `modules/notes-demo` for a module that writes its own routes and screens.
