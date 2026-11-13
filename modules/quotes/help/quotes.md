@@ -17,6 +17,8 @@ Priced proposals with line items, linked to {{dealPluralLower}}, that customers 
 - **Convert** an accepted quote to an invoice in one click.
 - Quotes expire after the number of days in Settings → Sales documents.
 
+- A **Quotes** tab on each {{dealLower}} and {{organizationLower}} page lists the quotes linked to it, with totals and status.
+
 ## Permissions
 
 <!-- generated:permissions:quotes. -->

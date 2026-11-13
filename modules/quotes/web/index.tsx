@@ -519,6 +519,43 @@ function QuoteDetail() {
   );
 }
 
+/** Quotes tab on deal and organization pages: what was proposed, and where it stands. */
+function QuotesPanel({ entity, uuid }: { entity: string; uuid: string }) {
+  const list = useQuery({
+    queryKey: [...KEY, 'panel', entity, uuid],
+    queryFn: () =>
+      apiGet<{ data: Quote[]; meta: { total: number } }>(BASE, {
+        [entity === 'deal' ? 'dealUuid' : 'organizationUuid']: uuid,
+        pageSize: 50,
+      }),
+  });
+  if (list.isPending) return <Skeleton className="h-24" />;
+  if (list.isError) return <ErrorState error={list.error} onRetry={() => void list.refetch()} />;
+  if (!list.data.data.length)
+    return (
+      <EmptyState
+        icon={<FileText />}
+        title="No quotes yet"
+        description="Quotes linked to this record will appear here."
+      />
+    );
+  return (
+    <ul className="divide-y divide-line rounded-md border border-line bg-surface">
+      {list.data.data.map((q) => (
+        <li key={q.uuid} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+          <Link to={`${BASE}/${q.uuid}`} className="min-w-0 truncate font-medium hover:underline">
+            {q.number} · {q.title}
+          </Link>
+          <span className="flex shrink-0 items-center gap-3">
+            <span className="tabular">{formatMoney(q.total, q.currency)}</span>
+            <QuoteStatus status={q.status} />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 const quotesModule: WebModule = {
   key: 'quotes',
   routes: [
@@ -527,6 +564,10 @@ const quotesModule: WebModule = {
     { path: ':uuid', element: <QuoteDetail /> },
     { path: ':uuid/edit', element: <QuoteEditor /> },
   ],
+  panels: {
+    'quotes-deal': (p) => <QuotesPanel {...p} />,
+    'quotes-organization': (p) => <QuotesPanel {...p} />,
+  },
 };
 
 export default quotesModule;
