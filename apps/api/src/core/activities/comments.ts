@@ -133,6 +133,17 @@ export async function addComment(
   return (await toDtos([row], user))[0]!;
 }
 
+/** Comments on a task, oldest first (scope applies through the task). */
+export async function listComments(user: AuthUser, activityUuid: string): Promise<ActivityCommentDto[]> {
+  const activity = await getRow(activitiesDef, user, activityUuid);
+  const rows = (await db('activity_comments')
+    .where({ activity_id: activity.id })
+    .whereNull('deleted_at')
+    .orderBy('id')
+    .limit(500)) as Row[];
+  return toDtos(rows, user);
+}
+
 export const activityCommentRoutes = defineRoutes('/activities', ['activities'])
   .add({
     method: 'patch',
@@ -183,15 +194,7 @@ export const activityCommentRoutes = defineRoutes('/activities', ['activities'])
     path: '/:uuid/comments',
     permission: 'core.activities.view',
     params: uuidParam,
-    handler: async ({ user, params }) => {
-      const activity = await getRow(activitiesDef, user, params.uuid);
-      const rows = (await db('activity_comments')
-        .where({ activity_id: activity.id })
-        .whereNull('deleted_at')
-        .orderBy('id')
-        .limit(500)) as Row[];
-      return { data: await toDtos(rows, user) };
-    },
+    handler: async ({ user, params }) => ({ data: await listComments(user, params.uuid) }),
   })
   .add({
     method: 'post',

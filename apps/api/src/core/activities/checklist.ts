@@ -79,6 +79,40 @@ async function log(
   });
 }
 
+/** Add an item at the end of a task's checklist (also used by tools). */
+export async function addChecklistItem(
+  ctx: RequestContext,
+  user: AuthUser,
+  activityUuid: string,
+  label: string,
+): Promise<ChecklistItemDto> {
+  const row = await db.transaction(async (trx) => {
+    const activity = await getRow(activitiesDef, user, activityUuid, trx, { forUpdate: true });
+    const stats = await trx('activity_checklist_items')
+      .where({ activity_id: activity.id })
+      .count('* as n')
+      .max('position as top')
+      .first();
+    if (Number(stats?.n ?? 0) >= MAX_ITEMS)
+      throw new AppError('VALIDATION_FAILED', `A checklist holds at most ${MAX_ITEMS} items`);
+    const [id] = await trx('activity_checklist_items').insert({
+      uuid: newUuid(),
+      activity_id: activity.id,
+      label,
+      position: Number(stats?.top ?? -1) + 1,
+    });
+    await log(trx, ctx, activity, { [`item:${label}`]: { from: null, to: 'added' } });
+    return (await trx('activity_checklist_items').where({ id }).first()) as Row;
+  });
+  return (await toDtos([row]))[0]!;
+}
+
+/** A task's checklist, for tools (scope applies through the task). */
+export async function listChecklist(user: AuthUser, activityUuid: string): Promise<ChecklistItemDto[]> {
+  const activity = await getRow(activitiesDef, user, activityUuid);
+  return toDtos(await listRows(activity.id));
+}
+
 export const checklistRoutes = defineRoutes('/activities', ['activities'])
   .add({
     method: 'patch',
@@ -128,10 +162,7 @@ export const checklistRoutes = defineRoutes('/activities', ['activities'])
     path: '/:uuid/checklist',
     permission: 'core.activities.view',
     params: uuidParam,
-    handler: async ({ user, params }) => {
-      const activity = await getRow(activitiesDef, user, params.uuid);
-      return { data: await toDtos(await listRows(activity.id)) };
-    },
+    handler: async ({ user, params }) => ({ data: await listChecklist(user, params.uuid) }),
   })
   .add({
     method: 'post',
@@ -140,27 +171,7 @@ export const checklistRoutes = defineRoutes('/activities', ['activities'])
     params: uuidParam,
     body: checklistItemSchema,
     status: 201,
-    handler: async ({ ctx, user, params, body }) => {
-      const row = await db.transaction(async (trx) => {
-        const activity = await getRow(activitiesDef, user, params.uuid, trx, { forUpdate: true });
-        const stats = await trx('activity_checklist_items')
-          .where({ activity_id: activity.id })
-          .count('* as n')
-          .max('position as top')
-          .first();
-        if (Number(stats?.n ?? 0) >= MAX_ITEMS)
-          throw new AppError('VALIDATION_FAILED', `A checklist holds at most ${MAX_ITEMS} items`);
-        const [id] = await trx('activity_checklist_items').insert({
-          uuid: newUuid(),
-          activity_id: activity.id,
-          label: body.label,
-          position: Number(stats?.top ?? -1) + 1,
-        });
-        await log(trx, ctx, activity, { [`item:${body.label}`]: { from: null, to: 'added' } });
-        return (await trx('activity_checklist_items').where({ id }).first()) as Row;
-      });
-      return (await toDtos([row]))[0];
-    },
+    handler: ({ ctx, user, params, body }) => addChecklistItem(ctx, user, params.uuid, body.label),
   })
   .add({
     method: 'put',
