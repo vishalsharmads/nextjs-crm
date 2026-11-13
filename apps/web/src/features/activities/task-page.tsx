@@ -6,6 +6,7 @@ import { ArrowLeft, Check, MoreHorizontal, RotateCcw, Trash2 } from 'lucide-reac
 import { ENTITY_ROUTE, type ActivityDto, type ActivityType } from '@app/shared';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { fromLocalInput, toLocalInput } from '@/lib/format';
+import { qk } from '@/lib/query-keys';
 import { useBranding } from '@/app/branding';
 import { useCan, useLabel, useT } from '@/app/session';
 import { setDocumentTitle } from '@/theme/apply';
@@ -18,6 +19,7 @@ import { UserPicker } from '@/components/fields/pickers';
 import { Timeline } from '@/features/records/timeline';
 import { ACTIVITY_ICON } from './activity-components';
 import { TaskComments } from './task-comments';
+import { TaskChecklist } from './task-checklist';
 
 export const TASK_TYPE_LABEL: Record<Exclude<ActivityType, 'note' | 'email'>, string> = {
   task: 'Task',
@@ -25,7 +27,7 @@ export const TASK_TYPE_LABEL: Record<Exclude<ActivityType, 'note' | 'email'>, st
   meeting: 'Meeting',
 };
 
-export const taskKey = (uuid: string) => ['records', 'activities', 'detail', uuid] as const;
+const taskKey = (uuid: string) => qk.record('activities', uuid);
 
 /** Patch one task and refresh every list that may show it. */
 export function useTaskPatch(uuid: string) {
@@ -253,6 +255,12 @@ export function TaskPage() {
               <p className="text-sm text-muted">No description.</p>
             )}
           </section>
+          {a.type !== 'note' ? (
+            <section>
+              <h2 className="mb-2 text-sm font-semibold">Checklist</h2>
+              <TaskChecklist taskUuid={a.uuid} editable={editable} />
+            </section>
+          ) : null}
           <section>
             <h2 className="mb-2 text-sm font-semibold">Comments</h2>
             <TaskComments taskUuid={a.uuid} />

@@ -25,6 +25,7 @@ import { useSavedReplies } from '@/components/editor/use-templates';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge, EmptyState, Skeleton } from '@/components/ui/misc';
 import { UserPicker } from '@/components/fields/pickers';
+import { ChecklistProgress } from './task-checklist';
 
 export const ACTIVITY_ICON: Record<ActivityType, typeof StickyNote> = {
   note: StickyNote,
@@ -139,6 +140,7 @@ export function ActivityItem({ a, showRelated }: { a: ActivityDto; showRelated?:
               <Flag className="size-3" /> High
             </Badge>
           ) : null}
+          {a.checklist?.total ? <ChecklistProgress checklist={a.checklist} /> : null}
           {showRelated && a.related ? <RelatedLink related={a.related} /> : null}
         </div>
         {a.body ? (

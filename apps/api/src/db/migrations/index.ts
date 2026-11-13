@@ -22,6 +22,7 @@ import * as m0020 from './0020_exchange_rates';
 import * as m0021 from './0021_mcp_oauth';
 import * as m0022 from './0022_oauth_families';
 import * as m0023 from './0023_activity_comments';
+import * as m0024 from './0024_activity_checklists';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -53,4 +54,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0021_mcp_oauth': m0021,
   '0022_oauth_families': m0022,
   '0023_activity_comments': m0023,
+  '0024_activity_checklists': m0024,
 };

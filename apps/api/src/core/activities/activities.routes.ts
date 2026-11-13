@@ -9,6 +9,7 @@ import { recordRoutes, uuidParam } from '../records/routes';
 import { recordDefs } from '../records/registry';
 import { activitiesDef } from './activities.def';
 import { activityCommentRoutes } from './comments';
+import { checklistRoutes } from './checklist';
 
 async function setCompleted(
   ctx: Parameters<typeof audit>[1],
@@ -39,6 +40,7 @@ async function setCompleted(
 export const activitiesRoutes = [
   // Static `/comments/:uuid` paths before `/:uuid`.
   activityCommentRoutes,
+  checklistRoutes,
   defineRoutes('/activities', ['activities'])
     .add({
       method: 'get',

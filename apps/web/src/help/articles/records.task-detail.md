@@ -13,6 +13,11 @@ One task, call or meeting on its own page.
 - **Complete** marks it done; **Reopen** brings it back to your list.
 - The record it belongs to is linked on the left.
 
+## Checklist
+
+- Break the work into steps under **Checklist**. Tick items as you go; the progress bar and the count in lists show how far along it is.
+- Drag the handle (or focus it and use the arrow keys) to reorder items. Rename an item by editing its text.
+
 ## Comments
 
 - Discuss the work under **Comments**. The assignee and the person who created it are told about new comments.

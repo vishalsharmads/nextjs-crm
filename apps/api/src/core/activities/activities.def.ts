@@ -16,6 +16,7 @@ import {
   timestampsFields,
 } from '../records/common';
 import { iso, userIdFromRef, userRefs } from '../records/hydrate';
+import { checklistCounts } from './checklist-counts';
 
 type Row = Record<string, unknown> & { id: number };
 
@@ -152,12 +153,16 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
     return row;
   },
   async toDtos(rows, { user, conn }) {
-    const [users, cf] = await Promise.all([
+    const [users, cf, checklists] = await Promise.all([
       userRefs(
         rows.flatMap((r) => [r.assignee_id as number, r.owner_id as number]),
         conn,
       ),
       customContext('activity', user),
+      checklistCounts(
+        rows.map((r) => r.id),
+        conn,
+      ),
     ]);
     const related = new Map<string, { uuid: string; title: string }>();
     for (const type of Object.keys(RELATED_TABLE) as RelatedType[]) {
@@ -192,6 +197,7 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
         createdAt: iso(r.created_at)!,
         updatedAt: iso(r.updated_at)!,
         overdue: !r.completed_at && !!r.due_at && new Date(r.due_at as string).getTime() < now,
+        checklist: checklists.get(r.id) ?? { done: 0, total: 0 },
       };
     });
   },

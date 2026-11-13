@@ -151,6 +151,8 @@ export interface ActivityDto {
   createdAt: string;
   updatedAt: string;
   overdue: boolean;
+  /** Checklist progress; total 0 when the task has no checklist. */
+  checklist: { done: number; total: number };
 }
 
 // ---------- Inputs (shared by API validation and web forms) ----------
@@ -326,6 +328,19 @@ export const activityCommentSchema = z.object({
   body: z.string().trim().min(1).max(20_000),
   mentions: z.array(z.uuid()).max(20).default([]),
 });
+export interface ChecklistItemDto {
+  uuid: string;
+  label: string;
+  done: boolean;
+  doneAt: string | null;
+  doneBy: UserRef | null;
+}
+export const checklistItemSchema = z.object({ label: z.string().trim().min(1).max(500) });
+export const checklistItemPatchSchema = z.object({
+  label: z.string().trim().min(1).max(500).optional(),
+  done: z.boolean().optional(),
+});
+export const checklistOrderSchema = z.object({ uuids: z.array(z.uuid()).min(1).max(200) });
 export const activityCommentPatchSchema = z.object({ body: z.string().trim().min(1).max(20_000) });
 
 export const BULK_ACTIONS = [
