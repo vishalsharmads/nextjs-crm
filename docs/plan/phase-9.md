@@ -1,6 +1,6 @@
 # Phase 9: tasks upgrade and CRM quick wins
 
-Status: in progress (9a).
+Status: 9a and 9b are built.
 
 Tasks (activities of type task, call and meeting) grow from a flat "My work" list into a full work-management surface: a detail page, comments with mentions, an optional status pipeline, checklists, recurrence, reminders and a rebuilt My work page. 9b follows with small, high-value improvements found in a review of the whole CRM.
 
@@ -9,7 +9,7 @@ Tasks (activities of type task, call and meeting) grow from a flat "My work" lis
 | Milestone | Scope |
 | --------- | ----- |
 | 9a | Task detail page, comments and mentions, task pipeline (behind a flag), checklists, recurring tasks, reminder UI and daily digest, My work rebuild, calendar drag and create, tools |
-| 9b | Notification preferences page, "Move to stage" on board cards, quote and invoice panels on deal and organization pages |
+| 9b | "Move to stage" on board cards, quote and invoice panels on deal and organization pages (notification preferences shipped with the digest in 9a) |
 
 ## Decisions
 
@@ -24,6 +24,15 @@ Tasks (activities of type task, call and meeting) grow from a flat "My work" lis
 | Recurrence is stored on the task; completing it creates the next one in the same transaction | No scheduler needed, and no orphan series if a task is deleted |
 | Next due dates are computed in the workspace time zone | "Every Monday 9:00" must not drift across daylight saving changes |
 | The daily digest is opt-in per person and skipped in the minimal-email compliance mode | Avoids unwanted email and respects compliance floors |
+
+## Built
+
+- 9a: task page (`/tasks/:uuid`), comments with mentions (`activity_comments`), checklists (`activity_checklist_items`), recurrence (`activities.recurrence`, shared `recurrence.ts`), reminder presets, daily digest (`tasks.digest`, opt-in in the profile), My work rebuild, calendar drag and create, task statuses (`features.taskPipeline`, `activity_stage_history`), task tools (`update_task`, `get_task`, `add_task_comment`, `add_checklist_item`).
+- 9b: Move to on board cards; Quotes and Invoices tabs on deal and organization pages.
+
+## Next candidates (from the CRM review)
+
+Email thread view and reply in thread; connecting a mailbox by signing in; record-level sharing; field visibility for core columns; rule-based lead scoring; branching in automations; sequences. Each needs its own plan.
 
 ## Future (parked)
 

@@ -16,6 +16,8 @@ Phases come from the product brief. Ideas that come up during a phase but sit ou
 
 ## Future
 
+- Per-event notification choices (assignments, mentions, reminders separately) beyond the email and digest switches.
+- Email thread view and reply in thread; connect a mailbox by signing in; record-level sharing; field visibility for core columns; rule-based lead scoring; branching in automations; email sequences (from the phase 9 review).
 - Task statuses in blueprints (seed a task pipeline per industry); exports leave them out for now.
 - Comments on deals, contacts and other records (tasks have them since phase 9).
 - Task dependencies (blocked by) and time tracking on tasks.
