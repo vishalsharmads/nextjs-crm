@@ -20,7 +20,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, MoreHorizontal } from 'lucide-react';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import type { ActivityDto, DealDto, FilterCondition, LeadDto } from '@app/shared';
 import { apiGet, apiPatch } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
@@ -205,6 +206,13 @@ export function PipelineBoard({
     const beforeUuid =
       overIndex > 0 ? siblings[overIndex - 1]?.uuid : overIndex === -1 ? siblings.at(-1)?.uuid : undefined;
     if (column.stage.uuid === fromStage && overId === deal.uuid) return;
+    moveTo(deal, column, beforeUuid, afterUuid);
+  };
+
+  /** Move a card to a column (drag or the card's menu); a lost deal asks for a reason first. */
+  const moveTo = (deal: BoardRecord, column: Column, beforeUuid?: string, afterUuid?: string) => {
+    if (!deal.stage) return;
+    const fromStage = deal.stage.uuid;
     if (
       entity === 'deal' &&
       column.stage.isLost &&
@@ -264,6 +272,8 @@ export function PipelineBoard({
           <BoardColumn
             key={c.stage.uuid}
             column={c}
+            stages={board.data.columns}
+            onMoveTo={(record, target) => moveTo(record, target)}
             onOpen={onOpen}
             disabled={!canMove}
             dragging={!!activeId}
@@ -301,12 +311,17 @@ export function PipelineBoard({
 
 export function BoardColumn({
   column,
+  stages,
+  onMoveTo,
   onOpen,
   disabled,
   dragging,
   settledId,
 }: {
   column: Column;
+  /** Every column, for the card's "Move to" menu. */
+  stages?: Column[];
+  onMoveTo?: (record: BoardRecord, column: Column) => void;
   onOpen: (uuid: string) => void;
   disabled: boolean;
   /** A card is being dragged somewhere on the board. */
@@ -342,6 +357,8 @@ export function BoardColumn({
             <SortableCard
               key={d.uuid}
               record={d}
+              moveTargets={disabled ? [] : (stages ?? []).filter((c) => c.stage.uuid !== column.stage.uuid)}
+              onMoveTo={(target) => onMoveTo?.(d, target)}
               onOpen={onOpen}
               disabled={disabled}
               settled={settledId === d.uuid}
@@ -361,12 +378,16 @@ export function BoardColumn({
 
 function SortableCard({
   record,
+  moveTargets,
+  onMoveTo,
   onOpen,
   disabled,
   settled,
   instant,
 }: {
   record: BoardRecord;
+  moveTargets: Column[];
+  onMoveTo: (column: Column) => void;
   onOpen: (uuid: string) => void;
   disabled: boolean;
   settled: boolean;
@@ -384,7 +405,31 @@ function SortableCard({
       {...attributes}
       {...listeners}
     >
-      <RecordCard record={record} onOpen={() => onOpen(record.uuid)} settled={settled} />
+      <div className="group relative">
+        <RecordCard record={record} onOpen={() => onOpen(record.uuid)} settled={settled} />
+        {moveTargets.length ? (
+          <Menu>
+            <MenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Move to stage"
+                onPointerDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+                className="absolute end-1.5 top-1.5 rounded-sm p-1 text-muted opacity-0 group-hover:opacity-100 hover:bg-hover hover:text-ink focus-visible:opacity-100 pointer-coarse:opacity-100"
+              >
+                <MoreHorizontal className="size-4" />
+              </button>
+            </MenuTrigger>
+            <MenuContent>
+              {moveTargets.map((c) => (
+                <MenuItem key={c.stage.uuid} onSelect={() => onMoveTo(c)}>
+                  <StageDot color={c.stage.color} /> Move to {c.stage.name}
+                </MenuItem>
+              ))}
+            </MenuContent>
+          </Menu>
+        ) : null}
+      </div>
     </div>
   );
 }
