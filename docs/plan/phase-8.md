@@ -81,7 +81,13 @@ Startup already runs new migrations of enabled modules (`migrateEnabledModules`)
 - **Bundles.** A bundle is a pre-built API file, a web chunk, `manifest.json` and migrations, signed with an ed25519 publisher key. Trusted keys are listed in `MODULE_PUBLISHER_KEYS`.
 - **Installing.** The bundle is verified, unpacked under `STORAGE_DIR/modules/<key>/<version>`, and loaded at the next restart.
 - **Limits.** Migrations may only touch `m_<key>_*` tables, and the bundle may not include native dependencies.
-- **Open question.** Uploaded modules run with full process rights: is a signed publisher enough, or do they need a worker or isolate sandbox? This must be answered before 8d is built.
+- **Decision: signed publishers, no in-process sandbox.** An uploaded module is treated as trusted code, exactly like a module in the release.
+  - **Why no sandbox.** Node's `vm` is not a security boundary, and a real one (a worker process talking to the app over a narrow RPC API, with its own database user) would mean a second module API to design, version and keep in step with the records engine, events, jobs and privacy handlers. Modules need the database, so the effort would buy little isolation.
+  - **How signing works.** A module installs only if its bundle is signed by an ed25519 key listed in `MODULE_PUBLISHER_KEYS`, which the server operator sets in `.env`. An admin in the app cannot add a key.
+  - **Same checks as a release.** `checkModuleFolder` runs on the bundle (imports, `m_<key>_*` tables, no `child_process`/`eval`, brand names), and migrations may touch only `m_<key>_*` tables.
+  - **Approval.** Install needs `core.modules.manage` and 2FA, is audited, and takes effect on the next restart.
+  - **Untrusted code stays outside.** Code from parties the operator does not trust connects from outside through webhooks, personal access tokens and MCP, never as a module.
+  - **Revisit.** Reopen the sandbox question only if modules from unknown third-party publishers become a goal.
 
 ## 8f: in-product module generation (design only)
 
@@ -96,4 +102,4 @@ Startup already runs new migrations of enabled modules (`migrateEnabledModules`)
 | Settings in `module_states.settings`, not per-module tables | One audited, encrypted path every module gets for free |
 | Secrets write-only | Same as webhooks and the assistant key |
 | Developer MCP separate from product MCP | Different trust: files in a checkout vs data in an instance |
-| Run-time upload and generation design only | Running uploaded code needs a sandboxing decision first |
+| Run-time upload and generation design only | Built later; 8d trust model decided: signed publishers set by the operator, no in-process sandbox |
