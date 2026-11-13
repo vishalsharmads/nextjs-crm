@@ -5,7 +5,7 @@ import { syncPermissions } from './core/rbac/catalog';
 import { isInstalled } from './core/settings/settings.service';
 import { logger } from './lib/logger';
 import { every, startJobWorker, stopJobWorker, stopSchedules } from './lib/jobs';
-import { sendDueReminders } from './core/notifications/notifications.service';
+import { sendDueReminders, sendTaskDigests } from './core/notifications/notifications.service';
 import { env, isTest } from './config/env';
 import './core/imports/import-export';
 import { startWebhookRetries } from './core/webhooks/webhooks';
@@ -43,6 +43,7 @@ export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promi
   if (!isTest) {
     startJobWorker();
     every(60_000, 'activity-reminders', () => sendDueReminders());
+    every(10 * 60_000, 'tasks.digest', () => sendTaskDigests());
     startWebhookRetries();
     startMailSync();
     startAutomationScheduler();
