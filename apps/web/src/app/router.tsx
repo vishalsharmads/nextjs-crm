@@ -44,6 +44,7 @@ const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'
 const DealsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'DealsPage');
 const LeadsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'LeadsPage');
 const TasksPage = lazyPage(() => import('@/features/activities/tasks-page'), 'TasksPage');
+const TaskPage = lazyPage(() => import('@/features/activities/task-page'), 'TaskPage');
 const ImportPage = lazyPage(() => import('@/features/imports/import-page'), 'ImportPage');
 const DashboardPage = lazyPage(() => import('@/features/dashboard/dashboard-page'), 'DashboardPage');
 const AuditPage = lazyPage(() => import('@/features/audit/audit-page'), 'AuditPage');
@@ -173,6 +174,7 @@ export const router = createBrowserRouter(
             { path: 'reports', element: page(<ReportsPage />) },
             { path: 'help', element: page(<HelpPage />) },
             { path: 'tasks', element: page(<TasksPage />) },
+            { path: 'tasks/:uuid', element: <TaskPage /> },
             { path: 'calendar', element: page(<CalendarPage />) },
             {
               path: 'settings',

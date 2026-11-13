@@ -313,7 +313,10 @@ export async function notifyAssignment(
     {
       type: `${def.entity}.assigned`,
       title: `${who} assigned you ${title ? `“${title}”` : 'a record'}`,
-      link: def.entity === 'activity' ? '/tasks' : `${recordBasePath(def)}/${row.uuid as string}`,
+      link:
+        def.entity === 'activity'
+          ? `/tasks/${row.uuid as string}`
+          : `${recordBasePath(def)}/${row.uuid as string}`,
       data: { entity: def.entity, uuid: row.uuid },
       email: true,
     },

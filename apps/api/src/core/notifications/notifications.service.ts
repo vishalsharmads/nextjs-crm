@@ -80,23 +80,9 @@ export async function sendDueReminders(now = new Date()): Promise<number> {
       type: 'activity.reminder',
       title: `Reminder: ${a.subject || a.type}`,
       body: a.due_at ? `Due ${new Date(a.due_at).toUTCString()}` : null,
-      link: await activityLink(a.related_type, a.related_id),
+      link: `/tasks/${a.uuid as string}`,
       email: true,
     });
   }
   return due.length;
-}
-
-const ROUTE: Record<string, { table: string; route: string }> = {
-  contact: { table: 'contacts', route: 'contacts' },
-  organization: { table: 'organizations', route: 'organizations' },
-  deal: { table: 'deals', route: 'deals' },
-  lead: { table: 'leads', route: 'leads' },
-};
-
-async function activityLink(type: string | null, id: number | null): Promise<string> {
-  const meta = type ? ROUTE[type] : undefined;
-  if (!meta || !id) return '/tasks';
-  const row = await db(meta.table).where({ id }).first('uuid');
-  return row ? `/${meta.route}/${row.uuid}` : '/tasks';
 }

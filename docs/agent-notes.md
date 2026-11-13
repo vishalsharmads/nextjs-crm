@@ -29,6 +29,8 @@ How to work around them:
 - Stacked milestones: rebase each onto the latest `main`, test, then merge one by one with `--no-ff`.
 - Before merging a milestone, run the review checklists in `.claude/agents/` (access control, white-label) and fix findings.
 
+- A new help article (or any file picked up by `import.meta.glob`) can stay invisible to Vitest because of its transform cache: delete `node_modules/.vitest-cache` and rerun.
+
 ## Machine notes
 
 - When two agent sessions share this machine, give each its own git worktree and its own test databases (`DATABASE_URL_TEST=…/crm_test_<name>`, `DATABASE_URL_E2E=…/crm_e2e_<name>`); test runs drop and recreate their databases.

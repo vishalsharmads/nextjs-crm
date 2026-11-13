@@ -121,9 +121,12 @@ export function ActivityItem({ a, showRelated }: { a: ActivityDto; showRelated?:
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           {a.type !== 'note' ? (
-            <span className={cn('text-sm font-medium', done && 'text-muted line-through')}>
+            <Link
+              to={`/tasks/${a.uuid}`}
+              className={cn('text-sm font-medium hover:underline', done && 'text-muted line-through')}
+            >
               {a.subject || TYPE_LABEL[a.type]}
-            </span>
+            </Link>
           ) : null}
           {when ? (
             <span className={cn('flex items-center gap-1 text-xs', a.overdue ? 'text-accent' : 'text-muted')}>
