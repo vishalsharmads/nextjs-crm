@@ -17,6 +17,7 @@ import { RichTextEditor } from '@/components/editor/rich-text-editor';
 import { UserPicker } from '@/components/fields/pickers';
 import { Timeline } from '@/features/records/timeline';
 import { ACTIVITY_ICON } from './activity-components';
+import { TaskComments } from './task-comments';
 
 export const TASK_TYPE_LABEL: Record<Exclude<ActivityType, 'note' | 'email'>, string> = {
   task: 'Task',
@@ -251,6 +252,10 @@ export function TaskPage() {
             ) : (
               <p className="text-sm text-muted">No description.</p>
             )}
+          </section>
+          <section>
+            <h2 className="mb-2 text-sm font-semibold">Comments</h2>
+            <TaskComments taskUuid={a.uuid} />
           </section>
           <section>
             <h2 className="mb-2 text-sm font-semibold">History</h2>

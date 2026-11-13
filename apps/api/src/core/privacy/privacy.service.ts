@@ -130,6 +130,9 @@ async function eraseCoreTraces(
         .update(blankMail),
     );
   if (mode === 'anonymize') {
+    // Discussion on the person's activities goes too (deleting activities cascades to it).
+    if (activityIds.length)
+      add('activityComments', await trx('activity_comments').whereIn('activity_id', activityIds).delete());
     // Subjects ("Call with Jane") and outcomes identify the person as much as the notes do.
     add(
       'activities',
@@ -358,6 +361,17 @@ export async function exportSubject(
         ...a,
         custom: visibleCustom(a.custom, actCtx.defs, actCtx.levels, canReveal),
       })),
+    ),
+    activityComments: plain(
+      activities.length
+        ? await db('activity_comments')
+            .whereIn(
+              'activity_id',
+              activities.map((a) => a.id),
+            )
+            .orderBy('id')
+            .select('uuid', 'body', 'created_at', 'edited_at')
+        : [],
     ),
     emails: plain(
       activities.length

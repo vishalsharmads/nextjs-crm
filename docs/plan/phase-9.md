@@ -18,7 +18,7 @@ Tasks (activities of type task, call and meeting) grow from a flat "My work" lis
 | Tasks stay `activities` rows; no new entity | Timeline, scope, reports, automations and tools already understand activities |
 | `completed_at` stays the source of truth for done | Every list, report, reminder and tool reads it; the pipeline syncs to it, not the other way round |
 | Task pipeline sits behind `features.taskPipeline`, off by default | Same pattern as `leadPipeline`; most workspaces only need open and done |
-| Comments get their own `comments` table with a generic `subject_type` | Comments are not activities (no due date, no owner scope of their own) and can later attach to deals |
+| Comments get their own `activity_comments` table, cascading with the activity | Comments are not activities; the cascade means erasing a person's activities removes the discussion with no extra code. Comments elsewhere get their own table later |
 | Mentions notify only people who can view the task | A mention must never reveal a record to someone outside its scope |
 | Checklist items live in `activity_checklist_items`, not JSON | Per-item audit, reorder and "done by" without rewriting the whole task |
 | Recurrence is stored on the task; completing it creates the next one in the same transaction | No scheduler needed, and no orphan series if a task is deleted |

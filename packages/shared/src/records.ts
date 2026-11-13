@@ -311,6 +311,23 @@ export const activityCreateSchema = activityInputSchema.refine(
 );
 export const activityPatchSchema = toPatch(activityInputSchema);
 
+/** A comment on a task, call or meeting. `mentions` are the users notified, by uuid. */
+export interface ActivityCommentDto {
+  uuid: string;
+  body: string;
+  author: UserRef | null;
+  mentions: UserRef[];
+  createdAt: string;
+  editedAt: string | null;
+  /** The viewer wrote it (or is an admin), so may edit and delete it. */
+  canEdit: boolean;
+}
+export const activityCommentSchema = z.object({
+  body: z.string().trim().min(1).max(20_000),
+  mentions: z.array(z.uuid()).max(20).default([]),
+});
+export const activityCommentPatchSchema = z.object({ body: z.string().trim().min(1).max(20_000) });
+
 export const BULK_ACTIONS = [
   'delete',
   'restore',
