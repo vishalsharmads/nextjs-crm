@@ -596,6 +596,11 @@ export function SettingsPanel() {
                 It never deletes anything, and never touches security, compliance, users, API keys, webhooks,
                 email accounts or privacy requests. Off by default.
               </p>
+              <Button asChild variant="secondary" size="sm" className="mt-2">
+                <Link to="/m/assistant/setup">
+                  <Wand2 /> Set up with AI
+                </Link>
+              </Button>
             </div>
             <Switch
               checked={saved?.setupEnabled ?? false}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ENTITY_ROUTE, recordTypePath } from '@app/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -26,6 +26,7 @@ import {
   Sparkles,
   Square,
   Trash2,
+  Wand2,
   X,
 } from 'lucide-react';
 import type { WebModule } from '@app/module-sdk';
@@ -95,11 +96,23 @@ function AssistantPage() {
       apiGet<{ name: string; ready: boolean; setup: boolean; vision?: boolean }>('/m/assistant/status'),
   });
   const admin = can('assistant.settings.manage');
+  const boot = useBoot();
   const [tab, setTab] = useState('chat');
   const name = status.data?.name ?? 'Assistant';
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={name} />
+      <PageHeader
+        title={name}
+        actions={
+          admin && boot.access.isAdmin ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/m/assistant/setup">
+                <Wand2 /> Set up with AI
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
       <div className="px-4 pb-4 md:px-6">
         {admin ? (
           <Tabs value={tab} onValueChange={setTab}>
