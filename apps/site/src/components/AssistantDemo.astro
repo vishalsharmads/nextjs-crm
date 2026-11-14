@@ -1,0 +1,301 @@
+---
+/**
+ * A scripted replay of the in-app assistant: a question answered with a report and chart, then a change
+ * that waits for Confirm. Purpose: explanation. Without JavaScript, or with reduced motion, it shows the
+ * finished conversation; motion.ts plays it once when it scrolls into view, and Replay runs it again.
+ */
+const bars = [
+  { stage: 'Discovery', value: 42000 },
+  { stage: 'Demo', value: 96000 },
+  { stage: 'Trial', value: 32000 },
+  { stage: 'Proposal', value: 24480 },
+];
+const max = Math.max(...bars.map((b) => b.value));
+const money = (v: number) => `$${Math.round(v / 1000)}k`;
+---
+
+<figure class="demo" data-demo aria-label="The assistant answering a question with a chart, then waiting for confirmation before creating a task">
+  <div class="panel">
+    <div class="bar-top" aria-hidden="true">
+      <span class="spark">✦</span>
+      <span class="title">Assistant</span>
+      <span class="using">Using: Northwind – add 60 seats</span>
+    </div>
+    <div class="thread">
+      <p class="msg me" data-beat="q1"><span data-type>What is our pipeline worth by stage?</span></p>
+      <p class="step" data-beat="s1"><span class="dot" aria-hidden="true"></span>Ran report · Opportunities by stage</p>
+      <div class="msg ai" data-beat="a1">
+        <p>Your open pipeline is <strong>$194k</strong>. Demo holds the most value, mostly Bluepeak’s renewal.</p>
+        <div class="chart" role="img" aria-label="Pipeline value by stage: Discovery 42 thousand, Demo 96 thousand, Trial 32 thousand, Proposal 24 thousand">
+          {
+            bars.map((b) => (
+              <div class="col">
+                <span class="val">{money(b.value)}</span>
+                <span class="fill" data-bar style={`--h:${(b.value / max) * 100}%`} />
+                <span class="lab">{b.stage}</span>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+      <p class="msg me" data-beat="q2"><span data-type>Create a task to call Maria Reyes tomorrow at 10</span></p>
+      <div class="confirm" data-beat="c1">
+        <p class="c-head">Create task</p>
+        <dl>
+          <div><dt>Subject</dt><dd>Call Maria Reyes</dd></div>
+          <div><dt>Due</dt><dd>Tomorrow, 10:00</dd></div>
+          <div><dt>Linked to</dt><dd>Northwind – add 60 seats</dd></div>
+        </dl>
+        <div class="c-actions" data-actions>
+          <span class="btn ghost">Decline</span>
+          <span class="btn primary" data-confirm>Confirm</span>
+        </div>
+        <p class="c-done" data-done><span class="tick" aria-hidden="true"></span>Created. It is on Maria’s timeline and in your tasks.</p>
+      </div>
+    </div>
+    <div class="composer" aria-hidden="true">
+      <span>Ask about this opportunity…</span>
+      <span class="send">↑</span>
+    </div>
+  </div>
+  <button type="button" class="replay" data-replay hidden>Replay</button>
+</figure>
+
+<style>
+  .demo {
+    margin: 0;
+    position: relative;
+  }
+  .panel {
+    background: #fff;
+    color: var(--ink);
+    border-radius: 14px;
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 30px 60px -20px rgb(0 0 0 / 0.55);
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .bar-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 600;
+  }
+  .spark {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--mat);
+    color: var(--tape);
+    font-size: 12px;
+  }
+  .using {
+    margin-inline-start: auto;
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--steel);
+    background: var(--chalk);
+    border-radius: 999px;
+    padding: 2px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 55%;
+  }
+  .thread {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    min-height: 500px;
+    align-content: start;
+    background: var(--chalk);
+  }
+  .msg {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    max-width: 88%;
+  }
+  .msg p {
+    margin: 0;
+  }
+  .me {
+    justify-self: end;
+    background: var(--mat);
+    color: var(--chalk);
+    border-end-end-radius: 4px;
+  }
+  .ai {
+    background: #fff;
+    box-shadow: 0 0 0 1px var(--line);
+    border-end-start-radius: 4px;
+    display: grid;
+    gap: 10px;
+    max-width: 100%;
+  }
+  .step {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--steel);
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #2f8a5b;
+  }
+  .chart {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    height: 140px;
+    align-items: end;
+    padding-top: 4px;
+  }
+  .col {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 100%;
+    gap: 4px;
+    text-align: center;
+  }
+  .val {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--steel);
+    font-variant-numeric: tabular-nums;
+  }
+  .fill {
+    align-self: end;
+    height: var(--h);
+    border-radius: 5px 5px 2px 2px;
+    background: var(--mat);
+    transform-origin: bottom;
+  }
+  .col:nth-child(2) .fill {
+    background: var(--tape);
+  }
+  .lab {
+    font-size: 11px;
+    color: var(--steel);
+  }
+  .confirm {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 0 0 1px var(--line);
+    padding: 12px 14px;
+    display: grid;
+    gap: 8px;
+  }
+  .c-head {
+    margin: 0;
+    font-weight: 650;
+  }
+  dl {
+    margin: 0;
+    display: grid;
+    gap: 2px;
+  }
+  dl div {
+    display: grid;
+    grid-template-columns: 82px 1fr;
+    gap: 8px;
+  }
+  dt {
+    color: var(--steel);
+  }
+  dd {
+    margin: 0;
+  }
+  .c-actions {
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .ghost {
+    box-shadow: 0 0 0 1px var(--line);
+    color: var(--steel);
+  }
+  .primary {
+    background: var(--mat);
+    color: var(--chalk);
+  }
+  .c-done {
+    margin: 0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: #1f6b45;
+    font-weight: 600;
+  }
+  .tick {
+    width: 12px;
+    height: 6px;
+    border-inline-start: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg) translateY(-2px);
+  }
+  /* Finished state (no JS, reduced motion): the confirm buttons are replaced by the result. */
+  .c-actions {
+    display: none;
+  }
+  .composer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 12px 16px 14px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    box-shadow: 0 0 0 1px var(--line);
+    color: var(--steel);
+  }
+  .send {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: var(--mat);
+    color: var(--chalk);
+    font-weight: 700;
+  }
+  .replay {
+    position: absolute;
+    inset-inline-end: 14px;
+    bottom: -44px;
+    background: none;
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 6px 16px;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform 160ms var(--ease-out);
+  }
+  .replay:active {
+    transform: scale(0.97);
+  }
+  @media (max-width: 520px) {
+    .thread {
+      min-height: 0;
+    }
+    .using {
+      display: none;
+    }
+  }
+</style>

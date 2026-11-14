@@ -1,0 +1,139 @@
+---
+import AssistantDemo from './AssistantDemo.astro';
+/** AI capabilities: what the assistant does, and the guardrails that make it safe to switch on. */
+const capabilities = [
+  {
+    title: 'An assistant beside every page',
+    body: 'Ask in plain words: “Which deals are stuck in Proposal?”, “Summarise this client’s history”, “Draft a follow-up email”. It answers from your records, runs reports and draws charts from the real numbers.',
+  },
+  {
+    title: 'Set up by describing your business',
+    body: 'Tell it “Set this up for a dental clinic” and it proposes the names, fields, pipeline stages and roles to match. Admins confirm each change; later, ask for tweaks like “Add a Renewal stage after Proposal”.',
+  },
+  {
+    title: 'Works with the AI apps your team already uses',
+    body: 'Connect any AI app that supports MCP. People approve it with their own sign-in, read only or read and write, and choose exactly which tools it may use.',
+  },
+];
+const guardrails = [
+  'It sees only what the person asking can see, and hidden fields are never sent',
+  'Nothing changes until someone presses Confirm, with the exact change shown first',
+  'Your choice of AI provider and model, or a model server you run yourself',
+  'Every action is recorded in the audit log as made by the assistant',
+  'Off until an admin switches it on, with monthly and daily usage limits',
+];
+---
+
+<section class="section on-dark ai" id="ai" aria-labelledby="ai-title">
+  <div class="wrap">
+    <div class="intro">
+      <div class="head">
+        <p class="eyebrow">AI built in</p>
+        <h2 class="h2" id="ai-title">AI that works inside your CRM, on your terms.</h2>
+        <p class="lede muted">
+          Not a chatbot bolted on the side. The assistant uses the same records, permissions and audit log as your
+          team, so you can let it help without letting it loose.
+        </p>
+      </div>
+      <AssistantDemo />
+    </div>
+    <ul class="caps">
+      {
+        capabilities.map((c) => (
+          <li>
+            <h3 class="h3">{c.title}</h3>
+            <p class="muted">{c.body}</p>
+          </li>
+        ))
+      }
+    </ul>
+    <div class="guard">
+      <h3 class="h3">Safe to switch on</h3>
+      <ul>
+        {guardrails.map((g) => <li>{g}</li>)}
+      </ul>
+    </div>
+    <a class="link more" href="/features#ai">More about the AI assistant</a>
+  </div>
+</section>
+
+<style>
+  .intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(32px, 6vw, 96px);
+    align-items: center;
+    margin-bottom: clamp(72px, 9vw, 112px);
+  }
+  .head {
+    display: grid;
+    gap: 16px;
+    align-content: start;
+  }
+  .eyebrow {
+    margin: 0;
+    color: var(--tape);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .caps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 1px solid var(--border);
+    border-inline-start: 1px solid var(--border);
+  }
+  .caps li {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+    padding: 28px 24px 32px;
+    border-inline-end: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .guard {
+    display: grid;
+    grid-template-columns: minmax(0, 0.6fr) minmax(0, 1.4fr);
+    gap: clamp(24px, 4vw, 64px);
+    margin-top: clamp(32px, 5vw, 56px);
+  }
+  .guard ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .guard li {
+    position: relative;
+    padding: 14px 0 14px 34px;
+    border-top: 2px dashed var(--border-strong);
+  }
+  .guard li:last-child {
+    border-bottom: 2px dashed var(--border-strong);
+  }
+  .guard li::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 4px;
+    top: 22px;
+    width: 14px;
+    height: 7px;
+    border-inline-start: 2px solid var(--tape);
+    border-bottom: 2px solid var(--tape);
+    transform: rotate(-45deg);
+  }
+  .more {
+    display: inline-block;
+    margin-top: 32px;
+  }
+  @media (max-width: 900px) {
+    .intro,
+    .caps,
+    .guard {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

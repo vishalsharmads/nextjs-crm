@@ -141,6 +141,121 @@ function steps() {
   });
 }
 
+/* ------------------------------------------------------------------
+ * 4. The assistant demo: a scripted conversation that plays once.
+ *    Purpose: explanation (ask, see the report, confirm a change).
+ *    Finished state is the markup default, so no JS or reduced motion
+ *    shows the whole conversation. Replay is user-triggered.
+ * ------------------------------------------------------------------ */
+function assistantDemo() {
+  const demo = document.querySelector<HTMLElement>('[data-demo]');
+  if (!demo || reduce) return;
+  const beat = (k: string) => demo.querySelector<HTMLElement>(`[data-beat="${k}"]`)!;
+  const beats = [...demo.querySelectorAll<HTMLElement>('[data-beat]')];
+  const bars = [...demo.querySelectorAll<HTMLElement>('[data-bar]')];
+  const actions = demo.querySelector<HTMLElement>('[data-actions]')!;
+  const confirm = demo.querySelector<HTMLElement>('[data-confirm]')!;
+  const done = demo.querySelector<HTMLElement>('[data-done]')!;
+  const replay = demo.querySelector<HTMLButtonElement>('[data-replay]')!;
+  const typed = [...demo.querySelectorAll<HTMLElement>('[data-type]')].map((el) => ({
+    el,
+    text: el.textContent ?? '',
+  }));
+
+  const typeOn = (tl: gsap.core.Timeline, i: number, at: string | number) => {
+    const t = typed[i]!;
+    const state = { n: 0 };
+    tl.to(
+      state,
+      {
+        n: t.text.length,
+        duration: t.text.length * 0.028,
+        ease: 'none',
+        onUpdate: () => {
+          t.el.textContent = t.text.slice(0, Math.round(state.n));
+        },
+      },
+      at,
+    );
+  };
+
+  const reset = () => {
+    gsap.set(beats, { opacity: 0, y: 8 });
+    gsap.set(bars, { scaleY: 0.02 });
+    gsap.set(actions, { display: 'flex', opacity: 1 });
+    gsap.set(done, { display: 'none', opacity: 0 });
+    gsap.set(confirm, { scale: 1 });
+    typed.forEach((t) => (t.el.textContent = ''));
+  };
+
+  const play = () => {
+    reset();
+    replay.hidden = true;
+    const enter = { opacity: 1, y: 0, duration: 0.32, ease: 'power3.out' };
+    const tl = gsap.timeline({ onComplete: () => (replay.hidden = false) });
+    tl.to(beat('q1'), enter, 0.2);
+    typeOn(tl, 0, 0.2);
+    tl.to(beat('s1'), enter, '+=0.35')
+      .to(beat('a1'), enter, '+=0.45')
+      .to(bars, { scaleY: 1, duration: 0.7, ease: 'power3.out', stagger: 0.07 }, '<0.1')
+      .to(beat('q2'), enter, '+=1.1');
+    typeOn(tl, 1, '<');
+    tl.to(beat('c1'), enter, '+=0.4')
+      // the person presses Confirm: press feedback, then the result replaces the buttons
+      .to(confirm, { scale: 0.95, duration: 0.12, ease: 'power2.out' }, '+=1.3')
+      .to(confirm, { scale: 1, duration: 0.16, ease: 'power2.out' })
+      .to(actions, { opacity: 0, duration: 0.14 })
+      .set(actions, { display: 'none' })
+      .set(done, { display: 'flex' })
+      .to(done, { opacity: 1, duration: 0.24, ease: 'power3.out' });
+  };
+
+  reset();
+  ScrollTrigger.create({ trigger: demo, start: 'top 70%', once: true, onEnter: play });
+  replay.addEventListener('click', play);
+}
+
+/* ------------------------------------------------------------------
+ * 5. Product screenshots: tabs swap the view; figures settle in once.
+ *    Purpose: explanation (tabs, user-triggered) and preventing a
+ *    jarring pop-in (reveal). Reduced motion: instant swap, no reveal.
+ * ------------------------------------------------------------------ */
+function shots() {
+  document.querySelectorAll<HTMLElement>('[data-shots]').forEach((fig) => {
+    const tabs = [...fig.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const imgs = [...fig.querySelectorAll<HTMLElement>('[data-shot]')];
+    const list = fig.querySelector<HTMLElement>('[role="tablist"]');
+    if (list && tabs.length > 1) list.hidden = false;
+    const show = (i: number) => {
+      tabs.forEach((t, n) => {
+        t.setAttribute('aria-selected', String(n === i));
+        t.tabIndex = n === i ? 0 : -1;
+      });
+      imgs.forEach((img, n) => img.classList.toggle('on', n === i));
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => show(i));
+      t.addEventListener('keydown', (e) => {
+        const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if (!d) return;
+        const next = (i + d + tabs.length) % tabs.length;
+        show(next);
+        tabs[next]!.focus();
+      });
+    });
+    if (reduce) return;
+    gsap.from(fig.querySelector('.frame'), {
+      opacity: 0,
+      y: 24,
+      duration: 0.7,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: fig, start: 'top 85%', once: true },
+    });
+  });
+}
+
 heroIntro();
 tailor();
 steps();
+assistantDemo();
+shots();

@@ -1,0 +1,122 @@
+---
+/**
+ * Real product screenshots in a frame. With several, tabs switch between them (tabs appear only with
+ * JavaScript; without it the first screenshot shows). Images are 2000×1250 WebP, lazy loaded.
+ */
+interface Shot {
+  src: string;
+  alt: string;
+  label: string;
+}
+interface Props {
+  shots: Shot[];
+  caption?: string;
+}
+const { shots, caption } = Astro.props;
+const id = `shots-${shots[0]!.src.replace(/\W+/g, '-')}`;
+---
+
+<figure class="shots" data-shots>
+  {
+    shots.length > 1 && (
+      <div class="tabs" role="tablist" aria-label="Screens" hidden>
+        {shots.map((s, i) => (
+          <button
+            type="button"
+            role="tab"
+            id={`${id}-tab-${i}`}
+            aria-controls={`${id}-panel`}
+            aria-selected={i === 0 ? 'true' : 'false'}
+            tabindex={i === 0 ? 0 : -1}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+    )
+  }
+  <div class="frame" id={`${id}-panel`} role={shots.length > 1 ? 'tabpanel' : undefined}>
+    {
+      shots.map((s, i) => (
+        <img
+          class:list={['shot', { on: i === 0 }]}
+          data-shot
+          src={s.src}
+          alt={s.alt}
+          width="2000"
+          height="1250"
+          loading="lazy"
+          decoding="async"
+        />
+      ))
+    }
+  </div>
+  {caption && <figcaption class="muted">{caption}</figcaption>}
+</figure>
+
+<style>
+  .shots {
+    margin: 0;
+    display: grid;
+    gap: 14px;
+  }
+  .tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .tabs[hidden] {
+    display: none;
+  }
+  [role='tab'] {
+    font: inherit;
+    font-size: 15px;
+    padding: 8px 16px;
+    min-height: 40px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease,
+      transform 160ms var(--ease-out);
+  }
+  [role='tab']:active {
+    transform: scale(0.97);
+  }
+  [role='tab'][aria-selected='true'] {
+    background: var(--tape);
+    border-color: var(--tape);
+    color: var(--tape-ink);
+  }
+  .frame {
+    display: grid;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow:
+      0 0 0 1px var(--border-strong),
+      0 30px 60px -24px rgb(0 0 0 / 0.5);
+  }
+  /* All screenshots share one grid cell, so swapping never shifts the layout. */
+  .shot {
+    grid-area: 1 / 1;
+    width: 100%;
+    height: auto;
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+  .shot.on {
+    opacity: 1;
+  }
+  figcaption {
+    font-size: 14px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .shot {
+      transition: none;
+    }
+  }
+</style>
