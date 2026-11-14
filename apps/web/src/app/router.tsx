@@ -61,8 +61,8 @@ const EmailSettingsPage = lazyPage(
   () => import('@/features/settings/integration-pages'),
   'EmailSettingsPage',
 );
-const AutomationsPage = lazyPage(() => import('@/features/settings/workflow-pages'), 'AutomationsPage');
-const FormsPage = lazyPage(() => import('@/features/settings/workflow-pages'), 'FormsPage');
+const AutomationsPage = lazyPage(() => import('@/features/settings/automations-page'), 'AutomationsPage');
+const FormsPage = lazyPage(() => import('@/features/settings/forms-page'), 'FormsPage');
 const LayoutBuilderPage = lazyPage(() => import('@/features/settings/layout-builder'), 'LayoutBuilderPage');
 const PublicFormPage = lazyPage(() => import('@/features/forms/public-form-page'), 'PublicFormPage');
 const UnsubscribePage = lazyPage(() => import('@/features/privacy/unsubscribe-page'), 'UnsubscribePage');

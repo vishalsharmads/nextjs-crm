@@ -27,4 +27,5 @@ related: records.lists, records.deals, settings.profile
 - You see the records your role allows: your own, your team's or everyone's.
 - Changes are kept in each record's history, and an admin can see the audit log.
 - Deleted records go to the trash first and can be restored.
+- Settings pages ask before you leave with changes you have not saved. Actions that are hard to undo, such as deleting a draft or voiding a document, ask you to confirm first.
 - Admins setting up a new workspace can use **Set up with AI** on the assistant page (when the assistant module is on): it asks about the business, proposes a setup to approve, and helps import existing spreadsheets.

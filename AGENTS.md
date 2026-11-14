@@ -13,7 +13,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 - **Phase 6** follows [docs/plan/phase-6.md](docs/plan/phase-6.md): 6a (quick wins), 6a2 (UI polish), 6a3 (rich text), 6b (records engine for modules), 6c (admin-defined objects), 6d (tool layer, personal access tokens, MCP), 6e (assistant module), 6f (sales reports) and 6g (delayed and scheduled automations, report builder, dashboard editing) are done. Phase 6 is complete. **Phase 7** (in-app help): 7a page help and knowledge base, 7b articles and blueprint help notes, 7c guided tours.
 - **Phase 8** follows [docs/plan/phase-8.md](docs/plan/phase-8.md): module settings and marketplace (8a, 8b), example integration and developer docs (8c), developer MCP server for AI coding agents (8e) and the git-repository module catalog (8g) are done. Run-time upload (8d) and in-product module generation (8f) are design only.
 - **Phase 9** follows [docs/plan/phase-9.md](docs/plan/phase-9.md): 9a (tasks: detail page, comments, checklists, recurrence, reminders and digest, My work, calendar, optional task statuses, task tools) and 9b (board Move to, quote and invoice tabs) are built.
-- **Phase 11** follows [docs/plan/phase-11.md](docs/plan/phase-11.md) (production readiness): 11a, 11b and 11c are built.
+- **Phase 11** follows [docs/plan/phase-11.md](docs/plan/phase-11.md) (production readiness): 11a–11d are built.
 - **Phase 10** follows [docs/plan/phase-10.md](docs/plan/phase-10.md): AI setup mode (10a interview and brief, 10b proposal, build and branding, 10c spreadsheet mapping and check-before-import, 10d entry points and E2E) is built.
 
 ## Non-negotiables
@@ -185,7 +185,8 @@ Before an E2E run, check nothing listens on :4300/:5300. A leftover API from an 
 - **Server state** lives in TanStack Query only. Query keys come from `lib/query-keys.ts`. Simple mutations (task complete, stage move, inline edit) use optimistic updates.
 - **Forms, detail pages, and list columns render from layouts + field definitions.** Never hardcode a custom field.
 - **Lists link their rows.** `DataTable` takes `rowHref` so the title cell is a real link (Tab, Enter, open in a new tab); a plain click still opens the peek. Its keyboard cursor stays hidden until the first key press or click.
-- **Every data view** has loading (skeleton matching the layout), empty (next action + one primary button), and error (what failed + how to fix) states.
+- **Every data view** has loading (skeleton matching the layout), empty (next action + one primary button), and error (what failed + how to fix) states. `src/app/load-states.test.ts` fails when a `useQuery` with a loading branch has no error branch.
+- **Confirmations** use `confirmAction`/`askText` (`components/ui/confirm.tsx`), never `window.confirm`/`prompt`/`alert` (lint error). Settings pages with a form call `useUnsavedChanges(form.formState.isDirty)` and reset the form after saving.
 - **Product patterns** (plan §9): `⌘K` command palette, keyboard shortcuts, record peek sheet, inline edit with undo toast, saved views as tabs, virtualized tables with bulk bar, Kanban with dnd-kit.
 - **`Button asChild`** renders its single child only (Radix Slot needs exactly one child).
 - **Never `import * as Icons from 'lucide-react'`** (pulls every icon into the bundle). Module menu icons come from the curated map in `app/shell/nav.ts`.

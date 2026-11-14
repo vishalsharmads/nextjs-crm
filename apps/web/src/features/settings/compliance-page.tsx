@@ -15,12 +15,13 @@ import { apiGet } from '@/lib/api';
 import { useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
-import { Pane, Skeleton } from '@/components/ui/misc';
+import { ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { SettingsPage } from './layout';
 import { useSaveGroup, useSettings } from './general-page';
 import { floorHint } from './compliance-floors';
 import { useEntityConfig } from '@/features/records/entities';
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 
 const PROFILE_COPY: Record<ComplianceProfile, { label: string; help: string }> = {
   standard: {
@@ -45,13 +46,20 @@ export function ComplianceSettingsPage() {
       title={t('settings.compliance')}
       description="Choose the rules this workspace must meet. A profile enforces minimum settings that nobody can lower while it is active."
     >
-      {q.data ? <ComplianceForm initial={q.data.compliance} /> : <Skeleton className="h-96" />}
+      {q.data ? (
+        <ComplianceForm initial={q.data.compliance} />
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+      ) : (
+        <Skeleton className="h-96" />
+      )}
     </SettingsPage>
   );
 }
 
 function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
   const form = useForm({ defaultValues: initial });
+  useUnsavedChanges(form.formState.isDirty);
   const save = useSaveGroup('compliance');
   const [confirm, setConfirm] = useState<ComplianceSettings | null>(null);
   const roles = useQuery({
@@ -265,6 +273,11 @@ function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-xs text-muted">Or require it for these roles</legend>
               {roles.isLoading ? <Skeleton className="h-16" /> : null}
+              {roles.isError ? (
+                <p role="alert" className="text-sm text-muted">
+                  Roles could not be loaded. Reload the page to choose roles.
+                </p>
+              ) : null}
               <Controller
                 control={form.control}
                 name="mfaRequiredRoles"

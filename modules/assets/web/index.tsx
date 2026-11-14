@@ -18,6 +18,7 @@ import { formatDate, formatDateTime } from '@/lib/format';
 import { labelVars } from '@/lib/labels';
 import { useBoot, useCan } from '@/app/session';
 import { Button } from '@/components/ui/button';
+import { confirmAction } from '@/components/ui/confirm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
 import { Badge, EmptyState, ErrorState, PageHeader, Pane, Skeleton } from '@/components/ui/misc';
@@ -775,7 +776,11 @@ function AssetPage() {
               {a.status !== 'retired' && a.status !== 'assigned' ? (
                 <Button
                   variant="ghost"
-                  onClick={() => window.confirm(`Retire ${a.tag}?`) && setStatus.mutate('retired')}
+                  onClick={() =>
+                    void confirmAction({ title: `Retire ${a.tag}?`, action: 'Retire' }).then(
+                      (ok) => ok && setStatus.mutate('retired'),
+                    )
+                  }
                 >
                   Retire
                 </Button>

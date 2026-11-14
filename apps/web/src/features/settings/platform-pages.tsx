@@ -7,7 +7,7 @@ import { formatDateTime } from '@/lib/format';
 import { useBoot, useT } from '@/app/session';
 import { labelVars } from '@/lib/labels';
 import { Button } from '@/components/ui/button';
-import { Badge, Pane, Skeleton } from '@/components/ui/misc';
+import { Badge, ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { SettingsPage } from './layout';
@@ -127,6 +127,8 @@ export function BlueprintPage() {
     >
       {info.isPending ? (
         <Skeleton className="h-32" />
+      ) : info.isError ? (
+        <ErrorState error={info.error} onRetry={() => void info.refetch()} />
       ) : (
         <Pane title="Current">
           {current ? (

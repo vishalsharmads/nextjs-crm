@@ -24,6 +24,7 @@ import { labelVars } from '@/lib/labels';
 import { useBranding } from '@/app/branding';
 import { useBoot } from '@/app/session';
 import { Button } from '@/components/ui/button';
+import { confirmAction } from '@/components/ui/confirm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, Textarea } from '@/components/ui/input';
 import { Badge, EmptyState, ErrorState, PageHeader, Pane, Skeleton } from '@/components/ui/misc';
@@ -223,12 +224,12 @@ function AccountsPage() {
                             size="sm"
                             variant="ghost"
                             onClick={() => {
-                              if (
-                                window.confirm(
-                                  `Remove portal access for ${a.contact.name}? They are signed out now.`,
-                                )
-                              )
-                                update.mutate({ a, patch: { status: 'disabled' } });
+                              void confirmAction({
+                                title: `Remove portal access for ${a.contact.name}?`,
+                                description: 'They are signed out now.',
+                                action: 'Remove access',
+                                danger: true,
+                              }).then((ok) => ok && update.mutate({ a, patch: { status: 'disabled' } }));
                             }}
                           >
                             Remove access
@@ -788,6 +789,8 @@ function SupportSection() {
     >
       {tickets.isPending ? (
         <Skeleton className="h-16" />
+      ) : tickets.isError ? (
+        <ErrorState error={tickets.error} onRetry={() => void tickets.refetch()} />
       ) : !tickets.data?.length ? (
         <p className="text-sm text-muted">
           Need something? Send us a request and we will reply here and by email.

@@ -6,8 +6,9 @@ import { apiGet, apiPatch } from '@/lib/api';
 import { bootstrapKey, useBoot } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/input';
-import { Pane, Skeleton } from '@/components/ui/misc';
+import { ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { SettingsPage } from './layout';
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 
 /** Business details and defaults printed on quotes, invoices and contracts. */
 export function CommerceSettingsPage() {
@@ -20,7 +21,13 @@ export function CommerceSettingsPage() {
       title="Sales documents"
       description="Your business details and the defaults used on quotes, invoices and contracts."
     >
-      {q.data ? <CommerceForm initial={q.data.commerce} /> : <Skeleton className="h-96" />}
+      {q.data ? (
+        <CommerceForm initial={q.data.commerce} />
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+      ) : (
+        <Skeleton className="h-96" />
+      )}
     </SettingsPage>
   );
 }
@@ -30,6 +37,7 @@ function CommerceForm({ initial }: { initial: CommerceSettings }) {
   const { modules } = useBoot();
   const on = (k: string) => modules.enabled.includes(k);
   const form = useForm<CommerceSettings>({ defaultValues: initial });
+  useUnsavedChanges(form.formState.isDirty);
   const save = useMutation({
     mutationFn: (v: CommerceSettings) =>
       apiPatch<CommerceSettings>('/settings/commerce', {

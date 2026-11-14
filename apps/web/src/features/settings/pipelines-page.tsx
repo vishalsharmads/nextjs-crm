@@ -25,7 +25,7 @@ import { bootstrapKey, useBoot, useT } from '@/app/session';
 import { labelVars } from '@/lib/labels';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
-import { Badge, Pane, Skeleton, Tabs, TabsList, TabsTrigger } from '@/components/ui/misc';
+import { Badge, ErrorState, Pane, Skeleton, Tabs, TabsList, TabsTrigger } from '@/components/ui/misc';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
@@ -81,6 +81,8 @@ export function PipelinesPage() {
       ) : null}
       {pipelines.isPending ? (
         <Skeleton className="h-64" />
+      ) : pipelines.isError ? (
+        <ErrorState error={pipelines.error} onRetry={() => void pipelines.refetch()} />
       ) : (
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
           <nav className="flex flex-col gap-1" aria-label="Pipelines">

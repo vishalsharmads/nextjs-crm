@@ -10,6 +10,7 @@ import { queryClient } from '@/app/query-client';
 import { BrandingProvider } from '@/app/branding';
 import { SessionProvider } from '@/app/session';
 import { TooltipProvider } from '@/components/ui/menu';
+import { ConfirmHost } from '@/components/ui/confirm';
 import { router } from '@/app/router';
 import { applyBranding } from '@/theme/apply';
 import { FACTORY_THEME } from '@/theme/defaults';
@@ -24,6 +25,7 @@ createRoot(document.getElementById('root')!).render(
         <SessionProvider>
           <TooltipProvider>
             <RouterProvider router={router} />
+            <ConfirmHost />
             <Toaster position="bottom-right" closeButton toastOptions={{ className: 'text-sm' }} />
           </TooltipProvider>
         </SessionProvider>

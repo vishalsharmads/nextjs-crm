@@ -21,6 +21,7 @@ import { formatDate, formatDateTime } from '@/lib/format';
 import { labelVars } from '@/lib/labels';
 import { useBoot, useCan } from '@/app/session';
 import { Button } from '@/components/ui/button';
+import { askText, confirmAction } from '@/components/ui/confirm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/editor/rich-text-editor';
@@ -424,8 +425,11 @@ function RequestsTab() {
                   <Button
                     size="sm"
                     onClick={() => {
-                      const note = window.prompt('What should they fix? (shown to the customer)');
-                      if (note !== null) review.mutate({ r, decision: 'rejected', note });
+                      void askText({
+                        title: 'Reject this document?',
+                        label: 'What should they fix? (shown to the customer)',
+                        action: 'Reject',
+                      }).then((note) => note !== null && review.mutate({ r, decision: 'rejected', note }));
                     }}
                   >
                     <X /> Reject
@@ -589,6 +593,8 @@ function TemplatesTab() {
       ) : null}
       {templates.isPending ? (
         <Skeleton className="h-32" />
+      ) : templates.isError ? (
+        <ErrorState error={templates.error} onRetry={() => void templates.refetch()} />
       ) : !templates.data?.length ? (
         <EmptyState
           icon={<FileText />}
@@ -771,8 +777,12 @@ function DocumentPage() {
               <Button
                 variant="ghost"
                 onClick={() => {
-                  if (window.confirm('Void this document? The customer will no longer see it.'))
-                    voidIt.mutate();
+                  void confirmAction({
+                    title: 'Void this document?',
+                    description: 'The customer will no longer see it.',
+                    action: 'Void',
+                    danger: true,
+                  }).then((ok) => ok && voidIt.mutate());
                 }}
               >
                 <Ban /> Void

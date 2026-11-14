@@ -11,6 +11,7 @@ import { useBoot, useCan } from '@/app/session';
 import { cn } from '@/lib/cn';
 import { addDaysTo, fromZonedInput, toZonedInput, zonedParts, zonedToUtc } from '@/lib/zoned';
 import { Button } from '@/components/ui/button';
+import { confirmAction } from '@/components/ui/confirm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
 import { Badge, EmptyState, ErrorState, PageHeader, Skeleton } from '@/components/ui/misc';
@@ -149,7 +150,12 @@ function BookingDialog({
                 className="me-auto"
                 loading={cancel.isPending}
                 onClick={() => {
-                  if (window.confirm(`Cancel this ${nouns.booking.toLowerCase()}?`)) cancel.mutate();
+                  void confirmAction({
+                    title: `Cancel this ${nouns.booking.toLowerCase()}?`,
+                    action: `Cancel ${nouns.booking.toLowerCase()}`,
+                    cancel: 'Keep',
+                    danger: true,
+                  }).then((ok) => ok && cancel.mutate());
                 }}
               >
                 Cancel {nouns.booking.toLowerCase()}
@@ -389,8 +395,11 @@ function DayBoard() {
       <div className="p-4 md:p-6">
         {resources.isPending || bookings.isPending ? (
           <Skeleton className="h-96" />
-        ) : resources.isError ? (
-          <ErrorState error={resources.error} onRetry={() => void resources.refetch()} />
+        ) : resources.isError || bookings.isError ? (
+          <ErrorState
+            error={resources.error ?? bookings.error}
+            onRetry={() => void Promise.all([resources.refetch(), bookings.refetch()])}
+          />
         ) : !resources.data.length ? (
           <EmptyState
             icon={<CalendarDays />}

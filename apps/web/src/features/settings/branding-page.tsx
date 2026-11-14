@@ -21,9 +21,10 @@ import { paletteVars } from '@/theme/apply';
 import { FACTORY_THEME } from '@/theme/defaults';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
-import { Pane, Skeleton } from '@/components/ui/misc';
+import { ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/checkbox';
 import { SettingsPage } from './layout';
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 
 interface BrandingResponse {
   branding: Branding;
@@ -59,7 +60,13 @@ export function BrandingPage() {
       title={t('settings.branding')}
       description="Everything people see: name, logo, colors and type. Changes apply instantly, no rebuild."
     >
-      {q.data ? <BrandingForm initial={q.data} /> : <Skeleton className="h-96" />}
+      {q.data ? (
+        <BrandingForm initial={q.data} />
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+      ) : (
+        <Skeleton className="h-96" />
+      )}
     </SettingsPage>
   );
 }
@@ -72,6 +79,7 @@ function BrandingForm({ initial }: { initial: BrandingResponse }) {
     resolver: zodResolver(brandingSchema) as unknown as Resolver<Branding>,
     defaultValues: initial.branding,
   });
+  useUnsavedChanges(form.formState.isDirty);
   const values = useWatch({ control: form.control }) as Branding;
   const warnings = useMemo(() => (values.colors ? checkPaletteContrast(values.colors) : []), [values.colors]);
 
@@ -95,7 +103,10 @@ function BrandingForm({ initial }: { initial: BrandingResponse }) {
   });
 
   return (
-    <form onSubmit={form.handleSubmit((v) => save.mutate(v))} className="flex flex-col gap-6">
+    <form
+      onSubmit={form.handleSubmit((v) => save.mutate(v, { onSuccess: () => form.reset(v) }))}
+      className="flex flex-col gap-6"
+    >
       <div className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-canvas/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={previewOn} onCheckedChange={setPreviewOn} />

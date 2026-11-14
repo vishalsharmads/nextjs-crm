@@ -24,7 +24,10 @@ export function NotificationsBell() {
   const count = useQuery({
     queryKey: ['notifications', 'count'],
     queryFn: () => apiGet<{ count: number }>('/notifications/unread-count').then((r) => r.count),
+    // Polling pauses while the tab is hidden (refetchIntervalInBackground is off); coming back refreshes.
     refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
   const list = useQuery({
     queryKey: ['notifications', 'list'],

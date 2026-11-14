@@ -10,6 +10,7 @@ import { formatDate, formatMoney } from '@/lib/format';
 import { labelVars } from '@/lib/labels';
 import { useBoot, useCan } from '@/app/session';
 import { Button } from '@/components/ui/button';
+import { confirmAction } from '@/components/ui/confirm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
 import { Badge, EmptyState, ErrorState, PageHeader, Pane, Skeleton } from '@/components/ui/misc';
@@ -486,8 +487,12 @@ function PaymentsPane({ invoice }: { invoice: Invoice }) {
                   size="sm"
                   variant="ghost"
                   onClick={() => {
-                    if (window.confirm('Remove this payment? The balance due goes back up.'))
-                      remove.mutate(p);
+                    void confirmAction({
+                      title: 'Remove this payment?',
+                      description: 'The balance due goes back up.',
+                      action: 'Remove',
+                      danger: true,
+                    }).then((ok) => ok && remove.mutate(p));
                   }}
                 >
                   Remove
@@ -606,7 +611,11 @@ function InvoiceDetail() {
                 size="icon"
                 aria-label="Delete"
                 onClick={() => {
-                  if (window.confirm(`Delete draft ${inv.number}?`)) remove.mutate();
+                  void confirmAction({
+                    title: `Delete draft ${inv.number}?`,
+                    action: 'Delete',
+                    danger: true,
+                  }).then((ok) => ok && remove.mutate());
                 }}
               >
                 <Trash2 />
