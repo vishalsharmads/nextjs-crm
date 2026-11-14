@@ -15,7 +15,7 @@ import { apiGet } from '@/lib/api';
 import { useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
-import { Pane, Skeleton } from '@/components/ui/misc';
+import { ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { SettingsPage } from './layout';
 import { useSaveGroup, useSettings } from './general-page';
@@ -45,7 +45,13 @@ export function ComplianceSettingsPage() {
       title={t('settings.compliance')}
       description="Choose the rules this workspace must meet. A profile enforces minimum settings that nobody can lower while it is active."
     >
-      {q.data ? <ComplianceForm initial={q.data.compliance} /> : <Skeleton className="h-96" />}
+      {q.data ? (
+        <ComplianceForm initial={q.data.compliance} />
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+      ) : (
+        <Skeleton className="h-96" />
+      )}
     </SettingsPage>
   );
 }
@@ -265,6 +271,11 @@ function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-xs text-muted">Or require it for these roles</legend>
               {roles.isLoading ? <Skeleton className="h-16" /> : null}
+              {roles.isError ? (
+                <p role="alert" className="text-sm text-muted">
+                  Roles could not be loaded. Reload the page to choose roles.
+                </p>
+              ) : null}
               <Controller
                 control={form.control}
                 name="mfaRequiredRoles"

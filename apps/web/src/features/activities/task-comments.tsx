@@ -7,7 +7,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { formatDateTime, formatRelative } from '@/lib/format';
 import { useBoot, useCan } from '@/app/session';
 import { Button } from '@/components/ui/button';
-import { Avatar, EmptyState, Skeleton } from '@/components/ui/misc';
+import { Avatar, EmptyState, ErrorState, Skeleton } from '@/components/ui/misc';
 import { RichTextEditor } from '@/components/editor/rich-text-editor';
 import { Combobox } from '@/components/fields/combobox';
 import { useUsersPicker } from '@/features/records/api';
@@ -160,6 +160,8 @@ export function TaskComments({ taskUuid }: { taskUuid: string }) {
     <div>
       {q.isPending ? (
         <Skeleton className="h-20" />
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : q.data?.length ? (
         <ul className="divide-y divide-line">
           {q.data.map((c) => (

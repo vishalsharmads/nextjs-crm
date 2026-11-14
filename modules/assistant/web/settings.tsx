@@ -727,6 +727,8 @@ export function SettingsPanel() {
       <Pane title={`Usage this month${usage.data ? ` (${usage.data.month})` : ''}`} padded={false}>
         {usage.isPending ? (
           <Skeleton className="m-4 h-10" />
+        ) : usage.isError ? (
+          <ErrorState error={usage.error} onRetry={() => void usage.refetch()} />
         ) : !usage.data?.data.length ? (
           <p className="p-4 text-sm text-muted">No usage yet this month.</p>
         ) : (

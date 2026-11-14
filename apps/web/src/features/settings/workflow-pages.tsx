@@ -9,7 +9,7 @@ import { formatDateTime, formatRelative } from '@/lib/format';
 import { useBoot, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
-import { Badge, EmptyState, Pane, Skeleton } from '@/components/ui/misc';
+import { Badge, EmptyState, ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { Sheet } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
 import { Combobox } from '@/components/fields/combobox';
@@ -149,6 +149,8 @@ export function AutomationsPage() {
       <Pane padded={false}>
         {list.isPending ? (
           <Skeleton className="m-4 h-20" />
+        ) : list.isError ? (
+          <ErrorState error={list.error} onRetry={() => void list.refetch()} />
         ) : !list.data?.data.length ? (
           <EmptyState
             icon={<Workflow />}
@@ -797,6 +799,8 @@ export function FormsPage() {
       <Pane padded={false}>
         {forms.isPending ? (
           <Skeleton className="m-4 h-16" />
+        ) : forms.isError ? (
+          <ErrorState error={forms.error} onRetry={() => void forms.refetch()} />
         ) : !forms.data?.length ? (
           <EmptyState
             icon={<FileInput />}

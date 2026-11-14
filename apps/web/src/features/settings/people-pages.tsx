@@ -714,6 +714,8 @@ function RoleEditor({ role, onClose }: { role: RoleDto | null; onClose: () => vo
         ) : null}
         {catalog.isPending ? (
           <Skeleton className="h-64" />
+        ) : catalog.isError ? (
+          <ErrorState error={catalog.error} onRetry={() => void catalog.refetch()} />
         ) : (
           <>
             <section>

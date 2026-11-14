@@ -21,7 +21,7 @@ import { paletteVars } from '@/theme/apply';
 import { FACTORY_THEME } from '@/theme/defaults';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
-import { Pane, Skeleton } from '@/components/ui/misc';
+import { ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/checkbox';
 import { SettingsPage } from './layout';
 
@@ -59,7 +59,13 @@ export function BrandingPage() {
       title={t('settings.branding')}
       description="Everything people see: name, logo, colors and type. Changes apply instantly, no rebuild."
     >
-      {q.data ? <BrandingForm initial={q.data} /> : <Skeleton className="h-96" />}
+      {q.data ? (
+        <BrandingForm initial={q.data} />
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+      ) : (
+        <Skeleton className="h-96" />
+      )}
     </SettingsPage>
   );
 }

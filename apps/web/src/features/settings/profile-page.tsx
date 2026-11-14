@@ -9,7 +9,7 @@ import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { bootstrapKey, useBoot, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/input';
-import { Badge, Pane, Skeleton } from '@/components/ui/misc';
+import { Badge, ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
 import { SettingsPage } from './layout';
@@ -362,6 +362,8 @@ function Sessions() {
         <div className="p-4">
           <Skeleton className="h-10" />
         </div>
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : (
         <ul className="divide-y divide-line">
           {q.data?.map((s) => (

@@ -409,6 +409,8 @@ function MergeDialog({ config, rec, onClose }: { config: EntityConfig; rec: Rec;
       >
         {dupes.isPending ? (
           <Skeleton className="h-20" />
+        ) : dupes.isError ? (
+          <ErrorState error={dupes.error} onRetry={() => void dupes.refetch()} />
         ) : !dupes.data?.length ? (
           <EmptyState
             title="No likely duplicates"

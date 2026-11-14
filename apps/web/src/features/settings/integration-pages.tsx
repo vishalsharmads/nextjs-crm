@@ -8,7 +8,7 @@ import { formatDateTime, formatRelative } from '@/lib/format';
 import { useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
-import { Badge, EmptyState, Pane, Skeleton } from '@/components/ui/misc';
+import { Badge, EmptyState, ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { Dialog, DialogContent, Sheet } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
 import { Combobox } from '@/components/fields/combobox';
@@ -106,6 +106,8 @@ export function ApiKeysPage() {
       <Pane padded={false}>
         {keys.isPending ? (
           <Skeleton className="m-4 h-16" />
+        ) : keys.isError ? (
+          <ErrorState error={keys.error} onRetry={() => void keys.refetch()} />
         ) : !keys.data?.length ? (
           <EmptyState
             icon={<KeyRound />}
@@ -229,6 +231,8 @@ export function WebhooksPage() {
       <Pane padded={false}>
         {hooks.isPending ? (
           <Skeleton className="m-4 h-16" />
+        ) : hooks.isError ? (
+          <ErrorState error={hooks.error} onRetry={() => void hooks.refetch()} />
         ) : !hooks.data?.data.length ? (
           <EmptyState
             icon={<Webhook />}
@@ -400,6 +404,8 @@ function DeliveriesSheet({ hook, onClose }: { hook: WebhookRow; onClose: () => v
     >
       {q.isPending ? (
         <Skeleton className="m-5 h-32" />
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : !q.data?.length ? (
         <EmptyState title="No deliveries yet" />
       ) : (
@@ -472,6 +478,8 @@ export function TemplatesPage() {
       <Pane padded={false}>
         {list.isPending ? (
           <Skeleton className="m-4 h-24" />
+        ) : list.isError ? (
+          <ErrorState error={list.error} onRetry={() => void list.refetch()} />
         ) : (
           <ul className="divide-y divide-line">
             {list.data?.map((tpl) => (
@@ -681,6 +689,8 @@ export function EmailSettingsPage() {
       <Pane padded={false}>
         {accounts.isPending ? (
           <Skeleton className="m-4 h-16" />
+        ) : accounts.isError ? (
+          <ErrorState error={accounts.error} onRetry={() => void accounts.refetch()} />
         ) : !accounts.data?.length ? (
           <EmptyState
             title="No mailbox connected"

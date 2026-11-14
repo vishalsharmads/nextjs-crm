@@ -789,6 +789,8 @@ function SupportSection() {
     >
       {tickets.isPending ? (
         <Skeleton className="h-16" />
+      ) : tickets.isError ? (
+        <ErrorState error={tickets.error} onRetry={() => void tickets.refetch()} />
       ) : !tickets.data?.length ? (
         <p className="text-sm text-muted">
           Need something? Send us a request and we will reply here and by email.

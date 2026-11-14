@@ -39,7 +39,16 @@ import { labelVars } from '@/lib/labels';
 import { bootstrapKey, useBoot, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
-import { Badge, EmptyState, Pane, Skeleton, Tabs, TabsList, TabsTrigger } from '@/components/ui/misc';
+import {
+  Badge,
+  EmptyState,
+  ErrorState,
+  Pane,
+  Skeleton,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/misc';
 import { Sheet } from '@/components/ui/dialog';
 import { Checkbox, Switch } from '@/components/ui/checkbox';
 import { CustomFieldInput } from '@/components/fields/custom-field';
@@ -157,6 +166,8 @@ export function FieldsPage() {
       <Pane padded={false}>
         {fields.isPending ? (
           <Skeleton className="m-4 h-24" />
+        ) : fields.isError ? (
+          <ErrorState error={fields.error} onRetry={() => void fields.refetch()} />
         ) : !fields.data?.length ? (
           <EmptyState
             title="No custom fields yet"

@@ -18,7 +18,7 @@ import { useBranding } from '@/app/branding';
 import { bootstrapKey, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
-import { Pane, Skeleton } from '@/components/ui/misc';
+import { ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
 import { SettingsPage } from './layout';
@@ -88,6 +88,8 @@ export function GeneralSettingsPage() {
             initial={q.data.deals.lostReasons}
           />
         </>
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : (
         <Skeleton className="h-80" />
       )}
@@ -286,6 +288,8 @@ export function SecuritySettingsPage() {
     >
       {q.data ? (
         <SecurityForm initial={q.data.security} profile={q.data.compliance.profile} />
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : (
         <Skeleton className="h-80" />
       )}

@@ -593,6 +593,8 @@ function TemplatesTab() {
       ) : null}
       {templates.isPending ? (
         <Skeleton className="h-32" />
+      ) : templates.isError ? (
+        <ErrorState error={templates.error} onRetry={() => void templates.refetch()} />
       ) : !templates.data?.length ? (
         <EmptyState
           icon={<FileText />}

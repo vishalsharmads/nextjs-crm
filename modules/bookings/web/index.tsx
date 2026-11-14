@@ -395,8 +395,11 @@ function DayBoard() {
       <div className="p-4 md:p-6">
         {resources.isPending || bookings.isPending ? (
           <Skeleton className="h-96" />
-        ) : resources.isError ? (
-          <ErrorState error={resources.error} onRetry={() => void resources.refetch()} />
+        ) : resources.isError || bookings.isError ? (
+          <ErrorState
+            error={resources.error ?? bookings.error}
+            onRetry={() => void Promise.all([resources.refetch(), bookings.refetch()])}
+          />
         ) : !resources.data.length ? (
           <EmptyState
             icon={<CalendarDays />}

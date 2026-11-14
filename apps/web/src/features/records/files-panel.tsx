@@ -8,7 +8,7 @@ import { qk } from '@/lib/query-keys';
 import { formatRelative } from '@/lib/format';
 import { useCan } from '@/app/session';
 import { Button } from '@/components/ui/button';
-import { EmptyState, Skeleton } from '@/components/ui/misc';
+import { EmptyState, ErrorState, Skeleton } from '@/components/ui/misc';
 
 interface FileRow {
   uuid: string;
@@ -86,6 +86,8 @@ export function FilesPanel({ entity, uuid }: { entity: RelatedType; uuid: string
       ) : null}
       {files.isPending ? (
         <Skeleton className="h-16" />
+      ) : files.isError ? (
+        <ErrorState error={files.error} onRetry={() => void files.refetch()} />
       ) : !files.data?.length ? (
         <EmptyState
           icon={<FileText />}
