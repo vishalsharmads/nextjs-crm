@@ -237,13 +237,15 @@ export const publicFormsRoutes = defineRoutes('/public/forms', ['forms'])
       }
       // createRecord leaves the event to its caller inside a transaction: emit after commit.
       await emitRecordEvent(def, 'created', record as unknown as Record<string, unknown>, actor);
-      await db('web_forms').where({ id: f.id }).increment('submission_count', 1);
-      await audit(db, ctx, {
-        action: 'form.submitted',
-        entity: 'web_form',
-        entityId: f.id,
-        entityUuid: f.uuid,
-        diff: { record: record.uuid },
+      await db.transaction(async (trx) => {
+        await trx('web_forms').where({ id: f.id }).increment('submission_count', 1);
+        await audit(trx, ctx, {
+          action: 'form.submitted',
+          entity: 'web_form',
+          entityId: f.id,
+          entityUuid: f.uuid,
+          diff: { record: record.uuid },
+        });
       });
       await emit({
         type: 'form.submitted',
@@ -350,8 +352,10 @@ export const formsRoutes = defineRoutes('/forms', ['forms'])
     permission: 'core.forms.manage',
     params: z.object({ uuid: z.uuid() }),
     handler: async ({ ctx, params }) => {
-      const n = await db('web_forms').where({ uuid: params.uuid }).delete();
-      if (!n) throw notFound('Form');
-      await audit(db, ctx, { action: 'form.deleted', entity: 'web_form', entityUuid: params.uuid });
+      await db.transaction(async (trx) => {
+        const n = await trx('web_forms').where({ uuid: params.uuid }).delete();
+        if (!n) throw notFound('Form');
+        await audit(trx, ctx, { action: 'form.deleted', entity: 'web_form', entityUuid: params.uuid });
+      });
     },
   });

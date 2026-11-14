@@ -1,3 +1,4 @@
+import { reportError } from '../lib/crash';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { MulterError } from 'multer';
@@ -30,6 +31,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
         : new AppError('VALIDATION_FAILED', 'Request body is not valid JSON');
   } else {
     logger.error({ err, requestId: req.ctx?.requestId }, 'Unhandled error');
+    void reportError(err, 'request');
     appErr = new AppError('INTERNAL', 'Something went wrong on our side. Try again in a moment.');
   }
   res.status(appErr.status).json({

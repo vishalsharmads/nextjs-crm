@@ -293,6 +293,9 @@ export async function restoreRecord<Dto>(
     return trx(def.table).where({ id: r.id }).first();
   });
   const [dto] = await def.toDtos([row], { user, conn: db });
+  await emitRecordEvent(def, 'updated', dto as Record<string, unknown>, user, {
+    deletedAt: { from: 'deleted', to: null },
+  });
   return dto!;
 }
 

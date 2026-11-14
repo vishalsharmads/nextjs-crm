@@ -160,11 +160,13 @@ export const apiKeysRoutes = defineRoutes('/api-keys', ['api-keys'])
     permission: 'core.api_keys.manage',
     params: z.object({ uuid: z.uuid() }),
     handler: async ({ ctx, params }) => {
-      const n = await db('api_keys')
-        .where({ uuid: params.uuid })
-        .whereNull('revoked_at')
-        .update({ revoked_at: new Date() });
-      if (!n) throw notFound('API key');
-      await audit(db, ctx, { action: 'api_key.revoked', entity: 'api_key', entityUuid: params.uuid });
+      await db.transaction(async (trx) => {
+        const n = await trx('api_keys')
+          .where({ uuid: params.uuid })
+          .whereNull('revoked_at')
+          .update({ revoked_at: new Date() });
+        if (!n) throw notFound('API key');
+        await audit(trx, ctx, { action: 'api_key.revoked', entity: 'api_key', entityUuid: params.uuid });
+      });
     },
   });

@@ -1,6 +1,7 @@
 import { Queue, Worker, type ConnectionOptions } from 'bullmq';
 import { db } from '../db/knex';
 import { newUuid } from './ids';
+import { AppError } from './errors';
 import { logger } from './logger';
 import { env, isTest } from '../config/env';
 
@@ -106,9 +107,11 @@ async function runJob(id: number, uuid: string, type: string, payload: Record<st
       .update({ status: 'failed', error: `No handler for ${type}`, finished_at: new Date() });
     return;
   }
-  await db('jobs')
-    .where({ id })
+  // Claim the job: only one runner moves it from queued to running.
+  const claimed = await db('jobs')
+    .where({ id, status: 'queued' })
     .update({ status: 'running', started_at: new Date(), attempts: db.raw('attempts + 1') });
+  if (!claimed) return;
   try {
     const result = await handler({ id, uuid, payload }, async (pct) => {
       await db('jobs')
@@ -127,8 +130,37 @@ async function runJob(id: number, uuid: string, type: string, payload: Record<st
     logger.error({ err, job: uuid, type }, 'Job failed');
     await db('jobs')
       .where({ id })
-      .update({ status: 'failed', error: (err as Error).message.slice(0, 2000), finished_at: new Date() });
+      .update({ status: 'failed', error: publicJobError(err), finished_at: new Date() });
   }
+}
+
+export const JOB_FAILED_MESSAGE =
+  'Something went wrong while this ran. Try again, or ask your administrator to check the server log.';
+export const JOB_INTERRUPTED_MESSAGE = 'This stopped because the server restarted. Try again.';
+
+/** Messages people may read: our own AppError text, never raw driver or library errors. */
+function publicJobError(err: unknown): string {
+  return err instanceof AppError ? err.message.slice(0, 2000) : JOB_FAILED_MESSAGE;
+}
+
+/**
+ * Jobs a stopped process left behind: `running` for over an hour, or (without Redis, where the
+ * queue lives in memory) `queued` for over ten minutes. They are marked failed so nobody waits forever.
+ */
+export async function recoverStaleJobs(now = new Date()) {
+  const hourAgo = new Date(now.getTime() - 60 * 60_000);
+  const running = await db('jobs')
+    .where({ status: 'running' })
+    .where('started_at', '<', hourAgo)
+    .update({ status: 'failed', error: JOB_INTERRUPTED_MESSAGE, finished_at: now });
+  let queued = 0;
+  if (!usingRedis())
+    queued = await db('jobs')
+      .where({ status: 'queued' })
+      .where('created_at', '<', new Date(now.getTime() - 10 * 60_000))
+      .update({ status: 'failed', error: JOB_INTERRUPTED_MESSAGE, finished_at: now });
+  if (running || queued) logger.warn({ running, queued }, 'Marked interrupted jobs as failed');
+  return { running, queued };
 }
 
 // ---------- Recurring tasks ----------

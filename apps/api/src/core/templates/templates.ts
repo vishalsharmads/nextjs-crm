@@ -151,9 +151,11 @@ export const templatesRoutes = defineRoutes('/templates', ['templates'])
     params: z.object({ uuid: z.uuid() }),
     summary: 'Delete a template (built-in keys fall back to the default)',
     handler: async ({ ctx, params }) => {
-      const n = await db('templates').where({ uuid: params.uuid }).delete();
-      if (!n) throw notFound('Template');
-      await audit(db, ctx, { action: 'template.deleted', entity: 'template', entityUuid: params.uuid });
+      await db.transaction(async (trx) => {
+        const n = await trx('templates').where({ uuid: params.uuid }).delete();
+        if (!n) throw notFound('Template');
+        await audit(trx, ctx, { action: 'template.deleted', entity: 'template', entityUuid: params.uuid });
+      });
     },
   })
   .add({

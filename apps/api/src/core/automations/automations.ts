@@ -661,9 +661,15 @@ export const automationsRoutes = defineRoutes('/automations', ['automations'])
     permission: 'core.automations.manage',
     params: z.object({ uuid: z.uuid() }),
     handler: async ({ ctx, params }) => {
-      const n = await db('automations').where({ uuid: params.uuid }).delete();
-      if (!n) throw notFound('Automation');
-      await audit(db, ctx, { action: 'automation.deleted', entity: 'automation', entityUuid: params.uuid });
+      await db.transaction(async (trx) => {
+        const n = await trx('automations').where({ uuid: params.uuid }).delete();
+        if (!n) throw notFound('Automation');
+        await audit(trx, ctx, {
+          action: 'automation.deleted',
+          entity: 'automation',
+          entityUuid: params.uuid,
+        });
+      });
     },
   })
   .add({

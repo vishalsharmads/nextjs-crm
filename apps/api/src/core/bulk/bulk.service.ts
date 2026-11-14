@@ -4,7 +4,13 @@ import { AppError } from '../../lib/errors';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { assertCan } from '../rbac/access';
 import { audit } from '../audit/audit.service';
-import { applyListCriteria, scopedQuery, updateRecord, type DbRow } from '../records/service';
+import {
+  applyListCriteria,
+  emitRecordEvent,
+  scopedQuery,
+  updateRecord,
+  type DbRow,
+} from '../records/service';
 import { ensureTags } from '../records/hydrate';
 import type { ResourceDef } from '../records/types';
 
@@ -56,6 +62,13 @@ export async function runBulk(def: ResourceDef, ctx: RequestContext, user: AuthU
             diff: { bulk: true },
           });
       });
+      // After commit, like single-record changes: webhooks and automations see each row.
+      for (const r of rows)
+        if (input.action === 'delete') await emitRecordEvent(def, 'deleted', { uuid: r.uuid }, user);
+        else
+          await emitRecordEvent(def, 'updated', { uuid: r.uuid }, user, {
+            deletedAt: { from: 'deleted', to: null },
+          });
       break;
     }
     case 'add_tags':
@@ -92,6 +105,10 @@ export async function runBulk(def: ResourceDef, ctx: RequestContext, user: AuthU
         }
         affected = rows.length;
       });
+      for (const r of rows)
+        await emitRecordEvent(def, 'updated', { uuid: r.uuid }, user, {
+          tags: input.action === 'add_tags' ? { from: null, to: input.tags } : { from: input.tags, to: null },
+        });
       break;
     }
     case 'assign':

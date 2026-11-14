@@ -1,6 +1,5 @@
 import { toPatch } from '@app/shared';
 import { lookup } from 'node:dns/promises';
-import net from 'node:net';
 import { z } from 'zod';
 import { env } from '../../config/env';
 import { defineRoutes } from '../../http/routes';
@@ -9,6 +8,7 @@ import { AppError, notFound } from '../../lib/errors';
 import { decrypt, encrypt, hmac, randomToken } from '../../lib/crypto';
 import { newUuid } from '../../lib/ids';
 import { logger } from '../../lib/logger';
+import { isPrivateAddress, safePost } from '../../lib/safe-net';
 import { enqueue, every, registerJob } from '../../lib/jobs';
 import { audit } from '../audit/audit.service';
 import { eventTouchesRestricted } from '../privacy/privacy.service';
@@ -19,32 +19,6 @@ const MAX_ATTEMPTS = 6;
 const BACKOFF_MIN = [0, 1, 5, 30, 120, 720];
 
 // ---------- SSRF guard ----------
-
-function isPrivate(ip: string): boolean {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number) as [number, number];
-    return (
-      a === 10 ||
-      a === 127 ||
-      a === 0 ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 100 && b >= 64 && b <= 127)
-    );
-  }
-  const v6 = ip.toLowerCase();
-  return (
-    v6 === '::1' ||
-    v6 === '::' ||
-    v6.startsWith('fc') ||
-    v6.startsWith('fd') ||
-    v6.startsWith('fe80') ||
-    v6.startsWith('::ffff:127.') ||
-    v6.startsWith('::ffff:10.') ||
-    v6.startsWith('::ffff:192.168.')
-  );
-}
 
 /**
  * Outbound targets (webhooks, the assistant's model provider) must be https (or http in dev) and
@@ -70,7 +44,7 @@ export async function assertSafeUrl(raw: string, path = 'url', opts: { privateHo
   }
   if (env.WEBHOOKS_ALLOW_PRIVATE) return;
   const addrs = await lookup(url.hostname, { all: true }).catch(() => []);
-  if (!addrs.length || addrs.some((a) => isPrivate(a.address))) {
+  if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) {
     throw new AppError('VALIDATION_FAILED', 'This address is not reachable from the internet', [
       { path, message: 'Private or unknown host' },
     ]);
@@ -89,6 +63,12 @@ async function deliver(deliveryId: number) {
     .where('d.id', deliveryId)
     .first('d.*', 'w.url', 'w.secret_enc', 'w.active', 'w.id as wid');
   if (!d || d.status !== 'pending' || !d.active) return;
+  // Claim the attempt so a retry sweep and the queued job never send the same delivery twice.
+  const claimed = await db('webhook_deliveries')
+    .where({ id: deliveryId, status: 'pending', attempts: d.attempts })
+    .where('next_attempt_at', '<=', new Date())
+    .update({ next_attempt_at: new Date(Date.now() + 5 * 60_000) });
+  if (!claimed) return;
   const body = JSON.stringify(d.payload);
   const timestamp = String(Math.floor(Date.now() / 1000));
   const attempts = d.attempts + 1;
@@ -96,9 +76,10 @@ async function deliver(deliveryId: number) {
   let error: string | null = null;
   try {
     await assertSafeUrl(d.url);
-    const res = await fetch(d.url, {
-      method: 'POST',
-      headers: {
+    // The address is checked again at connect time, so a DNS answer that changes cannot reach a private host.
+    const res = await safePost(
+      d.url,
+      {
         'Content-Type': 'application/json',
         'User-Agent': 'webhooks/1',
         'X-Webhook-Id': d.uuid,
@@ -107,9 +88,8 @@ async function deliver(deliveryId: number) {
         'X-Webhook-Signature': sign(decrypt(d.secret_enc, 'webhooks.secret_enc'), timestamp, body),
       },
       body,
-      redirect: 'manual',
-      signal: AbortSignal.timeout(10_000),
-    });
+      { timeoutMs: 10_000, allowPrivate: env.WEBHOOKS_ALLOW_PRIVATE },
+    );
     status = res.status;
     if (res.status < 200 || res.status >= 300) error = `HTTP ${res.status}`;
   } catch (err) {
@@ -179,12 +159,19 @@ onEvent(async (e: DomainEvent) => {
   }
 });
 
-/** Retry due deliveries (every minute, alongside reminders). */
+/**
+ * Retry due deliveries (every minute). First attempts whose job was lost (a restart before it ran)
+ * are picked up once they are two minutes overdue.
+ */
 export async function retryDueWebhooks() {
+  const now = Date.now();
   const due = await db('webhook_deliveries')
     .where({ status: 'pending' })
-    .where('attempts', '>', 0)
-    .where('next_attempt_at', '<=', new Date())
+    .where((q) =>
+      q
+        .where((r) => r.where('attempts', '>', 0).where('next_attempt_at', '<=', new Date(now)))
+        .orWhere('next_attempt_at', '<=', new Date(now - 120_000)),
+    )
     .limit(100)
     .pluck('id');
   for (const id of due as number[])
@@ -288,9 +275,11 @@ export const webhooksRoutes = defineRoutes('/webhooks', ['webhooks'])
     permission: 'core.webhooks.manage',
     params: z.object({ uuid: z.uuid() }),
     handler: async ({ ctx, params }) => {
-      const n = await db('webhooks').where({ uuid: params.uuid }).delete();
-      if (!n) throw notFound('Webhook');
-      await audit(db, ctx, { action: 'webhook.deleted', entity: 'webhook', entityUuid: params.uuid });
+      await db.transaction(async (trx) => {
+        const n = await trx('webhooks').where({ uuid: params.uuid }).delete();
+        if (!n) throw notFound('Webhook');
+        await audit(trx, ctx, { action: 'webhook.deleted', entity: 'webhook', entityUuid: params.uuid });
+      });
     },
   })
   .add({
