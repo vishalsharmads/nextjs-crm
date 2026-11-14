@@ -10,7 +10,7 @@ const PAGE = `<!doctype html><html><head>
 <meta name="theme-color" content="#0E7C86">
 <link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" sizes="180x180" href="/apple.png">
 <style>.btn{background:#0e7c86;color:#fff}.hero{color:#F2A541}.x{color:#333333}</style>
-</head><body><img class="site-logo" src="/img/logo.svg" alt="Bright Smiles">
+</head><body><img class="site-logo" src="/img/logo.png" alt="Bright Smiles">
 <h1>Your family dentist</h1><p>Check-ups, hygiene and whitening for all ages.</p>
 <script>var secret = 1;</script></body></html>`;
 
@@ -21,6 +21,16 @@ describe('AI setup mode', () => {
 
   beforeAll(async () => {
     server = createServer((req, res) => {
+      if (req.url === '/img/logo.png') {
+        res.setHeader('content-type', 'image/png');
+        res.end(
+          Buffer.from(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+            'base64',
+          ),
+        );
+        return;
+      }
       if (req.url === '/') {
         res.writeHead(301, { location: '/home' });
         res.end();
@@ -106,12 +116,85 @@ describe('AI setup mode', () => {
       name: 'Bright Smiles Dental',
       description: 'Friendly family dental care, check-ups and whitening.',
     });
-    expect(read.logos[0]).toBe(`${site}img/logo.svg`);
+    expect(read.logos[0]).toBe(`${site}img/logo.png`);
     expect(read.logos).toContain(`${site}apple.png`);
     expect(read.colors.slice(0, 2)).toEqual(['#0e7c86', '#f2a541']);
     expect(read.colors).not.toContain('#333333');
     expect(read.text).toContain('Check-ups, hygiene and whitening');
     expect(read.text).not.toContain('secret');
+  });
+
+  it('proposes a setup from the brief and builds what the admin chose, with their edits', async () => {
+    const s = await admin.post('/m/assistant/setup').expect(201);
+    const name = `Glow ${Date.now().toString(36)}`;
+    await admin
+      .put(`/m/assistant/setup/${s.body.uuid}/profile`, { businessName: name, website: site })
+      .expect(200);
+    await admin.post(`/m/assistant/setup/${s.body.uuid}/website`).expect(200);
+    const brief = (await admin.post(`/m/assistant/setup/${s.body.uuid}/brief`).expect(200)).body.brief;
+    await admin.post(`/m/assistant/setup/${s.body.uuid}/proposal`).expect(422);
+    const fieldLabel = `Insurer ${Date.now().toString(36)}`;
+    await admin
+      .put(`/m/assistant/setup/${s.body.uuid}/brief`, {
+        brief: {
+          ...brief,
+          stages: [{ name: 'Enquiry' }, { name: 'Consultation' }, { name: 'Treatment' }],
+          track: [{ entity: 'contact', label: fieldLabel, type: 'text' }],
+          roles: [{ name: 'Receptionist' }],
+        },
+        approve: true,
+      })
+      .expect(200);
+
+    const proposed = (await admin.post(`/m/assistant/setup/${s.body.uuid}/proposal`).expect(200)).body
+      .proposal.items;
+    const ids = proposed.map((i: { id: string }) => i.id);
+    expect(ids).toEqual(expect.arrayContaining(['branding', 'pipeline', 'fields', 'roles', 'reports']));
+    const pipeline = proposed.find((i: { id: string }) => i.id === 'pipeline');
+    // A won and a lost stage are added when the process has none.
+    expect(pipeline.preview.lists[0].items.map((x: { label: string }) => x.label)).toEqual([
+      'Enquiry',
+      'Consultation',
+      'Treatment',
+      'Won',
+      'Lost',
+    ]);
+    const branding = proposed.find((i: { id: string }) => i.id === 'branding');
+    // The website colour is darkened until white text on it is readable.
+    expect(branding.payload.primary).toMatch(/^#[0-9A-F]{6}$/);
+
+    const built = (
+      await admin
+        .post(`/m/assistant/setup/${s.body.uuid}/build`, {
+          include: ['branding', 'pipeline', 'fields', 'reports'],
+          edits: {
+            branding: { set: [{ path: ['appName'], value: `${name} CRM` }] },
+            pipeline: { drop: [{ path: ['stages'], index: 1 }] },
+          },
+        })
+        .expect(200)
+    ).body;
+    expect(built.step).toBe('built');
+    const results = built.built.results as { area: string; ok: boolean; message: string }[];
+    expect(results.filter((r) => !r.ok)).toEqual([]);
+    expect(results.map((r) => r.area)).toEqual(
+      expect.arrayContaining(['setup', 'branding', 'logo', 'report']),
+    );
+
+    const brand = (await admin.get('/settings/branding').expect(200)).body;
+    expect(brand.branding.appName).toBe(`${name} CRM`);
+    const { db } = await import('../src/db/knex');
+    const pipe = await db('pipelines')
+      .where({ name: `${name} sales` })
+      .first();
+    const stages = await db('pipeline_stages')
+      .where({ pipeline_id: pipe.id })
+      .orderBy('sort_order')
+      .pluck('name');
+    expect(stages).toEqual(['Enquiry', 'Treatment', 'Won', 'Lost']);
+    expect(await db('custom_field_definitions').where({ label: fieldLabel }).first()).toBeTruthy();
+    expect(await db('roles').where({ name: 'Receptionist' }).first()).toBeUndefined();
+    expect(await db('saved_reports').where({ name: 'Deals by stage' }).first()).toBeTruthy();
   });
 
   it('reads JSON out of a model reply, and tells brand colours from greys', async () => {
@@ -123,5 +206,19 @@ describe('AI setup mode', () => {
     expect(brandHex('#0E7C86')).toBe('#0e7c86');
     expect(brandHex('#fff')).toBeNull();
     expect(brandHex('#777777')).toBeNull();
+    const { readableBrand, keyOf } = await import('../../../modules/assistant/api/proposal');
+    const { contrastRatio } = await import('@app/shared');
+    // A pale website yellow becomes a colour text can sit on.
+    const yellow = readableBrand('#FFEE55');
+    expect(
+      Math.max(contrastRatio(yellow, '#FFFFFF'), contrastRatio(yellow, '#000000')),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(readableBrand('#0E7C86')).toBe('#0E7C86');
+    const used = new Set<string>();
+    expect([keyOf('Insurance ID', used), keyOf('insurance-id', used), keyOf('2nd phone', used)]).toEqual([
+      'insurance_id',
+      'insurance_id_2',
+      'f_2nd_phone',
+    ]);
   });
 });

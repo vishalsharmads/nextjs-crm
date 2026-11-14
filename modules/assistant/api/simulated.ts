@@ -196,6 +196,15 @@ function setupReply(req: ChatRequest): string | null {
     const next = SETUP_QUESTIONS[answered];
     return JSON.stringify(next ? { done: false, ...next } : { done: true });
   }
+  if (req.system.startsWith('[setup:reports]'))
+    return JSON.stringify({
+      reports: [
+        {
+          name: 'Deals by stage',
+          definition: { entity: 'deal', groupBy: 'stage', metric: 'count', chart: 'bar' },
+        },
+      ],
+    });
   if (req.system.startsWith('[setup:brief]')) {
     const details = /Business details: (\{.*\})/.exec(prompt)?.[1];
     let profile: Obj = {};

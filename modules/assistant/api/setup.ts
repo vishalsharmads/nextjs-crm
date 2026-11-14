@@ -7,9 +7,18 @@ import {
   newUuid,
   notFound,
   setupOverview,
+  addPreset,
+  applySetupDraft,
+  assertSafeUrl,
+  callRoute,
+  saveBrandingAsset,
+  logger,
   type AuthUser,
+  type RequestContext,
 } from '@app/api/module-api';
 import { readWebsite } from './website';
+import { buildProposal, draftOf, reportsSchema, type ProposalItem } from './proposal';
+import { applyEdits, type Edits } from './preview';
 
 /**
  * AI setup mode (phase 10): an admin tells the assistant about the business, it reads their
@@ -359,5 +368,201 @@ export function setupRoutes(deps: SetupDeps) {
           });
         return dto(await sessionFor(params.uuid, user));
       },
+    })
+    .add({
+      method: 'post',
+      path: '/:uuid/proposal',
+      permission: 'assistant.chat.use',
+      params: z.object({ uuid: z.uuid() }),
+      summary: 'Propose a setup from the approved brief, item by item, to review',
+      handler: async ({ user, params }) => {
+        const row = await sessionFor(params.uuid, user);
+        const s = dto(row);
+        if (!s.brief || (row.step !== 'proposal' && row.step !== 'built'))
+          throw new AppError('VALIDATION_FAILED', 'Approve the brief first');
+        const presets = (await setupOverview(user)).presets.filter((p) => p.ready);
+        // Reports are the one part the assistant translates (into report definitions); the rest
+        // follows from the brief. If it cannot, the proposal goes ahead without reports.
+        let reports: ProposalItem['payload'][] = [];
+        if (s.brief.reports.length)
+          reports = await askJson(
+            deps,
+            user,
+            `[setup:reports] ${CONSULTANT}\nTurn the reports the business asked for into report definitions. Each counts, sums or averages one record type (contact, organization, deal, lead or activity) grouped by one field: owner, stage, status, source, created_at (with dateBucket), or a custom field written as cf.<key>. Sum and average need a number field such as "value". Reply with JSON only: {"reports": [{"name": "...", "definition": {"entity": "deal", "groupBy": "stage", "metric": "count", "chart": "bar"}}]}`,
+            `Reports they want: ${JSON.stringify(s.brief.reports)}\nFields they track: ${JSON.stringify(s.brief.track)}`,
+            reportsSchema,
+          )
+            .then((r) => r.reports)
+            .catch(() => []);
+        const items = buildProposal(
+          s.brief,
+          s.website as Parameters<typeof buildProposal>[1],
+          reports as Parameters<typeof buildProposal>[2],
+          presets,
+        );
+        await save(row.id, { proposal: { items }, step: 'proposal' });
+        return dto(await sessionFor(params.uuid, user));
+      },
+    })
+    .add({
+      method: 'post',
+      path: '/:uuid/build',
+      permission: 'assistant.chat.use',
+      params: z.object({ uuid: z.uuid() }),
+      body: z.object({
+        include: z.array(z.string().max(20)).max(20),
+        edits: z.record(z.string().max(20), editsSchema).default({}),
+      }),
+      summary: 'Build the chosen items, with the edits made in the review',
+      handler: async ({ ctx, user, params, body }) => {
+        const row = await sessionFor(params.uuid, user);
+        const proposal = json<{ items: ProposalItem[] }>(row.proposal as string);
+        if (!proposal) throw new AppError('VALIDATION_FAILED', 'Make the proposal first');
+        let chosen: ProposalItem[];
+        try {
+          chosen = proposal.items
+            .filter((i) => body.include.includes(i.id) && !i.advice)
+            .map((i) =>
+              body.edits[i.id] ? { ...i, payload: applyEdits(i.payload, i.preview, body.edits[i.id]!) } : i,
+            );
+        } catch (err) {
+          throw new AppError('VALIDATION_FAILED', (err as Error).message);
+        }
+        const results = await build(chosen, { ctx, user });
+        await save(row.id, { built: { results, at: new Date().toISOString() }, step: 'built' });
+        await audit(db, ctx, {
+          action: 'assistant.setup.built',
+          entity: 'assistant.setup',
+          entityId: row.id,
+          entityUuid: row.uuid,
+          diff: { items: chosen.map((i) => i.id) },
+        });
+        return dto(await sessionFor(params.uuid, user));
+      },
     });
+}
+
+const inputPath = z
+  .array(z.union([z.string().max(64), z.number().int().min(0).max(1000)]))
+  .min(1)
+  .max(8);
+const editsSchema = z.object({
+  set: z
+    .array(z.object({ path: inputPath, value: z.union([z.string().max(4000), z.boolean()]) }))
+    .max(30)
+    .optional(),
+  drop: z
+    .array(z.object({ path: inputPath, index: z.number().int().min(0).max(1000) }))
+    .max(100)
+    .optional(),
+}) satisfies z.ZodType<Edits>;
+
+interface Built {
+  area: string;
+  ok: boolean;
+  message: string;
+}
+
+const MAX_LOGO = 2_000_000;
+
+/** The website's logo, fetched once (outbound checks, no redirects, size and type limits). */
+async function fetchLogo(url: string): Promise<{ buffer: Buffer; originalName: string }> {
+  await assertSafeUrl(url, 'logo');
+  const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(8_000) });
+  if (!res.ok || !/^image\//i.test(res.headers.get('content-type') ?? ''))
+    throw new AppError('UPSTREAM_FAILED', 'The logo could not be downloaded');
+  const buffer = Buffer.from(await res.arrayBuffer());
+  if (buffer.length > MAX_LOGO) throw new AppError('VALIDATION_FAILED', 'The logo is too large');
+  return { buffer, originalName: new URL(url).pathname.split('/').pop() || 'logo' };
+}
+
+/**
+ * Builds the chosen items in a safe order, through the same paths an admin's own changes take
+ * (the preset engine in add mode, the branding and report routes). Each part reports on its own,
+ * so one failure never hides what was built.
+ */
+async function build(items: ProposalItem[], tc: { ctx: RequestContext; user: AuthUser }): Promise<Built[]> {
+  const out: Built[] = [];
+  const step = async (area: string, ok: string, run: () => Promise<unknown>) => {
+    try {
+      // A step may return a note that replaces its plain success message.
+      const note = await run();
+      out.push({ area, ok: true, message: typeof note === 'string' && note ? note : ok });
+    } catch (err) {
+      if (!(err instanceof AppError)) logger.error({ err, area }, 'AI setup step failed');
+      out.push({
+        area,
+        ok: false,
+        message: err instanceof AppError ? err.message : 'This part could not be built.',
+      });
+    }
+  };
+  const item = (area: ProposalItem['area']) => items.find((i) => i.area === area);
+
+  const preset = item('preset');
+  if (preset)
+    await step('preset', 'Industry preset added', () =>
+      addPreset(String(preset.payload.key), tc).then(() => undefined),
+    );
+
+  const draft = draftOf(items);
+  if (Object.keys(draft).length)
+    await step('setup', 'Names, pipeline, fields and roles set up', async () => {
+      const report = await applySetupDraft(draft as Parameters<typeof applySetupDraft>[0], tc);
+      // What already existed is left as it was: say so, rather than claim it was set up.
+      const kept = report.conflicts.map((c) => c.item);
+      if (kept.length) return `Set up; already there and left as it was: ${kept.slice(0, 8).join(', ')}`;
+    });
+
+  const brand = item('branding');
+  if (brand) {
+    const p = brand.payload as {
+      appName: string;
+      tagline: string;
+      primary: string | null;
+      primaryDark: string | null;
+      accent: string | null;
+      logoUrl: string | null;
+      useLogo: boolean;
+    };
+    await step('branding', 'Branding updated', async () => {
+      const { branding: current } = (await callRoute('get', '/settings/branding', {}, tc)) as {
+        branding: Record<string, unknown> & {
+          colors: { light: Record<string, string>; dark: Record<string, string> };
+        };
+      };
+      const next = {
+        ...current,
+        appName: p.appName.slice(0, 60),
+        tagline: p.tagline.slice(0, 140),
+        colors: {
+          light: {
+            ...current.colors.light,
+            ...(p.primary ? { primary: p.primary } : {}),
+            ...(p.accent ? { accent: p.accent } : {}),
+          },
+          dark: { ...current.colors.dark, ...(p.primaryDark ? { primary: p.primaryDark } : {}) },
+        },
+      };
+      await callRoute('put', '/settings/branding', { body: next }, tc);
+    });
+    if (p.useLogo && p.logoUrl)
+      await step('logo', 'Logo added from your website', async () => {
+        const file = await fetchLogo(p.logoUrl!);
+        await saveBrandingAsset(tc.ctx, tc.user, 'logoLight', file);
+      });
+  }
+
+  const reports = item('reports')?.payload.reports as
+    { name: string; definition: Record<string, unknown> }[] | undefined;
+  for (const r of reports ?? [])
+    await step('report', `Report "${r.name}" added`, () =>
+      callRoute(
+        'post',
+        '/reports/custom',
+        { body: { name: r.name, shared: true, definition: r.definition } },
+        tc,
+      ).then(() => undefined),
+    );
+  return out;
 }
