@@ -1,6 +1,5 @@
 import { toPatch } from '@app/shared';
 import { lookup } from 'node:dns/promises';
-import net from 'node:net';
 import { z } from 'zod';
 import { env } from '../../config/env';
 import { defineRoutes } from '../../http/routes';
@@ -9,6 +8,7 @@ import { AppError, notFound } from '../../lib/errors';
 import { decrypt, encrypt, hmac, randomToken } from '../../lib/crypto';
 import { newUuid } from '../../lib/ids';
 import { logger } from '../../lib/logger';
+import { isPrivateAddress, safePost } from '../../lib/safe-net';
 import { enqueue, every, registerJob } from '../../lib/jobs';
 import { audit } from '../audit/audit.service';
 import { eventTouchesRestricted } from '../privacy/privacy.service';
@@ -19,32 +19,6 @@ const MAX_ATTEMPTS = 6;
 const BACKOFF_MIN = [0, 1, 5, 30, 120, 720];
 
 // ---------- SSRF guard ----------
-
-function isPrivate(ip: string): boolean {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number) as [number, number];
-    return (
-      a === 10 ||
-      a === 127 ||
-      a === 0 ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 100 && b >= 64 && b <= 127)
-    );
-  }
-  const v6 = ip.toLowerCase();
-  return (
-    v6 === '::1' ||
-    v6 === '::' ||
-    v6.startsWith('fc') ||
-    v6.startsWith('fd') ||
-    v6.startsWith('fe80') ||
-    v6.startsWith('::ffff:127.') ||
-    v6.startsWith('::ffff:10.') ||
-    v6.startsWith('::ffff:192.168.')
-  );
-}
 
 /**
  * Outbound targets (webhooks, the assistant's model provider) must be https (or http in dev) and
@@ -70,7 +44,7 @@ export async function assertSafeUrl(raw: string, path = 'url', opts: { privateHo
   }
   if (env.WEBHOOKS_ALLOW_PRIVATE) return;
   const addrs = await lookup(url.hostname, { all: true }).catch(() => []);
-  if (!addrs.length || addrs.some((a) => isPrivate(a.address))) {
+  if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) {
     throw new AppError('VALIDATION_FAILED', 'This address is not reachable from the internet', [
       { path, message: 'Private or unknown host' },
     ]);
@@ -96,9 +70,10 @@ async function deliver(deliveryId: number) {
   let error: string | null = null;
   try {
     await assertSafeUrl(d.url);
-    const res = await fetch(d.url, {
-      method: 'POST',
-      headers: {
+    // The address is checked again at connect time, so a DNS answer that changes cannot reach a private host.
+    const res = await safePost(
+      d.url,
+      {
         'Content-Type': 'application/json',
         'User-Agent': 'webhooks/1',
         'X-Webhook-Id': d.uuid,
@@ -107,9 +82,8 @@ async function deliver(deliveryId: number) {
         'X-Webhook-Signature': sign(decrypt(d.secret_enc, 'webhooks.secret_enc'), timestamp, body),
       },
       body,
-      redirect: 'manual',
-      signal: AbortSignal.timeout(10_000),
-    });
+      { timeoutMs: 10_000, allowPrivate: env.WEBHOOKS_ALLOW_PRIVATE },
+    );
     status = res.status;
     if (res.status < 200 || res.status >= 300) error = `HTTP ${res.status}`;
   } catch (err) {
