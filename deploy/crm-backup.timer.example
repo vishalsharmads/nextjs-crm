@@ -1,0 +1,11 @@
+# /etc/systemd/system/crm-backup-<client>.timer — systemctl enable --now crm-backup-<client>.timer
+[Unit]
+Description=Nightly CRM backup (%i)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -5,7 +5,7 @@ import { SAVED_REPLY_PREFIX } from '@app/shared';
 import { Copy, KeyRound, Plus, RefreshCw, Send, Trash2, Webhook } from 'lucide-react';
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { formatDateTime, formatRelative } from '@/lib/format';
-import { useT } from '@/app/session';
+import { useCan, useT } from '@/app/session';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
 import { Badge, EmptyState, ErrorState, Pane, Skeleton } from '@/components/ui/misc';
@@ -676,6 +676,11 @@ export function EmailSettingsPage() {
     mutationFn: (uuid: string) => apiDelete(`/email/accounts/${uuid}`),
     onSuccess: refresh,
   });
+  const can = useCan();
+  const testMail = useMutation({
+    mutationFn: () => apiPost<{ sentTo: string }>('/settings/email/test'),
+    onSuccess: (r) => toast.success(`Test email sent to ${r.sentTo}`),
+  });
   return (
     <SettingsPage
       title={t('settings.email')}
@@ -729,6 +734,19 @@ export function EmailSettingsPage() {
         )}
       </Pane>
       {connecting ? <ConnectMailbox onClose={() => setConnecting(false)} onSaved={refresh} /> : null}
+      {can('core.settings.manage') ? (
+        <Pane title="Workspace mail server">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <p className="min-w-0 flex-1 text-muted">
+              Invitations, password resets, reminders and automated emails go out through the server set up
+              for this workspace. Send yourself a test to check it works.
+            </p>
+            <Button onClick={() => testMail.mutate()} loading={testMail.isPending}>
+              <Send /> Send test email
+            </Button>
+          </div>
+        </Pane>
+      ) : null}
     </SettingsPage>
   );
 }

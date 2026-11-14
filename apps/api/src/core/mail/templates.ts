@@ -113,3 +113,18 @@ export async function sendTemplatedEmail(key: string, to: string, vars: Record<s
     fromAddress: base.branding.emailFromAddress || undefined,
   });
 }
+
+/** A fixed message in the branded layout: the SMTP check in Settings → Email. */
+export async function sendTestEmail(to: string, firstName: string) {
+  const base = await baseVars();
+  const appName = base.branding.appName;
+  const body = `<p>Hi ${Handlebars.escapeExpression(firstName)},</p><p>This is a test email from ${Handlebars.escapeExpression(appName)}. Email sending works.</p>`;
+  await sendMail({
+    to,
+    subject: `Test email from ${appName}`,
+    html: layout(body, base.branding),
+    text: htmlToText(body),
+    fromName: base.branding.emailFromName || appName,
+    fromAddress: base.branding.emailFromAddress || undefined,
+  });
+}

@@ -18,6 +18,8 @@ const schema = z.object({
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 
   DATABASE_URL: z.string().default('mysql://root@127.0.0.1:3306/crm_dev'),
+  /** Connections per API process. Keep (processes × DB_POOL_MAX) below MySQL's max_connections. */
+  DB_POOL_MAX: z.coerce.number().int().min(2).max(200).default(10),
   DATABASE_URL_TEST: z.string().default('mysql://root@127.0.0.1:3306/crm_test'),
 
   JWT_SECRET: z.string().min(16).default('dev-only-jwt-secret-change-me'),

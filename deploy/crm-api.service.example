@@ -6,13 +6,16 @@ After=network.target mysql.service
 [Service]
 Type=simple
 User=crm
-WorkingDirectory=/srv/crm/client/apps/api
+# deploy/release.sh switches the current symlink to each new release folder.
+WorkingDirectory=/srv/crm/client/current/apps/api
 EnvironmentFile=/srv/crm/client/.env
 Environment=NODE_ENV=production
-Environment=BLUEPRINTS_DIR=/srv/crm/client/packages/blueprints
+Environment=BLUEPRINTS_DIR=/srv/crm/client/current/packages/blueprints
 ExecStart=/usr/bin/node dist/server.js
 Restart=on-failure
 RestartSec=3
+# The API finishes open requests for up to 15 s on stop.
+TimeoutStopSec=20
 # Hardening
 NoNewPrivileges=true
 ProtectSystem=strict

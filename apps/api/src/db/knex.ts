@@ -28,7 +28,7 @@ export function createKnex(
     },
     pool: {
       min: 0,
-      max: opts.poolMax ?? 10,
+      max: opts.poolMax ?? env.DB_POOL_MAX,
       // All DATETIME defaults (CURRENT_TIMESTAMP) must be UTC, matching what the app writes.
       afterCreate(
         conn: { query: (sql: string, cb: (err: Error | null) => void) => void },

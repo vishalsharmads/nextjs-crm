@@ -1,3 +1,7 @@
+import { access, mkdir } from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
+import path from 'node:path';
+import { redisStatus } from '../lib/jobs';
 import { db } from '../db/knex';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
@@ -66,14 +70,23 @@ export function createApp(opts: AppOptions = {}): Express {
   app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
-  // Readiness: the database answers too. Use for uptime monitoring and deploy checks.
+  // Readiness: the database, file storage and (when used) Redis answer too. Use for uptime
+  // monitoring and deploy checks. Only states are returned, never addresses or errors.
   app.get('/api/v1/health/ready', async (_req, res) => {
-    try {
-      await db.raw('SELECT 1');
-      res.json({ status: 'ok', database: 'ok' });
-    } catch {
-      res.status(503).json({ status: 'unavailable', database: 'unreachable' });
-    }
+    const [database, files, redis] = await Promise.all([
+      db
+        .raw('SELECT 1')
+        .then(() => 'ok' as const)
+        .catch(() => 'unreachable' as const),
+      // Storage creates its folder on first upload, so a missing one is created here too.
+      mkdir(path.resolve(env.STORAGE_DIR), { recursive: true })
+        .then(() => access(path.resolve(env.STORAGE_DIR), fsConstants.W_OK))
+        .then(() => 'ok' as const)
+        .catch(() => 'unwritable' as const),
+      redisStatus(),
+    ]);
+    const ok = database === 'ok' && files === 'ok' && redis !== 'unreachable';
+    res.status(ok ? 200 : 503).json({ status: ok ? 'ok' : 'unavailable', database, storage: files, redis });
   });
 
   // OAuth discovery for MCP clients lives at the site root (RFC 8414, RFC 9728).

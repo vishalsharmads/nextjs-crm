@@ -1,3 +1,4 @@
+import { sendTestEmail } from '../mail/templates';
 import { z } from 'zod';
 import multer from 'multer';
 import {
@@ -148,6 +149,25 @@ export const publicRoutes = defineRoutes('/public', ['public'])
   });
 
 export const settingsRoutes = defineRoutes('/settings', ['settings'])
+  .add({
+    method: 'post',
+    path: '/email/test',
+    permission: 'core.settings.manage',
+    summary: 'Send a test email to yourself through the configured mail server',
+    handler: async ({ ctx, user }) => {
+      try {
+        await sendTestEmail(user.email, user.firstName);
+      } catch {
+        // The server log has the details; people get what to check.
+        throw new AppError(
+          'UPSTREAM_FAILED',
+          'The mail server did not accept the email. Check SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS in the server settings, then try again.',
+        );
+      }
+      await audit(db, ctx, { action: 'settings.test_email_sent', entity: 'settings' });
+      return { sentTo: user.email };
+    },
+  })
   .add({
     method: 'delete',
     path: '/demo-login',

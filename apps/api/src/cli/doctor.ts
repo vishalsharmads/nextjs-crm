@@ -1,4 +1,6 @@
+import { readdirSync, statSync } from 'node:fs';
 import net from 'node:net';
+import path from 'node:path';
 import { env } from '../config/env';
 import { db } from '../db/knex';
 
@@ -63,6 +65,16 @@ export async function runDoctor(out: Out): Promise<boolean> {
 
   await complianceChecks(out);
 
+  // Advisory: set BACKUP_DIR (the folder deploy/backup.sh writes to) to have the newest backup checked.
+  if (process.env.BACKUP_DIR) {
+    const age = newestBackupAgeHours(process.env.BACKUP_DIR);
+    out(
+      age !== null && age <= 26
+        ? `✔ Newest backup is ${Math.round(age)} h old`
+        : `! ${age === null ? 'No backup found' : `Newest backup is ${Math.round(age)} h old`} in ${process.env.BACKUP_DIR}\n    → Enable the nightly timer (deploy/crm-backup.timer.example) and check its log`,
+    );
+  }
+
   if (env.NODE_ENV === 'production') {
     check(env.APP_URL.startsWith('https://'), 'APP_URL uses https', 'Serve the app over HTTPS in production');
     check(
@@ -124,4 +136,18 @@ async function complianceChecks(out: Out) {
     'Traffic is encrypted (HTTPS)',
     'Serve the app over HTTPS',
   );
+}
+
+/** Hours since the newest file in a backup folder was written, or null when there is none. */
+export function newestBackupAgeHours(dir: string, now = Date.now()): number | null {
+  let newest = 0;
+  try {
+    for (const name of readdirSync(dir)) {
+      const st = statSync(path.join(dir, name));
+      if (st.isFile() && st.mtimeMs > newest) newest = st.mtimeMs;
+    }
+  } catch {
+    return null;
+  }
+  return newest ? (now - newest) / 3_600_000 : null;
 }
