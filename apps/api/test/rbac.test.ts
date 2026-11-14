@@ -74,3 +74,29 @@ describe('team membership', () => {
     await mgr.patch(`/teams/${team.body.uuid}`, { memberUuids: [mgrUser.uuid] }).expect(200);
   });
 });
+
+describe('links between records', () => {
+  it('cannot link a deal or contact to records outside the caller’s scope', async () => {
+    const { client: admin } = await clientWithRoles(['admin']);
+    const role = await createRole(['core.deals.*', 'core.contacts.*', 'core.organizations.view'], {
+      'core.deals': 'own',
+      'core.contacts': 'own',
+      'core.organizations': 'own',
+    });
+    const rep = await loginAs(await createUser({ roleKeys: [role] }));
+    const theirs = await admin.post('/contacts', { firstName: 'Not yours' }).expect(201);
+    const theirOrg = await admin.post('/organizations', { name: `Hidden ${Date.now()}` }).expect(201);
+
+    const res = await rep.post('/deals', { title: 'Peek', contactUuid: theirs.body.uuid }).expect(422);
+    expect(res.body.error.details[0].path).toBe('contactUuid');
+    await rep.post('/deals', { title: 'Peek', organizationUuid: theirOrg.body.uuid }).expect(422);
+    await rep.post('/contacts', { firstName: 'Mine', organizationUuid: theirOrg.body.uuid }).expect(422);
+
+    // A link an admin made is kept when the rep saves the deal with it unchanged.
+    const mine = await rep.post('/deals', { title: 'Mine' }).expect(201);
+    await admin.patch(`/deals/${mine.body.uuid}`, { contactUuid: theirs.body.uuid }).expect(200);
+    await rep
+      .patch(`/deals/${mine.body.uuid}`, { title: 'Mine 2', contactUuid: theirs.body.uuid })
+      .expect(200);
+  });
+});

@@ -85,6 +85,20 @@ export const contactsDef: ResourceDef<Row, ContactDto> = {
       input.organizationUuid as string | null | undefined,
       'organizationUuid',
       conn,
+      {
+        user,
+        resource: 'core.organizations',
+        ownerColumns: ['organizations.owner_id'],
+        // Re-sending the organization already linked is not a new link.
+        current: input.organizationUuid
+          ? ((
+              await conn('contact_organization as co')
+                .join('organizations as o', 'o.id', 'co.organization_id')
+                .where({ 'co.contact_id': id, 'o.uuid': input.organizationUuid })
+                .first('o.id')
+            )?.id as number | undefined)
+          : undefined,
+      },
     );
     if (orgId) {
       const existing = await conn('contact_organization')

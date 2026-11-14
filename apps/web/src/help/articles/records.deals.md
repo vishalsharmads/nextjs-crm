@@ -23,7 +23,7 @@ The {{dealPluralLower}} list shows everyone your role lets you see. Open one to 
 
 ## Fields
 
-Besides the built-in fields, your admin can add custom fields and arrange them (Settings → Custom fields and Layouts). Some fields may be read-only or hidden for your role.
+Besides the built-in fields, your admin can add custom fields and arrange them (Settings → Custom fields and Layouts). Some fields may be read-only or hidden for your role. You can link a {{dealLower}} only to {{contactPluralLower}} and {{organizationPluralLower}} you can see; a link someone else made stays when you edit the {{dealLower}}.
 
 ## Permissions
 

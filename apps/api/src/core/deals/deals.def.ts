@@ -76,12 +76,24 @@ export const dealsDef: ResourceDef<Row, DealDto> = {
         input.contactUuid as string | null | undefined,
         'contactUuid',
         conn,
+        {
+          user,
+          resource: 'core.contacts',
+          ownerColumns: ['contacts.owner_id'],
+          current: existing?.contact_id as number | null | undefined,
+        },
       ),
       organization_id: await idFromUuid(
         'organizations',
         input.organizationUuid as string | null | undefined,
         'organizationUuid',
         conn,
+        {
+          user,
+          resource: 'core.organizations',
+          ownerColumns: ['organizations.owner_id'],
+          current: existing?.organization_id as number | null | undefined,
+        },
       ),
     });
     if (!existing || input.pipelineUuid || input.stageUuid) {
