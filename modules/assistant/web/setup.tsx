@@ -1030,6 +1030,7 @@ function ProposalStep({
                   <label className="flex shrink-0 items-center gap-1.5 text-sm">
                     <Checkbox
                       checked={on}
+                      aria-label={`Include ${it.title}`}
                       onCheckedChange={(v) =>
                         setOff((x) => (v ? x.filter((y) => y !== it.id) : [...x, it.id]))
                       }
