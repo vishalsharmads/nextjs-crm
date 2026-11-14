@@ -28,7 +28,7 @@ Ask questions about your records in plain words, get summaries of a record's his
 
 ## Finding what was said
 
-Ask about conversations and notes ("what did we agree with Acme about pricing?", "who mentioned the delay?") and the assistant searches the text of notes, emails, calls, meetings, tasks and their comments that you can open, then answers with where each part came from. Put words in quotes to find that exact phrase. If an admin keeps any record type away from the assistant, this search is off.
+Ask about conversations and notes ("what did we agree with this {{organizationLower}} about pricing?", "who mentioned the delay?") and the assistant searches the text of notes, emails, calls, meetings, tasks and their comments that you can open, then answers with where each part came from. Put words in quotes to find that exact phrase. If an admin keeps any record type away from the assistant, this search is off.
 
 ## Numbers, charts and keeping results
 
