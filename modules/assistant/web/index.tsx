@@ -1,12 +1,4 @@
-import {
-  Fragment,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type MouseEvent,
-  type ReactNode,
-} from 'react';
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ENTITY_ROUTE, recordTypePath } from '@app/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -41,6 +33,7 @@ import { SettingsPanel } from './settings';
 import { SetupPage } from './setup';
 import { DECISION_WORDS, thinkingWords } from './thinking';
 import { replyHtml, splitNext, type RecordPath } from './markdown';
+import { ChangePreview, Details, pathKey, type ChangeEdits, type ChangePreviewDto } from './change-preview';
 import type { ReportDefinition, ReportResultDto } from '@app/shared';
 import { ReportChart } from '@/features/reports/report-chart';
 import { imageFiles, MAX_ATTACHMENTS, prepareImage, type Attachment } from './images';
@@ -49,10 +42,9 @@ import { ApiError, apiDelete, apiGet, apiPost, apiStream, buildUrl } from '@/lib
 import { formatRelative } from '@/lib/format';
 import { useBoot, useCan } from '@/app/session';
 import { cn } from '@/lib/cn';
-import { appUrl } from '@/lib/app-url';
 import { Button } from '@/components/ui/button';
-import { Input, Textarea } from '@/components/ui/input';
-import { Checkbox, Switch } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Badge,
   ErrorState,
@@ -77,18 +69,6 @@ interface Proposal {
   preview?: ChangePreviewDto;
 }
 
-type InputPath = (string | number)[];
-/** What a change will do, from the server: records by name, plain values, lists item by item. */
-interface ChangePreviewDto {
-  records: { entity: string; uuid: string; name: string | null }[];
-  fields: { label: string; value: string; edit?: InputPath; kind?: 'text' | 'boolean'; entity?: string }[];
-  lists?: { label: string; path: InputPath; items: { label: string; detail?: string }[] }[];
-}
-/** The person's edits to one change before confirming. */
-interface ChangeEdits {
-  set?: { path: InputPath; value: string | boolean }[];
-  drop?: { path: InputPath; index: number }[];
-}
 interface Conversation {
   uuid: string;
   title: string;
@@ -1010,8 +990,6 @@ function changeIcon(name: string) {
   return Pencil;
 }
 
-const pathKey = (p: InputPath) => JSON.stringify(p);
-
 /**
  * The changes the assistant proposes, each as what it will do: the records by name, the values
  * in plain words, names and titles editable, list items that can be left out, and the person's
@@ -1133,18 +1111,6 @@ function Proposals({
         </Button>
       </div>
     </div>
-  );
-}
-
-/** The exact change, for people who want to see it, out of the way of everyone else. */
-function Details({ input }: { input: Record<string, unknown> }) {
-  return (
-    <details className="mt-2 text-xs text-muted">
-      <summary className="cursor-pointer select-none">Details</summary>
-      <pre className="mt-1 max-h-48 overflow-auto rounded bg-subtle p-2">
-        {JSON.stringify(input, null, 2)}
-      </pre>
-    </details>
   );
 }
 
@@ -1386,122 +1352,6 @@ function AssistantAvatar({ working = false }: { working?: boolean }) {
     >
       <Sparkles className="size-3.5" />
     </span>
-  );
-}
-
-/**
- * A proposed change people can check at a glance: the records it touches by name (each opens in a
- * new tab), its values in plain words with names and titles editable, its lists as tick boxes, the
- * assistant's own note labelled as such, and the exact change one click away.
- */
-function ChangePreview({
-  preview,
-  input,
-  labels,
-  recordPath,
-  texts,
-  onText,
-  dropped,
-  onToggle,
-  note,
-}: {
-  preview: ChangePreviewDto;
-  input: Record<string, unknown>;
-  labels: Labels;
-  recordPath: RecordPath;
-  texts: Record<string, string | boolean>;
-  onText: (key: string, value: string | boolean) => void;
-  dropped: Record<string, number[]>;
-  onToggle: (key: string, index: number, keep: boolean) => void;
-  note?: string;
-}) {
-  return (
-    <div className="mt-2 space-y-2.5">
-      {preview.records.length ? (
-        <ul className="flex flex-wrap gap-1.5" aria-label="Records it changes">
-          {preview.records.map((r) => {
-            const type = labels[r.entity]?.singular ?? 'Record';
-            const to = recordPath(r.entity, r.uuid);
-            const name = r.name ?? 'A record you cannot see';
-            return (
-              <li key={`${r.entity}:${r.uuid}`}>
-                {to ? (
-                  <a href={appUrl(`/${to}`)} target="_blank" rel="noopener noreferrer" className="ai-chip">
-                    <span className="text-faint">{type}:</span> {name}
-                  </a>
-                ) : (
-                  <span className="ai-chip">
-                    <span className="text-faint">{type}:</span> {name}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-      {preview.fields.length ? (
-        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] items-center gap-x-3 gap-y-1.5 text-sm">
-          {preview.fields.map((f, i) => {
-            const k = f.edit ? pathKey(f.edit) : '';
-            return (
-              <Fragment key={i}>
-                <dt className="text-muted">{f.label}</dt>
-                <dd className="min-w-0 break-words text-ink">
-                  {f.edit && f.kind === 'boolean' ? (
-                    <Switch
-                      checked={(texts[k] as boolean | undefined) ?? f.value === 'Yes'}
-                      onCheckedChange={(v) => onText(k, v)}
-                      aria-label={f.label}
-                    />
-                  ) : f.edit ? (
-                    <Input
-                      value={(texts[k] as string | undefined) ?? f.value}
-                      onChange={(e) => onText(k, e.target.value)}
-                      aria-label={f.label}
-                      className="h-8"
-                    />
-                  ) : f.entity ? (
-                    (labels[f.entity]?.plural ?? f.value)
-                  ) : (
-                    f.value
-                  )}
-                </dd>
-              </Fragment>
-            );
-          })}
-        </dl>
-      ) : null}
-      {(preview.lists ?? []).map((l) => {
-        const k = pathKey(l.path);
-        const out = dropped[k] ?? [];
-        return (
-          <fieldset key={k}>
-            <legend className="mb-1 text-xs font-medium text-muted">
-              {l.label} · {l.items.length - out.length} of {l.items.length} kept
-            </legend>
-            <ul className="divide-y divide-line rounded-md border border-line">
-              {l.items.map((item, i) => (
-                <li key={i}>
-                  <label className="flex cursor-pointer items-start gap-2 px-2.5 py-1.5">
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={!out.includes(i)}
-                      onCheckedChange={(v) => onToggle(k, i, !!v)}
-                    />
-                    <span className={cn('min-w-0', out.includes(i) && 'text-faint line-through')}>
-                      <span className="block">{item.label}</span>
-                      {item.detail ? <span className="block text-xs text-muted">{item.detail}</span> : null}
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </fieldset>
-        );
-      })}
-      {note ? <p className="text-xs text-muted">Assistant&apos;s note: {note}</p> : null}
-      <Details input={input} />
-    </div>
   );
 }
 
