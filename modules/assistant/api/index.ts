@@ -32,6 +32,8 @@ import * as m0001 from './migrations/0001_assistant';
 import * as m0002 from './migrations/0002_presets';
 import * as m0003 from './migrations/0003_vision';
 import * as m0004 from './migrations/0004_changes';
+import * as m0005 from './migrations/0005_setup_sessions';
+import { setupRoutes } from './setup';
 import {
   assertSafeModelUrl,
   chat,
@@ -1501,9 +1503,40 @@ async function mentioning(
   return [...new Set([...fromMessages, ...fromConversations].map(Number))];
 }
 
+/**
+ * One question to the configured model, without tools, for AI setup: same provider, limits and
+ * usage counting as chat.
+ */
+async function askModel(user: AuthUser, system: string, prompt: string): Promise<string> {
+  assertRate(user.id);
+  const cfg = await loadConfig();
+  const provider = await providerConfig(cfg);
+  if (!provider)
+    throw new AppError('NOT_FOUND', 'The assistant is not set up yet. Choose an AI provider first.');
+  await assertWithinCaps(cfg, user.id);
+  const reply = await chat(provider, {
+    system,
+    messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
+    tools: [],
+  });
+  const text = reply.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n');
+  if (provider.provider !== 'simulated')
+    await recordUsage(user.id, {
+      input: reply.usage.input || estimate([system, prompt]),
+      output: reply.usage.output || estimate(text),
+    });
+  return text;
+}
+
 export const assistant: ApiModule = {
-  routes: () => [routes],
-  migrations: { '0001_assistant': m0001, '0002_presets': m0002, '0003_vision': m0003, '0004_changes': m0004 },
+  routes: () => [routes, setupRoutes({ ask: askModel })],
+  migrations: {
+    '0001_assistant': m0001,
+    '0002_presets': m0002,
+    '0003_vision': m0003,
+    '0004_changes': m0004,
+    '0005_setup_sessions': m0005,
+  },
   privacy,
   // Conversations are kept for the configured number of days (30 by default).
   start: () =>
