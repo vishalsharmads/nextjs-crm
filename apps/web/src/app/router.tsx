@@ -40,6 +40,11 @@ const OAuthAuthorizePage = lazyPage(
 );
 const HelpPage = lazyPage(() => import('@/features/help/help-page'), 'HelpPage');
 const SearchPage = lazyPage(() => import('@/features/search/search-page'), 'SearchPage');
+const DuplicatesPage = lazyPage(() => import('@/features/records/duplicates-page'), 'DuplicatesPage');
+const DuplicateRulesPage = lazyPage(
+  () => import('@/features/settings/duplicates-page'),
+  'DuplicateRulesPage',
+);
 const ObjectsPage = lazyPage(() => import('@/features/settings/objects-page'), 'ObjectsPage');
 const PipelinesPage = lazyPage(() => import('@/features/settings/pipelines-page'), 'PipelinesPage');
 const DealsPage = lazyPage(() => import('@/features/pipelines/pipeline-page'), 'DealsPage');
@@ -102,6 +107,7 @@ const settingsPages: { path: string; element: ReactNode }[] = [
   { path: 'general', element: <GeneralSettingsPage /> },
   { path: 'branding', element: <BrandingPage /> },
   { path: 'currencies', element: <CurrenciesPage /> },
+  { path: 'duplicates', element: <DuplicateRulesPage /> },
   { path: 'vocabulary', element: <VocabularyPage /> },
   { path: 'security', element: <SecuritySettingsPage /> },
   { path: 'compliance', element: <ComplianceSettingsPage /> },
@@ -175,6 +181,7 @@ export const router = createBrowserRouter(
             { path: 'reports', element: page(<ReportsPage />) },
             { path: 'help', element: page(<HelpPage />) },
             { path: 'search', element: page(<SearchPage />) },
+            { path: 'duplicates', element: page(<DuplicatesPage />) },
             { path: 'tasks', element: page(<TasksPage />) },
             { path: 'tasks/:uuid', element: <TaskPage /> },
             { path: 'calendar', element: page(<CalendarPage />) },

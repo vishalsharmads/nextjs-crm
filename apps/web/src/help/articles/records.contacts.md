@@ -21,6 +21,7 @@ The {{contactPluralLower}} list shows everyone your role lets you see. Open one 
 - **Privacy**: the Privacy tab records consent and lets privacy staff export or erase a person's data.
 - **Email**: send email from the record; replies are logged when a mailbox is connected (Settings → Email).
 - **Comments**: discuss the record with colleagues in the Comments tab. Mention someone to notify them; only people who can open the record are notified. The owner hears about new comments. You can edit or delete your own comments.
+- **Duplicates**: a new {{contactLower}} that matches an existing one is flagged while you type (Settings → Duplicate rules decides what counts). Matches found later appear under **Possible duplicates** (⌘K) to merge.
 
 ## Fields
 

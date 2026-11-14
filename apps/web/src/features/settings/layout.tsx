@@ -46,6 +46,7 @@ export function useSettingsSections() {
         { to: 'fields', label: t('settings.fields'), permission: 'core.fields.manage' },
         { to: 'layouts', label: t('settings.layouts'), permission: 'core.fields.manage' },
         { to: 'pipelines', label: t('settings.pipelines'), permission: 'core.pipelines.manage' },
+        { to: 'duplicates', label: 'Duplicate rules', permission: 'core.settings.manage' },
         { to: 'templates', label: t('settings.templates'), permission: 'core.templates.manage' },
         { to: 'automations', label: t('settings.automations'), permission: 'core.automations.manage' },
         { to: 'forms', label: t('settings.forms'), permission: 'core.forms.manage' },

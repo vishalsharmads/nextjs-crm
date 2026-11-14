@@ -12,12 +12,13 @@ import {
   Search,
   Sun,
   Trash2,
+  Copy,
   User,
   Keyboard,
   BookOpen,
 } from 'lucide-react';
 import { useBranding } from '@/app/branding';
-import { useBoot, useT, bootstrapKey } from '@/app/session';
+import { useBoot, useT, bootstrapKey, useCan } from '@/app/session';
 import { apiPost } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
@@ -87,6 +88,24 @@ export function AppShell() {
           ],
     [navigate, trashEntities.length],
   );
+  const can = useCan();
+  const mayMerge = can('core.contacts.merge') || can('core.organizations.merge');
+  const duplicatesCommand = useMemo<PaletteCommand[]>(
+    () =>
+      mayMerge
+        ? [
+            {
+              id: 'go:duplicates',
+              label: 'Possible duplicates',
+              group: 'Go to',
+              icon: Copy,
+              keywords: ['merge', 'duplicate', 'dedupe'],
+              run: () => navigate('/duplicates'),
+            },
+          ]
+        : [],
+    [navigate, mayMerge],
+  );
   const helpCommands = useMemo<PaletteCommand[]>(
     () => [
       {
@@ -113,7 +132,9 @@ export function AppShell() {
   );
 
   return (
-    <CommandPaletteProvider baseCommands={[...commands, ...trashCommand, ...helpCommands, ...createCommands]}>
+    <CommandPaletteProvider
+      baseCommands={[...commands, ...trashCommand, ...duplicatesCommand, ...helpCommands, ...createCommands]}
+    >
       <ShellLayout nav={nav} />
     </CommandPaletteProvider>
   );
