@@ -1345,6 +1345,29 @@ describe('assistant module', () => {
     await admin.patch('/m/assistant/config', { excludedEntities: [] }).expect(200);
   });
 
+  it('never sends rows of an excluded record type to the model when mapping a spreadsheet', async () => {
+    const setup = await admin.post('/m/assistant/setup').expect(201);
+    const body = {
+      entity: 'contact',
+      headers: ['Name', 'Mail'],
+      sample: [['Secret Person', 'secret.person@x.test']],
+      targets: [{ key: 'firstName', label: 'First name' }],
+      suggested: {},
+    };
+    replies = [text('{"mapping": {"Name": "firstName"}, "notes": {}}')];
+    seen.length = 0;
+    await admin.post(`/m/assistant/setup/${setup.body.uuid}/mapping`, body).expect(200);
+    expect(JSON.stringify(seen[0]!.body)).toContain('secret.person@x.test');
+
+    await admin.patch('/m/assistant/config', { excludedEntities: ['contact'] }).expect(200);
+    replies = [text('{"mapping": {"Name": "firstName"}, "notes": {}}')];
+    seen.length = 0;
+    const res = await admin.post(`/m/assistant/setup/${setup.body.uuid}/mapping`, body).expect(200);
+    expect(JSON.stringify(seen[0]!.body)).not.toContain('secret.person@x.test');
+    expect(res.body.mapping.Name).toBe('firstName');
+    await admin.patch('/m/assistant/config', { excludedEntities: [] }).expect(200);
+  });
+
   it('lets admins try configuration with simulated replies, still confirmed', async () => {
     await admin.patch('/m/assistant/config', { preset: 'simulated', setupEnabled: true }).expect(200);
     const what = await admin

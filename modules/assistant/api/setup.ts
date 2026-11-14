@@ -128,6 +128,65 @@ export type Brief = z.infer<typeof briefSchema>;
 export interface SetupDeps {
   /** Asks the configured model and returns its text; checks limits and counts usage. */
   ask(user: AuthUser, system: string, prompt: string): Promise<string>;
+  /** Record types an admin keeps away from the assistant: their data is never sent to the model. */
+  excluded(): Promise<string[]>;
+}
+
+const targetSchema = z.object({
+  key: z.string().max(80),
+  label: z.string().max(200),
+  required: z.boolean().optional(),
+  format: z.string().max(300).optional(),
+});
+const importEntity = z.enum(['contact', 'organization', 'deal', 'lead']);
+
+/** A mapping the assistant proposes: each column to a field key (or none), with a short note. */
+const mappingReply = z.object({
+  mapping: z.record(z.string(), z.string().nullable()).default({}),
+  notes: z.record(z.string(), z.string().max(300)).default({}),
+});
+const explainReply = z.object({
+  explanations: z
+    .array(
+      z.object({
+        problem: z.number().int().min(0),
+        explanation: z.string().max(500),
+        fix: z.string().max(500),
+      }),
+    )
+    .default([]),
+});
+
+/** Plain words for common import problems, when the assistant may not (or cannot) explain them. */
+function fallbackExplanation(message: string): { explanation: string; fix: string } {
+  if (/email/i.test(message))
+    return {
+      explanation: 'An email address is not in a valid form.',
+      fix: 'Correct it (name@example.com) or leave the cell empty.',
+    };
+  if (/option|one of|not allowed|invalid.*select/i.test(message))
+    return {
+      explanation: 'The value is not one of the choices this field allows.',
+      fix: 'Use one of the listed choices exactly, or add the choice to the field first.',
+    };
+  if (/date/i.test(message))
+    return {
+      explanation: 'A date is not in the expected format.',
+      fix: "Use the workspace's date format, or format the column as a date in the spreadsheet.",
+    };
+  if (/stage/i.test(message))
+    return {
+      explanation: 'The stage name does not match a stage in your pipelines.',
+      fix: 'Use the exact name of an existing stage, or add the stage first.',
+    };
+  if (/no user with email/i.test(message))
+    return {
+      explanation: 'The owner email does not belong to anyone in the workspace.',
+      fix: 'Use the email of an existing user, or invite them first.',
+    };
+  if (/required|too small|expected string/i.test(message))
+    return { explanation: 'A required value is missing.', fix: 'Fill it in, or map a column to it.' };
+  return { explanation: message, fix: 'Correct the value in the spreadsheet, or leave the cell empty.' };
 }
 
 const json = <T>(v: T | string | null): T | null => (typeof v === 'string' ? (JSON.parse(v) as T) : v);
@@ -367,6 +426,103 @@ export function setupRoutes(deps: SetupDeps) {
             entityUuid: row.uuid,
           });
         return dto(await sessionFor(params.uuid, user));
+      },
+    })
+    .add({
+      method: 'post',
+      path: '/:uuid/mapping',
+      permission: 'assistant.chat.use',
+      params: z.object({ uuid: z.uuid() }),
+      body: z.object({
+        entity: importEntity,
+        headers: z.array(z.string().max(200)).max(200),
+        sample: z
+          .array(z.array(z.string().max(500)).max(200))
+          .max(5)
+          .default([]),
+        targets: z.array(targetSchema).max(300),
+        suggested: z.record(z.string(), z.string().nullable()).default({}),
+      }),
+      summary: "Suggest which column goes to which field, from the spreadsheet's headers and a few rows",
+      handler: async ({ user, params, body }) => {
+        const s = dto(await sessionFor(params.uuid, user));
+        const keys = new Set(body.targets.map((t) => t.key));
+        // Data about record types kept away from the assistant never reaches the model.
+        const sample = (await deps.excluded()).includes(body.entity) ? [] : body.sample;
+        const reply = await askJson(
+          deps,
+          user,
+          `[setup:mapping] ${CONSULTANT}\nMap each spreadsheet column to the CRM field it holds, or null when it fits none. Use only the field keys given. Keep the suggestions already matched unless they are clearly wrong. Add a short note where a column needs attention (a format to change, two fields in one column, a column with no field). Reply with JSON only: {"mapping": {"<column>": "<field key or null>"}, "notes": {"<column>": "..."}}`,
+          JSON.stringify({
+            business: s.brief?.businessName ?? s.profile?.businessName,
+            recordType: body.entity,
+            columns: body.headers,
+            sampleRows: sample,
+            fields: body.targets,
+            alreadyMatched: body.suggested,
+          }),
+          mappingReply,
+        ).catch(() => ({
+          mapping: {} as Record<string, string | null>,
+          notes: {} as Record<string, string>,
+        }));
+        // Only real columns and real fields; each field used once; matched suggestions kept otherwise.
+        const used = new Set<string>();
+        const mapping: Record<string, string | null> = {};
+        for (const h of body.headers) {
+          const proposed = h in reply.mapping ? reply.mapping[h] : body.suggested[h];
+          const key = proposed && keys.has(proposed) && !used.has(proposed) ? proposed : null;
+          if (key) used.add(key);
+          mapping[h] = key;
+        }
+        const notes = Object.fromEntries(
+          Object.entries(reply.notes).filter(([h]) => body.headers.includes(h)),
+        );
+        return { mapping, notes };
+      },
+    })
+    .add({
+      method: 'post',
+      path: '/:uuid/explain',
+      permission: 'assistant.chat.use',
+      params: z.object({ uuid: z.uuid() }),
+      body: z.object({
+        entity: importEntity,
+        problems: z
+          .array(
+            z.object({
+              message: z.string().max(1000),
+              count: z.number().int(),
+              rows: z.array(z.number().int()).max(20),
+            }),
+          )
+          .max(30),
+        targets: z.array(targetSchema).max(300),
+      }),
+      summary: 'Explain import problems in plain words, with how to fix each in the spreadsheet',
+      handler: async ({ user, params, body }) => {
+        await sessionFor(params.uuid, user);
+        const plain = body.problems.map((p) => fallbackExplanation(p.message));
+        // Problem messages can quote cell values: kept from the model for excluded record types.
+        if (!body.problems.length || (await deps.excluded()).includes(body.entity))
+          return { explanations: plain };
+        const reply = await askJson(
+          deps,
+          user,
+          `[setup:explain] ${CONSULTANT}\nThese problems were found when checking a spreadsheet against the CRM's import rules. For each, explain in one plain sentence what is wrong and give one practical fix the person can make in their spreadsheet (mention the field's expected format where it helps). Reply with JSON only: {"explanations": [{"problem": 0, "explanation": "...", "fix": "..."}]}`,
+          JSON.stringify({
+            recordType: body.entity,
+            problems: body.problems.map((p, i) => ({ problem: i, ...p })),
+            fields: body.targets,
+          }),
+          explainReply,
+        ).catch(() => ({ explanations: [] }));
+        return {
+          explanations: plain.map((fallback, i) => {
+            const ai = reply.explanations.find((e) => e.problem === i);
+            return ai ? { explanation: ai.explanation, fix: ai.fix } : fallback;
+          }),
+        };
       },
     })
     .add({

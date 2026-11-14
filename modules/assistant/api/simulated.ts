@@ -196,6 +196,9 @@ function setupReply(req: ChatRequest): string | null {
     const next = SETUP_QUESTIONS[answered];
     return JSON.stringify(next ? { done: false, ...next } : { done: true });
   }
+  // Mapping keeps the matched suggestions; explanations fall back to the built-in wording.
+  if (req.system.startsWith('[setup:mapping]')) return JSON.stringify({ mapping: {}, notes: {} });
+  if (req.system.startsWith('[setup:explain]')) return JSON.stringify({ explanations: [] });
   if (req.system.startsWith('[setup:reports]'))
     return JSON.stringify({
       reports: [

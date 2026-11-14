@@ -197,6 +197,42 @@ describe('AI setup mode', () => {
     expect(await db('saved_reports').where({ name: 'Deals by stage' }).first()).toBeTruthy();
   });
 
+  it('maps spreadsheet columns to fields and explains problems in plain words', async () => {
+    const s = await admin.post('/m/assistant/setup').expect(201);
+    const targets = [
+      { key: 'firstName', label: 'First name' },
+      { key: 'email', label: 'Email', format: 'An email address' },
+    ];
+    const mapped = (
+      await admin
+        .post(`/m/assistant/setup/${s.body.uuid}/mapping`, {
+          entity: 'contact',
+          headers: ['Name', 'Mail', 'Also mail', 'Notes'],
+          sample: [['Ann', 'ann@x.test', 'a@x.test', 'hi']],
+          targets,
+          suggested: { Name: 'firstName', Mail: 'email', 'Also mail': 'email', Notes: 'nope' },
+        })
+        .expect(200)
+    ).body;
+    // Only real fields, each used once; unknown fields become "no field".
+    expect(mapped.mapping).toEqual({ Name: 'firstName', Mail: 'email', 'Also mail': null, Notes: null });
+
+    const explained = (
+      await admin
+        .post(`/m/assistant/setup/${s.body.uuid}/explain`, {
+          entity: 'contact',
+          problems: [
+            { message: 'email: Invalid email address', count: 2, rows: [3, 4] },
+            { message: 'Unknown stage "Maybe"', count: 1, rows: [5] },
+          ],
+          targets,
+        })
+        .expect(200)
+    ).body.explanations;
+    expect(explained[0].explanation).toMatch(/email address is not in a valid form/);
+    expect(explained[1].fix).toMatch(/existing stage/);
+  });
+
   it('reads JSON out of a model reply, and tells brand colours from greys', async () => {
     const { parseJsonReply } = await import('../../../modules/assistant/api/setup');
     const { brandHex } = await import('../../../modules/assistant/api/website');

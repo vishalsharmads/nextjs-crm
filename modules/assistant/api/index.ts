@@ -1529,7 +1529,13 @@ async function askModel(user: AuthUser, system: string, prompt: string): Promise
 }
 
 export const assistant: ApiModule = {
-  routes: () => [routes, setupRoutes({ ask: askModel })],
+  routes: () => [
+    routes,
+    setupRoutes({
+      ask: askModel,
+      excluded: async () => json<string[]>((await loadConfig()).excluded_entities),
+    }),
+  ],
   migrations: {
     '0001_assistant': m0001,
     '0002_presets': m0002,
