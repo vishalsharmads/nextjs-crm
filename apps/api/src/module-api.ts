@@ -80,3 +80,4 @@ export { assertSafeUrl } from './core/webhooks/webhooks';
 
 /** Development, tests and demo instances may offer testing aids (never a production instance). */
 export const allowsTestingAids = () => !appIsProd || appEnv.DEMO_MODE;
+export { saveBrandingAsset } from './core/settings/branding-assets';
