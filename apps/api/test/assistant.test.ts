@@ -1324,6 +1324,27 @@ describe('assistant module', () => {
     await admin.patch('/m/assistant/config', { setupEnabled: false }).expect(200);
   });
 
+  it('searches what people wrote and quotes its sources, unless records are kept away', async () => {
+    const word = `quokka${Date.now().toString(36)}`;
+    await admin
+      .post('/activities', { type: 'note', body: `<p>Promised a ${word} demo next week.</p>` })
+      .expect(201);
+    replies = [use('search_text', { query: word }), text('Found it.')];
+    seen.length = 0;
+    await admin.post('/m/assistant/conversations', { text: 'What did we promise?' }).expect(201);
+    expect(String(seen[0]!.body.system)).toContain('use search_text');
+    expect(JSON.stringify(seen[1]!.body.messages)).toContain(`${word} demo next week`);
+
+    await admin.patch('/m/assistant/config', { excludedEntities: ['contact'] }).expect(200);
+    replies = [use('search_text', { query: word }), text('No.')];
+    seen.length = 0;
+    await admin.post('/m/assistant/conversations', { text: 'Again' }).expect(201);
+    const sent = JSON.stringify(seen[1]!.body.messages);
+    expect(sent).toContain('may not use this record type');
+    expect(sent).not.toContain('demo next week');
+    await admin.patch('/m/assistant/config', { excludedEntities: [] }).expect(200);
+  });
+
   it('lets admins try configuration with simulated replies, still confirmed', async () => {
     await admin.patch('/m/assistant/config', { preset: 'simulated', setupEnabled: true }).expect(200);
     const what = await admin

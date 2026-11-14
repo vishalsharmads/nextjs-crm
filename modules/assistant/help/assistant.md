@@ -26,6 +26,10 @@ Ask questions about your records in plain words, get summaries of a record's his
 - **Enter** sends. **Shift+Enter** or **Ctrl+Enter** (**⌘+Enter** on a Mac) starts a new line.
 - When the model can read images, attach up to three screenshots with 📎, by pasting them, or by dropping them on the message box. They are shrunk before sending and kept with the conversation.
 
+## Finding what was said
+
+Ask about conversations and notes ("what did we agree with Acme about pricing?", "who mentioned the delay?") and the assistant searches the text of notes, emails, calls, meetings, tasks and their comments that you can open, then answers with where each part came from. Put words in quotes to find that exact phrase. If an admin keeps any record type away from the assistant, this search is off.
+
 ## Numbers, charts and keeping results
 
 - Ask for totals, counts or trends ("deal value by owner this quarter") and the assistant runs a report, then answers from its result. It can show the report as a bar, line or pie chart; the chart is always drawn from the report's real numbers.
