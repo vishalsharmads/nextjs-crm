@@ -3,8 +3,49 @@ import Base from '../layouts/Base.astro';
 import PageHero from '../components/PageHero.astro';
 import Compare from '../components/Compare.astro';
 import CtaBand from '../components/CtaBand.astro';
+import Shots from '../components/Shots.astro';
 import { features } from '../data/site';
 import { breadcrumbSchema, softwareSchema } from '../data/schema';
+
+/** Real product screens, taken from the demo workspace (a fictional software company). */
+const screens: Record<string, { src: string; alt: string; label: string }[]> = {
+  ai: [
+    {
+      src: '/product/assistant-panel.webp',
+      label: 'On a record',
+      alt: 'An opportunity page with the assistant open beside it, offering to summarise the opportunity, suggest next steps, show recent changes or draft a follow-up email',
+    },
+    {
+      src: '/product/assistant-tasks.webp',
+      label: 'On any page',
+      alt: 'The task list with the assistant panel open, suggesting questions such as which opportunities close this month',
+    },
+  ],
+  pipelines: [
+    {
+      src: '/product/deals.webp',
+      label: 'Board',
+      alt: 'An opportunities board with stages from Discovery to Proposal, each card showing the account, value and owner',
+    },
+  ],
+  tasks: [
+    {
+      src: '/product/tasks.webp',
+      label: 'My work',
+      alt: 'The task list grouped into Overdue, Today and Upcoming, with priorities and checklist progress on each task',
+    },
+    {
+      src: '/product/task-board.webp',
+      label: 'Board',
+      alt: 'A task board with To do, In progress, Waiting and Done columns',
+    },
+    {
+      src: '/product/task-page.webp',
+      label: 'Task page',
+      alt: 'A task page with status, due date, reminder, repeat and priority, a checklist two of four done, and a comment',
+    },
+  ],
+};
 
 /** What each module does, in specifics a buyer can check off. */
 const detail: Record<string, string[]> = {
@@ -105,6 +146,11 @@ const detail: Record<string, string[]> = {
             ))}
           </ul>
         </div>
+        {screens[f.slug] && (
+          <div class="wrap screens">
+            <Shots shots={screens[f.slug]!} />
+          </div>
+        )}
       </section>
     ))
   }
@@ -121,6 +167,9 @@ const detail: Record<string, string[]> = {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: clamp(32px, 6vw, 96px);
     align-items: start;
+  }
+  .screens {
+    margin-top: clamp(40px, 6vw, 72px);
   }
   .text {
     display: grid;

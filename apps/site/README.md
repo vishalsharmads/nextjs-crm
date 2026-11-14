@@ -37,6 +37,8 @@ Pages run under a strict CSP (`script-src 'self'`), so every script is a file: n
 - Features, home FAQ, nav, placeholders: `src/data/site.ts`
 - Live demo: the site asks the demo app (`PUBLIC_DEMO_INFO_URL`, default `/api/v1/public/demo`) which industry it shows and links that one live; the others point to the booking form. `demoLinks` in `src/data/site.ts` holds fixed links for industries with their own always-on demo
 - Guides: `src/data/articles.ts`
+- Product screenshots: `public/product/*.webp` (2000×1250, taken at 1440×900 and 2× from the demo workspace), listed per feature in `screens` in `src/pages/features.astro`
+- The assistant demo on the home page: `src/components/AssistantDemo.astro` (script in `src/scripts/motion.ts`)
 
 Placeholders to replace before launch: testimonials and logos (`src/components/Proof.astro`), the
 "three weeks" figure, office details, privacy and terms text, and `site.email`.

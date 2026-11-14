@@ -1,4 +1,5 @@
 ---
+import AssistantDemo from './AssistantDemo.astro';
 /** AI capabilities: what the assistant does, and the guardrails that make it safe to switch on. */
 const capabilities = [
   {
@@ -25,13 +26,16 @@ const guardrails = [
 
 <section class="section on-dark ai" id="ai" aria-labelledby="ai-title">
   <div class="wrap">
-    <div class="head">
-      <p class="eyebrow">AI built in</p>
-      <h2 class="h2" id="ai-title">AI that works inside your CRM, on your terms.</h2>
-      <p class="lede muted">
-        Not a chatbot bolted on the side. The assistant uses the same records, permissions and audit log as your
-        team, so you can let it help without letting it loose.
-      </p>
+    <div class="intro">
+      <div class="head">
+        <p class="eyebrow">AI built in</p>
+        <h2 class="h2" id="ai-title">AI that works inside your CRM, on your terms.</h2>
+        <p class="lede muted">
+          Not a chatbot bolted on the side. The assistant uses the same records, permissions and audit log as your
+          team, so you can let it help without letting it loose.
+        </p>
+      </div>
+      <AssistantDemo />
     </div>
     <ul class="caps">
       {
@@ -54,11 +58,17 @@ const guardrails = [
 </section>
 
 <style>
+  .intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(32px, 6vw, 96px);
+    align-items: center;
+    margin-bottom: clamp(72px, 9vw, 112px);
+  }
   .head {
     display: grid;
     gap: 16px;
-    max-width: 760px;
-    margin-bottom: clamp(32px, 5vw, 56px);
+    align-content: start;
   }
   .eyebrow {
     margin: 0;
@@ -120,6 +130,7 @@ const guardrails = [
     margin-top: 32px;
   }
   @media (max-width: 900px) {
+    .intro,
     .caps,
     .guard {
       grid-template-columns: 1fr;
