@@ -13,7 +13,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 - **Phase 6** follows [docs/plan/phase-6.md](docs/plan/phase-6.md): 6a (quick wins), 6a2 (UI polish), 6a3 (rich text), 6b (records engine for modules), 6c (admin-defined objects), 6d (tool layer, personal access tokens, MCP), 6e (assistant module), 6f (sales reports) and 6g (delayed and scheduled automations, report builder, dashboard editing) are done. Phase 6 is complete. **Phase 7** (in-app help): 7a page help and knowledge base, 7b articles and blueprint help notes, 7c guided tours.
 - **Phase 8** follows [docs/plan/phase-8.md](docs/plan/phase-8.md): module settings and marketplace (8a, 8b), example integration and developer docs (8c), developer MCP server for AI coding agents (8e) and the git-repository module catalog (8g) are done. Run-time upload (8d) and in-product module generation (8f) are design only.
 - **Phase 9** follows [docs/plan/phase-9.md](docs/plan/phase-9.md): 9a (tasks: detail page, comments, checklists, recurrence, reminders and digest, My work, calendar, optional task statuses, task tools) and 9b (board Move to, quote and invoice tabs) are built.
-- **Phase 11** follows [docs/plan/phase-11.md](docs/plan/phase-11.md) (production readiness): 11a and 11b are built.
+- **Phase 11** follows [docs/plan/phase-11.md](docs/plan/phase-11.md) (production readiness): 11a, 11b and 11c are built.
 - **Phase 10** follows [docs/plan/phase-10.md](docs/plan/phase-10.md): AI setup mode (10a interview and brief, 10b proposal, build and branding, 10c spreadsheet mapping and check-before-import, 10d entry points and E2E) is built.
 
 ## Non-negotiables
