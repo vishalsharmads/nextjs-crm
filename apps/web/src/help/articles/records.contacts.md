@@ -17,7 +17,7 @@ The {{contactPluralLower}} list shows everyone your role lets you see. Open one 
 - **Edit**: change a field in place on the record page. You can undo from the message that appears.
 - **Work in bulk**: tick several rows to assign an owner, change a field, add tags or delete them.
 - **Log what happens**: add notes, tasks, calls and meetings from the record page. They appear in its timeline.
-- **Merge duplicates**: from the record's menu, merge two {{contactPluralLower}} into one. History, notes and links move to the record you keep.
+- **Merge duplicates**: from the record's menu, merge two {{contactPluralLower}} into one. History, notes, links and records from modules (such as tickets, quotes, invoices and bookings) move to the record you keep. If either one unsubscribed or had processing restricted, the record you keep does too.
 - **Privacy**: the Privacy tab records consent and lets privacy staff export or erase a person's data.
 - **Email**: send email from the record; replies are logged when a mailbox is connected (Settings → Email).
 

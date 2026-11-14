@@ -137,6 +137,54 @@ const MERGEABLE: Record<'contact' | 'organization', string[]> = {
 };
 
 /** Re-point everything that references the secondary records to the primary. */
+/**
+ * Module tables (`m_<key>_*`) that link to the merged records: tickets, quotes, invoices, bookings,
+ * assets, portal accounts, and any module added later. Found from the schema, so a module never has
+ * to remember to register. Where a module allows one row per record (a unique key on the column), a
+ * secondary's row moves only when the primary has none; otherwise it stays with the merged record.
+ */
+async function repointModuleTables(
+  trx: Knex.Transaction,
+  col: 'contact_id' | 'organization_id',
+  primaryId: number,
+  secondaryIds: number[],
+) {
+  const [tables] = (await trx.raw(
+    `SELECT c.TABLE_NAME AS name,
+       EXISTS (SELECT 1 FROM information_schema.STATISTICS s
+               WHERE s.TABLE_SCHEMA = c.TABLE_SCHEMA AND s.TABLE_NAME = c.TABLE_NAME
+                 AND s.NON_UNIQUE = 0 AND s.INDEX_NAME <> 'PRIMARY' AND s.COLUMN_NAME = ?
+                 AND (SELECT COUNT(*) FROM information_schema.STATISTICS s2
+                      WHERE s2.TABLE_SCHEMA = s.TABLE_SCHEMA AND s2.TABLE_NAME = s.TABLE_NAME
+                        AND s2.INDEX_NAME = s.INDEX_NAME) = 1) AS one_per_record
+     FROM information_schema.COLUMNS c
+     JOIN information_schema.TABLES t
+       ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME AND t.TABLE_TYPE = 'BASE TABLE'
+     WHERE c.TABLE_SCHEMA = DATABASE() AND c.COLUMN_NAME = ? AND c.TABLE_NAME LIKE 'm\\_%'`,
+    [col, col],
+  )) as unknown as [{ name: string; one_per_record: number }[]];
+  for (const t of tables) {
+    if (!/^m_[a-z0-9_]+$/.test(t.name)) continue;
+    if (!Number(t.one_per_record)) {
+      await trx(t.name)
+        .whereIn(col, secondaryIds)
+        .update({ [col]: primaryId });
+      continue;
+    }
+    if (
+      await trx(t.name)
+        .where({ [col]: primaryId })
+        .first(col)
+    )
+      continue;
+    const first = await trx(t.name).whereIn(col, secondaryIds).orderBy(col).first(col);
+    if (first)
+      await trx(t.name)
+        .where({ [col]: first[col] })
+        .update({ [col]: primaryId });
+  }
+}
+
 async function repoint(
   trx: Knex.Transaction,
   entity: 'contact' | 'organization',
@@ -152,6 +200,7 @@ async function repoint(
     .whereIn('related_id', secondaryIds)
     .update({ related_id: primaryId });
   await trx('files').where({ entity }).whereIn('entity_id', secondaryIds).update({ entity_id: primaryId });
+  await repointModuleTables(trx, col, primaryId, secondaryIds);
   if (entity === 'contact') {
     await trx('leads')
       .whereIn('converted_contact_id', secondaryIds)
@@ -258,6 +307,12 @@ export async function mergeRecords(def: ResourceDef, ctx: RequestContext, user: 
     }
     patch.custom = JSON.stringify(custom);
     patch.updated_by = user.id;
+    if (entity === 'contact') {
+      // Privacy choices are never lost by merging: if any record opted out or is restricted, the
+      // surviving one is too.
+      for (const flag of ['marketing_opt_out', 'processing_restricted'] as const)
+        if (!primary[flag] && secondaries.some((s) => s[flag])) patch[flag] = true;
+    }
     await trx(def.table).where({ id: primary.id }).update(patch);
 
     const secondaryIds = secondaries.map((s) => s.id as number);

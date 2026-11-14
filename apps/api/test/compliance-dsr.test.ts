@@ -606,3 +606,29 @@ describe('data export is limited to what the exporter can see', () => {
     for (const f of [hidden, special]) await admin.post(`/custom-fields/${f.body.uuid}/archive`).expect(200);
   });
 });
+
+describe('merging contacts keeps privacy choices and module records', () => {
+  it('carries opt-out and restriction, and moves tickets and the portal account to the survivor', async () => {
+    const keep = await admin.post('/contacts', { firstName: 'Keep' }).expect(201);
+    const dup = await admin
+      .post('/contacts', { firstName: 'Dup', email: `dup-${Date.now()}@example.test` })
+      .expect(201);
+    const ticket = await admin
+      .post('/m/tickets/tickets', { subject: 'Before merge', contactUuid: dup.body.uuid })
+      .expect(201);
+    await admin.post('/m/portal/accounts', { contactUuid: dup.body.uuid }).expect(201);
+    await admin.post(`/privacy/contact/${dup.body.uuid}/restriction`, { restricted: true }).expect(204);
+    await db('contacts').where({ uuid: dup.body.uuid }).update({ marketing_opt_out: true });
+
+    await admin
+      .post('/contacts/merge', { primaryUuid: keep.body.uuid, secondaryUuids: [dup.body.uuid] })
+      .expect(200);
+    const survivor = await db('contacts').where({ uuid: keep.body.uuid }).first();
+    expect(survivor.marketing_opt_out).toBeTruthy();
+    expect(survivor.processing_restricted).toBeTruthy();
+    expect((await db('m_tickets_tickets').where({ uuid: ticket.body.uuid }).first()).contact_id).toBe(
+      survivor.id,
+    );
+    expect(await db('m_portal_accounts').where({ contact_id: survivor.id }).first()).toBeTruthy();
+  });
+});
