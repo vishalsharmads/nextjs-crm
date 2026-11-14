@@ -30,6 +30,7 @@ import * as m0028 from './0028_record_comments';
 import * as m0029 from './0029_duplicate_rules';
 import * as m0030 from './0030_record_shares';
 import * as m0031 from './0031_standard_field_visibility';
+import * as m0032 from './0032_push';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -69,4 +70,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0029_duplicate_rules': m0029,
   '0030_record_shares': m0030,
   '0031_standard_field_visibility': m0031,
+  '0032_push': m0032,
 };

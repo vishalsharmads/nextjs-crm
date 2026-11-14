@@ -81,8 +81,55 @@ export interface SessionDto {
 }
 
 export interface NotificationPrefs {
-  /** Mirror notifications by email (assignments, mentions, reminders). */
+  /** Mirror notifications by email (assignments, mentions, reminders). Off turns every email off. */
   email: boolean;
   /** One email each morning with tasks due today and overdue. */
   taskDigest: boolean;
+  /** Email and push per kind of notification. In-app notifications are always kept. */
+  categories: Record<NotificationCategory, { email: boolean; push: boolean }>;
 }
+
+/** Kinds of notification people can tune separately. */
+export const NOTIFICATION_CATEGORIES = [
+  { key: 'assigned', label: 'Assigned to me' },
+  { key: 'mentioned', label: 'Mentioned me' },
+  { key: 'comments', label: 'Comments and replies on my records' },
+  { key: 'reminders', label: 'Reminders and things coming due' },
+  { key: 'shared', label: 'Shared with me' },
+  { key: 'other', label: 'Automations and everything else' },
+] as const;
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number]['key'];
+
+/** Which category a notification type (`deal.assigned`, `comment.mentioned`…) belongs to. */
+export function notificationCategory(type: string): NotificationCategory {
+  if (type.endsWith('.assigned')) return 'assigned';
+  if (type.endsWith('.mentioned')) return 'mentioned';
+  if (['comment.created', 'activity.commented', 'ticket.replied'].includes(type)) return 'comments';
+  if (
+    type === 'activity.reminder' ||
+    type.endsWith('.due') ||
+    type.endsWith('_due') ||
+    type.endsWith('.overdue')
+  )
+    return 'reminders';
+  if (type.endsWith('.shared')) return 'shared';
+  return 'other';
+}
+
+/** Defaults: email follows what the sender asked for; push is on for anything addressed to you. */
+export const DEFAULT_NOTIFICATION_PUSH: Record<NotificationCategory, boolean> = {
+  assigned: true,
+  mentioned: true,
+  comments: true,
+  reminders: true,
+  shared: true,
+  other: false,
+};
+export const DEFAULT_NOTIFICATION_EMAIL: Record<NotificationCategory, boolean> = {
+  assigned: true,
+  mentioned: true,
+  comments: false,
+  reminders: true,
+  shared: true,
+  other: true,
+};

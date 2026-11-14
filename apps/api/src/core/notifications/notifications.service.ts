@@ -6,6 +6,8 @@ import { sendTemplatedEmail } from '../mail/templates';
 import { hasPermission, wallClock, zonedTime } from '@app/shared';
 import { loadAccess } from '../rbac/access';
 import { effectiveCompliance, getGroup } from '../settings/settings.service';
+import { DEFAULT_NOTIFICATION_PUSH, notificationCategory, type NotificationCategory } from '@app/shared';
+import { queuePush } from '../push/push';
 
 export interface NotifyInput {
   type: string;
@@ -19,6 +21,7 @@ export interface NotifyInput {
 
 interface Prefs {
   emailNotifications?: boolean;
+  notificationCategories?: Partial<Record<NotificationCategory, { email?: boolean; push?: boolean }>>;
 }
 
 /** In-app notification, optionally mirrored by email. Never notifies the actor about their own action. */
@@ -45,7 +48,22 @@ export async function notify(
     data: input.data ? JSON.stringify(input.data) : null,
   });
   const prefs = (user.preferences ?? {}) as Prefs;
-  if (input.email && prefs.emailNotifications !== false) {
+  const category = notificationCategory(input.type);
+  const chosen = prefs.notificationCategories?.[category];
+  // Email: off everywhere when the person turned email off; otherwise their choice for this kind,
+  // or what the sender asked for. In-app notifications are always kept.
+  const wantEmail = prefs.emailNotifications !== false && (chosen?.email ?? !!input.email);
+  if (chosen?.push ?? DEFAULT_NOTIFICATION_PUSH[category]) {
+    const minimal = (await effectiveCompliance()).notificationEmailMinimal;
+    // Push text shows on a lock screen: under the health data profile it carries no details.
+    await queuePush(userId, {
+      title: minimal ? 'You have a new notification' : input.title,
+      body: minimal ? undefined : (input.body ?? undefined),
+      link: input.link ?? undefined,
+      tag: uuid,
+    }).catch((err: unknown) => logger.warn({ err }, 'Push could not be queued'));
+  }
+  if (wantEmail) {
     // Email after commit, best-effort: a mail outage must not roll back the business change.
     // Minimal mode (forced by the health data profile): email leaves the system, so it carries no
     // names or details; the in-app notification, behind sign-in, keeps them.
