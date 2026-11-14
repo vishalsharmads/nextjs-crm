@@ -11,7 +11,7 @@ import { snake } from '../records/record-type';
 import type { ResourceDef } from '../records/types';
 import { getGroup } from '../settings/settings.service';
 import { fieldLevel, getDefinitions } from '../custom-fields/definitions';
-import { searchText } from './text-search';
+import { plainText, searchText, snippetOf } from './text-search';
 import { logAccess } from '../audit/access-log';
 import type { AuthUser, RequestContext } from '../../http/context';
 
@@ -142,6 +142,38 @@ async function searchProvider(
   return [...hits.values()].sort((x, y) => y.score - x.score).slice(0, limit);
 }
 
+/** Records whose comments match, as hits of the record's own type. */
+async function searchComments(
+  s: SearchProvider,
+  user: AuthUser,
+  q: string,
+  limit: number,
+): Promise<SearchHit[]> {
+  if (q.length < 3) return [];
+  const def = s.def;
+  const t = def.table;
+  const { qb } = await scopedQuery(def, user, db);
+  const rows = (await qb
+    .join('record_comments as rc', (j) => j.on('rc.record_id', `${t}.id`).andOnVal('rc.entity', def.entity))
+    .whereRaw('MATCH(rc.body) AGAINST (? IN NATURAL LANGUAGE MODE)', [q])
+    .select(
+      `${t}.uuid`,
+      `${t}.${s.title} as title`,
+      'rc.body',
+      db.raw('MATCH(rc.body) AGAINST (? IN NATURAL LANGUAGE MODE) as score', [q]),
+    )
+    .orderBy('score', 'desc')
+    .limit(limit)) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    type: s.entity,
+    uuid: r.uuid as string,
+    title: (r.title as string) || '(no name)',
+    subtitle: `Comment: ${snippetOf(plainText(r.body as string), q, 80)}`,
+    url: `${recordBasePath(def)}/${r.uuid as string}`,
+    score: Math.round(Number(r.score) * 100) / 100,
+  }));
+}
+
 /** Notes, emails, calls, meetings and tasks whose text matches, as search hits. */
 async function searchActivities(user: AuthUser, q: string, limit: number) {
   if (q.length < 2 || !can(user, `${recordDefs.activity.resource}.view`)) return [];
@@ -194,7 +226,15 @@ export async function searchRecords(
     ...providers()
       .filter((s) => (!types || types.has(s.entity)) && (s.entity !== 'lead' || leads))
       .filter((s) => can(user, `${s.def.resource}.view`))
-      .map((s) => searchProvider(s, user, query.q, query.limit)),
+      .map(async (s) => {
+        const [hits, comments] = await Promise.all([
+          searchProvider(s, user, query.q, query.limit),
+          searchComments(s, user, query.q, query.limit),
+        ]);
+        // A record found by name and by a comment appears once, by name.
+        const seen = new Set(hits.map((h) => h.uuid));
+        return [...hits, ...comments.filter((c) => !seen.has(c.uuid))].slice(0, query.limit);
+      }),
     !types || types.has('activity') ? searchActivities(user, query.q, query.limit) : Promise.resolve([]),
   ]);
   const hits = results.flat();

@@ -351,6 +351,11 @@ export const checklistItemPatchSchema = z.object({
 export const checklistOrderSchema = z.object({ uuids: z.array(z.uuid()).min(1).max(200) });
 export const activityCommentPatchSchema = z.object({ body: z.string().trim().min(1).max(20_000) });
 
+/** Comments on any record use the same shape as task comments. */
+export type RecordCommentDto = ActivityCommentDto;
+export const recordCommentSchema = activityCommentSchema;
+export const recordCommentPatchSchema = activityCommentPatchSchema;
+
 export const BULK_ACTIONS = [
   'delete',
   'restore',
@@ -378,12 +383,13 @@ export type BulkInput = z.infer<typeof bulkSchema>;
 
 export interface TimelineItem {
   id: string;
-  kind: 'activity' | 'change' | 'created' | 'stage' | 'file' | 'merged' | 'email';
+  kind: 'activity' | 'change' | 'created' | 'stage' | 'file' | 'merged' | 'email' | 'comment';
   at: string;
   actor: UserRef | null;
   title: string;
   detail?: unknown;
   activity?: ActivityDto;
+  comment?: ActivityCommentDto;
 }
 
 export interface DuplicateCandidate {

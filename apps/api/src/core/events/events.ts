@@ -28,6 +28,8 @@ export const EVENT_TYPES = [
   'activity.updated',
   'activity.completed',
   'form.submitted',
+  // Someone commented on a record (entity and uuid are the record's).
+  'comment.created',
   // Commercial modules (emitted only while the module is enabled).
   'quote.created',
   'quote.sent',

@@ -26,6 +26,7 @@ import * as m0024 from './0024_activity_checklists';
 import * as m0025 from './0025_activity_recurrence';
 import * as m0026 from './0026_task_pipeline';
 import * as m0027 from './0027_text_search';
+import * as m0028 from './0028_record_comments';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -61,4 +62,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0025_activity_recurrence': m0025,
   '0026_task_pipeline': m0026,
   '0027_text_search': m0027,
+  '0028_record_comments': m0028,
 };
