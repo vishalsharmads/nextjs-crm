@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger';
 import { z } from 'zod';
 import {
   changePasswordSchema,
@@ -69,7 +70,11 @@ export const authRoutes = defineRoutes('/auth', ['auth'])
     body: forgotPasswordSchema,
     // Always 204 so the response does not reveal whether the email exists.
     handler: async ({ ctx, body }) => {
-      await auth.forgotPassword(ctx, body.email).catch(() => undefined);
+      await auth
+        .forgotPassword(ctx, body.email)
+        .catch((err: unknown) =>
+          logger.warn({ err, requestId: ctx.requestId }, 'Password reset email failed'),
+        );
     },
   })
   .add({
