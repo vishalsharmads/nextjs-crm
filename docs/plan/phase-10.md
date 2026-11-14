@@ -24,6 +24,8 @@ A guided, AI-led setup that turns a business's own story into a working CRM. The
 | 10c       | Spreadsheet import in setup: Excel and CSV, AI column mapping, check-before-import (dry run) with plain explanations, start and follow the import |
 | 10d       | Onboarding entry for new workspaces, Settings entry, help article and tour, end-to-end test                                                       |
 
+**Status (2026-11-14):** 10a–10d are built. 10d puts the entry on the assistant page and in its settings; a home-page prompt for new workspaces and a guided tour moved to Future.
+
 ## Decisions
 
 | Decision                                                                                                                                                                                 | Why                                                                                     |
