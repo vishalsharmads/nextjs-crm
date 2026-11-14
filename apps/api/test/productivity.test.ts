@@ -137,6 +137,47 @@ describe('import and export', () => {
     expect(ana.body.data[0].organizations[0].organization.name).toBe('Importers Ltd');
   });
 
+  it('imports an Excel workbook like a CSV: first sheet, dates as days, formulas as results', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const ExcelJS = (await import('exceljs')).default;
+    const book = new ExcelJS.Workbook();
+    const sheet = book.addWorksheet('People');
+    sheet.addRow(['First Name', 'Surname', 'E-mail', 'Joined']);
+    sheet.addRow(['Xia', 'Sheet', 'xia@xlsx.test', new Date('2026-03-05T00:00:00Z')]);
+    sheet.addRow(['Yan', { formula: '"Sh"&"eet"', result: 'Sheet' }, 'yan@xlsx.test', '']);
+    sheet.addRow([]);
+    const file = Buffer.from(await book.xlsx.writeBuffer());
+    const up = await client.agent
+      .post('/api/v1/imports')
+      .set('x-csrf-token', client.csrf)
+      .field('entity', 'contact')
+      .attach('file', file, 'people.xlsx')
+      .expect(201);
+    expect(up.body.headers).toEqual(['First Name', 'Surname', 'E-mail', 'Joined']);
+    expect(up.body.total).toBe(2);
+    expect(up.body.sample[0]).toEqual(['Xia', 'Sheet', 'xia@xlsx.test', '2026-03-05']);
+    expect(up.body.sample[1][1]).toBe('Sheet');
+    const start = await client
+      .post('/imports/start', {
+        entity: 'contact',
+        fileUuid: up.body.fileUuid,
+        mapping: { ...up.body.suggested, 'E-mail': 'email', Joined: null },
+        options: { duplicates: 'skip' },
+      })
+      .expect(200);
+    const status = await client.get(`/imports/${start.body.jobUuid}`).expect(200);
+    expect(status.body.result).toMatchObject({ created: 2, failed: 0 });
+
+    // Anything that is not a workbook or CSV is refused with a reason.
+    const bad = await client.agent
+      .post('/api/v1/imports')
+      .set('x-csrf-token', client.csrf)
+      .field('entity', 'contact')
+      .attach('file', Buffer.from([0x50, 0x4b, 0x03, 0x04, 1, 2, 3]), 'broken.xlsx');
+    expect(bad.status).toBe(422);
+    expect(bad.body.error.message).toMatch(/Excel workbook/);
+  });
+
   it('exports the current list as CSV with visible custom fields only', async () => {
     const { client } = await clientWithRoles(['admin']);
     await client

@@ -6,7 +6,7 @@ route: /import/:route
 related: records.lists
 ---
 
-Bring records in from a spreadsheet (CSV).
+Bring records in from a spreadsheet: an Excel workbook (.xlsx, the first sheet is read) or a CSV file.
 
 1. Choose the file. The first row must hold column names.
 2. Match each column to a field. Columns you skip are ignored.

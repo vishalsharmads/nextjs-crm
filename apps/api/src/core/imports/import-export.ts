@@ -12,6 +12,7 @@ import {
 } from '@app/shared';
 import { db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
+import { parseTable } from './table';
 import { enqueue, registerJob } from '../../lib/jobs';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { logAccess } from '../audit/access-log';
@@ -26,7 +27,7 @@ import type { IoColumn, ResourceDef } from '../records/types';
 import { applySort } from '../records/filters';
 import { getGroup } from '../settings/settings.service';
 
-const MAX_ROWS = 50_000;
+export const MAX_ROWS = 50_000;
 
 // ---------------- Columns ----------------
 
@@ -430,7 +431,7 @@ registerJob('import', async (job, progress) => {
   const ctx: RequestContext = { requestId: `job:${job.uuid}`, ip: null, userAgent: null, user };
   const def = ioDef(input.entity);
   const file = await db('files').where({ uuid: input.fileUuid }).first();
-  const { headers, rows } = parseCsv(await readStoredFile(file));
+  const { headers, rows } = await parseTable(await readStoredFile(file));
   const { defs } = await customContext(input.entity, user);
   const { dateFormat } = await getGroup('general');
   const users = new Map(
