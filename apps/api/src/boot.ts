@@ -9,6 +9,7 @@ import { sendDueReminders, sendTaskDigests } from './core/notifications/notifica
 import { env, isTest } from './config/env';
 import './core/imports/import-export';
 import { startWebhookRetries } from './core/webhooks/webhooks';
+import { scanDuplicates } from './core/duplicates/duplicates';
 import { startMailSync } from './core/email/email';
 import { maintainAuditLogs } from './core/audit/integrity';
 import { remindDueRequests } from './core/privacy/requests.service';
@@ -52,6 +53,7 @@ export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promi
     every(60 * 60_000, 'audit.maintain', maintainAuditLogs);
     every(60 * 60_000, 'privacy.reminders', remindDueRequests);
     every(6 * 60 * 60_000, 'privacy.retention', () => runRetention());
+    every(24 * 60 * 60_000, 'duplicates.scan', () => scanDuplicates());
     for (const m of loadModules()) m.api?.start?.();
   }
   return {

@@ -10,6 +10,7 @@ import { createRecord, emitDealStage, emitLeadStage, emitRecordEvent, getRow } f
 import { boardQuerySchema, loadBoard, moveToStage } from '../pipelines/board';
 import { endOfStage, publicStageChanges, recordStageHistory } from '../pipelines/stage-engine';
 import { recordRoutes } from '../records/routes';
+import { checkDuplicates, probeFrom, rowProbe } from '../duplicates/duplicates';
 import { dealsDef, statusForStage } from './deals.def';
 import { leadsDef } from '../leads/leads.def';
 import { contactsDef } from '../contacts/contacts.def';
@@ -267,6 +268,32 @@ export const leadsRoutes = [
             await emitRecordEvent(leadsDef, 'converted', { uuid: params.uuid, ...r }, user);
             return r;
           });
+      },
+    }),
+  defineRoutes('/leads', ['leads'])
+    .add({
+      method: 'post',
+      path: '/check-duplicates',
+      permission: 'core.leads.view',
+      summary: 'Possible duplicates (leads and contacts) for a lead about to be created',
+      body: z.object({
+        email: z.string().max(255).nullish(),
+        phone: z.string().max(50).nullish(),
+        firstName: z.string().max(100).nullish(),
+        lastName: z.string().max(100).nullish(),
+        companyName: z.string().max(200).nullish(),
+      }),
+      handler: ({ user, body }) =>
+        checkDuplicates(user, 'lead', probeFrom({ ...body, company: body.companyName })),
+    })
+    .add({
+      method: 'get',
+      path: '/:uuid/duplicates',
+      permission: 'core.leads.view',
+      params: z.object({ uuid: z.uuid() }),
+      handler: async ({ user, params }) => {
+        const row = await getRow(leadsDef, user, params.uuid);
+        return checkDuplicates(user, 'lead', probeFrom(rowProbe(row)), { excludeId: row.id as number });
       },
     }),
   recordRoutes(leadsDef, 'leads'),

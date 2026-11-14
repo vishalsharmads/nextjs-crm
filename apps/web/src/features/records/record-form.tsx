@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
-import type { DuplicateCandidate, LayoutSection } from '@app/shared';
+import type { DuplicateCheckResult, LayoutSection } from '@app/shared';
 import { ApiError, apiPost } from '@/lib/api';
 import { basePath } from '@/lib/app-url';
 import { useBoot } from '@/app/session';
@@ -311,7 +311,16 @@ export function RecordFormSheet<T extends { uuid: string }>({
     if (open) form.reset(defaults);
   }, [open, defaults, form]);
 
-  const watched = form.watch(['email', 'phone', 'firstName', 'lastName', 'name', 'website']);
+  const watched = form.watch([
+    'email',
+    'phone',
+    'firstName',
+    'lastName',
+    'name',
+    'website',
+    'companyName',
+    'organizationUuid',
+  ]);
   const dupes = useDuplicateCheck(config.entity, record ? null : watched);
 
   const submit = form.handleSubmit(async (values) => {
@@ -357,7 +366,7 @@ export function RecordFormSheet<T extends { uuid: string }>({
         className="flex flex-col gap-6 p-5"
         noValidate
       >
-        {dupes.length ? <DuplicateWarning route={config.route} dupes={dupes} /> : null}
+        {dupes.data.length || dupes.hidden ? <DuplicateWarning route={config.route} result={dupes} /> : null}
         {sections.map((s) => (
           <fieldset key={s.key} className="flex flex-col gap-3">
             <legend className="mb-1 text-xs font-semibold text-muted">{s.label}</legend>
@@ -388,7 +397,14 @@ export function RecordFormSheet<T extends { uuid: string }>({
   );
 }
 
-function useDuplicateCheck(entity: string, watched: unknown[] | null): DuplicateCandidate[] {
+const NO_DUPES: DuplicateCheckResult = { data: [], hidden: 0, blocked: false };
+const CHECK_PATH: Record<string, string> = {
+  contact: '/contacts/check-duplicates',
+  organization: '/organizations/check-duplicates',
+  lead: '/leads/check-duplicates',
+};
+
+function useDuplicateCheck(entity: string, watched: unknown[] | null): DuplicateCheckResult {
   const [debounced, setDebounced] = useState<unknown[] | null>(null);
   const key = JSON.stringify(watched);
   useEffect(() => {
@@ -396,40 +412,46 @@ function useDuplicateCheck(entity: string, watched: unknown[] | null): Duplicate
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  const enabled = !!debounced && (entity === 'contact' || entity === 'organization');
-  const [email, phone, firstName, lastName, name, website] = (debounced ?? []) as (string | undefined)[];
+  const path = CHECK_PATH[entity];
+  const [email, phone, firstName, lastName, name, website, companyName, organizationUuid] = (debounced ??
+    []) as (string | undefined)[];
   const q = useQuery({
     queryKey: ['duplicates', entity, debounced],
     queryFn: () =>
-      entity === 'contact'
-        ? apiPost<{ data: DuplicateCandidate[] }>('/contacts/check-duplicates', {
-            email: email || null,
-            phone: phone || null,
-            firstName: firstName || null,
-            lastName: lastName || null,
-          })
-        : apiPost<{ data: DuplicateCandidate[] }>('/organizations/check-duplicates', {
-            name: name || null,
-            website: website || null,
-          }),
+      apiPost<DuplicateCheckResult>(
+        path!,
+        entity === 'organization'
+          ? { name: name || null, website: website || null }
+          : {
+              email: email || null,
+              phone: phone || null,
+              firstName: firstName || null,
+              lastName: lastName || null,
+              ...(entity === 'lead' ? { companyName: companyName || null } : {}),
+              ...(entity === 'contact' ? { organizationUuid: organizationUuid || null } : {}),
+            },
+      ),
     enabled:
-      enabled && !!(email || phone || name || website || ((firstName ?? '') + (lastName ?? '')).length >= 3),
+      !!debounced &&
+      !!path &&
+      !!(email || phone || name || website || ((firstName ?? '') + (lastName ?? '')).length >= 3),
     staleTime: 30_000,
   });
-  return q.data?.data ?? [];
+  return q.data ?? NO_DUPES;
 }
 
-function DuplicateWarning({ route, dupes }: { route: string; dupes: DuplicateCandidate[] }) {
+function DuplicateWarning({ route, result }: { route: string; result: DuplicateCheckResult }) {
   return (
     <div role="status" className="rounded-sm border border-accent bg-accent-soft p-3 text-sm">
       <p className="flex items-center gap-2 font-medium text-accent">
-        <AlertTriangle className="size-4" /> This might already exist
+        <AlertTriangle className="size-4" />
+        {result.blocked ? 'This already exists: saving will be refused' : 'This might already exist'}
       </p>
       <ul className="mt-1.5 flex flex-col gap-1">
-        {dupes.slice(0, 3).map((d) => (
-          <li key={d.uuid} className="flex flex-wrap items-center gap-2">
+        {result.data.slice(0, 3).map((d) => (
+          <li key={`${d.entity ?? ''}${d.uuid}`} className="flex flex-wrap items-center gap-2">
             <a
-              href={`${basePath}/${route}/${d.uuid}`}
+              href={`${basePath}/${d.entity ? `${d.entity}s` : route}/${d.uuid}`}
               target="_blank"
               rel="noreferrer"
               className="font-medium text-ink underline-offset-2 hover:underline"
@@ -440,6 +462,13 @@ function DuplicateWarning({ route, dupes }: { route: string; dupes: DuplicateCan
             <span className="text-xs text-muted">· {d.reasons.join(', ')}</span>
           </li>
         ))}
+        {result.hidden ? (
+          <li className="text-xs text-muted">
+            {result.hidden === 1
+              ? 'A possible duplicate exists that you cannot open. Ask its owner before creating another.'
+              : `${result.hidden} possible duplicates exist that you cannot open. Ask their owners before creating another.`}
+          </li>
+        ) : null}
       </ul>
     </div>
   );

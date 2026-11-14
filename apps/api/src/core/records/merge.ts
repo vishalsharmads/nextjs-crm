@@ -1,102 +1,14 @@
 import type { Knex } from 'knex';
-import { normalizePhone, type DuplicateCandidate } from '@app/shared';
+import { normalizePhone } from '@app/shared';
 import { db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { audit } from '../audit/audit.service';
-import { applyScope, assertCan } from '../rbac/access';
+import { assertCan } from '../rbac/access';
 import { customContext } from './common';
 import { getRow } from './service';
+import { closePairsAfterMerge } from '../duplicates/duplicates';
 import type { ResourceDef } from './types';
-
-// ---------- Duplicate detection ----------
-
-interface ContactProbe {
-  email?: string | null;
-  phone?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  excludeUuid?: string;
-}
-
-/** Likely duplicates of a contact, within the caller's scope. Exact email/phone score highest. */
-export async function findContactDuplicates(
-  user: AuthUser,
-  probe: ContactProbe,
-  limit = 10,
-): Promise<DuplicateCandidate[]> {
-  const email = probe.email?.trim().toLowerCase() || null;
-  const phone = probe.phone ? normalizePhone(probe.phone) || null : null;
-  const name = `${probe.firstName ?? ''} ${probe.lastName ?? ''}`.trim();
-  if (!email && !phone && name.length < 3) return [];
-  const qb = db('contacts').whereNull('deleted_at');
-  await applyScope(qb, user, 'core.contacts', ['contacts.owner_id']);
-  if (probe.excludeUuid) qb.whereNot('uuid', probe.excludeUuid);
-  qb.where((w) => {
-    if (email) w.orWhere('email_norm', email);
-    if (phone) w.orWhere('phone_e164', phone);
-    if (name.length >= 3) w.orWhere('full_name', name);
-  });
-  const rows = await qb
-    .limit(limit * 3)
-    .select('uuid', 'full_name', 'email', 'email_norm', 'phone_e164', 'first_name', 'last_name');
-  return rows
-    .map((r) => {
-      const reasons: string[] = [];
-      let score = 0;
-      if (email && r.email_norm === email) {
-        reasons.push('Same email');
-        score += 60;
-      }
-      if (phone && r.phone_e164 === phone) {
-        reasons.push('Same phone');
-        score += 40;
-      }
-      if (name && r.full_name?.toLowerCase() === name.toLowerCase()) {
-        reasons.push('Same name');
-        score += 20;
-      }
-      return { uuid: r.uuid, title: r.full_name || r.email || '', subtitle: r.email, reasons, score };
-    })
-    .filter((c) => c.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
-}
-
-export async function findOrganizationDuplicates(
-  user: AuthUser,
-  probe: { name?: string | null; domain?: string | null; excludeUuid?: string },
-  limit = 10,
-): Promise<DuplicateCandidate[]> {
-  const name = probe.name?.trim() || null;
-  const domain = probe.domain?.trim().toLowerCase() || null;
-  if (!name && !domain) return [];
-  const qb = db('organizations').whereNull('deleted_at');
-  await applyScope(qb, user, 'core.organizations', ['organizations.owner_id']);
-  if (probe.excludeUuid) qb.whereNot('uuid', probe.excludeUuid);
-  qb.where((w) => {
-    if (domain) w.orWhere('domain', domain);
-    if (name) w.orWhere('name', name);
-  });
-  const rows = await qb.limit(limit * 3).select('uuid', 'name', 'domain');
-  return rows
-    .map((r) => {
-      const reasons: string[] = [];
-      let score = 0;
-      if (domain && r.domain === domain) {
-        reasons.push('Same website');
-        score += 60;
-      }
-      if (name && r.name?.toLowerCase() === name.toLowerCase()) {
-        reasons.push('Same name');
-        score += 40;
-      }
-      return { uuid: r.uuid, title: r.name, subtitle: r.domain, reasons, score };
-    })
-    .filter((c) => c.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
-}
 
 // ---------- Merge ----------
 
@@ -321,6 +233,7 @@ export async function mergeRecords(def: ResourceDef, ctx: RequestContext, user: 
 
     const secondaryIds = secondaries.map((s) => s.id as number);
     await repoint(trx, entity, primary.id as number, secondaryIds);
+    await closePairsAfterMerge(trx, entity, user.id, secondaryIds);
     await trx(def.table)
       .whereIn('id', secondaryIds)
       .update({ merged_into_id: primary.id, deleted_at: new Date(), updated_by: user.id });

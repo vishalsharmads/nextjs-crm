@@ -14,6 +14,7 @@ import { maskEncrypted, prepareCustom, redactDiff } from './custom';
 import { notify } from '../notifications/notifications.service';
 import { emit, type EventType } from '../events/events';
 import { publicStageChanges } from '../pipelines/stage-engine';
+import { assertNotBlocked, probeFrom } from '../duplicates/duplicates';
 import type { ResourceDef } from './types';
 import { recordBasePath } from './paths';
 
@@ -163,6 +164,23 @@ export async function createRecord<Dto>(
     ) {
       throw new AppError('FORBIDDEN', 'You can only create records you own');
     }
+    // Duplicate rules set to block refuse the save (the record is never named: it may be out of scope).
+    await assertNotBlocked(
+      def.entity,
+      probeFrom({
+        email: row.email,
+        phone: row.phone,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        name: row.name,
+        domain: row.domain,
+        company: row.company_name,
+        organizationId: (row.organization_id as number | null | undefined) ?? null,
+        organizationUuid: core.organizationUuid,
+        custom,
+      }),
+      trx,
+    );
     const values = {
       ...row,
       uuid: newUuid(),
