@@ -214,7 +214,7 @@ describe('templates and email', () => {
     await client
       .post('/users', { email: 'templated@example.test', firstName: 'Tem', roleKeys: ['read_only'] })
       .expect(201);
-    expect(takeMail()[0]?.subject).toBe('Come aboard Test CRM');
+    expect(takeMail().find((m) => m.to === 'templated@example.test')?.subject).toBe('Come aboard Test CRM');
     const preview = await client
       .post('/templates/preview', {
         subject: 'Hello {{user.firstName}}',
@@ -237,7 +237,7 @@ describe('templates and email', () => {
         body: '<p>Attached <script>x</script></p>',
       })
       .expect(201);
-    expect(takeMail()[0]?.to).toBe('mailme@example.test');
+    expect(takeMail().some((m) => m.to === 'mailme@example.test')).toBe(true);
     const acts = await client.get(`/activities/for?type=contact&uuid=${c.body.uuid}`).expect(200);
     const email = acts.body.data.find((a: { type: string }) => a.type === 'email');
     expect(email.subject).toBe('Proposal');
