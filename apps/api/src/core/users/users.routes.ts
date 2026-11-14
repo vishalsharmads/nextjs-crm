@@ -208,6 +208,8 @@ export const usersRoutes = defineRoutes('/users', ['users'])
         }
       }
       const tIds = body.teamUuids ? await teamIds(body.teamUuids) : null;
+      if (tIds && u.id === user.id)
+        for (const teamId of tIds) await assertNotJoiningSelf(user, teamId, [user.id]);
       await db.transaction(async (trx) => {
         const patch: Record<string, unknown> = {};
         if (body.firstName !== undefined) patch.first_name = body.firstName;
@@ -590,14 +592,33 @@ async function teamDto(id: number) {
   };
 }
 
+/**
+ * Team membership widens record scope (`team`), so only admins may put themselves into a team they
+ * are not already in. Anyone else could otherwise read the records of any team by joining it.
+ */
+async function assertNotJoiningSelf(actor: AuthUser, teamId: number | null, memberIds: number[]) {
+  if (actor.isAdmin || !memberIds.includes(actor.id)) return;
+  const already = teamId
+    ? await db('team_members').where({ team_id: teamId, user_id: actor.id }).first('user_id')
+    : undefined;
+  if (!already) throw new AppError('FORBIDDEN', 'Only an admin can add you to a team');
+}
+
 async function writeMembers(
   trx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  actor: AuthUser,
   teamId: number,
   members: string[],
   leads: string[],
+  isNew = false,
 ) {
   const users = members.length ? await trx('users').whereIn('uuid', members).select('id', 'uuid') : [];
   if (users.length !== new Set(members).size) throw new AppError('VALIDATION_FAILED', 'Unknown team member');
+  await assertNotJoiningSelf(
+    actor,
+    isNew ? null : teamId,
+    users.map((u) => u.id as number),
+  );
   if (leads.some((l) => !members.includes(l)))
     throw new AppError('VALIDATION_FAILED', 'Team leads must be members of the team');
   await trx('team_members').where({ team_id: teamId }).delete();
@@ -624,12 +645,12 @@ export const teamsRoutes = defineRoutes('/teams', ['users'])
     permission: 'core.users.manage',
     body: teamInputSchema,
     status: 201,
-    handler: async ({ ctx, body }) => {
+    handler: async ({ ctx, user, body }) => {
       if (await db('teams').where({ name: body.name }).first())
         throw conflict('A team with this name already exists');
       const id = await db.transaction(async (trx) => {
         const [tid] = await trx('teams').insert({ uuid: newUuid(), name: body.name });
-        await writeMembers(trx, tid!, body.memberUuids, body.leadUuids ?? []);
+        await writeMembers(trx, user, tid!, body.memberUuids, body.leadUuids ?? [], true);
         await audit(trx, ctx, { action: 'team.created', entity: 'team', entityId: tid, diff: body });
         return tid!;
       });
@@ -643,7 +664,7 @@ export const teamsRoutes = defineRoutes('/teams', ['users'])
     permission: 'core.users.manage',
     params: uuidParam,
     body: toPatch(teamInputSchema),
-    handler: async ({ ctx, params, body }) => {
+    handler: async ({ ctx, user, params, body }) => {
       const t = await db('teams').where({ uuid: params.uuid }).first();
       if (!t) throw notFound('Team');
       const current = await teamDto(t.id);
@@ -655,7 +676,7 @@ export const teamsRoutes = defineRoutes('/teams', ['users'])
           const leads =
             body.leadUuids ??
             current.members.filter((m) => m.isLead && members.includes(m.uuid)).map((m) => m.uuid);
-          await writeMembers(trx, t.id, members, leads);
+          await writeMembers(trx, user, t.id, members, leads);
         }
         await audit(trx, ctx, { action: 'team.updated', entity: 'team', entityId: t.id, diff: body });
       });

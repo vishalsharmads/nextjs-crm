@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clientWithRoles, createRole } from './helpers';
+import { clientWithRoles, createRole, createUser, loginAs } from './helpers';
 
 describe('rbac', () => {
   it('denies admin endpoints without the permission', async () => {
@@ -49,5 +49,28 @@ describe('rbac', () => {
     const adminRole = roles.body.data.find((r: { key: string }) => r.key === 'admin');
     expect((await client.delete(`/roles/${adminRole.uuid}`)).status).toBe(409);
     expect((await client.patch(`/roles/${adminRole.uuid}`, { permissions: [] })).status).toBe(409);
+  });
+});
+
+describe('team membership', () => {
+  it('lets only admins put themselves into a team, since teams widen record scope', async () => {
+    const { client: admin } = await clientWithRoles(['admin']);
+    const role = await createRole(['core.users.manage', 'core.users.view']);
+    const mgrUser = await createUser({ roleKeys: [role] });
+    const mgr = await loginAs(mgrUser);
+    const other = await createUser({ roleKeys: [role] });
+    const team = await admin
+      .post('/teams', { name: `Execs ${Date.now()}`, memberUuids: [other.uuid] })
+      .expect(201);
+
+    await mgr.patch(`/teams/${team.body.uuid}`, { memberUuids: [other.uuid, mgrUser.uuid] }).expect(403);
+    await mgr.patch(`/users/${mgrUser.uuid}`, { teamUuids: [team.body.uuid] }).expect(403);
+    await mgr.post('/teams', { name: `Mine ${Date.now()}`, memberUuids: [mgrUser.uuid] }).expect(403);
+    // Managing other people's membership is still allowed.
+    await mgr.post('/teams', { name: `Theirs ${Date.now()}`, memberUuids: [other.uuid] }).expect(201);
+    // An admin can add them.
+    await admin.patch(`/teams/${team.body.uuid}`, { memberUuids: [other.uuid, mgrUser.uuid] }).expect(200);
+    // Once in, they may edit the team without losing their place.
+    await mgr.patch(`/teams/${team.body.uuid}`, { memberUuids: [mgrUser.uuid] }).expect(200);
   });
 });
