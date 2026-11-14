@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-const apiDelete = vi.fn(() => Promise.resolve());
+const apiDelete = vi.fn((path: string) => Promise.resolve(path));
 vi.mock('@/lib/api', () => ({
   apiGet: (path: string) =>
     Promise.resolve(

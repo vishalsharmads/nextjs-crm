@@ -86,6 +86,14 @@ export async function teamUserIds(userId: number, conn: Db = db): Promise<number
  */
 export type ShareAccess = 'view' | 'edit' | 'none';
 
+/** The alias (or name) of a query's main table, for callers that pass unqualified owner columns. */
+function baseTable(qb: Knex.QueryBuilder): string {
+  const table = (qb as unknown as { _single?: { table?: unknown } })._single?.table;
+  if (typeof table !== 'string') throw new Error('applyScope needs table-qualified owner columns here');
+  const m = /\s+as\s+(\S+)$/i.exec(table);
+  return m ? m[1]! : table;
+}
+
 export async function applyScope(
   qb: Knex.QueryBuilder,
   user: AuthUser,
@@ -98,7 +106,7 @@ export async function applyScope(
   if (scope === 'all') return;
   const ids = scope === 'team' ? await teamUserIds(user.id, conn) : [user.id];
   // Records shared with the person, or with a team they belong to, are in scope too (plan D4).
-  const alias = ownerColumns[0]!.split('.')[0]!;
+  const alias = ownerColumns[0]!.includes('.') ? ownerColumns[0]!.split('.')[0]! : baseTable(qb);
   const teams =
     shares === 'none'
       ? []
