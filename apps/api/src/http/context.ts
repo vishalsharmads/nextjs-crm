@@ -19,7 +19,8 @@ export interface AuthUser {
   /** Read-only token: only `.view` permissions apply. */
   readOnly?: boolean;
   /** How the call came in, for the audit log (MCP client or in-app assistant). */
-  via?: 'mcp' | 'assistant';
+  /** How the request arrived: an AI client, the assistant, or a public web form (acting as its owner). */
+  via?: 'mcp' | 'assistant' | 'form';
   /** Admin who must enrol in 2FA (workspace policy) before using anything else. */
   mfaSetupRequired?: boolean;
 }

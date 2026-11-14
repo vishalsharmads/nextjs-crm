@@ -94,4 +94,78 @@ describe('standard field visibility', () => {
     // Admins still see everything.
     expect((await admin.get(`/deals/${deal.body.uuid}`).expect(200)).body.value).toBe(SECRET + 1);
   });
+
+  it('closes the side doors: list search, duplicates, merge, forecast, audit, conversion, write probing', async () => {
+    const { client: admin } = await clientWithRoles(['admin']);
+    await admin.patch('/settings/features', { leads: true }).expect(200);
+    const role = await createRole(
+      [
+        'core.deals.*',
+        'core.contacts.*',
+        'core.leads.*',
+        'core.organizations.view',
+        'core.reports.view',
+        'core.audit.view',
+      ],
+      { '*': 'all' },
+    );
+    await admin
+      .put('/custom-fields/standard/contact/email', {
+        visibility: { default: 'write', roles: { [role]: 'hidden' } },
+      })
+      .expect(200);
+    await admin
+      .put('/custom-fields/standard/deal/value', {
+        visibility: { default: 'write', roles: { [role]: 'read' } },
+      })
+      .expect(200);
+    await admin
+      .put('/custom-fields/standard/deal/expected_close', {
+        visibility: { default: 'write', roles: { [role]: 'hidden' } },
+      })
+      .expect(200);
+    const EMAIL = `side-${Date.now()}@example.test`;
+    const onlyEmail = await admin.post('/contacts', { email: EMAIL }).expect(201);
+    const other = await admin.post('/contacts', { firstName: 'Twin', email: EMAIL }).expect(201);
+    await admin.patch(`/contacts/${onlyEmail.body.uuid}`, { email: `x.${EMAIL}` }).expect(200);
+    await admin.patch(`/contacts/${onlyEmail.body.uuid}`, { email: EMAIL }).expect(200);
+
+    const { client } = await clientWithRoles([role]);
+    const leak = (body: unknown) => JSON.stringify(body).toLowerCase().includes(EMAIL);
+    // A name that falls back to the email does not show it.
+    expect(leak((await client.get(`/contacts/${onlyEmail.body.uuid}`).expect(200)).body)).toBe(false);
+    // List search does not match on the hidden email.
+    const found = await client.get(`/contacts?q=${encodeURIComponent(EMAIL)}`).expect(200);
+    expect(found.body.data).toHaveLength(0);
+    // Duplicate checks neither compare nor show it.
+    const dup = await client.post('/contacts/check-duplicates', { email: EMAIL }).expect(200);
+    expect(dup.body.data).toHaveLength(0);
+    const dupOf = await client.get(`/contacts/${other.body.uuid}/duplicates`).expect(200);
+    expect(leak(dupOf.body)).toBe(false);
+    // Writing a guess is refused whatever the stored value: nothing to compare against.
+    await client.patch(`/contacts/${onlyEmail.body.uuid}`, { email: EMAIL }).expect(403);
+    // Merging cannot pick the hidden email.
+    await client
+      .post('/contacts/merge', {
+        primaryUuid: onlyEmail.body.uuid,
+        secondaryUuids: [other.body.uuid],
+        pick: { email: other.body.uuid },
+      })
+      .expect(403);
+    // Audit diffs leave the hidden columns out.
+    expect(leak((await client.get(`/audit-logs?entityUuid=${onlyEmail.body.uuid}`).expect(200)).body)).toBe(
+      false,
+    );
+    // Forecast buckets by the hidden expected close date.
+    await client.get('/reports/forecast').expect(403);
+    // A read-only value: deals can still be created (the default is not a choice) and saved unchanged.
+    const deal = await client.post('/deals', { title: 'Read-only value' }).expect(201);
+    await client.patch(`/deals/${deal.body.uuid}`, { value: 0, title: 'Renamed' }).expect(200);
+    await client.patch(`/deals/${deal.body.uuid}`, { value: 10 }).expect(403);
+    // Converting a lead does not copy what the person may not write on the contact.
+    const lead = await admin.post('/leads', { firstName: 'Conv', email: `lead-${EMAIL}` }).expect(201);
+    const conv = await client.post(`/leads/${lead.body.uuid}/convert`, {}).expect(200);
+    const row = await db('contacts').where({ uuid: conv.body.contactUuid }).first('email');
+    expect(row.email).toBeNull();
+  });
 });

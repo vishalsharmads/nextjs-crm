@@ -201,6 +201,8 @@ export const publicFormsRoutes = defineRoutes('/public/forms', ['forms'])
         lastName: owner.last_name,
         sessionId: null,
         ...(await loadAccess(owner.id)),
+        // A visitor fills in the form; the owner's field restrictions are about what the owner sees.
+        via: 'form',
       };
       input.ownerUuid = owner.uuid;
       const def = recordDefs[f.entity as 'contact' | 'lead'];

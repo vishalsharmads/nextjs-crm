@@ -18,6 +18,7 @@ import { logAccess } from './access-log';
 import { verifyIntegrity } from './integrity';
 import { csvSafe } from '../../lib/csv';
 import { verifyLimiter } from '../../middleware/rate-limit';
+import { hiddenColumns } from '../custom-fields/standard-visibility';
 
 const EXPORT_MAX_ROWS = 100_000;
 
@@ -60,11 +61,14 @@ function applyFilters(qb: Knex.QueryBuilder, f: Filters, table: 'a' | 'x') {
 async function viewerRedactor(user: AuthUser) {
   const levels = new Map<string, Record<string, VisibilityLevel>>();
   for (const e of customizableEntities()) levels.set(e, fieldAccessMap(await getDefinitions(e), user));
+  const hiddenStd = new Map<string, Set<string>>();
+  for (const e of ['contact', 'organization', 'lead', 'deal']) hiddenStd.set(e, await hiddenColumns(e, user));
   return (entity: string, diff: unknown) => {
     const l = levels.get(entity as CustomizableEntity);
-    return l && diff && typeof diff === 'object' && !Array.isArray(diff)
-      ? redactDiff(diff as Record<string, unknown>, l)
-      : diff;
+    if (!l || !diff || typeof diff !== 'object' || Array.isArray(diff)) return diff;
+    const out = redactDiff(diff as Record<string, unknown>, l);
+    for (const col of hiddenStd.get(entity) ?? []) Reflect.deleteProperty(out, col);
+    return out;
   };
 }
 

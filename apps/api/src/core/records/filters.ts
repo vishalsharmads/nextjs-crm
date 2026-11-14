@@ -234,18 +234,31 @@ export function fulltextQuery(q: string): string | null {
   return words.map((w) => `+${w}*`).join(' ');
 }
 
-export function applySearch(qb: Knex.QueryBuilder, q: string | undefined, def: ResourceDef) {
+/**
+ * `hidden` holds table-qualified columns of standard fields hidden from the viewer: they are not
+ * searched, so a hidden email cannot be confirmed by searching for it.
+ */
+export function applySearch(
+  qb: Knex.QueryBuilder,
+  q: string | undefined,
+  def: ResourceDef,
+  hidden: Set<string> = new Set(),
+) {
   const term = q?.trim();
   if (!term) return qb;
   const ft = fulltextQuery(term);
+  const ftAllowed = !def.fulltext.some((c) => hidden.has(c));
   return qb.where((w) => {
-    if (ft && def.fulltext.length) {
+    if (ft && def.fulltext.length && ftAllowed) {
       w.whereRaw(`MATCH(${def.fulltext.map(() => '??').join(', ')}) AGAINST (? IN BOOLEAN MODE)`, [
         ...def.fulltext,
         ft,
       ]);
     }
-    for (const col of def.likeColumns) w.orWhere(col, 'like', `${escapeLike(term)}%`);
+    const like = def.likeColumns.filter((c) => !hidden.has(c));
+    // Nothing left to search: match nothing rather than everything.
+    if (!like.length && !(ft && def.fulltext.length && ftAllowed)) w.whereRaw('1 = 0');
+    for (const col of like) w.orWhere(col, 'like', `${escapeLike(term)}%`);
   });
 }
 

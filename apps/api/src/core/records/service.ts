@@ -18,6 +18,7 @@ import { assertNotBlocked, probeFrom } from '../duplicates/duplicates';
 import type { ResourceDef } from './types';
 import { recordBasePath } from './paths';
 import { assertStandardWrite, standardLevels } from '../custom-fields/standard-visibility';
+import { hiddenColumns } from '../custom-fields/standard-visibility';
 
 export async function filterContext(def: ResourceDef, user: AuthUser): Promise<FilterContext> {
   const customDefs = await getDefinitions(def.entity);
@@ -72,7 +73,8 @@ export async function applyListCriteria(
     if (view.filters) compileFilter(qb, view.filters, fc);
   }
   if (query.filter) compileFilter(qb, query.filter, fc);
-  applySearch(qb, query.q, def);
+  const hidden = new Set([...(await hiddenColumns(def.entity, user))].map((c) => `${def.table}.${c}`));
+  applySearch(qb, query.q, def, hidden);
   return fc;
 }
 
@@ -155,7 +157,8 @@ export async function createRecord<Dto>(
 ): Promise<Dto> {
   assertCan(user, perm(def, 'create'));
   const core = def.createSchema.parse(input) as Record<string, unknown>;
-  await assertStandardWrite(def.entity, user, core);
+  // The raw input: schema defaults (a deal value of 0) are not something the person chose.
+  await assertStandardWrite(def.entity, user, input);
   const fc = await filterContext(def, user);
   const custom = prepareCustom(
     fc.customDefs,
