@@ -225,6 +225,42 @@ describe('unsubscribe and opt-out of sale', () => {
   });
 });
 
+describe('lead conversion keeps privacy choices', () => {
+  it('carries the opt-out, the restriction and consents to the contact, and old links still work', async () => {
+    await withPurposes();
+    const lead = await admin.post('/leads', { firstName: 'Careful', lastName: 'Lead' }).expect(201);
+    await admin
+      .post(`/privacy/lead/${lead.body.uuid}/consents`, { purposeKey: 'newsletter', status: 'granted' })
+      .expect(200);
+    await admin.post(`/privacy/lead/${lead.body.uuid}/restriction`, { restricted: true }).expect(204);
+    await db('leads').where({ uuid: lead.body.uuid }).update({ marketing_opt_out: true });
+    const oldLink = unsubscribeToken('lead', lead.body.uuid);
+
+    await admin.post(`/leads/${lead.body.uuid}/convert`, {}).expect(200);
+    const row = await db('leads').where({ uuid: lead.body.uuid }).first('converted_contact_id');
+    const contact = await db('contacts').where({ id: row.converted_contact_id }).first();
+    expect(contact.marketing_opt_out).toBeTruthy();
+    expect(contact.processing_restricted).toBeTruthy();
+    expect(
+      await db('consents').where({
+        subject_type: 'contact',
+        subject_id: contact.id,
+        purpose_key: 'newsletter',
+      }),
+    ).toHaveLength(1);
+
+    // An unsubscribe link sent to the lead now applies to the contact.
+    await db('contacts').where({ id: contact.id }).update({ marketing_opt_out: false });
+    const app = await getApp();
+    await request(app)
+      .post('/api/v1/public/privacy/unsubscribe')
+      .query({ token: oldLink })
+      .send({})
+      .expect(200);
+    expect((await db('contacts').where({ id: contact.id }).first()).marketing_opt_out).toBeTruthy();
+  });
+});
+
 describe('restriction of processing', () => {
   it('stops webhooks, automations and outgoing email for the record', async () => {
     const hook = await admin
