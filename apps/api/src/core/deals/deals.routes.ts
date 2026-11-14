@@ -159,6 +159,13 @@ export const leadsRoutes = [
               );
               organizationUuid = org.uuid;
             }
+            // Carry only what this person may see on the lead and may write on the contact.
+            const fromLead = await standardLevels('lead', user);
+            const toContact = await standardLevels('contact', user);
+            const carryField = (field: string, value: unknown) =>
+              user.isAdmin || (fromLead[field] !== 'hidden' && toContact[field] === 'write')
+                ? value
+                : undefined;
             const contact = await createRecord(
               contactsDef,
               ctx,
@@ -166,9 +173,9 @@ export const leadsRoutes = [
               {
                 firstName: lead.first_name,
                 lastName: lead.last_name,
-                email: lead.email,
-                phone: lead.phone,
-                jobTitle: lead.job_title,
+                email: carryField('email', lead.email),
+                phone: carryField('phone', lead.phone),
+                jobTitle: carryField('job_title', lead.job_title),
                 source: lead.source,
                 organizationUuid,
                 custom: await carry('contact'),
@@ -187,7 +194,7 @@ export const leadsRoutes = [
                     lead.company_name ||
                     `${lead.first_name} ${lead.last_name}`.trim() ||
                     'New deal',
-                  value: body.dealValue ?? 0,
+                  ...(body.dealValue !== undefined ? { value: body.dealValue } : {}),
                   contactUuid: contact.uuid,
                   organizationUuid,
                   pipelineUuid: body.pipelineUuid,

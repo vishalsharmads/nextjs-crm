@@ -66,6 +66,9 @@ async function forecast(
   user: AuthUser,
   q: { months: number; pipelineUuid?: string; currency?: string; convert?: boolean },
 ) {
+  // Buckets by expected close month: not for people that date is hidden from.
+  if ((await standardLevels('deal', user)).expected_close === 'hidden')
+    throw new AppError('FORBIDDEN', 'Expected close dates are hidden for your role');
   const open = await deals(user, q);
   const today = new Date().toISOString().slice(0, 10);
   const rows = (await open.qb

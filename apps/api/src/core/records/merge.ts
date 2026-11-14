@@ -10,6 +10,7 @@ import { getRow } from './service';
 import { closePairsAfterMerge } from '../duplicates/duplicates';
 import { dropSharesOnMerge } from '../sharing/sharing';
 import type { ResourceDef } from './types';
+import { standardFieldsAt } from '../custom-fields/standard-visibility';
 
 // ---------- Merge ----------
 
@@ -191,7 +192,15 @@ export async function mergeRecords(def: ResourceDef, ctx: RequestContext, user: 
     const byUuid = new Map(all.map((r) => [r.uuid as string, r]));
 
     const patch: Record<string, unknown> = {};
+    // Standard fields this person may not change (or see) keep the primary's value, and cannot be picked.
+    const locked = new Set(
+      (await standardFieldsAt(entity, user, ['read', 'hidden'])).flatMap((s) => s.columns),
+    );
     for (const col of MERGEABLE[entity]) {
+      if (locked.has(col)) {
+        if (input.pick?.[col]) throw new AppError('FIELD_FORBIDDEN', `You cannot change ${col}`);
+        continue;
+      }
       const source = input.pick?.[col] ? byUuid.get(input.pick[col]) : undefined;
       if (input.pick?.[col] && !source) throw new AppError('VALIDATION_FAILED', `Unknown source for ${col}`);
       // Default: keep the primary's value, fill blanks from the others in order.

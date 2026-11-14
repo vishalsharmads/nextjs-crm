@@ -89,7 +89,18 @@ export async function stripHidden<T>(entity: string, user: AuthUser | undefined,
   if (!user || user.isAdmin || !isStandardEntity(entity)) return dtos;
   const hidden = await standardFieldsAt(entity, user, ['hidden']);
   if (!hidden.length) return dtos;
-  for (const d of dtos) for (const s of hidden) Reflect.deleteProperty(d as object, s.dto);
+  for (const d of dtos) {
+    const rec = d as Record<string, unknown>;
+    const values = new Set(hidden.map((s) => rec[s.dto]).filter((v) => typeof v === 'string' && v !== ''));
+    for (const s of hidden) Reflect.deleteProperty(rec, s.dto);
+    // A record without a name is named by its email: that fallback is hidden too.
+    for (const k of ['fullName', 'title', 'name'])
+      if (typeof rec[k] === 'string' && values.has(rec[k])) rec[k] = '';
+    // A contact's organization links carry the job title as well.
+    if (hidden.some((s) => s.dto === 'jobTitle') && Array.isArray(rec.organizations))
+      for (const link of rec.organizations as Record<string, unknown>[])
+        Reflect.deleteProperty(link, 'jobTitle');
+  }
   return dtos;
 }
 
@@ -103,15 +114,24 @@ export async function assertStandardWrite(
   input: Record<string, unknown>,
   existing?: Record<string, unknown>,
 ) {
-  if (user.isAdmin || !isStandardEntity(entity)) return;
-  for (const s of await standardFieldsAt(entity, user, ['read', 'hidden'])) {
-    if (!(s.input in input)) continue;
+  if (user.isAdmin || user.via === 'form' || !isStandardEntity(entity)) return;
+  const levels = await standardLevels(entity, user);
+  for (const s of STANDARD_HIDEABLE[entity]) {
+    const level = levels[s.field];
+    if (level === 'write' || !(s.input in input)) continue;
     const next = input[s.input];
-    if (existing) {
+    const empty = next === null || next === undefined || next === '';
+    // A hidden value is never compared with what is stored: that would let it be guessed.
+    if (level === 'hidden') {
+      if (empty) continue;
+    } else if (existing) {
       const before = existing[s.columns[0]!];
-      const same = (before ?? null) === (next ?? null) || String(before ?? '') === String(next ?? '');
+      const same =
+        (before ?? null) === (next ?? null) ||
+        String(before ?? '') === String(next ?? '') ||
+        (before !== null && next !== null && before !== '' && Number(before) === Number(next));
       if (same) continue;
-    } else if (next === null || next === undefined || next === '') continue;
+    } else if (empty) continue;
     throw new AppError('FIELD_FORBIDDEN', `You cannot change ${s.label}`, [
       { path: s.input, message: 'Not allowed' },
     ]);
