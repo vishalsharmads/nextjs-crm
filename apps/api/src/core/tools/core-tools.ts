@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AppError } from '../../lib/errors';
 import {
   ACTIVITY_TYPES,
   RELATED_TYPES,
@@ -12,6 +13,7 @@ import { customizableEntities, getRecordDef, recordDefs } from '../records/regis
 import { createRecord, getRecord, getRow, listRecords, updateRecord } from '../records/service';
 import { recordTimeline } from '../timeline/timeline.service';
 import { searchRecords } from '../search/search.routes';
+import { addRecordComment, listRecordComments } from '../comments/comments';
 import { listPipelines } from '../pipelines/pipelines.repository';
 import { can, assertCan } from '../rbac/access';
 import { getLabels } from '../labels/labels.service';
@@ -293,6 +295,39 @@ defineTool({
   async handler(input, { ctx, user }) {
     assertCan(user, 'core.activities.update');
     return addComment(ctx, user, input.uuid, { body: input.body, mentions: input.mentions });
+  },
+});
+
+defineTool({
+  name: 'list_comments',
+  title: 'Read comments on a record',
+  description: 'Comments people wrote on a record (not a task: use get_task for those), oldest first.',
+  write: false,
+  input: z.object({ entity, uuid }),
+  async handler(input, { ctx, user }) {
+    return { data: await listRecordComments(viewable(user, input.entity), ctx, user, input.uuid) };
+  },
+});
+
+defineTool({
+  name: 'add_comment',
+  title: 'Comment on a record',
+  description:
+    'Adds a comment to a record such as a contact or deal (for tasks use add_task_comment). Mention people by user id to notify them; only people who can see the record are notified.',
+  write: true,
+  input: z.object({
+    entity,
+    uuid,
+    body: z.string().trim().min(1).max(20_000).describe('Plain text or simple HTML'),
+    mentions: z.array(z.uuid()).max(20).default([]),
+  }),
+  async handler(input, { ctx, user }) {
+    if (input.entity === 'activity')
+      throw new AppError('VALIDATION_FAILED', 'Use add_task_comment to comment on a task');
+    return addRecordComment(viewable(user, input.entity), ctx, user, input.uuid, {
+      body: input.body,
+      mentions: input.mentions,
+    });
   },
 });
 

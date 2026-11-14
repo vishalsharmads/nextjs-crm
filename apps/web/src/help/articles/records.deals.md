@@ -20,6 +20,7 @@ The {{dealPluralLower}} list shows everyone your role lets you see. Open one to 
 - **Board**: drag a card to another stage, pick **Move to** from the ⋯ on the card, or use the stage track on its page. Moving to a won or lost stage closes it; marking one lost asks for a reason.
 - **Value and close date** feed the pipeline widget, the forecast and quotas (Reports).
 - **Line items** (with the Products module): list what you are selling; the total can become the value.
+- **Comments**: discuss the record with colleagues in the Comments tab. Mention someone to notify them; only people who can open the record are notified. The owner hears about new comments. You can edit or delete your own comments.
 
 ## Fields
 

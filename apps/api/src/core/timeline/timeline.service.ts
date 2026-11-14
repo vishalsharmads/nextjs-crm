@@ -1,4 +1,5 @@
 import type { RequestContext } from '../../http/context';
+import { timelineComments } from '../comments/comments';
 import { logAccess } from '../audit/access-log';
 import type { RecordEntity, TimelineItem } from '@app/shared';
 import type { Knex } from 'knex';
@@ -112,6 +113,18 @@ export async function recordTimeline(
         activity: a,
       });
     }
+  }
+
+  if (want('comment') && entity !== 'activity') {
+    for (const c of await timelineComments(entity, id, user, before, opts.limit))
+      items.push({
+        id: `comment:${c.uuid}`,
+        kind: 'comment',
+        at: c.createdAt,
+        actor: c.author,
+        title: 'commented',
+        comment: c,
+      });
   }
 
   const logs = await db('audit_logs')

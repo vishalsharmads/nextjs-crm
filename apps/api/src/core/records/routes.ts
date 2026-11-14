@@ -14,13 +14,68 @@ import {
 } from './service';
 import { recordTimeline } from '../timeline/timeline.service';
 import { assertCan } from '../rbac/access';
+import {
+  addRecordComment,
+  deleteRecordComment,
+  editRecordComment,
+  listRecordComments,
+} from '../comments/comments';
 
 export const uuidParam = z.object({ uuid: z.uuid() });
 
 /** Standard REST endpoints for a record entity. Entity-specific routes are added by the caller. */
+export const commentParam = uuidParam.extend({ commentUuid: z.uuid() });
+
+/**
+ * Comments on a record. Anyone who can see the record may read and add comments (plan D1);
+ * authors (and admins) edit and delete their own. Tasks keep their own comment routes.
+ */
+export function addCommentRoutes(group: RouteGroup, def: ResourceDef): RouteGroup {
+  if (def.entity === 'activity') return group;
+  const view = `${def.resource}.view`;
+  return group
+    .add({
+      method: 'get',
+      path: '/:uuid/comments',
+      permission: view,
+      params: uuidParam,
+      summary: `Comments on one ${def.entity} record`,
+      handler: async ({ ctx, user, params }) => ({
+        data: await listRecordComments(def, ctx, user, params.uuid),
+      }),
+    })
+    .add({
+      method: 'post',
+      path: '/:uuid/comments',
+      permission: view,
+      params: uuidParam,
+      body: z.record(z.string(), z.unknown()),
+      status: 201,
+      handler: ({ ctx, user, params, body }) => addRecordComment(def, ctx, user, params.uuid, body),
+    })
+    .add({
+      method: 'patch',
+      path: '/:uuid/comments/:commentUuid',
+      permission: view,
+      params: commentParam,
+      body: z.record(z.string(), z.unknown()),
+      handler: ({ ctx, user, params, body }) =>
+        editRecordComment(def, ctx, user, params.uuid, params.commentUuid, body),
+    })
+    .add({
+      method: 'delete',
+      path: '/:uuid/comments/:commentUuid',
+      permission: view,
+      params: commentParam,
+      status: 204,
+      handler: ({ ctx, user, params }) =>
+        deleteRecordComment(def, ctx, user, params.uuid, params.commentUuid),
+    });
+}
+
 export function recordRoutes(def: ResourceDef, tag: string): RouteGroup {
   const p = (action: string) => `${def.resource}.${action}`;
-  return defineRoutes(recordBasePath(def), [tag], def.moduleKey)
+  const group = defineRoutes(recordBasePath(def), [tag], def.moduleKey)
     .add({
       method: 'get',
       path: '/',
@@ -82,4 +137,5 @@ export function recordRoutes(def: ResourceDef, tag: string): RouteGroup {
         return recordTimeline(def.entity, row, user, query, ctx);
       },
     });
+  return addCommentRoutes(group, def);
 }

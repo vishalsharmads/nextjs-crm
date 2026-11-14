@@ -20,6 +20,7 @@ The {{contactPluralLower}} list shows everyone your role lets you see. Open one 
 - **Merge duplicates**: from the record's menu, merge two {{contactPluralLower}} into one. History, notes, links and records from modules (such as tickets, quotes, invoices and bookings) move to the record you keep. If either one unsubscribed or had processing restricted, the record you keep does too.
 - **Privacy**: the Privacy tab records consent and lets privacy staff export or erase a person's data.
 - **Email**: send email from the record; replies are logged when a mailbox is connected (Settings → Email).
+- **Comments**: discuss the record with colleagues in the Comments tab. Mention someone to notify them; only people who can open the record are notified. The owner hears about new comments. You can edit or delete your own comments.
 
 ## Fields
 

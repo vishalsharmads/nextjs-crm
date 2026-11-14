@@ -20,6 +20,7 @@ The {{leadPluralLower}} list shows everyone your role lets you see. Open one to 
 - **Convert** qualified {{leadPluralLower}} from the record's menu: this creates {{contactLower}} records, and optionally {{organizationLower}} and {{dealLower}} records too. The person's privacy choices go with them: an unsubscribe or a processing restriction on the {{leadLower}} also applies to the new {{contactLower}}, and consents are copied over. An unsubscribe link from an earlier email still works after conversion.
 - With the {{leadLower}} pipeline turned on (Settings → General), {{leadPluralLower}} also move through stages on a board.
 - {{leadPlural}} can be turned off entirely in Settings → General.
+- **Comments**: discuss the record with colleagues in the Comments tab. Mention someone to notify them; only people who can open the record are notified. The owner hears about new comments. You can edit or delete your own comments.
 
 ## Fields
 

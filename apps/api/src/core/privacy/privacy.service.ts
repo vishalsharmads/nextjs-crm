@@ -197,6 +197,8 @@ async function eraseCoreTraces(
   }
 
   await trx('taggables').where({ taggable_type: entity, taggable_id: id }).delete();
+  // The discussion about the person goes with them.
+  add('comments', await trx('record_comments').where({ entity, record_id: id }).delete());
   return activityIds;
 }
 
@@ -366,6 +368,13 @@ export async function exportSubject(
         ...a,
         custom: visibleCustom(a.custom, actCtx.defs, actCtx.levels, canReveal),
       })),
+    ),
+    comments: plain(
+      await db('record_comments')
+        .where({ entity })
+        .whereIn('record_id', ids)
+        .orderBy('id')
+        .select('uuid', 'body', 'created_at', 'edited_at'),
     ),
     activityComments: plain(
       activities.length

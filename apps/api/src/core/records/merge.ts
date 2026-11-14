@@ -200,6 +200,10 @@ async function repoint(
     .whereIn('related_id', secondaryIds)
     .update({ related_id: primaryId });
   await trx('files').where({ entity }).whereIn('entity_id', secondaryIds).update({ entity_id: primaryId });
+  await trx('record_comments')
+    .where({ entity })
+    .whereIn('record_id', secondaryIds)
+    .update({ record_id: primaryId });
   await repointModuleTables(trx, col, primaryId, secondaryIds);
   if (entity === 'contact') {
     await trx('leads')

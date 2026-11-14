@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import {
+  addRecordComment,
+  deleteRecordComment,
+  editRecordComment,
+  listRecordComments,
+} from '../comments/comments';
+import {
   CUSTOM_OBJECTS_KEY,
   MAX_CUSTOM_OBJECTS,
   customObjectInputSchema,
@@ -278,5 +284,53 @@ export const objectRecordRoutes = defineRoutes('/o/:object', ['objects'])
       assertCan(user, `${def.resource}.view`);
       const row = await getRow(def, user, params.uuid);
       return recordTimeline(def.entity, row, user, query, ctx);
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/:uuid/comments',
+    permission: 'authenticated',
+    params: recordParam,
+    handler: async ({ ctx, user, params }) => {
+      const def = objectDef(params.object);
+      assertCan(user, `${def.resource}.view`);
+      return { data: await listRecordComments(def, ctx, user, params.uuid) };
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/:uuid/comments',
+    permission: 'authenticated',
+    params: recordParam,
+    body: z.record(z.string(), z.unknown()),
+    status: 201,
+    handler: ({ ctx, user, params, body }) => {
+      const def = objectDef(params.object);
+      assertCan(user, `${def.resource}.view`);
+      return addRecordComment(def, ctx, user, params.uuid, body);
+    },
+  })
+  .add({
+    method: 'patch',
+    path: '/:uuid/comments/:commentUuid',
+    permission: 'authenticated',
+    params: recordParam.extend({ commentUuid: z.uuid() }),
+    body: z.record(z.string(), z.unknown()),
+    handler: ({ ctx, user, params, body }) => {
+      const def = objectDef(params.object);
+      assertCan(user, `${def.resource}.view`);
+      return editRecordComment(def, ctx, user, params.uuid, params.commentUuid, body);
+    },
+  })
+  .add({
+    method: 'delete',
+    path: '/:uuid/comments/:commentUuid',
+    permission: 'authenticated',
+    params: recordParam.extend({ commentUuid: z.uuid() }),
+    status: 204,
+    handler: async ({ ctx, user, params }) => {
+      const def = objectDef(params.object);
+      assertCan(user, `${def.resource}.view`);
+      await deleteRecordComment(def, ctx, user, params.uuid, params.commentUuid);
     },
   });

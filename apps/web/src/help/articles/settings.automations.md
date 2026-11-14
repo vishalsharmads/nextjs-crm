@@ -9,7 +9,7 @@ permission: core.automations.manage
 
 When something happens, or on a schedule, check conditions and act: create tasks, notify, send email, update fields, assign, add notes or tags.
 
-- **When**: an event (created, updated, stage changed, won…), after an optional wait, or on a daily or weekly schedule for every matching record.
+- **When**: an event (created, updated, stage changed, won, someone comments on a record…), after an optional wait, or on a daily or weekly schedule for every matching record.
 - **Only if**: the same filters as lists. After a wait, the conditions are checked again.
 - **Then**: one or more actions, in order.
 

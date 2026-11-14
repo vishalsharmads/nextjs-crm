@@ -8,6 +8,7 @@ Shared memory for every AI coding agent working in this repo. Project rules live
 - **Every new env key goes into `.env.example`** with a short comment, in the same commit that adds it to `apps/api/src/config/env.ts` (2026-10-28).
 - **Delegated decisions:** the user expects decisions made with multi-industry CRM experience and asks only when blocked. "Finalise completely" has meant: merge each milestone with `--no-ff` once its checks and reviews pass.
 - **Always update the knowledge base and tours** (2026-11-14, "always must update the knowledge base and tours"): every change that alters what people see or how something behaves updates the help articles (`apps/web/src/help/articles`, `modules/<key>/help`) and, when a flow or target changes, the guided tours (`src/help/tours.ts`, `data-tour` targets), in the same milestone and usually the same commit. Fixes included, not only features.
+- **Don't wait for approval between planned milestones** (2026-11-15, "don't wait for me, you are an expert so take decisions"): once a phase plan exists, build its milestones one after another, make the product decisions, record them in the plan, and report at the end.
 - **Never push** unless asked. The user pushes `main` themselves.
 
 ## The user's local files (never commit)

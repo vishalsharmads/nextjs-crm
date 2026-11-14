@@ -1,6 +1,6 @@
 # Phase 12: collaboration and data quality
 
-Source: the feature-gap table in the [production-readiness review](../review/production-readiness-2026-11.md) and row 12 of the [roadmap](../roadmap.md). Status: **draft, waiting for approval.**
+Source: the feature-gap table in the [production-readiness review](../review/production-readiness-2026-11.md) and row 12 of the [roadmap](../roadmap.md). Status: **approved 2026-11-15** (D1–D7 as written); built milestone by milestone.
 
 ## Goal
 
@@ -91,3 +91,7 @@ Real-time co-editing or live presence; comment reactions and threads beyond one 
 - `npm run check:brand`, lint, typecheck, build, the help and tour tests, and a lighthouse installability check for the app.
 
 Estimate: about 4–5 weeks for the whole phase, in the order 12a → 12e.
+
+## Progress
+
+**12a built (2026-11-15).** `record_comments` (entity + record id, FULLTEXT on the body) serves every record type through `addCommentRoutes` on the records engine and the same four routes under `/o/:object`; tasks keep `activity_comments`. Mentions and owner notices go only to people who can open the record (`viewersOf`). Comments appear on the timeline (`kind: 'comment'`), emit `comment.created` (automations: "Someone comments on a record"), are found by global search as hits of their record, are moved by merge, exported with a person's data and removed by erasure. Tools `list_comments` and `add_comment`. Web: a shared `Comments` component (`components/comments`) used by tasks and by a Comments tab on every record page. Fixed on the way: webhook claims allowed for DATETIME rounding (a first attempt could be skipped until the retry sweep).
