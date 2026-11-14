@@ -105,6 +105,47 @@ describe('personal access tokens and MCP', () => {
     expect(report.body.result.structuredContent.total).toBe(0);
   });
 
+  it('searches what people wrote, ranked, as the person may see it', async () => {
+    await enable();
+    const t = await newToken(admin);
+    const word = `zephyr${Date.now().toString(36)}`;
+    const org = await admin.post('/organizations', { name: unique('Searchco') }).expect(201);
+    await admin
+      .post('/activities', {
+        type: 'note',
+        body: `<p>We agreed the <strong>${word}</strong> renewal at 12% off, signed by Friday.</p>`,
+        related: { type: 'organization', uuid: org.body.uuid },
+      })
+      .expect(201);
+    const task = await admin.post('/activities', { type: 'task', subject: unique('Follow up') }).expect(201);
+    await admin
+      .post(`/activities/${task.body.uuid}/comments`, { body: `Client asked about the ${word} discount` })
+      .expect(201);
+
+    const res = await call(t.secret, 'search_text', { query: word });
+    const hits = res.body.result.structuredContent.results as {
+      in: string;
+      kind: string;
+      snippet: string;
+      related: { name: string } | null;
+    }[];
+    expect(hits.map((h) => h.in).sort()).toEqual(['activity', 'comment']);
+    const note = hits.find((h) => h.in === 'activity')!;
+    expect(note).toMatchObject({ kind: 'note', related: { name: org.body.name } });
+    expect(note.snippet).toContain(`${word} renewal at 12% off`);
+    expect(note.snippet).not.toContain('<strong>');
+
+    const phrase = await call(t.secret, 'search_text', { query: `"${word} discount"` });
+    expect(phrase.body.result.structuredContent.results).toHaveLength(1);
+
+    // Someone who sees only their own activities finds none of these.
+    const role = await createRole(['core.activities.view'], { '*': 'own' });
+    const own = await loginAs(await createUser({ roleKeys: [role] }));
+    const ownToken = await newToken(own);
+    const none = await call(ownToken.secret, 'search_text', { query: word });
+    expect(none.body.result.structuredContent.results).toEqual([]);
+  });
+
   it('writes as the user, audited as mcp', async () => {
     await enable();
     const t = await newToken(admin);

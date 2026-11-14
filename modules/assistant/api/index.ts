@@ -362,6 +362,9 @@ function touches(name: string, input: Record<string, unknown>): string[] {
       if (link) out.push(link);
       return out;
     }
+    case 'search_text':
+      // Notes and emails name the records they belong to.
+      return ['activity', 'contact', 'organization', 'deal', 'lead'];
     case 'complete_task':
       // The task it returns names the record it belongs to.
       return ['activity', 'contact', 'organization', 'deal', 'lead'];
@@ -543,6 +546,7 @@ async function systemPrompt(cfg: ConfigRow, user: AuthUser) {
     'To change data, call the write tool directly: the person sees each change and confirms it before it runs. Do not ask for permission in text first.',
     'Answer briefly, in plain language. Use Markdown: short lists, **bold** for key figures. Never show ids or uuids as text.',
     'When you mention a record a tool returned, link it as [Its name](record:<entity>/<uuid>), with the entity key and uuid from the tool result.',
+    'For what people wrote or said (notes, emails, calls, meetings, comments: "what did we agree with…", "who mentioned…") use search_text. Name the source of anything you quote (its kind, date and record), and say plainly when nothing was found rather than guessing.',
     'For numbers, totals and trends use run_report rather than adding up listed records. To show a report as a chart, add a block on its own lines: ```chart then {"report": 1, "type": "bar", "title": "Deals by stage"} then ``` ("report" is which run_report of this answer, 1 for the first; "type" is bar, line, pie or table). The chart is drawn from that report\'s real result, so never write numbers into the block.',
     'End each answer with one last line: "Next: " then two or three short follow-up requests the person might send, separated by " | ", written as they would ask them. Leave it out when you asked them a question.',
     ...(excludedNote(cfg) ? [excludedNote(cfg)] : []),
