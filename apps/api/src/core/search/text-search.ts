@@ -86,7 +86,8 @@ function matchMode(query: string) {
 
 export async function searchText(
   user: AuthUser,
-  ctx: RequestContext,
+  /** Without a context (global search logs its own access entry) nothing is logged here. */
+  ctx: RequestContext | undefined,
   raw: unknown,
 ): Promise<{ results: TextHit[] }> {
   const input = textSearchSchema.parse(raw);
@@ -168,11 +169,12 @@ export async function searchText(
       names.set(`${type}:${r.id}`, { uuid: r.uuid as string, name: (r.name as string | null) ?? null });
   }
 
-  await logAccess(ctx, {
-    action: 'view',
-    entity: 'activity',
-    detail: { search: 'text', results: rows.length },
-  });
+  if (ctx)
+    await logAccess(ctx, {
+      action: 'view',
+      entity: 'activity',
+      detail: { search: 'text', results: rows.length },
+    });
   return {
     results: rows.map((r) => {
       const rel = r.related_type ? names.get(`${r.related_type}:${r.related_id}`) : undefined;
