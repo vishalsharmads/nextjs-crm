@@ -16,12 +16,13 @@ import {
   exportCsv,
   exportQuerySchema,
   importStartSchema,
+  checkImport,
   importTargets,
   ioDef,
-  parseCsv,
   startImport,
   suggestMapping,
 } from './import-export';
+import { parseTable } from './table';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -34,14 +35,14 @@ export const importsRoutes = defineRoutes('/imports', ['import-export'])
     path: '/',
     permission: 'authenticated',
     before: [upload.single('file')],
-    summary: 'Upload a CSV and get headers, a sample and suggested column mapping',
+    summary: 'Upload a CSV or Excel file and get headers, a sample and suggested column mapping',
     status: 201,
     handler: async ({ req, ctx, user }) => {
       const entity = entityKeySchema.parse(req.body?.entity);
       const def = ioDef(entity);
       assertCan(user, `${def.resource}.import`);
-      if (!req.file) throw new AppError('VALIDATION_FAILED', 'Choose a CSV file');
-      const { headers, rows } = parseCsv(req.file.buffer);
+      if (!req.file) throw new AppError('VALIDATION_FAILED', 'Choose a CSV or Excel file');
+      const { headers, rows } = await parseTable(req.file.buffer);
       const stored = await db.transaction((trx) =>
         storeFile(trx, ctx, {
           buffer: req.file!.buffer,
@@ -60,6 +61,14 @@ export const importsRoutes = defineRoutes('/imports', ['import-export'])
         suggested: suggestMapping(headers, targets),
       };
     },
+  })
+  .add({
+    method: 'post',
+    path: '/check',
+    permission: 'authenticated',
+    body: importStartSchema,
+    summary: 'Check a file against the import rules without saving: what would be created, and every problem',
+    handler: ({ ctx, user, body }) => checkImport(ctx, user, body),
   })
   .add({
     method: 'post',

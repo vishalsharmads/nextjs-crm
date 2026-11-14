@@ -19,7 +19,7 @@ import { env } from '../../config/env';
 import { AppError, notFound } from '../../lib/errors';
 import { storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
-import { storeFile } from '../files/files.service';
+import { saveBrandingAsset } from './branding-assets';
 import { getLabels, clearLabelCache } from '../labels/labels.service';
 import { industryForBlueprint, listBlueprintKeys, loadBlueprint } from '@app/blueprints';
 import { verifyLimiter } from '../../middleware/rate-limit';
@@ -265,30 +265,9 @@ export const settingsRoutes = defineRoutes('/settings', ['settings'])
     before: [upload.single('file')],
     handler: async ({ req, ctx, user, params }) => {
       if (!req.file) throw new AppError('VALIDATION_FAILED', 'Choose a file to upload');
-      const assets = await getBrandingAssets();
-      const stored = await db.transaction(async (trx) => {
-        const f = await storeFile(trx, ctx, {
-          buffer: req.file!.buffer,
-          originalName: req.file!.originalname,
-          entity: 'branding',
-          imagesOnly: true,
-          isPublic: true,
-        });
-        await setRaw(
-          'branding.assets',
-          'branding',
-          { ...assets, [params.slot]: f.uuid },
-          { isPublic: true, userId: user.id, conn: trx },
-        );
-        const previous = assets[params.slot];
-        if (previous)
-          await trx('files').where({ uuid: previous }).update({ deleted_at: new Date(), is_public: false });
-        await audit(trx, ctx, {
-          action: 'settings.branding_asset_updated',
-          entity: 'settings',
-          diff: { slot: params.slot, file: f.uuid },
-        });
-        return f;
+      const stored = await saveBrandingAsset(ctx, user, params.slot, {
+        buffer: req.file.buffer,
+        originalName: req.file.originalname,
       });
       return {
         slot: params.slot,

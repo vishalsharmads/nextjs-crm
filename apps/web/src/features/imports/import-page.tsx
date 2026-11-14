@@ -89,7 +89,7 @@ export function ImportPage() {
     <div className="flex min-h-full flex-col">
       <PageHeader
         title={`Import ${config.plural.toLowerCase()}`}
-        description="Bring records in from a spreadsheet. Save it as CSV first."
+        description="Bring records in from a spreadsheet: an Excel workbook (.xlsx) or a CSV file."
         actions={
           <Button variant="ghost" asChild>
             <Link to={`/${route}`}>
@@ -134,16 +134,16 @@ export function ImportPage() {
               }}
             >
               <FileSpreadsheet className="size-8 text-faint" />
-              <p className="font-medium">Drop a CSV file here</p>
+              <p className="font-medium">Drop an Excel or CSV file here</p>
               <p className="text-sm text-muted">
                 The first row must contain column names. Up to 50,000 rows.
               </p>
               <input
                 ref={input}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className="sr-only"
-                aria-label="Choose a CSV file"
+                aria-label="Choose an Excel or CSV file"
                 onChange={(e) => e.target.files?.[0] && send.mutate(e.target.files[0])}
               />
               <Button variant="primary" onClick={() => input.current?.click()} loading={send.isPending}>

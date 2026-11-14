@@ -158,7 +158,91 @@ function answerList(turn: Turn, types: RecordType[]): string {
   ].join('\n');
 }
 
+/** The scripted interview: four questions most CRM setups need answered, then done. */
+const SETUP_QUESTIONS = [
+  {
+    question: 'Which steps does a customer go through, from first contact to paying you?',
+    why: 'These become the stages of your pipeline.',
+    suggestions: ['Enquiry', 'Meeting or demo', 'Proposal sent', 'Negotiation', 'Won', 'Lost'],
+    multi: true,
+  },
+  {
+    question: 'What do you most need to know about each customer?',
+    why: 'These become fields on their record.',
+    suggestions: ['Budget', 'Source', 'Industry', 'Renewal date', 'Preferred contact time'],
+    multi: true,
+  },
+  {
+    question: 'Who in your team works with customers?',
+    why: 'This shapes the roles and what each person sees.',
+    suggestions: ['Sales', 'Account management', 'Support', 'Managers only'],
+    multi: true,
+  },
+  {
+    question: 'What would you like to see at a glance every week?',
+    why: 'This becomes your dashboard and reports.',
+    suggestions: ['Deals by stage', 'Revenue by month', 'New customers', 'Overdue tasks'],
+    multi: true,
+  },
+];
+
+/** Scripted AI setup replies, so the whole flow works without a provider. */
+function setupReply(req: ChatRequest): string | null {
+  const prompt = req.messages
+    .flatMap((m) => m.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])))
+    .join('\n');
+  if (req.system.startsWith('[setup:interview]')) {
+    const answered = (prompt.match(/"q":/g) ?? []).length;
+    const next = SETUP_QUESTIONS[answered];
+    return JSON.stringify(next ? { done: false, ...next } : { done: true });
+  }
+  // Mapping keeps the matched suggestions; explanations fall back to the built-in wording.
+  if (req.system.startsWith('[setup:mapping]')) return JSON.stringify({ mapping: {}, notes: {} });
+  if (req.system.startsWith('[setup:explain]')) return JSON.stringify({ explanations: [] });
+  if (req.system.startsWith('[setup:reports]'))
+    return JSON.stringify({
+      reports: [
+        {
+          name: 'Deals by stage',
+          definition: { entity: 'deal', groupBy: 'stage', metric: 'count', chart: 'bar' },
+        },
+      ],
+    });
+  if (req.system.startsWith('[setup:brief]')) {
+    const details = /Business details: (\{.*\})/.exec(prompt)?.[1];
+    let profile: Obj = {};
+    try {
+      profile = details ? (JSON.parse(details) as Obj) : {};
+    } catch {
+      profile = {};
+    }
+    const name = typeof profile.businessName === 'string' ? profile.businessName : 'Your business';
+    return JSON.stringify({
+      businessName: name,
+      summary: `${name}${typeof profile.offerings === 'string' ? ` offers ${profile.offerings}` : ''}. (Simulated brief: no AI was used.)`,
+      industry: typeof profile.industry === 'string' ? profile.industry : '',
+      presetKey: null,
+      offerings: typeof profile.offerings === 'string' ? [profile.offerings] : [],
+      customerTypes: [],
+      channels: ['Website', 'Referral'],
+      stages: [{ name: 'Enquiry' }, { name: 'Proposal sent' }, { name: 'Won' }, { name: 'Lost' }],
+      track: [
+        { entity: 'deal', label: 'Budget', type: 'currency' },
+        { entity: 'contact', label: 'Source', type: 'select', options: ['Website', 'Referral'] },
+      ],
+      roles: [{ name: 'Sales', does: 'Works deals' }],
+      vocabulary: {},
+      problems: typeof profile.problems === 'string' ? [profile.problems] : [],
+      reports: ['Deals by stage'],
+      automations: ['Remind the owner when a deal has had no activity for a week'],
+    });
+  }
+  return null;
+}
+
 function decide(req: ChatRequest): Block[] {
+  const setup = setupReply(req);
+  if (setup) return [{ type: 'text', text: setup }];
   if (!req.tools.length) return [{ type: 'text', text: 'ready' }];
   const has = (name: string) => req.tools.some((t) => t.name === name);
   const turn = turnOf(req.messages);

@@ -1,3 +1,4 @@
+import type { Knex } from 'knex';
 import type { Response } from 'express';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify';
@@ -12,6 +13,7 @@ import {
 } from '@app/shared';
 import { db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
+import { parseTable } from './table';
 import { enqueue, registerJob } from '../../lib/jobs';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { logAccess } from '../audit/access-log';
@@ -26,7 +28,7 @@ import type { IoColumn, ResourceDef } from '../records/types';
 import { applySort } from '../records/filters';
 import { getGroup } from '../settings/settings.service';
 
-const MAX_ROWS = 50_000;
+export const MAX_ROWS = 50_000;
 
 // ---------------- Columns ----------------
 
@@ -216,22 +218,77 @@ export interface ImportTarget {
   key: string;
   label: string;
   required?: boolean;
+  /** What a cell must look like, in words, for people and the assistant ("A date (DD/MM/YYYY)"). */
+  format?: string;
 }
+
+/** The format a custom field's cells must have, in words. */
+function formatOf(d: CustomFieldDef, dateFormat: string): string | undefined {
+  const opts = d.options
+    .map((o) => o.label)
+    .slice(0, 20)
+    .join(', ');
+  switch (d.type) {
+    case 'number':
+    case 'decimal':
+      return 'A number';
+    case 'currency':
+      return 'An amount, digits only';
+    case 'date':
+      return `A date (${dateFormat})`;
+    case 'datetime':
+      return `A date and time (${dateFormat} HH:MM)`;
+    case 'boolean':
+      return 'Yes or no';
+    case 'select':
+      return `One of: ${opts}`;
+    case 'multi_select':
+      return `Any of, separated by ; : ${opts}`;
+    case 'email':
+      return 'An email address';
+    case 'url':
+      return 'A web address';
+    case 'phone':
+      return 'A phone number';
+    default:
+      return undefined;
+  }
+}
+
+/** Formats of core columns that are not plain text. */
+const CORE_FORMATS: Record<string, string> = {
+  email: 'An email address',
+  ownerEmail: "An existing user's email address",
+  value: 'An amount, digits only',
+  expectedClose: 'A date',
+  stageName: 'The name of an existing stage',
+  tags: 'Tags separated by ; or ,',
+};
 
 export async function importTargets(def: ResourceDef, user: AuthUser): Promise<ImportTarget[]> {
   const { defs, levels } = await customContext(def.entity, user);
+  const { dateFormat } = await getGroup('general');
   const core = ioColumns(def)
     .filter((c) => c.importable)
     .map((c) => ({
       key: c.key,
       label: c.header,
       required: c.required ?? REQUIRED_CORE[def.entity] === c.key,
+      ...(CORE_FORMATS[c.key] ? { format: CORE_FORMATS[c.key] } : {}),
     }));
   return [
     ...core,
     ...defs
       .filter((d) => levels[d.key] === 'write')
-      .map((d) => ({ key: `custom.${d.key}`, label: d.label, required: d.required })),
+      .map((d) => {
+        const format = formatOf(d, dateFormat);
+        return {
+          key: `custom.${d.key}`,
+          label: d.label,
+          required: d.required,
+          ...(format ? { format } : {}),
+        };
+      }),
   ];
 }
 
@@ -413,6 +470,214 @@ async function findExisting(def: ResourceDef, user: AuthUser, row: Record<string
   return (await qb.first(`${def.table}.uuid`)) as { uuid: string } | undefined;
 }
 
+/**
+ * What one import needs, once: the file's rows, field definitions, the date format and users by
+ * email, plus a function that imports one row. The import job runs it for real; the check runs it
+ * inside a transaction that is rolled back (`conn`), so both apply exactly the same rules.
+ */
+async function importRunner(input: StartInput, user: AuthUser, ctx: RequestContext) {
+  const def = ioDef(input.entity);
+  const { defs } = await customContext(input.entity, user);
+  const { dateFormat } = await getGroup('general');
+  const users = new Map(
+    (await db('users').whereNull('deleted_at').select('uuid', 'email')).map((x) => [
+      String(x.email).toLowerCase(),
+      x.uuid as string,
+    ]),
+  );
+  const file = await db('files').where({ uuid: input.fileUuid }).first();
+  const { headers, rows } = await parseTable(await readStoredFile(file));
+  // Columns mapped to sensitive fields: never echo their values back in error reports.
+  const sensitiveCols = new Set(
+    headers.flatMap((h, col) => {
+      const target = input.mapping[h];
+      return target?.startsWith('custom.') &&
+        defs.some((d) => d.key === target.slice(7) && d.sensitivity === 'special')
+        ? [col]
+        : [];
+    }),
+  );
+
+  /** Imports one row; with `conn`, inside that (rolled-back) transaction. */
+  async function importRow(
+    cells: string[],
+    conn?: Knex.Transaction,
+  ): Promise<'created' | 'updated' | 'skipped'> {
+    const core: Record<string, unknown> = {};
+    const custom: Record<string, unknown> = {};
+    headers.forEach((h, col) => {
+      const target = input.mapping[h];
+      const raw = (cells[col] ?? '').trim();
+      if (!target || raw === '') return;
+      if (target.startsWith('custom.')) {
+        const fd = defs.find((d) => d.key === target.slice(7));
+        if (fd) custom[fd.key] = coerceCustom(fd, raw, dateFormat);
+      } else core[target] = raw;
+    });
+    // Relations and lookups by human-readable values.
+    if (core.ownerEmail) {
+      const ownerUuid = users.get(String(core.ownerEmail).toLowerCase());
+      if (!ownerUuid) throw new Error(`No user with email ${String(core.ownerEmail)}`);
+      core.ownerUuid = ownerUuid;
+    } else if (input.options.defaultOwnerUuid) core.ownerUuid = input.options.defaultOwnerUuid;
+    delete core.ownerEmail;
+    if (core.tags || input.options.tags.length)
+      core.tags = [
+        ...String(core.tags ?? '')
+          .split(/[;,]/)
+          .map((t) => t.trim())
+          .filter(Boolean),
+        ...input.options.tags,
+      ];
+    if (def.ioColumns) coerceModuleColumns(def.ioColumns, core, dateFormat);
+    if (core.value !== undefined && !def.moduleKey)
+      core.value = Number(String(core.value).replace(/[^\d.-]/g, ''));
+    if (core.expectedClose)
+      core.expectedClose = parseDate(String(core.expectedClose), dateFormat, 'Expected close');
+    if (core.organizationName) {
+      const name = String(core.organizationName);
+      let org = await db('organizations').where({ name }).whereNull('deleted_at').first('uuid');
+      if (!org)
+        org = {
+          uuid: ((await createRecord(recordDefs.organization, ctx, user, { name }, conn)) as { uuid: string })
+            .uuid,
+        };
+      core.organizationUuid = org.uuid;
+    }
+    delete core.organizationName;
+    if (core.contactEmail) {
+      const c = await db('contacts')
+        .where({ email_norm: String(core.contactEmail).toLowerCase() })
+        .whereNull('deleted_at')
+        .first('uuid');
+      if (c) core.contactUuid = c.uuid;
+    }
+    delete core.contactEmail;
+    if (core.stageName) {
+      const stage = await db('pipeline_stages as s')
+        .join('pipelines as p', 'p.id', 's.pipeline_id')
+        .where('s.name', String(core.stageName))
+        .where('s.active', true)
+        .first('s.uuid', 'p.uuid as pipeline_uuid');
+      if (!stage) throw new Error(`Unknown stage "${String(core.stageName)}"`);
+      core.stageUuid = stage.uuid;
+      core.pipelineUuid = stage.pipeline_uuid;
+    }
+    delete core.stageName;
+    delete core.pipelineName;
+    if (Object.keys(custom).length) core.custom = custom;
+
+    const existing = input.options.duplicates === 'create' ? null : await findExisting(def, user, core);
+    if (existing && input.options.duplicates === 'skip') return 'skipped';
+    if (existing) {
+      // A check cannot run an update without making it: it counts it instead.
+      if (!conn) await updateRecord(def, ctx, user, existing.uuid, core);
+      return 'updated';
+    }
+    await createRecord(def, ctx, user, core, conn);
+    return 'created';
+  }
+
+  /** A failed row as the error report shows it (sensitive columns masked). */
+  function failure(i: number, cells: string[], err: unknown) {
+    const details = (err as AppError).details as { path: string; message: string }[] | undefined;
+    return {
+      row: i + 2,
+      message: details?.length
+        ? details.map((d) => `${d.path}: ${d.message}`).join('; ')
+        : (err as Error).message,
+      values: cells.map((c, col) => (sensitiveCols.has(col) && c ? SENSITIVE_MASK : c)),
+    };
+  }
+  return { def, headers, rows, importRow, failure };
+}
+
+/** Rows a check runs through; larger files are checked on their first rows. */
+const CHECK_ROWS = 5_000;
+class Rollback extends Error {}
+
+export interface ImportCheck {
+  total: number;
+  checked: number;
+  wouldCreate: number;
+  wouldUpdate: number;
+  wouldSkip: number;
+  failed: number;
+  /** The first problems, row by row. */
+  errors: { row: number; message: string; values: string[] }[];
+  /** The same problems grouped by what went wrong, most common first. */
+  problems: { message: string; rows: number[]; count: number }[];
+}
+
+/**
+ * Runs the import's own rules over the file without saving anything: each row is imported inside
+ * a transaction that is always rolled back (a savepoint per row, so one bad row does not spoil the
+ * rest). Updates of existing records are counted, not run.
+ */
+export async function checkImport(
+  ctx: RequestContext,
+  user: AuthUser,
+  input: StartInput,
+): Promise<ImportCheck> {
+  const def = ioDef(input.entity);
+  assertCan(user, `${def.resource}.import`);
+  assertCan(user, `${def.resource}.create`);
+  const file = await db('files')
+    .where({ uuid: input.fileUuid, entity: 'import', uploaded_by: user.id })
+    .whereNull('deleted_at')
+    .first();
+  if (!file) throw new AppError('NOT_FOUND', 'Upload the file again');
+  const targets = new Set((await importTargets(def, user)).map((t) => t.key));
+  for (const target of Object.values(input.mapping))
+    if (target && !targets.has(target)) throw new AppError('VALIDATION_FAILED', `Unknown field: ${target}`);
+
+  const { rows, importRow, failure } = await importRunner(input, user, ctx);
+  const out: ImportCheck = {
+    total: rows.length,
+    checked: Math.min(rows.length, CHECK_ROWS),
+    wouldCreate: 0,
+    wouldUpdate: 0,
+    wouldSkip: 0,
+    failed: 0,
+    errors: [],
+    problems: [],
+  };
+  const all: { row: number; message: string }[] = [];
+  const seen = { created: 'wouldCreate', updated: 'wouldUpdate', skipped: 'wouldSkip' } as const;
+  await db
+    .transaction(async (trx) => {
+      for (const [i, cells] of rows.slice(0, CHECK_ROWS).entries()) {
+        try {
+          out[seen[await trx.transaction((sp) => importRow(cells, sp))]]++;
+        } catch (err) {
+          out.failed++;
+          const f = failure(i, cells, err);
+          all.push({ row: f.row, message: f.message });
+          if (out.errors.length < 200) out.errors.push(f);
+        }
+      }
+      throw new Rollback();
+    })
+    .catch((err: unknown) => {
+      if (!(err instanceof Rollback)) throw err;
+    });
+  // Group by the message with quoted values taken out, so "Unknown stage "A"" and "…"B"" group.
+  const groups = new Map<string, number[]>();
+  for (const e of all) {
+    const k = e.message.replace(/"[^"]*"/g, '"…"').replace(/\b\d+(\.\d+)?\b/g, '#');
+    groups.set(k, [...(groups.get(k) ?? []), e.row]);
+  }
+  out.problems = [...groups.entries()]
+    .map(([_key, r]) => ({
+      message: all.find((e) => e.row === r[0])!.message,
+      rows: r.slice(0, 20),
+      count: r.length,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 30);
+  return out;
+}
+
 registerJob('import', async (job, progress) => {
   const input = importStartSchema.parse(job.payload);
   const userId = job.payload.userId as number;
@@ -428,17 +693,7 @@ registerJob('import', async (job, progress) => {
     ...access,
   };
   const ctx: RequestContext = { requestId: `job:${job.uuid}`, ip: null, userAgent: null, user };
-  const def = ioDef(input.entity);
-  const file = await db('files').where({ uuid: input.fileUuid }).first();
-  const { headers, rows } = parseCsv(await readStoredFile(file));
-  const { defs } = await customContext(input.entity, user);
-  const { dateFormat } = await getGroup('general');
-  const users = new Map(
-    (await db('users').whereNull('deleted_at').select('uuid', 'email')).map((x) => [
-      String(x.email).toLowerCase(),
-      x.uuid as string,
-    ]),
-  );
+  const { headers, rows, importRow, failure } = await importRunner(input, user, ctx);
   const result = {
     created: 0,
     updated: 0,
@@ -446,105 +701,12 @@ registerJob('import', async (job, progress) => {
     failed: 0,
     errors: [] as { row: number; message: string; values: string[] }[],
   };
-
-  // Columns mapped to sensitive fields: never echo their values back in error reports.
-  const sensitiveCols = new Set(
-    headers.flatMap((h, col) => {
-      const target = input.mapping[h];
-      return target?.startsWith('custom.') &&
-        defs.some((d) => d.key === target.slice(7) && d.sensitivity === 'special')
-        ? [col]
-        : [];
-    }),
-  );
-
   for (const [i, cells] of rows.entries()) {
-    const core: Record<string, unknown> = {};
-    const custom: Record<string, unknown> = {};
     try {
-      headers.forEach((h, col) => {
-        const target = input.mapping[h];
-        const raw = (cells[col] ?? '').trim();
-        if (!target || raw === '') return;
-        if (target.startsWith('custom.')) {
-          const fd = defs.find((d) => d.key === target.slice(7));
-          if (fd) custom[fd.key] = coerceCustom(fd, raw, dateFormat);
-        } else core[target] = raw;
-      });
-      // Relations and lookups by human-readable values.
-      if (core.ownerEmail) {
-        const ownerUuid = users.get(String(core.ownerEmail).toLowerCase());
-        if (!ownerUuid) throw new Error(`No user with email ${String(core.ownerEmail)}`);
-        core.ownerUuid = ownerUuid;
-      } else if (input.options.defaultOwnerUuid) core.ownerUuid = input.options.defaultOwnerUuid;
-      delete core.ownerEmail;
-      if (core.tags || input.options.tags.length)
-        core.tags = [
-          ...String(core.tags ?? '')
-            .split(/[;,]/)
-            .map((t) => t.trim())
-            .filter(Boolean),
-          ...input.options.tags,
-        ];
-      if (def.ioColumns) coerceModuleColumns(def.ioColumns, core, dateFormat);
-      if (core.value !== undefined && !def.moduleKey)
-        core.value = Number(String(core.value).replace(/[^\d.-]/g, ''));
-      if (core.expectedClose)
-        core.expectedClose = parseDate(String(core.expectedClose), dateFormat, 'Expected close');
-      if (core.organizationName) {
-        const name = String(core.organizationName);
-        let org = await db('organizations').where({ name }).whereNull('deleted_at').first('uuid');
-        if (!org)
-          org = {
-            uuid: ((await createRecord(recordDefs.organization, ctx, user, { name })) as { uuid: string })
-              .uuid,
-          };
-        core.organizationUuid = org.uuid;
-      }
-      delete core.organizationName;
-      if (core.contactEmail) {
-        const c = await db('contacts')
-          .where({ email_norm: String(core.contactEmail).toLowerCase() })
-          .whereNull('deleted_at')
-          .first('uuid');
-        if (c) core.contactUuid = c.uuid;
-      }
-      delete core.contactEmail;
-      if (core.stageName) {
-        const stage = await db('pipeline_stages as s')
-          .join('pipelines as p', 'p.id', 's.pipeline_id')
-          .where('s.name', String(core.stageName))
-          .where('s.active', true)
-          .first('s.uuid', 'p.uuid as pipeline_uuid');
-        if (!stage) throw new Error(`Unknown stage "${String(core.stageName)}"`);
-        core.stageUuid = stage.uuid;
-        core.pipelineUuid = stage.pipeline_uuid;
-      }
-      delete core.stageName;
-      delete core.pipelineName;
-      if (Object.keys(custom).length) core.custom = custom;
-
-      const existing = input.options.duplicates === 'create' ? null : await findExisting(def, user, core);
-      if (existing && input.options.duplicates === 'skip') result.skipped++;
-      else if (existing) {
-        await updateRecord(def, ctx, user, existing.uuid, core);
-        result.updated++;
-      } else {
-        await createRecord(def, ctx, user, core);
-        result.created++;
-      }
+      result[await importRow(cells)]++;
     } catch (err) {
       result.failed++;
-      if (result.errors.length < 1000) {
-        const details = (err as AppError).details as { path: string; message: string }[] | undefined;
-        result.errors.push({
-          row: i + 2,
-          message: details?.length
-            ? details.map((d) => `${d.path}: ${d.message}`).join('; ')
-            : (err as Error).message,
-          values: cells.map((c, col) => (sensitiveCols.has(col) && c ? SENSITIVE_MASK : c)),
-        });
-      }
+      if (result.errors.length < 1000) result.errors.push(failure(i, cells, err));
     }
     if (i % 25 === 0) await progress(((i + 1) / rows.length) * 100);
   }

@@ -118,6 +118,13 @@ describe('import and export', () => {
       Company: 'organizationName',
       Plan: 'custom.plan',
     });
+    // Each field says what its cells must look like.
+    expect(up.body.targets).toContainEqual(
+      expect.objectContaining({ key: 'custom.plan', format: 'One of: Basic, Pro' }),
+    );
+    expect(up.body.targets).toContainEqual(
+      expect.objectContaining({ key: 'email', format: 'An email address' }),
+    );
     const mapping = { ...up.body.suggested, 'E-mail': 'email' };
     const start = await client
       .post('/imports/start', {
@@ -135,6 +142,85 @@ describe('import and export', () => {
     const ana = await client.get('/contacts?q=ana%40import.test').expect(200);
     expect(ana.body.data[0].custom.plan).toBe('pro');
     expect(ana.body.data[0].organizations[0].organization.name).toBe('Importers Ltd');
+  });
+
+  it('imports an Excel workbook like a CSV: first sheet, dates as days, formulas as results', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const ExcelJS = (await import('exceljs')).default;
+    const book = new ExcelJS.Workbook();
+    const sheet = book.addWorksheet('People');
+    sheet.addRow(['First Name', 'Surname', 'E-mail', 'Joined']);
+    sheet.addRow(['Xia', 'Sheet', 'xia@xlsx.test', new Date('2026-03-05T00:00:00Z')]);
+    sheet.addRow(['Yan', { formula: '"Sh"&"eet"', result: 'Sheet' }, 'yan@xlsx.test', '']);
+    sheet.addRow([]);
+    const file = Buffer.from(await book.xlsx.writeBuffer());
+    const up = await client.agent
+      .post('/api/v1/imports')
+      .set('x-csrf-token', client.csrf)
+      .field('entity', 'contact')
+      .attach('file', file, 'people.xlsx')
+      .expect(201);
+    expect(up.body.headers).toEqual(['First Name', 'Surname', 'E-mail', 'Joined']);
+    expect(up.body.total).toBe(2);
+    expect(up.body.sample[0]).toEqual(['Xia', 'Sheet', 'xia@xlsx.test', '2026-03-05']);
+    expect(up.body.sample[1][1]).toBe('Sheet');
+    const start = await client
+      .post('/imports/start', {
+        entity: 'contact',
+        fileUuid: up.body.fileUuid,
+        mapping: { ...up.body.suggested, 'E-mail': 'email', Joined: null },
+        options: { duplicates: 'skip' },
+      })
+      .expect(200);
+    const status = await client.get(`/imports/${start.body.jobUuid}`).expect(200);
+    expect(status.body.result).toMatchObject({ created: 2, failed: 0 });
+
+    // Anything that is not a workbook or CSV is refused with a reason.
+    const bad = await client.agent
+      .post('/api/v1/imports')
+      .set('x-csrf-token', client.csrf)
+      .field('entity', 'contact')
+      .attach('file', Buffer.from([0x50, 0x4b, 0x03, 0x04, 1, 2, 3]), 'broken.xlsx');
+    expect(bad.status).toBe(422);
+    expect(bad.body.error.message).toMatch(/Excel workbook/);
+  });
+
+  it('checks a file against the import rules without saving anything', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const tag = Date.now().toString(36);
+    const file = csv([
+      ['First Name', 'E-mail', 'Company', 'Plan'],
+      [`Cia${tag}`, `cia${tag}@check.test`, `Checkco ${tag}`, 'Pro'],
+      [`Dov${tag}`, 'not-an-email', '', 'basic'],
+      [`Eli${tag}`, `eli${tag}@check.test`, '', 'Gold'],
+      [`Fay${tag}`, `fay${tag}@check.test`, '', 'Silver'],
+    ]);
+    const up = await client.agent
+      .post('/api/v1/imports')
+      .set('x-csrf-token', client.csrf)
+      .field('entity', 'contact')
+      .attach('file', file, 'check.csv')
+      .expect(201);
+    const check = await client
+      .post('/imports/check', {
+        entity: 'contact',
+        fileUuid: up.body.fileUuid,
+        mapping: { ...up.body.suggested, 'E-mail': 'email' },
+        options: { duplicates: 'skip' },
+      })
+      .expect(200);
+    expect(check.body).toMatchObject({ total: 4, checked: 4, wouldCreate: 1, failed: 3 });
+    // The two unknown plans are one kind of problem, the bad email another.
+    expect(check.body.problems).toHaveLength(2);
+    expect(check.body.problems[0]).toMatchObject({ count: 2, rows: [4, 5] });
+    expect(check.body.errors.map((e: { row: number }) => e.row)).toEqual([3, 4, 5]);
+    // Nothing was saved, not even the company the import would have created.
+    expect(await db('contacts').where('first_name', 'like', `%${tag}`)).toHaveLength(0);
+    expect(
+      await db('organizations')
+        .where({ name: `Checkco ${tag}` })
+        .first(),
+    ).toBeUndefined();
   });
 
   it('exports the current list as CSV with visible custom fields only', async () => {
