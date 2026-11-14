@@ -40,6 +40,6 @@ test('a module record type gets list, form, detail and search pages', async ({ p
 
   await page.keyboard.press('Control+k');
   await page.getByPlaceholder('Search or jump to…').fill('Playwright forklift');
-  await page.getByRole('option', { name: /Playwright forklift/ }).click();
+  await page.getByRole('option', { name: /^Playwright forklift/ }).click();
   await expect(page.getByRole('heading', { name: 'Playwright forklift', level: 1 })).toBeVisible();
 });
