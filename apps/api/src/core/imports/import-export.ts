@@ -218,22 +218,77 @@ export interface ImportTarget {
   key: string;
   label: string;
   required?: boolean;
+  /** What a cell must look like, in words, for people and the assistant ("A date (DD/MM/YYYY)"). */
+  format?: string;
 }
+
+/** The format a custom field's cells must have, in words. */
+function formatOf(d: CustomFieldDef, dateFormat: string): string | undefined {
+  const opts = d.options
+    .map((o) => o.label)
+    .slice(0, 20)
+    .join(', ');
+  switch (d.type) {
+    case 'number':
+    case 'decimal':
+      return 'A number';
+    case 'currency':
+      return 'An amount, digits only';
+    case 'date':
+      return `A date (${dateFormat})`;
+    case 'datetime':
+      return `A date and time (${dateFormat} HH:MM)`;
+    case 'boolean':
+      return 'Yes or no';
+    case 'select':
+      return `One of: ${opts}`;
+    case 'multi_select':
+      return `Any of, separated by ; : ${opts}`;
+    case 'email':
+      return 'An email address';
+    case 'url':
+      return 'A web address';
+    case 'phone':
+      return 'A phone number';
+    default:
+      return undefined;
+  }
+}
+
+/** Formats of core columns that are not plain text. */
+const CORE_FORMATS: Record<string, string> = {
+  email: 'An email address',
+  ownerEmail: "An existing user's email address",
+  value: 'An amount, digits only',
+  expectedClose: 'A date',
+  stageName: 'The name of an existing stage',
+  tags: 'Tags separated by ; or ,',
+};
 
 export async function importTargets(def: ResourceDef, user: AuthUser): Promise<ImportTarget[]> {
   const { defs, levels } = await customContext(def.entity, user);
+  const { dateFormat } = await getGroup('general');
   const core = ioColumns(def)
     .filter((c) => c.importable)
     .map((c) => ({
       key: c.key,
       label: c.header,
       required: c.required ?? REQUIRED_CORE[def.entity] === c.key,
+      ...(CORE_FORMATS[c.key] ? { format: CORE_FORMATS[c.key] } : {}),
     }));
   return [
     ...core,
     ...defs
       .filter((d) => levels[d.key] === 'write')
-      .map((d) => ({ key: `custom.${d.key}`, label: d.label, required: d.required })),
+      .map((d) => {
+        const format = formatOf(d, dateFormat);
+        return {
+          key: `custom.${d.key}`,
+          label: d.label,
+          required: d.required,
+          ...(format ? { format } : {}),
+        };
+      }),
   ];
 }
 

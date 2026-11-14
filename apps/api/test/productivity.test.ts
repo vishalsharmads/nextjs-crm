@@ -118,6 +118,13 @@ describe('import and export', () => {
       Company: 'organizationName',
       Plan: 'custom.plan',
     });
+    // Each field says what its cells must look like.
+    expect(up.body.targets).toContainEqual(
+      expect.objectContaining({ key: 'custom.plan', format: 'One of: Basic, Pro' }),
+    );
+    expect(up.body.targets).toContainEqual(
+      expect.objectContaining({ key: 'email', format: 'An email address' }),
+    );
     const mapping = { ...up.body.suggested, 'E-mail': 'email' };
     const start = await client
       .post('/imports/start', {
