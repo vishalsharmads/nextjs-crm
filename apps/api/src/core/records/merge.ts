@@ -8,7 +8,7 @@ import { assertCan } from '../rbac/access';
 import { customContext } from './common';
 import { getRow } from './service';
 import { closePairsAfterMerge } from '../duplicates/duplicates';
-import { moveShares } from '../sharing/sharing';
+import { dropSharesOnMerge } from '../sharing/sharing';
 import type { ResourceDef } from './types';
 
 // ---------- Merge ----------
@@ -235,7 +235,7 @@ export async function mergeRecords(def: ResourceDef, ctx: RequestContext, user: 
     const secondaryIds = secondaries.map((s) => s.id as number);
     await repoint(trx, entity, primary.id as number, secondaryIds);
     await closePairsAfterMerge(trx, entity, user.id, secondaryIds);
-    await moveShares(trx, def.resource, primary.id as number, secondaryIds);
+    await dropSharesOnMerge(trx, def.resource, secondaryIds);
     await trx(def.table)
       .whereIn('id', secondaryIds)
       .update({ merged_into_id: primary.id, deleted_at: new Date(), updated_by: user.id });

@@ -22,14 +22,18 @@ const upload = multer({
 const target = z.object({ entity: z.enum(RELATED_TYPES), uuid: z.uuid() });
 
 /** Files belong to a record; access follows the record's visibility. */
-async function fileWithAccess(user: Parameters<typeof getRow>[1], uuid: string) {
+async function fileWithAccess(
+  user: Parameters<typeof getRow>[1],
+  uuid: string,
+  shares: 'view' | 'edit' = 'view',
+) {
   const file = await db('files').where({ uuid }).whereNull('deleted_at').first();
   if (!file || !file.entity || !(file.entity in recordDefs)) throw notFound('File');
   const def = recordDefs[file.entity as keyof typeof recordDefs];
   const parent = await db(def.table).where({ id: file.entity_id }).first('uuid');
   if (!parent) throw notFound('File');
   assertCan(user, `${def.resource}.view`);
-  await getRow(def, user, parent.uuid as string);
+  await getRow(def, user, parent.uuid as string, db, { shares });
   return file;
 }
 
@@ -61,7 +65,8 @@ export const filesRoutes = defineRoutes('/files', ['files'])
       if (!req.file) throw new AppError('VALIDATION_FAILED', 'Choose a file to upload');
       const def = recordDefs[t.entity];
       assertCan(user, `${def.resource}.view`);
-      const parent = await getRow(def, user, t.uuid);
+      // Adding a file changes the record: a view share is not enough.
+      const parent = await getRow(def, user, t.uuid, db, { shares: 'edit' });
       const stored = await db.transaction((trx) =>
         storeFile(trx, ctx, {
           buffer: req.file!.buffer,
@@ -124,7 +129,7 @@ export const filesRoutes = defineRoutes('/files', ['files'])
     permission: 'core.files.delete',
     params: z.object({ uuid: z.uuid() }),
     handler: async ({ ctx, user, params }) => {
-      const file = await fileWithAccess(user, params.uuid);
+      const file = await fileWithAccess(user, params.uuid, 'edit');
       if (
         file.uploaded_by !== user.id &&
         !can(user, `${recordDefs[file.entity as keyof typeof recordDefs].resource}.update`)

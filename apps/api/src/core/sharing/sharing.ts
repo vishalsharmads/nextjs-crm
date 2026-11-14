@@ -95,6 +95,8 @@ export async function shareRecord(
   }
 
   const row = await db.transaction(async (trx) => {
+    // Lock the record so two shares at once cannot both insert.
+    await trx(def.table).where({ id: record.id }).forUpdate().first('id');
     const existing = await trx('record_shares')
       .where({ resource: def.resource, record_id: record.id, ...target })
       .first();
@@ -166,14 +168,10 @@ export async function unshareRecord(
   });
 }
 
-/** Merges keep access: shares of merged-away records move to the kept one. */
-export async function moveShares(conn: Db, resource: string, primaryId: number, secondaryIds: number[]) {
-  const rows = await conn('record_shares').where({ resource }).whereIn('record_id', secondaryIds);
-  for (const r of rows) {
-    const dup = await conn('record_shares')
-      .where({ resource, record_id: primaryId, user_id: r.user_id, team_id: r.team_id })
-      .first('id');
-    if (dup) await conn('record_shares').where({ id: r.id }).delete();
-    else await conn('record_shares').where({ id: r.id }).update({ record_id: primaryId });
-  }
+/**
+ * Merges do not carry shares across: a share opened one record, and the kept record holds more
+ * than that. The merged-away records' shares are removed.
+ */
+export async function dropSharesOnMerge(conn: Db, resource: string, secondaryIds: number[]) {
+  await conn('record_shares').where({ resource }).whereIn('record_id', secondaryIds).delete();
 }

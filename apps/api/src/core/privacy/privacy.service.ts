@@ -59,7 +59,12 @@ async function loadSubject(
   conn: Db,
   forUpdate = false,
 ) {
-  const row = (await getRow(recordDefs[entity], user, uuid, conn, { withDeleted: true, forUpdate })) as Row;
+  // Erasure and restriction never work through a share: the role must cover the person.
+  const row = (await getRow(recordDefs[entity], user, uuid, conn, {
+    withDeleted: true,
+    forUpdate,
+    shares: forUpdate ? 'none' : 'view',
+  })) as Row;
   const subject: DataSubject = { entity, id: row.id, uuid, email: (row.email as string | null) ?? null };
   return { row, subject };
 }

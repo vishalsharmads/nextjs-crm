@@ -69,7 +69,7 @@ describe('record sharing', () => {
     await noView.get(`/organizations/${org.body.uuid}`).expect(403);
   });
 
-  it('moves shares when records merge', async () => {
+  it('does not carry shares into the kept record when records merge', async () => {
     const { client: admin } = await clientWithRoles(['admin']);
     const guest = await createUser({ roleKeys: ['sales_rep'] });
     const a = await admin.post('/contacts', { firstName: 'Keep', lastName: `Me${Date.now()}` }).expect(201);
@@ -78,6 +78,29 @@ describe('record sharing', () => {
     await admin
       .post('/contacts/merge', { primaryUuid: a.body.uuid, secondaryUuids: [b.body.uuid] })
       .expect(200);
-    await (await loginAs(guest)).get(`/contacts/${a.body.uuid}`).expect(200);
+    await (await loginAs(guest)).get(`/contacts/${a.body.uuid}`).expect(404);
+  });
+
+  it('an edit share cannot take ownership, and a view share cannot add files', async () => {
+    const role = await createRole(['core.contacts.*', 'core.files.*'], { '*': 'own' });
+    const owner = await createUser({ roleKeys: [role] });
+    const guest = await createUser({ roleKeys: [role] });
+    const ownerClient = await loginAs(owner);
+    const guestClient = await loginAs(guest);
+    const c = await ownerClient
+      .post('/contacts', { firstName: 'Taken', lastName: `Not${Date.now()}` })
+      .expect(201);
+    const url = `/contacts/${c.body.uuid}`;
+    await ownerClient.post(`${url}/shares`, { userUuid: guest.uuid, level: 'view' }).expect(201);
+    await guestClient.agent
+      .post('/api/v1/files')
+      .set('x-csrf-token', guestClient.csrf)
+      .field('entity', 'contact')
+      .field('uuid', c.body.uuid)
+      .attach('file', Buffer.from('hello'), 'note.txt')
+      .expect(404);
+    await ownerClient.post(`${url}/shares`, { userUuid: guest.uuid, level: 'edit' }).expect(201);
+    await guestClient.patch(url, { ownerUuid: guest.uuid }).expect(403);
+    await guestClient.patch(url, { jobTitle: 'Editor' }).expect(200);
   });
 });

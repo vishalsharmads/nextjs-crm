@@ -230,6 +230,10 @@ export async function updateRecord<Dto>(
     const row = await def.toRow(core, wctx);
     if ('owner_id' in row && row.owner_id !== existing.owner_id) {
       assertCan(user, perm(def, 'assign'));
+      // Reassigning needs the record in role scope: an edit share never lets someone take it over.
+      const owners = def.ownerColumns.map((c) => (existing[c.split('.').pop()!] as number | null) ?? null);
+      if (!(await scopeAllows(user, def.resource, owners, trx)))
+        throw new AppError('FORBIDDEN', 'Only people whose role covers this record can reassign it');
       if (!(await scopeAllows(user, def.resource, [row.owner_id as number | null], trx))) {
         throw new AppError('FORBIDDEN', 'You cannot assign records outside your scope');
       }
