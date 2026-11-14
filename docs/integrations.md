@@ -49,7 +49,7 @@ The assistant runs the same tools as MCP clients, as the signed-in person: their
 
 ## Modules and the module catalog
 
-Optional features and integrations are modules. Admins turn them on or off and fill in their settings at Settings → Modules. Secrets are encrypted and never shown again. To build one, see [module-authoring.md](module-authoring.md) and [integration-authoring.md](integration-authoring.md).
+Optional features and integrations are modules. Admins turn them on or off and fill in their settings at Settings → Modules. Secrets are encrypted and never shown again. To build one, see [module-development.md](module-development.md) (start-to-finish, including catalog submission), [module-authoring.md](module-authoring.md) and [integration-authoring.md](integration-authoring.md).
 
 A **module catalog** lists modules kept in other git repositories, each pinned to a tag and the commit that tag pointed at.
 

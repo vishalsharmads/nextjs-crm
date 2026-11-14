@@ -1,5 +1,7 @@
 # Writing an integration
 
+New to modules? Start with [module-development.md](module-development.md), the start-to-finish guide from idea to catalog submission.
+
 An integration is a module that connects the workspace to another service: it reads settings an admin fills in, reacts to record events, and calls out in the background. `modules/chat-notify` is the worked example; this guide walks through it. Read [module-authoring.md](module-authoring.md) first for the module contract.
 
 ## 1. Generate it
