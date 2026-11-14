@@ -1,3 +1,4 @@
+import type { Knex } from 'knex';
 import type { Response } from 'express';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify';
@@ -414,6 +415,128 @@ async function findExisting(def: ResourceDef, user: AuthUser, row: Record<string
   return (await qb.first(`${def.table}.uuid`)) as { uuid: string } | undefined;
 }
 
+/**
+ * What one import needs, once: the file's rows, field definitions, the date format and users by
+ * email, plus a function that imports one row. The import job runs it for real; the check runs it
+ * inside a transaction that is rolled back (`conn`), so both apply exactly the same rules.
+ */
+async function importRunner(input: StartInput, user: AuthUser, ctx: RequestContext) {
+  const def = ioDef(input.entity);
+  const { defs } = await customContext(input.entity, user);
+  const { dateFormat } = await getGroup('general');
+  const users = new Map(
+    (await db('users').whereNull('deleted_at').select('uuid', 'email')).map((x) => [
+      String(x.email).toLowerCase(),
+      x.uuid as string,
+    ]),
+  );
+  const file = await db('files').where({ uuid: input.fileUuid }).first();
+  const { headers, rows } = await parseTable(await readStoredFile(file));
+  // Columns mapped to sensitive fields: never echo their values back in error reports.
+  const sensitiveCols = new Set(
+    headers.flatMap((h, col) => {
+      const target = input.mapping[h];
+      return target?.startsWith('custom.') &&
+        defs.some((d) => d.key === target.slice(7) && d.sensitivity === 'special')
+        ? [col]
+        : [];
+    }),
+  );
+
+  /** Imports one row; with `conn`, inside that (rolled-back) transaction. */
+  async function importRow(
+    cells: string[],
+    conn?: Knex.Transaction,
+  ): Promise<'created' | 'updated' | 'skipped'> {
+    const core: Record<string, unknown> = {};
+    const custom: Record<string, unknown> = {};
+    headers.forEach((h, col) => {
+      const target = input.mapping[h];
+      const raw = (cells[col] ?? '').trim();
+      if (!target || raw === '') return;
+      if (target.startsWith('custom.')) {
+        const fd = defs.find((d) => d.key === target.slice(7));
+        if (fd) custom[fd.key] = coerceCustom(fd, raw, dateFormat);
+      } else core[target] = raw;
+    });
+    // Relations and lookups by human-readable values.
+    if (core.ownerEmail) {
+      const ownerUuid = users.get(String(core.ownerEmail).toLowerCase());
+      if (!ownerUuid) throw new Error(`No user with email ${String(core.ownerEmail)}`);
+      core.ownerUuid = ownerUuid;
+    } else if (input.options.defaultOwnerUuid) core.ownerUuid = input.options.defaultOwnerUuid;
+    delete core.ownerEmail;
+    if (core.tags || input.options.tags.length)
+      core.tags = [
+        ...String(core.tags ?? '')
+          .split(/[;,]/)
+          .map((t) => t.trim())
+          .filter(Boolean),
+        ...input.options.tags,
+      ];
+    if (def.ioColumns) coerceModuleColumns(def.ioColumns, core, dateFormat);
+    if (core.value !== undefined && !def.moduleKey)
+      core.value = Number(String(core.value).replace(/[^\d.-]/g, ''));
+    if (core.expectedClose)
+      core.expectedClose = parseDate(String(core.expectedClose), dateFormat, 'Expected close');
+    if (core.organizationName) {
+      const name = String(core.organizationName);
+      let org = await db('organizations').where({ name }).whereNull('deleted_at').first('uuid');
+      if (!org)
+        org = {
+          uuid: ((await createRecord(recordDefs.organization, ctx, user, { name }, conn)) as { uuid: string })
+            .uuid,
+        };
+      core.organizationUuid = org.uuid;
+    }
+    delete core.organizationName;
+    if (core.contactEmail) {
+      const c = await db('contacts')
+        .where({ email_norm: String(core.contactEmail).toLowerCase() })
+        .whereNull('deleted_at')
+        .first('uuid');
+      if (c) core.contactUuid = c.uuid;
+    }
+    delete core.contactEmail;
+    if (core.stageName) {
+      const stage = await db('pipeline_stages as s')
+        .join('pipelines as p', 'p.id', 's.pipeline_id')
+        .where('s.name', String(core.stageName))
+        .where('s.active', true)
+        .first('s.uuid', 'p.uuid as pipeline_uuid');
+      if (!stage) throw new Error(`Unknown stage "${String(core.stageName)}"`);
+      core.stageUuid = stage.uuid;
+      core.pipelineUuid = stage.pipeline_uuid;
+    }
+    delete core.stageName;
+    delete core.pipelineName;
+    if (Object.keys(custom).length) core.custom = custom;
+
+    const existing = input.options.duplicates === 'create' ? null : await findExisting(def, user, core);
+    if (existing && input.options.duplicates === 'skip') return 'skipped';
+    if (existing) {
+      // A check cannot run an update without making it: it counts it instead.
+      if (!conn) await updateRecord(def, ctx, user, existing.uuid, core);
+      return 'updated';
+    }
+    await createRecord(def, ctx, user, core, conn);
+    return 'created';
+  }
+
+  /** A failed row as the error report shows it (sensitive columns masked). */
+  function failure(i: number, cells: string[], err: unknown) {
+    const details = (err as AppError).details as { path: string; message: string }[] | undefined;
+    return {
+      row: i + 2,
+      message: details?.length
+        ? details.map((d) => `${d.path}: ${d.message}`).join('; ')
+        : (err as Error).message,
+      values: cells.map((c, col) => (sensitiveCols.has(col) && c ? SENSITIVE_MASK : c)),
+    };
+  }
+  return { def, headers, rows, importRow, failure };
+}
+
 registerJob('import', async (job, progress) => {
   const input = importStartSchema.parse(job.payload);
   const userId = job.payload.userId as number;
@@ -429,17 +552,7 @@ registerJob('import', async (job, progress) => {
     ...access,
   };
   const ctx: RequestContext = { requestId: `job:${job.uuid}`, ip: null, userAgent: null, user };
-  const def = ioDef(input.entity);
-  const file = await db('files').where({ uuid: input.fileUuid }).first();
-  const { headers, rows } = await parseTable(await readStoredFile(file));
-  const { defs } = await customContext(input.entity, user);
-  const { dateFormat } = await getGroup('general');
-  const users = new Map(
-    (await db('users').whereNull('deleted_at').select('uuid', 'email')).map((x) => [
-      String(x.email).toLowerCase(),
-      x.uuid as string,
-    ]),
-  );
+  const { headers, rows, importRow, failure } = await importRunner(input, user, ctx);
   const result = {
     created: 0,
     updated: 0,
@@ -447,105 +560,12 @@ registerJob('import', async (job, progress) => {
     failed: 0,
     errors: [] as { row: number; message: string; values: string[] }[],
   };
-
-  // Columns mapped to sensitive fields: never echo their values back in error reports.
-  const sensitiveCols = new Set(
-    headers.flatMap((h, col) => {
-      const target = input.mapping[h];
-      return target?.startsWith('custom.') &&
-        defs.some((d) => d.key === target.slice(7) && d.sensitivity === 'special')
-        ? [col]
-        : [];
-    }),
-  );
-
   for (const [i, cells] of rows.entries()) {
-    const core: Record<string, unknown> = {};
-    const custom: Record<string, unknown> = {};
     try {
-      headers.forEach((h, col) => {
-        const target = input.mapping[h];
-        const raw = (cells[col] ?? '').trim();
-        if (!target || raw === '') return;
-        if (target.startsWith('custom.')) {
-          const fd = defs.find((d) => d.key === target.slice(7));
-          if (fd) custom[fd.key] = coerceCustom(fd, raw, dateFormat);
-        } else core[target] = raw;
-      });
-      // Relations and lookups by human-readable values.
-      if (core.ownerEmail) {
-        const ownerUuid = users.get(String(core.ownerEmail).toLowerCase());
-        if (!ownerUuid) throw new Error(`No user with email ${String(core.ownerEmail)}`);
-        core.ownerUuid = ownerUuid;
-      } else if (input.options.defaultOwnerUuid) core.ownerUuid = input.options.defaultOwnerUuid;
-      delete core.ownerEmail;
-      if (core.tags || input.options.tags.length)
-        core.tags = [
-          ...String(core.tags ?? '')
-            .split(/[;,]/)
-            .map((t) => t.trim())
-            .filter(Boolean),
-          ...input.options.tags,
-        ];
-      if (def.ioColumns) coerceModuleColumns(def.ioColumns, core, dateFormat);
-      if (core.value !== undefined && !def.moduleKey)
-        core.value = Number(String(core.value).replace(/[^\d.-]/g, ''));
-      if (core.expectedClose)
-        core.expectedClose = parseDate(String(core.expectedClose), dateFormat, 'Expected close');
-      if (core.organizationName) {
-        const name = String(core.organizationName);
-        let org = await db('organizations').where({ name }).whereNull('deleted_at').first('uuid');
-        if (!org)
-          org = {
-            uuid: ((await createRecord(recordDefs.organization, ctx, user, { name })) as { uuid: string })
-              .uuid,
-          };
-        core.organizationUuid = org.uuid;
-      }
-      delete core.organizationName;
-      if (core.contactEmail) {
-        const c = await db('contacts')
-          .where({ email_norm: String(core.contactEmail).toLowerCase() })
-          .whereNull('deleted_at')
-          .first('uuid');
-        if (c) core.contactUuid = c.uuid;
-      }
-      delete core.contactEmail;
-      if (core.stageName) {
-        const stage = await db('pipeline_stages as s')
-          .join('pipelines as p', 'p.id', 's.pipeline_id')
-          .where('s.name', String(core.stageName))
-          .where('s.active', true)
-          .first('s.uuid', 'p.uuid as pipeline_uuid');
-        if (!stage) throw new Error(`Unknown stage "${String(core.stageName)}"`);
-        core.stageUuid = stage.uuid;
-        core.pipelineUuid = stage.pipeline_uuid;
-      }
-      delete core.stageName;
-      delete core.pipelineName;
-      if (Object.keys(custom).length) core.custom = custom;
-
-      const existing = input.options.duplicates === 'create' ? null : await findExisting(def, user, core);
-      if (existing && input.options.duplicates === 'skip') result.skipped++;
-      else if (existing) {
-        await updateRecord(def, ctx, user, existing.uuid, core);
-        result.updated++;
-      } else {
-        await createRecord(def, ctx, user, core);
-        result.created++;
-      }
+      result[await importRow(cells)]++;
     } catch (err) {
       result.failed++;
-      if (result.errors.length < 1000) {
-        const details = (err as AppError).details as { path: string; message: string }[] | undefined;
-        result.errors.push({
-          row: i + 2,
-          message: details?.length
-            ? details.map((d) => `${d.path}: ${d.message}`).join('; ')
-            : (err as Error).message,
-          values: cells.map((c, col) => (sensitiveCols.has(col) && c ? SENSITIVE_MASK : c)),
-        });
-      }
+      if (result.errors.length < 1000) result.errors.push(failure(i, cells, err));
     }
     if (i % 25 === 0) await progress(((i + 1) / rows.length) * 100);
   }
