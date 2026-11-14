@@ -464,7 +464,10 @@ function RecordCard({
         <p className="mt-0.5 truncate text-xs text-muted">{deal.organization?.name ?? deal.contact?.name}</p>
       ) : null}
       <div className="mt-2 flex items-center justify-between gap-2 text-xs">
-        <span className="tabular font-medium">{formatMoney(deal.value, deal.currency)}</span>
+        {/* The value is absent when it is hidden from this person's role. */}
+        <span className="tabular font-medium">
+          {typeof deal.value === 'number' ? formatMoney(deal.value, deal.currency) : ''}
+        </span>
         <span className="flex items-center gap-1.5 text-muted">
           {deal.rotting ? (
             <AlertTriangle className="size-3 text-accent" aria-label="Stalled in this stage" />

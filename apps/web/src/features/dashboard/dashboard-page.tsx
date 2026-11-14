@@ -313,14 +313,15 @@ function PipelineValue({
   data,
 }: {
   data: {
-    stages: { name: string; value: number; count: number; probability: number }[];
-    total: number;
-    weighted: number;
+    stages: { name: string; value: number | null; count: number; probability: number }[];
+    /** Null when deal values are hidden from this person's role: counts only. */
+    total: number | null;
+    weighted: number | null;
     count: number;
   };
 }) {
   const { settings } = useBoot();
-  const money = (v: number) => formatMoney(v, settings.general.currency);
+  const money = (v: number | null) => (v === null ? '—' : formatMoney(v, settings.general.currency));
   // Stage names collide when each gets less than about 96px, so they are tilted instead of overlapping.
   const [chartWidth, setChartWidth] = useState(0);
   const crowded = chartWidth > 0 && chartWidth / Math.max(1, data.stages.length) < 96;
@@ -413,7 +414,7 @@ function Conversion({
     lost: number;
     created: number;
     winRate: number | null;
-    wonValue: number;
+    wonValue: number | null;
   };
 }) {
   const { settings, labels } = useBoot();
@@ -424,7 +425,9 @@ function Conversion({
         label={`Win rate, last ${data.days} days`}
         value={data.winRate === null ? '—' : `${data.winRate}%`}
       />
-      <Stat label="Won value" value={formatMoney(data.wonValue, settings.general.currency)} />
+      {data.wonValue === null ? null : (
+        <Stat label="Won value" value={formatMoney(data.wonValue, settings.general.currency)} />
+      )}
       <Stat label={`${L.dealPlural} won`} value={data.won} />
       <Stat label="Lost" value={data.lost} />
     </dl>
