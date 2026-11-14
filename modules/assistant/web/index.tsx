@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import type { WebModule } from '@app/module-sdk';
 import { SettingsPanel } from './settings';
+import { SetupPage } from './setup';
 import { DECISION_WORDS, thinkingWords } from './thinking';
 import { replyHtml, splitNext, type RecordPath } from './markdown';
 import type { ReportDefinition, ReportResultDto } from '@app/shared';
@@ -1282,7 +1283,10 @@ function AssistantPanel({ entity, uuid }: { entity: string; uuid: string }) {
 
 const assistantModule: WebModule = {
   key: 'assistant',
-  routes: [{ path: '', element: <AssistantPage /> }],
+  routes: [
+    { path: '', element: <AssistantPage /> },
+    { path: 'setup', element: <SetupPage /> },
+  ],
   panels: { chat: ({ entity, uuid }) => <AssistantPanel entity={entity} uuid={uuid} /> },
 };
 export default assistantModule;
