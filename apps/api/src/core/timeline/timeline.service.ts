@@ -1,3 +1,5 @@
+import type { RequestContext } from '../../http/context';
+import { logAccess } from '../audit/access-log';
 import type { RecordEntity, TimelineItem } from '@app/shared';
 import type { Knex } from 'knex';
 import { db } from '../../db/knex';
@@ -67,8 +69,17 @@ export async function recordTimeline(
   row: Record<string, unknown>,
   user: AuthUser,
   opts: { kinds?: string; before?: string; limit: number },
+  ctx: RequestContext,
 ): Promise<{ data: TimelineItem[] }> {
   const id = row.id as number;
+  // The history holds notes, emails and calls about the person: a read like opening the record.
+  await logAccess(ctx, {
+    action: 'view',
+    entity,
+    entityId: id,
+    entityUuid: row.uuid as string,
+    detail: { timeline: true },
+  });
   const kinds = opts.kinds ? new Set(opts.kinds.split(',')) : null;
   const want = (k: string) => !kinds || kinds.has(k);
   const before = opts.before ? new Date(opts.before) : new Date(Date.now() + 1000);

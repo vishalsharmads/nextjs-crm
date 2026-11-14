@@ -273,10 +273,10 @@ export const objectRecordRoutes = defineRoutes('/o/:object', ['objects'])
       before: z.iso.datetime().optional(),
       limit: z.coerce.number().int().min(1).max(200).default(50),
     }),
-    handler: async ({ user, params, query }) => {
+    handler: async ({ ctx, user, params, query }) => {
       const def = objectDef(params.object);
       assertCan(user, `${def.resource}.view`);
       const row = await getRow(def, user, params.uuid);
-      return recordTimeline(def.entity, row, user, query);
+      return recordTimeline(def.entity, row, user, query, ctx);
     },
   });

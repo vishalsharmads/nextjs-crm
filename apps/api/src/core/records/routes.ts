@@ -76,10 +76,10 @@ export function recordRoutes(def: ResourceDef, tag: string): RouteGroup {
         before: z.iso.datetime().optional(),
         limit: z.coerce.number().int().min(1).max(200).default(50),
       }),
-      handler: async ({ user, params, query }) => {
+      handler: async ({ ctx, user, params, query }) => {
         assertCan(user, p('view'));
         const row = await getRow(def, user, params.uuid);
-        return recordTimeline(def.entity, row, user, query);
+        return recordTimeline(def.entity, row, user, query, ctx);
       },
     });
 }

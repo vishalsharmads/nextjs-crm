@@ -145,10 +145,10 @@ defineTool({
   description: 'Recent history of a record: notes, tasks, calls, emails and changes, newest first.',
   write: false,
   input: z.object({ entity, uuid, limit: z.number().int().min(1).max(100).default(30) }),
-  async handler(input, { user }) {
+  async handler(input, { user, ctx }) {
     const def = viewable(user, input.entity);
     const row = await getRow(def, user, input.uuid);
-    return recordTimeline(def.entity, row, user, { limit: input.limit });
+    return recordTimeline(def.entity, row, user, { limit: input.limit }, ctx);
   },
 });
 
