@@ -36,13 +36,39 @@ Then:
 
 ## Releases
 
-```bash
-BLUEPRINT=coworking deploy/release.sh /srv/crm/acme crm-acme
+Each release is built in its own folder and the service is switched to it only once it is ready, so a bad release can be undone in seconds.
+
+```
+/srv/crm/acme/
+  .env                      shared by every release
+  storage/                  uploaded files (STORAGE_DIR)
+  repo/                     git clone the releases are taken from
+  releases/<utc>-<sha>/     one built release per folder (the newest 5 are kept, KEEP_RELEASES)
+  current -> releases/…     the release that runs; the systemd unit uses current/apps/api
 ```
 
-This checks out the release, builds, runs `doctor` and migrations, re-applies the blueprint (a no-op unless a newer version shipped, and never overwriting client edits), restarts the service and checks `/api/v1/health`.
+```bash
+REPO_URL=<git url> BLUEPRINT=coworking deploy/release.sh /srv/crm/acme crm-acme   # REPO_URL only the first time
+deploy/rollback.sh /srv/crm/acme crm-acme            # back to the previous release
+deploy/rollback.sh /srv/crm/acme crm-acme <folder>   # or to a named one
+```
+
+`release.sh` exports the commit (`RELEASE_REF`, default `origin/main`) into a new folder, links the shared `.env`, runs `npm ci`, the build and `doctor`, takes a backup, runs migrations, re-applies the blueprint (a no-op unless a newer version shipped, never overwriting client edits), switches `current` and restarts the service. If `/api/v1/health/ready` does not answer within 30 seconds it switches back to the previous release by itself and exits with an error.
+
+A switch back does not undo migrations. Migrations only add tables and columns, so the older code keeps running; if a migration itself damaged data, restore the backup the release took (`deploy/restore.sh`).
+
+**Moving an existing in-place instance to release folders (once):** stop the service; `mkdir -p /srv/crm/acme/releases`; move the checkout to `/srv/crm/acme/repo` and keep `.env` and `storage/` at the instance root (adjust `STORAGE_DIR`); update the systemd unit from `deploy/crm-api.service.example` (`WorkingDirectory=…/current/apps/api`) and run `systemctl daemon-reload`; then run `release.sh`.
+
+## Processes, connections and health
+
+- Run **one API process per instance** (the systemd unit does). Rate limits and the short-lived settings and permission caches live in process memory; a second process would count limits separately and see setting changes a few seconds late. `REDIS_URL` moves background jobs and scheduled work to Redis, not these.
+- `DB_POOL_MAX` (default 10) sets database connections per process. Keep it below MySQL's `max_connections` together with everything else that connects.
+- `/api/v1/health` answers while the process runs (for restarts). `/api/v1/health/ready` also checks the database, that `STORAGE_DIR` is writable and, with `REDIS_URL`, that Redis answers; it returns `{ status, database, storage, redis }` and 503 when something is down. Use it for uptime monitoring.
+- Settings → Email → **Send test email** (admins) checks the SMTP settings end to end.
 
 ## Backups
+
+Schedule `deploy/backup.sh` nightly with the systemd timer in `deploy/crm-backup.service.example` and `deploy/crm-backup.timer.example` (`systemctl enable --now crm-backup-acme.timer`), and copy the backup folder off the server. Set `BACKUP_DIR` in `.env` to that folder and `npm run doctor` warns when the newest backup is more than 26 hours old.
 
 - `mysqldump --single-transaction --routines --triggers <db>`: the triggers keep the audit log append-only after a restore.
 - `STORAGE_DIR` (uploaded files). Files are stored under random keys and are only reachable through signed links.
