@@ -137,6 +137,8 @@ describe('import and export', () => {
     const status = await client.get(`/imports/${start.body.jobUuid}`).expect(200);
     expect(status.body.status).toBe('succeeded');
     expect(status.body.result).toMatchObject({ created: 2, skipped: 1, failed: 1 });
+    // The uploaded file holds raw personal data: it is gone once the import ends.
+    expect(await db('files').where({ uuid: up.body.fileUuid }).first()).toBeUndefined();
     const errors = await client.get(`/imports/${start.body.jobUuid}/errors.csv`).expect(200);
     expect(errors.text).toContain('Platinum');
     const ana = await client.get('/contacts?q=ana%40import.test').expect(200);
@@ -221,6 +223,21 @@ describe('import and export', () => {
         .where({ name: `Checkco ${tag}` })
         .first(),
     ).toBeUndefined();
+  });
+
+  it('removes import uploads that were never imported after a day', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const up = await client.agent
+      .post('/api/v1/imports')
+      .set('x-csrf-token', client.csrf)
+      .field('entity', 'contact')
+      .attach('file', csv([['First Name'], ['Left behind']]), 'abandoned.csv')
+      .expect(201);
+    const { runRetention } = await import('../src/core/privacy/retention.service');
+    await runRetention(new Date(Date.now() + 2 * 3_600_000));
+    expect(await db('files').where({ uuid: up.body.fileUuid }).first()).toBeTruthy();
+    await runRetention(new Date(Date.now() + 25 * 3_600_000));
+    expect(await db('files').where({ uuid: up.body.fileUuid }).first()).toBeUndefined();
   });
 
   it('tells nobody about records a check would create', async () => {

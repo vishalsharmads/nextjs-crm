@@ -19,6 +19,7 @@ import type { AuthUser, RequestContext } from '../../http/context';
 import { logAccess } from '../audit/access-log';
 import { readStoredFile } from '../files/files.service';
 import { csvSafe } from '../../lib/csv';
+import { storage } from '../../lib/storage';
 import { audit } from '../audit/audit.service';
 import { assertCan, loadAccess } from '../rbac/access';
 import { customContext } from '../records/common';
@@ -678,8 +679,40 @@ export async function checkImport(
   return out;
 }
 
+/**
+ * Uploaded import files hold raw personal data outside any record, so they are removed as soon as
+ * they have served their purpose: when the import ends, or (never started) after a day.
+ */
+export async function purgeImportFiles(where: { uuid?: string; olderThan?: Date }) {
+  const qb = db('files').where({ entity: 'import' });
+  if (where.uuid) qb.where({ uuid: where.uuid });
+  if (where.olderThan) qb.where('created_at', '<', where.olderThan);
+  const rows = (await qb.clone().select('id', 'storage_key')) as { id: number; storage_key: string }[];
+  if (!rows.length) return 0;
+  await db('files')
+    .whereIn(
+      'id',
+      rows.map((r) => r.id),
+    )
+    .delete();
+  for (const r of rows) await storage.delete(r.storage_key).catch(() => undefined);
+  return rows.length;
+}
+
 registerJob('import', async (job, progress) => {
   const input = importStartSchema.parse(job.payload);
+  try {
+    return await runImportJob(job, progress, input);
+  } finally {
+    await purgeImportFiles({ uuid: input.fileUuid });
+  }
+});
+
+async function runImportJob(
+  job: Parameters<Parameters<typeof registerJob>[1]>[0],
+  progress: Parameters<Parameters<typeof registerJob>[1]>[1],
+  input: ReturnType<typeof importStartSchema.parse>,
+) {
   const userId = job.payload.userId as number;
   const u = await db('users').where({ id: userId }).first();
   const access = await loadAccess(userId);
@@ -721,4 +754,4 @@ registerJob('import', async (job, progress) => {
     },
   });
   return { ...result, headers };
-});
+}
