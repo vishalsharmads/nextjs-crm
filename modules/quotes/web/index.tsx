@@ -9,6 +9,7 @@ import { formatDate, formatMoney } from '@/lib/format';
 import { labelVars } from '@/lib/labels';
 import { useBoot, useCan } from '@/app/session';
 import { Button } from '@/components/ui/button';
+import { confirmAction } from '@/components/ui/confirm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input } from '@/components/ui/input';
 import { Badge, EmptyState, ErrorState, PageHeader, Skeleton } from '@/components/ui/misc';
@@ -476,7 +477,12 @@ function QuoteDetail() {
                 size="icon"
                 aria-label="Delete"
                 onClick={() => {
-                  if (window.confirm(`Delete ${q.number}? This cannot be undone.`)) remove.mutate();
+                  void confirmAction({
+                    title: `Delete ${q.number}?`,
+                    description: 'This cannot be undone.',
+                    action: 'Delete',
+                    danger: true,
+                  }).then((ok) => ok && remove.mutate());
                 }}
               >
                 <Trash2 />

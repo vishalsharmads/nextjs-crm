@@ -71,6 +71,13 @@ export default tseslint.config(
           message: 'Use logical utilities.',
         },
       ],
+      'no-restricted-properties': [
+        'error',
+        { object: 'window', property: 'confirm', message: 'Use confirmAction() from components/ui/confirm.' },
+        { object: 'window', property: 'alert', message: 'Use a toast or an inline message.' },
+        { object: 'window', property: 'prompt', message: 'Use a dialog with a labelled input.' },
+      ],
+      'no-restricted-globals': ['error', 'confirm', 'alert', 'prompt'],
     },
   },
   prettier,
