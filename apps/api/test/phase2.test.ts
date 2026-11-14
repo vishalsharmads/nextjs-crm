@@ -81,8 +81,13 @@ describe('webhooks', () => {
       .where({ uuid: pending.uuid })
       .update({ next_attempt_at: new Date(Date.now() - 1000) });
     const { retryDueWebhooks } = await import('../src/core/webhooks/webhooks');
-    await retryDueWebhooks();
-    expect((await db('webhook_deliveries').where({ uuid: pending.uuid }).first()).status).toBe('succeeded');
+    const before = received.length;
+    // Two sweeps at once (two processes) send the delivery only once.
+    await Promise.all([retryDueWebhooks(), retryDueWebhooks()]);
+    const after = await db('webhook_deliveries').where({ uuid: pending.uuid }).first();
+    expect(after.status).toBe('succeeded');
+    expect(after.attempts).toBe(2);
+    expect(received.length - before).toBe(1);
     await client.delete(`/webhooks/${hook.body.uuid}`).expect(204);
   });
 

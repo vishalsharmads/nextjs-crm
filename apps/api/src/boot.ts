@@ -4,7 +4,7 @@ import { db } from './db/knex';
 import { syncPermissions } from './core/rbac/catalog';
 import { isInstalled } from './core/settings/settings.service';
 import { logger } from './lib/logger';
-import { every, startJobWorker, stopJobWorker, stopSchedules } from './lib/jobs';
+import { every, recoverStaleJobs, startJobWorker, stopJobWorker, stopSchedules } from './lib/jobs';
 import { sendDueReminders, sendTaskDigests } from './core/notifications/notifications.service';
 import { env, isTest } from './config/env';
 import './core/imports/import-export';
@@ -42,6 +42,7 @@ export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promi
   });
   if (!isTest) {
     startJobWorker();
+    every(10 * 60_000, 'jobs.recover', () => recoverStaleJobs());
     every(60_000, 'activity-reminders', () => sendDueReminders());
     every(10 * 60_000, 'tasks.digest', () => sendTaskDigests());
     startWebhookRetries();

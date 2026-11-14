@@ -63,6 +63,12 @@ async function deliver(deliveryId: number) {
     .where('d.id', deliveryId)
     .first('d.*', 'w.url', 'w.secret_enc', 'w.active', 'w.id as wid');
   if (!d || d.status !== 'pending' || !d.active) return;
+  // Claim the attempt so a retry sweep and the queued job never send the same delivery twice.
+  const claimed = await db('webhook_deliveries')
+    .where({ id: deliveryId, status: 'pending', attempts: d.attempts })
+    .where('next_attempt_at', '<=', new Date())
+    .update({ next_attempt_at: new Date(Date.now() + 5 * 60_000) });
+  if (!claimed) return;
   const body = JSON.stringify(d.payload);
   const timestamp = String(Math.floor(Date.now() / 1000));
   const attempts = d.attempts + 1;
@@ -153,12 +159,19 @@ onEvent(async (e: DomainEvent) => {
   }
 });
 
-/** Retry due deliveries (every minute, alongside reminders). */
+/**
+ * Retry due deliveries (every minute). First attempts whose job was lost (a restart before it ran)
+ * are picked up once they are two minutes overdue.
+ */
 export async function retryDueWebhooks() {
+  const now = Date.now();
   const due = await db('webhook_deliveries')
     .where({ status: 'pending' })
-    .where('attempts', '>', 0)
-    .where('next_attempt_at', '<=', new Date())
+    .where((q) =>
+      q
+        .where((r) => r.where('attempts', '>', 0).where('next_attempt_at', '<=', new Date(now)))
+        .orWhere('next_attempt_at', '<=', new Date(now - 120_000)),
+    )
     .limit(100)
     .pluck('id');
   for (const id of due as number[])
