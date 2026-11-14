@@ -17,7 +17,7 @@ related: records.lists, records.deals, settings.profile
 
 ## A typical day
 
-1. Open **Home** to see your pipeline, tasks due and recent activity. Choose **Edit dashboard** to add, resize or remove widgets, including saved reports.
+1. Open **Home** to see your pipeline, tasks due and recent activity. Choose **Edit dashboard** to add, resize or remove widgets, including saved reports. Widgets follow your access: they count only the records you can see, and a widget built on a field hidden from your role shows as unavailable.
 2. Work through your **Tasks**: call, email, meet, then mark them done.
 3. Move {{dealPluralLower}} forward on the board as they progress.
 4. Log notes on the record after every conversation, so your team knows what happened.

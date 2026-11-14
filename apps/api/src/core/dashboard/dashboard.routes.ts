@@ -8,7 +8,7 @@ import type { AuthUser } from '../../http/context';
 import { audit } from '../audit/audit.service';
 import { applyScope, can } from '../rbac/access';
 import { recordDefs } from '../records/registry';
-import { getDefinition } from '../custom-fields/definitions';
+import { fieldLevel, getDefinition } from '../custom-fields/definitions';
 import { isModuleEnabled } from '../../modules/registry';
 import { moduleWidget } from '../../modules/widgets';
 import { runReport, visibleReport } from '../reports/builder';
@@ -200,6 +200,8 @@ async function widgetData(type: string, params: Record<string, unknown>, user: A
         const fd = await getDefinition(entity, field.slice(3));
         if (!fd?.filterable || !FIELD_KEY_RE.test(fd.key))
           return { unavailable: true, reason: 'field_not_filterable' };
+        // The widget lists records and their dates: a field hidden from the viewer stays hidden.
+        if (fieldLevel(fd, user) === 'hidden') return { unavailable: true, reason: 'forbidden' };
         column = `${def.table}.cf_${fd.key}`;
       } else if (field === 'expected_close' && entity === 'deal') column = 'deals.expected_close';
       else throw new AppError('VALIDATION_FAILED', 'Unsupported date field');
@@ -338,10 +340,17 @@ export const dashboardRoutes = defineRoutes('/dashboards', ['dashboard'])
     permission: 'core.dashboard.view',
     params: z.object({ type: z.string().regex(/^([a-z][a-z0-9-]*:)?[a-z][a-z0-9_.-]*$/) }),
     query: z.object({ params: z.string().max(2000).optional() }),
-    handler: async ({ user, params, query }) =>
-      widgetData(
-        params.type,
-        query.params ? (JSON.parse(query.params) as Record<string, unknown>) : {},
-        user,
-      ),
+    handler: async ({ user, params, query }) => widgetData(params.type, parseParams(query.params), user),
   });
+
+/** Widget parameters arrive as JSON in the query string; anything else is a bad request. */
+function parseParams(raw: string | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+  } catch {
+    // Falls through to the error below.
+  }
+  throw new AppError('VALIDATION_FAILED', 'Widget parameters must be a JSON object');
+}
