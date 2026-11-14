@@ -57,6 +57,11 @@ const schema = z.object({
   REDIS_URL: z.string().default(''),
   /** Allow webhook URLs that resolve to private/loopback addresses (development only). */
   WEBHOOKS_ALLOW_PRIVATE: bool.default(false),
+  /** Optional address that receives a JSON report of crashes and unexpected server errors. */
+  ERROR_WEBHOOK_URL: z
+    .url()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
   /** Address of a module catalog (`catalog.json`); unset means no catalog. */
   MODULE_CATALOG_URL: z.url({ protocol: /^https?$/ }).optional(),
   /** Read token for a private catalog, sent only to the catalog's own address. */
@@ -74,6 +79,27 @@ const schema = z.object({
 });
 
 export type Env = z.infer<typeof schema>;
+
+/**
+ * Settings whose development defaults (the dev database, a local mail catcher, localhost links)
+ * must never be used in production by accident: each must be set explicitly.
+ */
+export function productionConfigProblems(source: Record<string, string | undefined>): string[] {
+  const problems: string[] = [];
+  for (const key of ['APP_URL', 'DATABASE_URL', 'SMTP_HOST', 'SMTP_PORT', 'MAIL_FROM'])
+    if (!source[key]?.trim()) problems.push(`${key} must be set`);
+  const appUrl = source.APP_URL?.trim();
+  if (appUrl) {
+    try {
+      const host = new URL(appUrl).hostname;
+      if (['localhost', '127.0.0.1', '[::1]', '0.0.0.0'].includes(host))
+        problems.push('APP_URL must be the address people use, not localhost');
+    } catch {
+      problems.push('APP_URL is not a valid URL');
+    }
+  }
+  return problems;
+}
 
 function load(): Env {
   const parsed = schema.safeParse(process.env);
@@ -93,6 +119,9 @@ function load(): Env {
     if (active === '0'.repeat(64))
       weak.push((env.ENCRYPTION_KEYS ? 'ENCRYPTION_KEYS' : 'ENCRYPTION_KEY') as never);
     if (weak.length) throw new Error(`Weak or default secrets in production: ${weak.join(', ')}`);
+    const problems = productionConfigProblems(process.env);
+    if (problems.length)
+      throw new Error(`Production configuration is incomplete:\n  ${problems.join('\n  ')}`);
   }
   return env;
 }

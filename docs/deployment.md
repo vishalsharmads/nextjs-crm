@@ -50,7 +50,11 @@ This checks out the release, builds, runs `doctor` and migrations, re-applies th
 
 ## Security checklist
 
-- Production refuses to start with default or short secrets.
+- Production refuses to start with default or short secrets, and when `APP_URL`, `DATABASE_URL`, `SMTP_HOST`, `SMTP_PORT` or `MAIL_FROM` is missing or `APP_URL` points at localhost, so development defaults are never used by accident.
+- A crash (uncaught error) is logged as fatal and the process exits, so systemd starts a clean one. Set `ERROR_WEBHOOK_URL` to receive a JSON report (`kind`, `at`, `app`, `error.name`, `error.message`, `error.stack`, no request data) for each crash and each unexpected server error.
+- On stop, the API finishes open requests for up to 15 seconds, then closes them. Jobs left running by a stopped process are marked failed after an hour (and, without Redis, queued jobs after ten minutes) with "This stopped because the server restarted"; webhook deliveries whose first attempt was lost are retried.
+- Job errors shown to people are plain messages; the details are in the server log.
+- An `X-Request-Id` header is kept only when it is up to 64 plain characters; otherwise a new id is used.
 - Cookies are `Secure` in production; serve over HTTPS only.
 - Keep `CORS_ORIGINS` empty (same-origin deployment).
 - Settings → Compliance sets the profile (Standard, Privacy, Health data) and its enforced minimums: 2FA, session limits, logging, retention and encryption.

@@ -13,7 +13,7 @@ import { effectiveCompliance, effectiveSecurity } from '../core/settings/setting
 /** Attach request context. Never rejects; route permission checks decide what is allowed. */
 export async function contextMiddleware(req: Request, _res: Response, next: NextFunction) {
   req.ctx = {
-    requestId: (req.get('x-request-id') ?? randomUUID()).slice(0, 64),
+    requestId: safeRequestId(req.get('x-request-id')),
     ip: req.ip ?? null,
     userAgent: req.get('user-agent') ?? null,
     user: null,
@@ -88,4 +88,9 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   } catch (err) {
     next(err);
   }
+}
+
+/** A caller's request id is kept only when it is short and plain, so it cannot forge log lines. */
+export function safeRequestId(raw: string | undefined): string {
+  return raw && /^[A-Za-z0-9._:-]{1,64}$/.test(raw) ? raw : randomUUID();
 }
