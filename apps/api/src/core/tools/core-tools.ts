@@ -19,6 +19,7 @@ import { fieldLevel, getDefinitions } from '../custom-fields/definitions';
 import { getGroup } from '../settings/settings.service';
 import { runReport } from '../reports/builder';
 import { runBulk } from '../bulk/bulk.service';
+import { searchText, textSearchSchema } from '../search/text-search';
 import { addComment, listComments } from '../activities/comments';
 import { addChecklistItem, listChecklist } from '../activities/checklist';
 
@@ -379,5 +380,17 @@ defineTool({
   }),
   async handler({ entity: key, ...input }, { ctx, user }) {
     return runBulk(getRecordDef(key), ctx, user, input);
+  },
+});
+
+defineTool({
+  name: 'search_text',
+  title: 'Search notes and emails',
+  description:
+    'Full-text search over what people wrote: notes, emails, calls, meetings and tasks (subject and text) and comments on them, ranked by relevance. Use it for "what did we discuss / agree / promise", quotes, or anything in conversation history. Each hit gives a snippet, the kind, the date and the record it belongs to. Quote a phrase for exact words; narrow by kind, by one record or by date.',
+  write: false,
+  input: textSearchSchema,
+  async handler(input, { ctx, user }) {
+    return searchText(user, ctx, input);
   },
 });
