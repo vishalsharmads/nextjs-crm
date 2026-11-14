@@ -18,7 +18,14 @@ const MAX = 5000;
 
 /** Resolve the target rows: explicit uuids or "everything matching this list", always within scope. */
 async function targets(def: ResourceDef, user: AuthUser, input: BulkInput): Promise<DbRow[]> {
-  const { qb } = await scopedQuery(def, user, db, input.action === 'restore' ? 'only' : undefined);
+  // Shares never allow deleting or restoring; changes need an edit share; the rest re-check per record.
+  const shares =
+    input.action === 'delete' || input.action === 'restore'
+      ? 'none'
+      : input.action === 'add_tags' || input.action === 'remove_tags'
+        ? 'edit'
+        : 'view';
+  const { qb } = await scopedQuery(def, user, db, input.action === 'restore' ? 'only' : undefined, shares);
   if (input.all) {
     const filter =
       input.filter === undefined || input.filter === null ? undefined : filterSchema.parse(input.filter);

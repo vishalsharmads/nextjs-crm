@@ -5,6 +5,7 @@ import {
   editRecordComment,
   listRecordComments,
 } from '../comments/comments';
+import { listShares, shareRecord, unshareRecord } from '../sharing/sharing';
 import {
   CUSTOM_OBJECTS_KEY,
   MAX_CUSTOM_OBJECTS,
@@ -332,5 +333,41 @@ export const objectRecordRoutes = defineRoutes('/o/:object', ['objects'])
       const def = objectDef(params.object);
       assertCan(user, `${def.resource}.view`);
       await deleteRecordComment(def, ctx, user, params.uuid, params.commentUuid);
+    },
+  })
+  .add({
+    method: 'get',
+    path: '/:uuid/shares',
+    permission: 'authenticated',
+    params: recordParam,
+    handler: ({ user, params }) => {
+      const def = objectDef(params.object);
+      assertCan(user, `${def.resource}.view`);
+      return listShares(def, user, params.uuid);
+    },
+  })
+  .add({
+    method: 'post',
+    path: '/:uuid/shares',
+    permission: 'authenticated',
+    params: recordParam,
+    body: z.record(z.string(), z.unknown()),
+    status: 201,
+    handler: ({ ctx, user, params, body }) => {
+      const def = objectDef(params.object);
+      assertCan(user, `${def.resource}.view`);
+      return shareRecord(def, ctx, user, params.uuid, body);
+    },
+  })
+  .add({
+    method: 'delete',
+    path: '/:uuid/shares/:shareUuid',
+    permission: 'authenticated',
+    params: recordParam.extend({ shareUuid: z.uuid() }),
+    status: 204,
+    handler: async ({ ctx, user, params }) => {
+      const def = objectDef(params.object);
+      assertCan(user, `${def.resource}.view`);
+      await unshareRecord(def, ctx, user, params.uuid, params.shareUuid);
     },
   });

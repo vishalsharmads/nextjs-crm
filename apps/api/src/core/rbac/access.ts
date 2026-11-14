@@ -80,18 +80,43 @@ export async function teamUserIds(userId: number, conn: Db = db): Promise<number
  * `ownerColumns` are OR-ed (e.g. activities: assignee or owner).
  * Mutates `qb` and returns nothing: returning a Knex builder from an async function would execute it.
  */
+/**
+ * Which shares widen the scope: `view` (any share, the default for reads), `edit` (edit shares
+ * only, for changes) or `none` (role scope only: delete, restore, merge, reassignment).
+ */
+export type ShareAccess = 'view' | 'edit' | 'none';
+
 export async function applyScope(
   qb: Knex.QueryBuilder,
   user: AuthUser,
   resource: string,
   ownerColumns: string[],
   conn: Db = db,
+  shares: ShareAccess = 'view',
 ): Promise<void> {
   const scope = user.isAdmin ? 'all' : (user.scopes[resource] ?? 'own');
   if (scope === 'all') return;
   const ids = scope === 'team' ? await teamUserIds(user.id, conn) : [user.id];
+  // Records shared with the person, or with a team they belong to, are in scope too (plan D4).
+  const alias = ownerColumns[0]!.split('.')[0]!;
+  const teams =
+    shares === 'none'
+      ? []
+      : ((await conn('team_members').where({ user_id: user.id }).pluck('team_id')) as number[]);
   qb.where((w) => {
     for (const col of ownerColumns) w.orWhereIn(col, ids);
+    if (shares !== 'none')
+      w.orWhereExists((e) => {
+        e.select(conn.raw('1'))
+          .from('record_shares as rs')
+          .where('rs.resource', resource)
+          .whereRaw('rs.record_id = ??', [`${alias}.id`])
+          .where((who) => {
+            who.where('rs.user_id', user.id);
+            if (teams.length) who.orWhereIn('rs.team_id', teams);
+          });
+        if (shares === 'edit') e.where('rs.level', 'edit');
+      });
   });
 }
 

@@ -20,6 +20,7 @@ import {
   editRecordComment,
   listRecordComments,
 } from '../comments/comments';
+import { listShares, shareRecord, unshareRecord } from '../sharing/sharing';
 
 export const uuidParam = z.object({ uuid: z.uuid() });
 
@@ -70,6 +71,40 @@ export function addCommentRoutes(group: RouteGroup, def: ResourceDef): RouteGrou
       status: 204,
       handler: ({ ctx, user, params }) =>
         deleteRecordComment(def, ctx, user, params.uuid, params.commentUuid),
+    });
+}
+
+const shareParam = uuidParam.extend({ shareUuid: z.uuid() });
+
+/** Sharing one record with a person or team. Tasks are shared through what they belong to. */
+export function addShareRoutes(group: RouteGroup, def: ResourceDef): RouteGroup {
+  if (def.entity === 'activity') return group;
+  const view = `${def.resource}.view`;
+  return group
+    .add({
+      method: 'get',
+      path: '/:uuid/shares',
+      permission: view,
+      params: uuidParam,
+      summary: `Who one ${def.entity} record is shared with`,
+      handler: ({ user, params }) => listShares(def, user, params.uuid),
+    })
+    .add({
+      method: 'post',
+      path: '/:uuid/shares',
+      permission: view,
+      params: uuidParam,
+      body: z.record(z.string(), z.unknown()),
+      status: 201,
+      handler: ({ ctx, user, params, body }) => shareRecord(def, ctx, user, params.uuid, body),
+    })
+    .add({
+      method: 'delete',
+      path: '/:uuid/shares/:shareUuid',
+      permission: view,
+      params: shareParam,
+      status: 204,
+      handler: ({ ctx, user, params }) => unshareRecord(def, ctx, user, params.uuid, params.shareUuid),
     });
 }
 
@@ -137,5 +172,5 @@ export function recordRoutes(def: ResourceDef, tag: string): RouteGroup {
         return recordTimeline(def.entity, row, user, query, ctx);
       },
     });
-  return addCommentRoutes(group, def);
+  return addShareRoutes(addCommentRoutes(group, def), def);
 }
