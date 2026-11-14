@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { clientWithRoles, createUser, loginAs, takeMail } from './helpers';
 import { db } from '../src/db/knex';
+import { onEvent } from '../src/core/events/events';
 import { sendDueReminders } from '../src/core/notifications/notifications.service';
 
 const csv = (rows: string[][]) =>
@@ -54,9 +55,20 @@ describe('bulk actions', () => {
       .first();
     expect(Number((n as { c: number }).c)).toBe(2);
     const filter = { field: 'tags', op: 'in', value: ['bulk-tag'] };
+    const seen: string[] = [];
+    onEvent((e) => {
+      if (uuids.includes(e.uuid)) seen.push(`${e.type}:${e.uuid}`);
+      return Promise.resolve();
+    });
     const del = await client.post('/contacts/bulk', { action: 'delete', all: true, filter }).expect(200);
     expect(del.body.affected).toBe(2);
     await client.post('/contacts/bulk', { action: 'restore', uuids }).expect(200);
+    await client.post('/contacts/bulk', { action: 'remove_tags', uuids, tags: ['bulk-tag'] }).expect(200);
+    // Bulk changes reach webhooks and automations like single ones: one event per record.
+    for (const u of uuids) {
+      expect(seen).toContain(`contact.deleted:${u}`);
+      expect(seen.filter((s) => s === `contact.updated:${u}`)).toHaveLength(2);
+    }
   });
 
   it('cannot touch records outside the caller’s scope', async () => {
