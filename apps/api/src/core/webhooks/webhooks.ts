@@ -275,9 +275,11 @@ export const webhooksRoutes = defineRoutes('/webhooks', ['webhooks'])
     permission: 'core.webhooks.manage',
     params: z.object({ uuid: z.uuid() }),
     handler: async ({ ctx, params }) => {
-      const n = await db('webhooks').where({ uuid: params.uuid }).delete();
-      if (!n) throw notFound('Webhook');
-      await audit(db, ctx, { action: 'webhook.deleted', entity: 'webhook', entityUuid: params.uuid });
+      await db.transaction(async (trx) => {
+        const n = await trx('webhooks').where({ uuid: params.uuid }).delete();
+        if (!n) throw notFound('Webhook');
+        await audit(trx, ctx, { action: 'webhook.deleted', entity: 'webhook', entityUuid: params.uuid });
+      });
     },
   })
   .add({
