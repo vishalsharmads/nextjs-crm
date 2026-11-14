@@ -96,6 +96,12 @@ export function useT() {
   );
 }
 
+/** Singular and plural names of every record type, as this workspace calls them. */
+export function useLabels() {
+  const { data } = useSession();
+  return data?.labels ?? {};
+}
+
 export function useLabel(entity: string) {
   const { data } = useSession();
   const l = data?.labels[entity];

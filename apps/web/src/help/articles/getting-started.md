@@ -11,7 +11,7 @@ related: records.lists, records.deals, settings.profile
 ## Find your way
 
 - **Sidebar**: the main lists ({{contactPlural}}, {{organizationPlural}}, {{dealPlural}}, tasks, calendar) and the modules your workspace uses.
-- **Search** (`⌘K` or `Ctrl K`, or `/`): jump to any record, page or action. Type a name, an email or a page.
+- **Search** (`⌘K` or `Ctrl K`, or `/`): jump to any record, page or action. Type a name, an email, a number or words from a note; **See all results** opens the full search page.
 - **Help** (`?`): the ⓘ button at the top of every page explains that page. This knowledge base collects every article.
 - **Your menu** (your picture, top right): your profile, theme, keyboard shortcuts and sign out.
 
