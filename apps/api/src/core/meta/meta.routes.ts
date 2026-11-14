@@ -11,6 +11,7 @@ import { enabledModuleKeys, moduleMenu, modulePanels, moduleShellPanels } from '
 import { can } from '../rbac/access';
 import { customizableEntities, moduleRecordDefs } from '../records/registry';
 import { objectMenu } from '../objects/objects';
+import { standardLevelsForBoot } from '../custom-fields/standard-visibility';
 
 export async function accessFor(user: AuthUser): Promise<AccessDto> {
   const fields: AccessDto['fields'] = {};
@@ -63,6 +64,7 @@ export const metaRoutes = defineRoutes('/meta', ['meta']).add({
         }))),
       },
       customFields,
+      standardFields: await standardLevelsForBoot(user),
       fieldGroups: groups.map((g) => ({
         entity: g.entity,
         key: g.key,

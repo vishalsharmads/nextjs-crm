@@ -1,3 +1,4 @@
+import { guardStandardFields } from '../custom-fields/standard-visibility';
 import { organizationInputSchema, organizationPatchSchema, type OrganizationDto } from '@app/shared';
 import type { ResourceDef } from '../records/types';
 import { serializeCustom } from '../records/custom';
@@ -120,3 +121,6 @@ export const organizationsDef: ResourceDef<Row, OrganizationDto> = {
     }));
   },
 };
+
+// Standard fields hidden from the viewer never leave the API (phase 12d).
+guardStandardFields(organizationsDef);

@@ -19,6 +19,7 @@ import { assertCan, can, teamUserIds } from '../rbac/access';
 import { scopedQuery } from '../records/service';
 import { recordDefs } from '../records/registry';
 import { getGroup } from '../settings/settings.service';
+import { standardLevels } from '../custom-fields/standard-visibility';
 
 const DAY = 86_400_000;
 const money = (v: unknown) => Math.round(Number(v ?? 0) * 100) / 100;
@@ -34,6 +35,9 @@ async function deals(
 ) {
   assertCan(user, 'core.reports.view');
   assertCan(user, `${recordDefs.deal.resource}.view`);
+  // Every sales report is built from deal values: none for people the value is hidden from.
+  if ((await standardLevels('deal', user)).value === 'hidden')
+    throw new AppError('FORBIDDEN', 'Deal values are hidden for your role');
   const base = (await getGroup('general')).currency;
   const currency = q.convert ? base : (q.currency ?? base);
   const { qb } = await scopedQuery(recordDefs.deal, user, db);

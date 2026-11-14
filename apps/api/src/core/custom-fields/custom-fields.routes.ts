@@ -20,6 +20,8 @@ import { revealField } from './reveal';
 import { customizableEntities, recordEntitySchema } from '../records/registry';
 import { entityTable, bumpDefinitionsVersion, getDefinitions, rowToDef } from './definitions';
 import { dropCustomFieldIndex, ensureCustomFieldIndexes, MAX_INDEXED_FIELDS } from './ddl.service';
+import { STANDARD_HIDEABLE } from '@app/shared';
+import { clearStandardVisibilityCache, standardVisibility } from './standard-visibility';
 
 const entityQuery = z.object({
   entity: recordEntitySchema.optional(),
@@ -61,6 +63,53 @@ const patchSchema = toPatch(customFieldInputSchema.omit({ entity: true, key: tru
 });
 
 export const customFieldsRoutes = defineRoutes('/custom-fields', ['custom-fields'])
+  .add({
+    method: 'get',
+    path: '/standard',
+    permission: 'core.fields.manage',
+    summary: 'Standard fields that can be hidden or made read-only per role, with their settings',
+    handler: async () => ({ fields: STANDARD_HIDEABLE, visibility: await standardVisibility() }),
+  })
+  .add({
+    method: 'put',
+    path: '/standard/:entity/:field',
+    permission: 'core.fields.manage',
+    params: z.object({
+      entity: z.enum(['contact', 'organization', 'lead', 'deal']),
+      field: z.string().max(64),
+    }),
+    body: z.object({ visibility: visibilitySchema }),
+    summary: 'Set who can see and edit one standard field',
+    handler: async ({ ctx, params, body }) => {
+      if (!STANDARD_HIDEABLE[params.entity].some((f) => f.field === params.field))
+        throw new AppError('VALIDATION_FAILED', 'This field cannot be hidden', [
+          { path: 'field', message: 'Not a hideable field' },
+        ]);
+      const roles = Object.keys(body.visibility.roles);
+      if (roles.length) {
+        const known = (await db('roles').whereIn('key', roles).pluck('key')) as string[];
+        if (known.length !== roles.length) throw new AppError('VALIDATION_FAILED', 'Unknown role');
+      }
+      await db.transaction(async (trx) => {
+        const before = await trx('standard_field_visibility').where(params).first('visibility');
+        await trx('standard_field_visibility')
+          .insert({ ...params, visibility: JSON.stringify(body.visibility), updated_at: new Date() })
+          .onConflict(['entity', 'field'])
+          .merge();
+        await audit(trx, ctx, {
+          action: 'field.visibility_changed',
+          entity: 'standard_field',
+          diff: {
+            field: `${params.entity}.${params.field}`,
+            visibility: { from: before?.visibility ?? null, to: body.visibility },
+          },
+        });
+      });
+      clearStandardVisibilityCache();
+      bumpDefinitionsVersion();
+      return { entity: params.entity, field: params.field, visibility: body.visibility };
+    },
+  })
   .add({
     method: 'get',
     path: '/reveal',

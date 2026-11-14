@@ -1,3 +1,4 @@
+import { guardStandardFields } from '../custom-fields/standard-visibility';
 import { leadCreateSchema, leadPatchSchema, type LeadDto } from '@app/shared';
 import type { ResourceDef } from '../records/types';
 import { serializeCustom } from '../records/custom';
@@ -177,3 +178,6 @@ export const leadsDef: ResourceDef<Row, LeadDto> = {
     });
   },
 };
+
+// Standard fields hidden from the viewer never leave the API (phase 12d).
+guardStandardFields(leadsDef);

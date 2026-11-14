@@ -235,3 +235,49 @@ export function generatedColumnName(key: string): string {
   if (!FIELD_KEY_RE.test(key)) throw new Error(`Invalid field key: ${key}`);
   return `cf_${key}`;
 }
+
+/**
+ * Standard fields an admin may hide or make read-only per role, like custom fields (plan D5).
+ * Titles, owners and stages are not in this list: lists, boards and links depend on them.
+ * `field` is the filter/sort key, `dto` the response key, `columns` the database columns
+ * (audit diffs and duplicate checks), `input` the create/update key.
+ */
+export interface StandardFieldSpec {
+  field: string;
+  label: string;
+  dto: string;
+  input: string;
+  columns: string[];
+}
+
+export const STANDARD_HIDEABLE: Record<'contact' | 'organization' | 'lead' | 'deal', StandardFieldSpec[]> = {
+  contact: [
+    { field: 'email', label: 'Email', dto: 'email', input: 'email', columns: ['email', 'email_norm'] },
+    { field: 'phone', label: 'Phone', dto: 'phone', input: 'phone', columns: ['phone', 'phone_e164'] },
+    { field: 'job_title', label: 'Job title', dto: 'jobTitle', input: 'jobTitle', columns: ['job_title'] },
+  ],
+  organization: [
+    { field: 'email', label: 'Email', dto: 'email', input: 'email', columns: ['email'] },
+    { field: 'phone', label: 'Phone', dto: 'phone', input: 'phone', columns: ['phone'] },
+  ],
+  lead: [
+    { field: 'email', label: 'Email', dto: 'email', input: 'email', columns: ['email', 'email_norm'] },
+    { field: 'phone', label: 'Phone', dto: 'phone', input: 'phone', columns: ['phone', 'phone_e164'] },
+    { field: 'job_title', label: 'Job title', dto: 'jobTitle', input: 'jobTitle', columns: ['job_title'] },
+  ],
+  deal: [
+    { field: 'value', label: 'Value', dto: 'value', input: 'value', columns: ['value'] },
+    {
+      field: 'expected_close',
+      label: 'Expected close',
+      dto: 'expectedClose',
+      input: 'expectedClose',
+      columns: ['expected_close'],
+    },
+  ],
+};
+
+export type StandardFieldEntity = keyof typeof STANDARD_HIDEABLE;
+
+/** Visibility of standard fields, per record type and field (only fields that differ from "write"). */
+export type StandardFieldLevels = Partial<Record<StandardFieldEntity, Record<string, VisibilityLevel>>>;

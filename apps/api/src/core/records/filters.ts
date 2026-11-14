@@ -112,6 +112,8 @@ export interface FilterContext {
   user: AuthUser;
   customDefs: CustomFieldDef[];
   fieldLevels: Record<string, VisibilityLevel>;
+  /** Levels of hideable standard fields (filter and sort keys); a hidden one cannot be probed. */
+  standardLevels?: Record<string, VisibilityLevel>;
 }
 
 /** Resolve a custom field key to its definition, enforcing visibility and filterability. */
@@ -181,7 +183,8 @@ function compileCondition(qb: Knex.QueryBuilder, cond: FilterCondition, fc: Filt
     return applyOp(qb, customColumn(res.table, def), cond, kind);
   }
   const spec: CoreFieldSpec | undefined = res.fields[cond.field];
-  if (!spec || spec.filterable === false) throw invalid(`Cannot filter by ${cond.field}`);
+  if (!spec || spec.filterable === false || fc.standardLevels?.[cond.field] === 'hidden')
+    throw invalid(`Cannot filter by ${cond.field}`);
   if (spec.filter) return spec.filter(qb, cond, user);
   if (!spec.column) throw invalid(`Cannot filter by ${cond.field}`);
   return applyOp(qb, spec.column, cond, spec.kind);
@@ -215,7 +218,8 @@ export function applySort(qb: Knex.QueryBuilder, sort: string | undefined, fc: F
       continue;
     }
     const spec = fc.def.fields[s.field];
-    if (!spec || !spec.sortable) throw invalid(`Cannot sort by ${s.field}`);
+    if (!spec || !spec.sortable || fc.standardLevels?.[s.field] === 'hidden')
+      throw invalid(`Cannot sort by ${s.field}`);
     if (spec.sortExpr) qb.orderByRaw(`${spec.sortExpr} ${s.dir === 'desc' ? 'DESC' : 'ASC'}`);
     else qb.orderBy(spec.column!, s.dir);
   }

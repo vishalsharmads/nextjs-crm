@@ -15,6 +15,7 @@ import type { ResourceDef } from '../records/types';
 import { redactDiff } from '../records/custom';
 import { userRefs } from '../records/hydrate';
 import { STAGED, type StagedEntity } from '../pipelines/stage-engine';
+import { hiddenColumns } from '../custom-fields/standard-visibility';
 
 /** Fields that are bookkeeping, or are shown elsewhere (stage moves), not as "changed X". */
 const NOISE = new Set([
@@ -86,6 +87,7 @@ export async function recordTimeline(
   const before = opts.before ? new Date(opts.before) : new Date(Date.now() + 1000);
   const items: TimelineItem[] = [];
   const { levels } = await customContext(entity, user);
+  const hiddenStd = await hiddenColumns(entity, user);
 
   // Activities on this record are visible to anyone who can see the record (decision D9).
   if (want('activity') && entity !== 'activity') {
@@ -141,6 +143,7 @@ export async function recordTimeline(
       items.push({ id: `audit:${l.id}`, kind: 'created', at, actor, title: 'created' });
     } else if (action === 'updated' && want('change')) {
       const diff = redactDiff((l.diff as Record<string, { from: unknown; to: unknown }>) ?? {}, levels);
+      for (const col of hiddenStd) Reflect.deleteProperty(diff, col);
       const fields = Object.entries(diff).filter(([k]) => !NOISE.has(k));
       if (fields.length)
         items.push({

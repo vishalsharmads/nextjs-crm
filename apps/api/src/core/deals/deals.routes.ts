@@ -16,6 +16,7 @@ import { leadsDef } from '../leads/leads.def';
 import { contactsDef } from '../contacts/contacts.def';
 import { organizationsDef } from '../organizations/organizations.def';
 import { getGroup } from '../settings/settings.service';
+import { standardLevels } from '../custom-fields/standard-visibility';
 
 export const dealsRoutes = [
   defineRoutes('/deals', ['deals'])
@@ -26,7 +27,9 @@ export const dealsRoutes = [
       summary: 'Deals grouped by stage for the Kanban board',
       query: boardQuerySchema,
       handler: async ({ user, query }) => {
-        const board = await loadBoard(dealsDef, 'deal', user, query, 'value');
+        // Column totals add up deal values: left out when the value is hidden from the viewer.
+        const hideValue = (await standardLevels('deal', user)).value === 'hidden';
+        const board = await loadBoard(dealsDef, 'deal', user, query, hideValue ? undefined : 'value');
         return {
           pipeline: board.pipeline,
           columns: board.columns.map(({ records, ...c }) => ({ ...c, deals: records })),

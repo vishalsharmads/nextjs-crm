@@ -28,6 +28,7 @@ import { getRecordDef, recordDefs } from '../records/registry';
 import type { IoColumn, ResourceDef } from '../records/types';
 import { applySort } from '../records/filters';
 import { getGroup } from '../settings/settings.service';
+import { standardFieldsAt } from '../custom-fields/standard-visibility';
 
 export const MAX_ROWS = 50_000;
 
@@ -167,7 +168,8 @@ export async function exportCsv(
   assertCan(user, `${def.resource}.export`);
   const { defs, levels } = await customContext(entity, user);
   const visible = defs.filter((d) => levels[d.key] !== 'hidden');
-  const columns = ioColumns(def);
+  const hiddenStd = new Set((await standardFieldsAt(entity, user, ['hidden'])).map((s) => s.dto));
+  const columns = ioColumns(def).filter((c) => !hiddenStd.has(c.key));
   const { qb } = await scopedQuery(def, user, db);
   const filter = query.filter ? filterSchema.parse(JSON.parse(query.filter)) : undefined;
   const fc = await applyListCriteria(qb, def, user, { filter, q: query.q, view: query.view });
