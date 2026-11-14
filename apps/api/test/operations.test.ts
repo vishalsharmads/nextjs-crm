@@ -73,3 +73,44 @@ describe('operations', () => {
     ]);
   });
 });
+
+describe('readiness and backups', () => {
+  it('reports database, storage and redis states', async () => {
+    const { default: request } = await import('supertest');
+    const { createApp } = await import('../src/http/app');
+    const res = await request(createApp()).get('/api/v1/health/ready').expect(200);
+    expect(res.body).toEqual({ status: 'ok', database: 'ok', storage: 'ok', redis: 'off' });
+  });
+
+  it('tells how old the newest backup is', async () => {
+    const { mkdtempSync, writeFileSync, utimesSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const path = await import('node:path');
+    const { newestBackupAgeHours } = await import('../src/cli/doctor');
+    const dir = mkdtempSync(path.join(tmpdir(), 'bk-'));
+    expect(newestBackupAgeHours(dir)).toBeNull();
+    expect(newestBackupAgeHours(path.join(dir, 'missing'))).toBeNull();
+    const f = path.join(dir, 'db-1.sql.gz');
+    writeFileSync(f, 'x');
+    const old = (Date.now() - 30 * 3_600_000) / 1000;
+    utimesSync(f, old, old);
+    expect(Math.round(newestBackupAgeHours(dir)!)).toBe(30);
+  });
+});
+
+describe('test email', () => {
+  it('sends a branded test email to the admin who asked', async () => {
+    const { clientWithRoles, takeMail } = await import('./helpers');
+    const { client, user } = await clientWithRoles(['admin']);
+    const res = await client.post('/settings/email/test').expect(200);
+    expect(res.body.sentTo).toBe(user.email);
+    const mail = takeMail().find((m) => m.to === user.email);
+    expect(mail?.subject).toMatch(/^Test email from /);
+  });
+
+  it('is for settings managers only', async () => {
+    const { clientWithRoles } = await import('./helpers');
+    const { client } = await clientWithRoles(['sales_rep']);
+    expect((await client.post('/settings/email/test')).status).toBe(403);
+  });
+});

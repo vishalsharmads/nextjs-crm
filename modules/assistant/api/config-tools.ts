@@ -45,6 +45,8 @@ const NEVER = [
   /^\/settings\/(security|compliance|mcp)(\/|$)/,
   /^\/settings\/demo/,
   /^\/settings\/demo-login/,
+  // Sends email out.
+  /^\/settings\/email\/test$/,
   /^\/settings\/branding\/assets/,
   // Payment instructions and legal details print on invoices: changing them is fraud-shaped.
   /^\/settings\/commerce(\/|$)/,

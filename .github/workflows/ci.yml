@@ -26,6 +26,8 @@ jobs:
           my-cnf: |
             log_bin_trust_function_creators=1
       - run: npm ci
+      # Production dependencies with a known high or critical advisory fail the build.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test

@@ -67,6 +67,22 @@ export function startJobWorker() {
   logger.info('Background jobs use Redis (BullMQ)');
 }
 
+/** Readiness: 'ok' when Redis answers, 'off' without Redis, 'unreachable' otherwise. */
+export async function redisStatus(): Promise<'ok' | 'off' | 'unreachable'> {
+  if (!usingRedis() || !queue) return 'off';
+  try {
+    // Narrow view of the Redis client, as for the locks below.
+    const client = (await queue.client) as unknown as { ping(): Promise<string> };
+    await Promise.race([
+      client.ping(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+    ]);
+    return 'ok';
+  } catch {
+    return 'unreachable';
+  }
+}
+
 export async function stopJobWorker() {
   await worker?.close();
   await queue?.close();

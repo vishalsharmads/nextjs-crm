@@ -1,7 +1,14 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { clientWithRoles, createRole, createUser, loginAs, type Client } from './helpers';
+import {
+  clientWithRoles,
+  createRole,
+  createUser,
+  loginAs,
+  restoreSettingsAfterEach,
+  type Client,
+} from './helpers';
 
 /** A small business website to read. */
 const PAGE = `<!doctype html><html><head>
@@ -13,6 +20,9 @@ const PAGE = `<!doctype html><html><head>
 </head><body><img class="site-logo" src="/img/logo.png" alt="Bright Smiles">
 <h1>Your family dentist</h1><p>Check-ups, hygiene and whitening for all ages.</p>
 <script>var secret = 1;</script></body></html>`;
+
+// The build sets the workspace's name and branding: put them back so later files see the defaults.
+restoreSettingsAfterEach(['branding', 'general', 'features']);
 
 describe('AI setup mode', () => {
   let admin: Client;

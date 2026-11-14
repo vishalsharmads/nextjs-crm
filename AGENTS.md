@@ -13,7 +13,7 @@ Architecture plan: [docs/plan/phase-0.md](docs/plan/phase-0.md). Roadmap and "Fu
 - **Phase 6** follows [docs/plan/phase-6.md](docs/plan/phase-6.md): 6a (quick wins), 6a2 (UI polish), 6a3 (rich text), 6b (records engine for modules), 6c (admin-defined objects), 6d (tool layer, personal access tokens, MCP), 6e (assistant module), 6f (sales reports) and 6g (delayed and scheduled automations, report builder, dashboard editing) are done. Phase 6 is complete. **Phase 7** (in-app help): 7a page help and knowledge base, 7b articles and blueprint help notes, 7c guided tours.
 - **Phase 8** follows [docs/plan/phase-8.md](docs/plan/phase-8.md): module settings and marketplace (8a, 8b), example integration and developer docs (8c), developer MCP server for AI coding agents (8e) and the git-repository module catalog (8g) are done. Run-time upload (8d) and in-product module generation (8f) are design only.
 - **Phase 9** follows [docs/plan/phase-9.md](docs/plan/phase-9.md): 9a (tasks: detail page, comments, checklists, recurrence, reminders and digest, My work, calendar, optional task statuses, task tools) and 9b (board Move to, quote and invoice tabs) are built.
-- **Phase 11** follows [docs/plan/phase-11.md](docs/plan/phase-11.md) (production readiness): 11a–11d are built.
+- **Phase 11** follows [docs/plan/phase-11.md](docs/plan/phase-11.md) (production readiness): 11a–11e are built; phase 11 is complete.
 - **Phase 10** follows [docs/plan/phase-10.md](docs/plan/phase-10.md): AI setup mode (10a interview and brief, 10b proposal, build and branding, 10c spreadsheet mapping and check-before-import, 10d entry points and E2E) is built.
 
 ## Non-negotiables
@@ -98,6 +98,7 @@ npm run check:brand              # white-label grep over build output, templates
 npm run doctor                   # Node/MySQL versions, sql_mode, TRIGGER privilege, binlog, SMTP
 npm run cli -w @app/api -- user:reset-password --email=<email>
 npm run cli -w @app/api -- demo:seed [--password=..]   # one demo user per role; shown on sign-in only with DEMO_MODE=true
+deploy/release.sh <dir> <unit> | deploy/rollback.sh <dir> <unit> [release]   # release folders; see docs/deployment.md
 npm run demo:reset -- --industry=<slug> [--yes]        # wipe the demo DB and install one industry with sample data (demo instances only)
 npm run cli -w @app/api -- module:new --key=<module> --entity=<entity> --plural=<Plural> [--personal]  # scaffold a module with one record type
 npm run cli -w @app/api -- module:new --integration --key=<module> --name=<Name>  # scaffold an integration (settings, event job, connection test)

@@ -1,0 +1,10 @@
+# /etc/systemd/system/crm-backup-<client>.service — nightly backup, started by the timer below.
+[Unit]
+Description=CRM backup (%i)
+After=mysql.service
+
+[Service]
+Type=oneshot
+User=crm
+# Optional: Environment=BACKUP_ENCRYPTION_KEY_FILE=/etc/crm/backup.key
+ExecStart=/srv/crm/client/current/deploy/backup.sh /srv/crm/client /var/backups/crm/client
