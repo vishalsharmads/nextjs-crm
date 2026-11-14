@@ -37,10 +37,22 @@ export const nav = [
 
 export const features = [
   {
+    slug: 'ai',
+    name: 'An AI assistant that asks first',
+    short: 'AI assistant',
+    body: 'Ask about your records in plain words, get summaries, reports and drafted emails, and let it make changes only after you confirm. It sees what you can see, nothing more.',
+  },
+  {
     slug: 'pipelines',
     name: 'Pipelines in your words',
     short: 'Pipelines',
     body: 'Stages, fields and labels match how your industry actually works. A real estate agency sees Listings; a clinic sees Treatment plans.',
+  },
+  {
+    slug: 'tasks',
+    name: 'Tasks your team actually finishes',
+    short: 'Tasks',
+    body: 'A My work list grouped by what is due, checklists, repeating tasks, reminders, comments with @mentions and an optional board of statuses.',
   },
   {
     slug: 'quotes-invoices',
@@ -113,6 +125,10 @@ export const homeFaq = [
   {
     q: 'How long does setup take?',
     a: 'Most businesses go live in two to four weeks: one week to configure the template, then importing data and training the team.',
+  },
+  {
+    q: 'Does Bespoq use AI?',
+    a: 'Yes, if you want it. The built-in assistant answers questions about your records, drafts notes and emails, runs reports and can set up the CRM from a description of your business. It works with your permissions, asks before changing anything and records every action. You choose the AI provider, or run your own model, and it stays off until you switch it on. AI apps that support MCP can also connect with each person’s own sign-in.',
   },
   {
     q: 'Can agencies resell Bespoq under their own brand?',

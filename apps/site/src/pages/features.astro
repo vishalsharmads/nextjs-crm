@@ -8,11 +8,26 @@ import { breadcrumbSchema, softwareSchema } from '../data/schema';
 
 /** What each module does, in specifics a buyer can check off. */
 const detail: Record<string, string[]> = {
+  ai: [
+    'Questions in plain words, answered from your records, with reports and charts from the real numbers',
+    'Summaries of a record’s history and drafted notes and emails, on the page you are looking at',
+    'Changes proposed in plain words and made only after you press Confirm',
+    'Workspace setup from a description of your business, for admins',
+    'Any AI app that supports MCP can connect, with each person’s own sign-in and permissions',
+    'Your choice of AI provider, or a model server you run yourself; every action in the audit log',
+  ],
   pipelines: [
     'Rename people, organizations and deals to your industry’s words, everywhere',
     'Your own pipeline stages, with Kanban and list views',
     'Custom fields, layouts and saved views per team',
     'Own, team or everyone access, set per role',
+  ],
+  tasks: [
+    'My work: overdue, today, upcoming, with quick add, filters and keyboard shortcuts',
+    'Checklists, repeating tasks and reminders, plus a morning email of what is due',
+    'Comments with @mentions on every task',
+    'Optional statuses such as To do, In progress and Waiting, on a drag-and-drop board',
+    'A calendar where you drag to reschedule and select a time to create',
   ],
   'quotes-invoices': [
     'A product and service price list with tax rates',
@@ -60,10 +75,10 @@ const detail: Record<string, string[]> = {
 ---
 
 <Base
-  title="CRM features: quotes, invoices, client portal, bookings | Bespoq"
-  description="Everything in Bespoq: pipelines in your words, quotes to payments, a client portal, bookings, documents and e-signatures, a support desk, automations and data ownership."
+  title="CRM features: AI assistant, quotes, invoices, client portal | Bespoq"
+  description="Everything in Bespoq: an AI assistant that asks before it acts, pipelines in your words, tasks, quotes to payments, a client portal, bookings, documents and e-signatures, a support desk, automations and data ownership."
   schema={[
-    softwareSchema({ description: 'A configurable CRM with quotes, invoices, client portal, bookings, documents, support desk and automations.' }),
+    softwareSchema({ description: 'A configurable CRM with an AI assistant, tasks, quotes, invoices, client portal, bookings, documents, support desk and automations.' }),
     breadcrumbSchema([
       { name: 'Home', path: '/' },
       { name: 'Features', path: '/features' },

@@ -15,7 +15,7 @@ const { heading = 'Everything a service business runs on, in one place' } = Astr
     <ul class="grid">
       {
         features.map((f, n) => (
-          <li class:list={['item', { wide: [0, 4, 6, 7].includes(n) }]}>
+          <li class:list={['item', { wide: [0, 9].includes(n) }]}>
             <h3 class="h3">{f.name}</h3>
             <p class="muted">{f.body}</p>
             <a class="link" href={`/features#${f.slug}`}>
