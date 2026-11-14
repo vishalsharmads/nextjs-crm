@@ -66,7 +66,8 @@ async function deliver(deliveryId: number) {
   // Claim the attempt so a retry sweep and the queued job never send the same delivery twice.
   const claimed = await db('webhook_deliveries')
     .where({ id: deliveryId, status: 'pending', attempts: d.attempts })
-    .where('next_attempt_at', '<=', new Date())
+    // DATETIME rounds to whole seconds, so a row written this instant may read up to 1 s ahead.
+    .where('next_attempt_at', '<=', new Date(Date.now() + 1000))
     .update({ next_attempt_at: new Date(Date.now() + 5 * 60_000) });
   if (!claimed) return;
   const body = JSON.stringify(d.payload);
