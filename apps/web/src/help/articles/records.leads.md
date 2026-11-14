@@ -22,6 +22,7 @@ The {{leadPluralLower}} list shows everyone your role lets you see. Open one to 
 - {{leadPlural}} can be turned off entirely in Settings → General.
 - **Comments**: discuss the record with colleagues in the Comments tab. Mention someone to notify them; only people who can open the record are notified. The owner hears about new comments. You can edit or delete your own comments.
 - **Duplicates**: a new {{leadLower}} whose email or phone matches another {{leadLower}} or a {{contactLower}} is flagged while you type.
+- **Share**: ⋯ → **Share** gives one more person or team access to this record, to view or to edit, without changing their role. They still need permission for this kind of record. A view share lets them read it and add notes and comments; an edit share also lets them change its fields. A share never lets them delete, merge, reassign or share it onwards, and merging records removes the merged-away record's shares. The owner, admins and people with the share permission can share; anyone can remove their own access.
 
 ## Fields
 

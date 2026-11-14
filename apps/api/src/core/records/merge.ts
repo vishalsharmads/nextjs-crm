@@ -8,6 +8,7 @@ import { assertCan } from '../rbac/access';
 import { customContext } from './common';
 import { getRow } from './service';
 import { closePairsAfterMerge } from '../duplicates/duplicates';
+import { dropSharesOnMerge } from '../sharing/sharing';
 import type { ResourceDef } from './types';
 
 // ---------- Merge ----------
@@ -182,10 +183,10 @@ export async function mergeRecords(def: ResourceDef, ctx: RequestContext, user: 
   const { defs, levels } = await customContext(entity, user);
   return db.transaction(async (trx) => {
     // Every record must be in the caller's scope (404 otherwise).
-    const primary = await getRow(def, user, input.primaryUuid, trx, { forUpdate: true });
+    const primary = await getRow(def, user, input.primaryUuid, trx, { forUpdate: true, shares: 'none' });
     const secondaries = [];
     for (const uuid of input.secondaryUuids)
-      secondaries.push(await getRow(def, user, uuid, trx, { forUpdate: true }));
+      secondaries.push(await getRow(def, user, uuid, trx, { forUpdate: true, shares: 'none' }));
     const all = [primary, ...secondaries];
     const byUuid = new Map(all.map((r) => [r.uuid as string, r]));
 
@@ -234,6 +235,7 @@ export async function mergeRecords(def: ResourceDef, ctx: RequestContext, user: 
     const secondaryIds = secondaries.map((s) => s.id as number);
     await repoint(trx, entity, primary.id as number, secondaryIds);
     await closePairsAfterMerge(trx, entity, user.id, secondaryIds);
+    await dropSharesOnMerge(trx, def.resource, secondaryIds);
     await trx(def.table)
       .whereIn('id', secondaryIds)
       .update({ merged_into_id: primary.id, deleted_at: new Date(), updated_by: user.id });

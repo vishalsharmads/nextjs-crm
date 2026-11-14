@@ -343,8 +343,8 @@ export async function listPairs(
       .where({ 'p.entity': e, 'p.status': 'open' });
     t.live(q, 'a');
     t.live(q, 'b');
-    await applyScope(q, user, t.resource, ['a.owner_id']);
-    await applyScope(q, user, t.resource, ['b.owner_id']);
+    await applyScope(q, user, t.resource, ['a.owner_id'], db, 'none');
+    await applyScope(q, user, t.resource, ['b.owner_id'], db, 'none');
     const rows = await q
       .orderBy('p.id', 'desc')
       .limit(200)

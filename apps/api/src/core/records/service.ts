@@ -7,7 +7,7 @@ import { newUuid } from '../../lib/ids';
 import type { AuthUser, RequestContext } from '../../http/context';
 import { audit, diffRecords } from '../audit/audit.service';
 import { logAccess } from '../audit/access-log';
-import { applyScope, assertCan, scopeAllows } from '../rbac/access';
+import { applyScope, assertCan, scopeAllows, type ShareAccess } from '../rbac/access';
 import { fieldAccessMap, getDefinitions } from '../custom-fields/definitions';
 import { applySearch, applySort, compileFilter, type FilterContext } from './filters';
 import { maskEncrypted, prepareCustom, redactDiff } from './custom';
@@ -37,13 +37,14 @@ export async function scopedQuery(
   user: AuthUser,
   conn: Db = db,
   trashed?: 'only' | 'with',
+  shares: ShareAccess = 'view',
 ) {
   const qb = conn(def.table);
   if (trashed === 'only') {
     qb.whereNotNull(`${def.table}.deleted_at`);
     if (def.mergeable) qb.whereNull(`${def.table}.merged_into_id`);
   } else if (!trashed) qb.whereNull(`${def.table}.deleted_at`);
-  await applyScope(qb, user, def.resource, def.ownerColumns, conn);
+  await applyScope(qb, user, def.resource, def.ownerColumns, conn, shares);
   return { qb };
 }
 
@@ -103,9 +104,15 @@ export async function getRow(
   user: AuthUser,
   uuid: string,
   conn: Db = db,
-  opts: { withDeleted?: boolean; forUpdate?: boolean } = {},
+  opts: {
+    withDeleted?: boolean;
+    forUpdate?: boolean;
+    /** Which shares count; reads take any share, locked writes need an edit share by default. */
+    shares?: ShareAccess;
+  } = {},
 ) {
-  const { qb } = await scopedQuery(def, user, conn, opts.withDeleted ? 'with' : undefined);
+  const shares = opts.shares ?? (opts.forUpdate ? 'edit' : 'view');
+  const { qb } = await scopedQuery(def, user, conn, opts.withDeleted ? 'with' : undefined, shares);
   qb.where(`${def.table}.uuid`, uuid);
   if (opts.forUpdate) qb.forUpdate();
   const row = await qb.first(`${def.table}.*`);
@@ -223,6 +230,10 @@ export async function updateRecord<Dto>(
     const row = await def.toRow(core, wctx);
     if ('owner_id' in row && row.owner_id !== existing.owner_id) {
       assertCan(user, perm(def, 'assign'));
+      // Reassigning needs the record in role scope: an edit share never lets someone take it over.
+      const owners = def.ownerColumns.map((c) => (existing[c.split('.').pop()!] as number | null) ?? null);
+      if (!(await scopeAllows(user, def.resource, owners, trx)))
+        throw new AppError('FORBIDDEN', 'Only people whose role covers this record can reassign it');
       if (!(await scopeAllows(user, def.resource, [row.owner_id as number | null], trx))) {
         throw new AppError('FORBIDDEN', 'You cannot assign records outside your scope');
       }
@@ -279,7 +290,8 @@ export async function updateRecord<Dto>(
 export async function deleteRecord(def: ResourceDef, ctx: RequestContext, user: AuthUser, uuid: string) {
   assertCan(user, perm(def, 'delete'));
   await db.transaction(async (trx) => {
-    const row = await getRow(def, user, uuid, trx, { forUpdate: true });
+    // Sharing never lets someone delete: only role scope does.
+    const row = await getRow(def, user, uuid, trx, { forUpdate: true, shares: 'none' });
     await trx(def.table).where({ id: row.id }).update({ deleted_at: new Date(), updated_by: user.id });
     await audit(trx, ctx, {
       action: `${def.entity}.deleted`,
@@ -299,7 +311,7 @@ export async function restoreRecord<Dto>(
 ): Promise<Dto> {
   assertCan(user, perm(def, 'delete'));
   const row = await db.transaction(async (trx) => {
-    const r = await getRow(def, user, uuid, trx, { withDeleted: true, forUpdate: true });
+    const r = await getRow(def, user, uuid, trx, { withDeleted: true, forUpdate: true, shares: 'none' });
     if (r.merged_into_id) throw new AppError('CONFLICT', 'Merged records cannot be restored');
     await trx(def.table).where({ id: r.id }).update({ deleted_at: null, updated_by: user.id });
     await audit(trx, ctx, {

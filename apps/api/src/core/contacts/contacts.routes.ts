@@ -75,7 +75,7 @@ export const contactsRoutes = [
       }),
       status: 201,
       handler: async ({ ctx, user, params, body }) => {
-        const contact = await getRow(contactsDef, user, params.uuid);
+        const contact = await getRow(contactsDef, user, params.uuid, db, { shares: 'edit' });
         const org = await getRow(organizationsDef, user, body.organizationUuid);
         await db.transaction(async (trx) => {
           if (
@@ -117,7 +117,7 @@ export const contactsRoutes = [
       permission: 'core.contacts.update',
       params: z.object({ uuid: z.uuid(), linkUuid: z.uuid() }),
       handler: async ({ ctx, user, params }) => {
-        const contact = await getRow(contactsDef, user, params.uuid);
+        const contact = await getRow(contactsDef, user, params.uuid, db, { shares: 'edit' });
         await db.transaction(async (trx) => {
           const link = await trx('contact_organization')
             .where({ uuid: params.linkUuid, contact_id: contact.id })

@@ -12,6 +12,8 @@ export const RECORD_ACTIONS = [
   'merge',
   'assign',
   'bulk',
+  // Give one person or team access to one record (owners and admins always can).
+  'share',
 ] as const;
 export type RecordAction = (typeof RECORD_ACTIONS)[number];
 

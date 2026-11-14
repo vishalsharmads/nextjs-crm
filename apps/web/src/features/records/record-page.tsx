@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, GitMerge, Mail, MoreHorizontal, Pencil, Trash2, UserCheck } from 'lucide-react';
+import { ArrowLeft, GitMerge, Mail, MoreHorizontal, Pencil, Share2, Trash2, UserCheck } from 'lucide-react';
 import { ComposeEmail } from '@/features/email/compose-email';
 import type {
   ContactDto,
@@ -39,6 +39,7 @@ import { useEntityConfig, type EntityConfig } from './entities';
 import { FieldsPanel } from './fields-panel';
 import { RecordFormSheet } from './record-form';
 import { Timeline } from './timeline';
+import { ShareDialog } from './share-dialog';
 import { qk } from '@/lib/query-keys';
 import { Comments } from '@/components/comments/comments';
 import { FilesPanel } from './files-panel';
@@ -66,6 +67,7 @@ export function RecordPage({ entity }: { entity: RecordEntity }) {
   const { remove, restore } = useRecordMutations<Rec>(config.route);
   const [editing, setEditing] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   // `?convert=1` (from the lead board's Convert action) opens the convert dialog once.
   const [converting, setConverting] = useState(() => searchParams.get('convert') === '1');
@@ -152,6 +154,11 @@ export function RecordPage({ entity }: { entity: RecordEntity }) {
                 </Button>
               </MenuTrigger>
               <MenuContent>
+                {entity !== 'activity' ? (
+                  <MenuItem onSelect={() => setSharing(true)}>
+                    <Share2 /> Share
+                  </MenuItem>
+                ) : null}
                 {(entity === 'contact' || entity === 'organization') && can(`${config.resource}.merge`) ? (
                   <MenuItem onSelect={() => setMerging(true)}>
                     <GitMerge /> Find and merge duplicates
@@ -247,6 +254,9 @@ export function RecordPage({ entity }: { entity: RecordEntity }) {
         </main>
       </div>
       <RecordFormSheet config={config} record={rec} open={editing} onOpenChange={setEditing} />
+      {sharing ? (
+        <ShareDialog route={config.route} uuid={rec.uuid} title={title} onClose={() => setSharing(false)} />
+      ) : null}
       {merging ? <MergeDialog config={config} rec={rec} onClose={() => setMerging(false)} /> : null}
       {emailing ? (
         <ComposeEmail

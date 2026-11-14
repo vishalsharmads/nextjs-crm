@@ -461,3 +461,27 @@ export interface DuplicatePairDto {
   b: { uuid: string; title: string; subtitle: string | null };
   createdAt: string;
 }
+
+/** One record opened to one more person or team (on top of role scope). */
+export interface RecordShareDto {
+  uuid: string;
+  user: UserRef | null;
+  team: { uuid: string; name: string } | null;
+  level: 'view' | 'edit';
+  sharedBy: UserRef | null;
+  createdAt: string;
+}
+
+export const recordShareSchema = z
+  .object({
+    userUuid: z.uuid().optional(),
+    teamUuid: z.uuid().optional(),
+    level: z.enum(['view', 'edit']).default('view'),
+  })
+  .refine((v) => !!v.userUuid !== !!v.teamUuid, 'Choose one person or one team');
+
+/** Shares on a record, and whether the viewer may change them. */
+export interface RecordSharesResult {
+  data: RecordShareDto[];
+  canManage: boolean;
+}

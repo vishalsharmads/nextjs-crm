@@ -59,7 +59,12 @@ async function loadSubject(
   conn: Db,
   forUpdate = false,
 ) {
-  const row = (await getRow(recordDefs[entity], user, uuid, conn, { withDeleted: true, forUpdate })) as Row;
+  // Erasure and restriction never work through a share: the role must cover the person.
+  const row = (await getRow(recordDefs[entity], user, uuid, conn, {
+    withDeleted: true,
+    forUpdate,
+    shares: forUpdate ? 'none' : 'view',
+  })) as Row;
   const subject: DataSubject = { entity, id: row.id, uuid, email: (row.email as string | null) ?? null };
   return { row, subject };
 }
@@ -199,6 +204,12 @@ async function eraseCoreTraces(
   await trx('taggables').where({ taggable_type: entity, taggable_id: id }).delete();
   // The discussion about the person goes with them.
   add('comments', await trx('record_comments').where({ entity, record_id: id }).delete());
+  add(
+    'shares',
+    await trx('record_shares')
+      .where({ resource: `core.${entity}s`, record_id: id })
+      .delete(),
+  );
   return activityIds;
 }
 
