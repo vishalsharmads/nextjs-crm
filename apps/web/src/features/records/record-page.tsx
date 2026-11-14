@@ -39,6 +39,8 @@ import { useEntityConfig, type EntityConfig } from './entities';
 import { FieldsPanel } from './fields-panel';
 import { RecordFormSheet } from './record-form';
 import { Timeline } from './timeline';
+import { qk } from '@/lib/query-keys';
+import { Comments } from '@/components/comments/comments';
 import { FilesPanel } from './files-panel';
 import { ConsentPanel } from '@/features/privacy/consent-panel';
 import { StageTrack } from '@/features/deals/stage-track';
@@ -181,6 +183,7 @@ export function RecordPage({ entity }: { entity: RecordEntity }) {
           <Tabs defaultValue="timeline">
             <TabsList>
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              {entity !== 'activity' ? <TabsTrigger value="comments">Comments</TabsTrigger> : null}
               {!config.moduleKey ? (
                 <>
                   <TabsTrigger value="activities">Activities</TabsTrigger>
@@ -202,6 +205,17 @@ export function RecordPage({ entity }: { entity: RecordEntity }) {
             <TabsContent value="timeline" className="pt-3">
               <Timeline config={config} uuid={rec.uuid} />
             </TabsContent>
+            {entity !== 'activity' ? (
+              <TabsContent value="comments" className="pt-3">
+                <Comments
+                  listPath={`/${config.route}/${rec.uuid}/comments`}
+                  itemPath={(c) => `/${config.route}/${rec.uuid}/comments/${c}`}
+                  queryKey={['records', config.route, 'comments', rec.uuid]}
+                  alsoRefresh={qk.timeline(config.route, rec.uuid)}
+                  canWrite
+                />
+              </TabsContent>
+            ) : null}
             <TabsContent value="activities" className="pt-3">
               <RecordActivities type={related} uuid={rec.uuid} />
             </TabsContent>

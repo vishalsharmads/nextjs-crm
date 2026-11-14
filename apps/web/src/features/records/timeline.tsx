@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRightLeft, FilePlus, GitMerge, PencilLine, Sparkles } from 'lucide-react';
+import { ArrowRightLeft, FilePlus, GitMerge, MessageSquare, PencilLine, Sparkles } from 'lucide-react';
 import type { TimelineItem } from '@app/shared';
 import { apiGet } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { formatRelative, formatDateTime } from '@/lib/format';
-import { EmptyState, Skeleton } from '@/components/ui/misc';
+import { EmptyState, ErrorState, Skeleton } from '@/components/ui/misc';
 import { ActivityItem } from '@/features/activities/activity-components';
 import type { EntityConfig } from './entities';
 
@@ -14,6 +14,7 @@ const ICON = {
   stage: ArrowRightLeft,
   file: FilePlus,
   merged: GitMerge,
+  comment: MessageSquare,
 } as const;
 
 type TimelineConfig = Pick<EntityConfig, 'route' | 'fields'>;
@@ -46,11 +47,12 @@ export function Timeline({ config, uuid }: { config: TimelineConfig; uuid: strin
       ),
   });
   if (q.isPending) return <Skeleton className="h-40" />;
+  if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
   if (!q.data?.length)
     return (
       <EmptyState
         title="Nothing here yet"
-        description="Notes, calls, changes and stage moves will appear here."
+        description="Notes, calls, comments, changes and stage moves will appear here."
       />
     );
   return (
@@ -82,6 +84,12 @@ export function Timeline({ config, uuid }: { config: TimelineConfig; uuid: strin
                   <span className="text-muted"> {fieldLabel(config, detail[0]![0])}</span>
                 ) : null}
               </p>
+              {item.kind === 'comment' && item.comment ? (
+                <div
+                  className="rte-prose mt-1 text-sm"
+                  dangerouslySetInnerHTML={{ __html: item.comment.body }}
+                />
+              ) : null}
               {detail.length ? (
                 <ul className="mt-1 flex flex-col gap-0.5 text-xs text-muted">
                   {detail.map(([k, v]) => (

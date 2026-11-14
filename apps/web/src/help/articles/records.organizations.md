@@ -18,6 +18,7 @@ The {{organizationPluralLower}} list shows everyone your role lets you see. Open
 - **Work in bulk**: tick several rows to assign an owner, change a field, add tags or delete them.
 - **Log what happens**: add notes, tasks, calls and meetings from the record page. They appear in its timeline.
 - The **Related** tab lists the {{contactPluralLower}} and {{dealPluralLower}} of the {{organizationLower}}.
+- **Comments**: discuss the record with colleagues in the Comments tab. Mention someone to notify them; only people who can open the record are notified. The owner hears about new comments. You can edit or delete your own comments.
 
 ## Fields
 
