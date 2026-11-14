@@ -99,7 +99,9 @@ describe('auth', () => {
     const setup = await c.post('/me/2fa/setup').expect(200);
     expect(setup.body.otpauthUrl).toContain('otpauth://totp/');
     await c.post('/me/2fa/enable', { code: '000000' }).expect(401);
-    await c.post('/me/2fa/enable', { code: totpAt(setup.body.secret, Date.now()) }).expect(200);
+    // One clock reading for the whole test, so crossing a 30-second step boundary cannot change the codes.
+    const enabledAt = Date.now();
+    await c.post('/me/2fa/enable', { code: totpAt(setup.body.secret, enabledAt) }).expect(200);
 
     const fresh = await anonymousClient();
     const first = await fresh.post('/auth/login', { email: user.email, password: user.password }).expect(200);
@@ -107,10 +109,8 @@ describe('auth', () => {
     expect((await fresh.get('/me')).status).toBe(401);
     await fresh.post('/auth/2fa/verify', { code: '123456' }).expect(401);
     // The code used to enable 2FA cannot be replayed; the next time step's code works.
-    await fresh.post('/auth/2fa/verify', { code: totpAt(setup.body.secret, Date.now()) }).expect(401);
-    await fresh
-      .post('/auth/2fa/verify', { code: totpAt(setup.body.secret, Date.now() + 30_000) })
-      .expect(200);
+    await fresh.post('/auth/2fa/verify', { code: totpAt(setup.body.secret, enabledAt) }).expect(401);
+    await fresh.post('/auth/2fa/verify', { code: totpAt(setup.body.secret, enabledAt + 30_000) }).expect(200);
     expect((await fresh.get('/me')).status).toBe(200);
   });
 

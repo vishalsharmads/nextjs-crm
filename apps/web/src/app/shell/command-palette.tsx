@@ -2,9 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { Command } from 'cmdk';
 import { Dialog as D } from 'radix-ui';
 import { useNavigate } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
 import { Search, CornerDownLeft, type LucideIcon } from 'lucide-react';
-import { apiGet } from '@/lib/api';
+import { useDebounced } from '@/lib/use-debounced';
+import { useSearch, useTypeName } from '@/features/search/search-hit';
 import { useT } from '@/app/session';
 import { Kbd } from '@/components/ui/misc';
 
@@ -24,14 +24,6 @@ interface PaletteContextValue {
 }
 
 const PaletteContext = createContext<PaletteContextValue | null>(null);
-
-interface SearchHit {
-  type: string;
-  uuid: string;
-  title: string;
-  subtitle: string | null;
-  url: string;
-}
 
 export function CommandPaletteProvider({
   children,
@@ -62,16 +54,19 @@ export function CommandPaletteProvider({
     [register],
   );
 
-  const q = search.trim();
-  const hits = useQuery({
-    queryKey: ['search', q],
-    queryFn: () => apiGet<{ data: SearchHit[] }>(`/search?q=${encodeURIComponent(q)}`).then((r) => r.data),
-    enabled: isOpen && q.length >= 2,
-    staleTime: 10_000,
-  });
+  const typed = search.trim();
+  // Wait for a pause in typing before asking the server.
+  const q = useDebounced(typed, 200);
+  const hits = useSearch(q, { enabled: isOpen });
+  const typeName = useTypeName();
 
   // Pages may re-register a base command (same id) with page-specific behaviour; the page wins.
-  const all = [...new Map([...baseCommands, ...extra.flat()].map((c) => [c.id, c])).values()];
+  // The server ranks records, so the list is not re-filtered; commands are matched here.
+  const needle = typed.toLowerCase();
+  const all = [...new Map([...baseCommands, ...extra.flat()].map((c) => [c.id, c])).values()].filter(
+    (c) => !needle || `${c.label} ${(c.keywords ?? []).join(' ')}`.toLowerCase().includes(needle),
+  );
+  const shownHits = typed.length >= 2 ? (hits.data ?? []) : [];
   const groups = [...new Set(all.map((c) => c.group))];
   const run = (fn: () => void) => {
     setOpen(false);
@@ -87,7 +82,7 @@ export function CommandPaletteProvider({
           <D.Content className="anim-pop fixed inset-x-0 top-[14vh] z-50 mx-auto w-[calc(100vw-2rem)] max-w-xl overflow-hidden rounded-lg border border-line bg-surface shadow-overlay">
             <D.Title className="sr-only">{t('nav.search')}</D.Title>
             <D.Description className="sr-only">{t('nav.search')}</D.Description>
-            <Command label={t('nav.search')} shouldFilter loop>
+            <Command label={t('nav.search')} shouldFilter={false} loop>
               <div className="flex items-center gap-2 border-b border-line px-3">
                 <Search className="size-4 text-muted" />
                 <Command.Input
@@ -100,26 +95,41 @@ export function CommandPaletteProvider({
               </div>
               <Command.List className="max-h-[50vh] overflow-y-auto p-1.5">
                 <Command.Empty className="px-3 py-8 text-center text-sm text-muted">
-                  {hits.isFetching ? t('common.loading') : 'No results'}
+                  {hits.isFetching || typed !== q ? t('common.loading') : 'No results'}
                 </Command.Empty>
-                {hits.data?.length ? (
+                {shownHits.length ? (
                   <Command.Group
                     heading="Records"
                     className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-faint"
                   >
-                    {hits.data.map((h) => (
-                      <Item
-                        key={`${h.type}:${h.uuid}`}
-                        value={`${h.title} ${h.subtitle ?? ''} ${h.uuid}`}
-                        onSelect={() => run(() => navigate(h.url))}
-                      >
-                        <span className="truncate">{h.title}</span>
-                        {h.subtitle ? (
-                          <span className="truncate text-xs text-muted">{h.subtitle}</span>
-                        ) : null}
-                        <span className="ms-auto text-2xs text-faint">{h.type}</span>
-                      </Item>
-                    ))}
+                    {[...shownHits]
+                      .sort((a, b) => b.score - a.score)
+                      .slice(0, 12)
+                      .map((h) => (
+                        <Item
+                          key={`${h.type}:${h.uuid}`}
+                          value={`hit:${h.type}:${h.uuid}`}
+                          onSelect={() =>
+                            run(() => navigate(h.url ?? `/search?q=${encodeURIComponent(typed)}`))
+                          }
+                        >
+                          <span className="truncate">{h.title}</span>
+                          {h.subtitle ? (
+                            <span className="truncate text-xs text-muted">{h.subtitle}</span>
+                          ) : null}
+                          <span className="ms-auto shrink-0 text-2xs text-faint">
+                            {h.matched ? `${h.matched} · ` : ''}
+                            {typeName(h.type)}
+                          </span>
+                        </Item>
+                      ))}
+                    <Item
+                      value="hit:all"
+                      onSelect={() => run(() => navigate(`/search?q=${encodeURIComponent(typed)}`))}
+                    >
+                      <Search className="size-4 text-muted" />
+                      <span>See all results for “{typed}”</span>
+                    </Item>
                   </Command.Group>
                 ) : null}
                 {groups.map((g) => (
