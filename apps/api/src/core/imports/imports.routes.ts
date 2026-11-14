@@ -16,6 +16,7 @@ import {
   exportCsv,
   exportQuerySchema,
   importStartSchema,
+  checkImport,
   importTargets,
   ioDef,
   startImport,
@@ -60,6 +61,14 @@ export const importsRoutes = defineRoutes('/imports', ['import-export'])
         suggested: suggestMapping(headers, targets),
       };
     },
+  })
+  .add({
+    method: 'post',
+    path: '/check',
+    permission: 'authenticated',
+    body: importStartSchema,
+    summary: 'Check a file against the import rules without saving: what would be created, and every problem',
+    handler: ({ ctx, user, body }) => checkImport(ctx, user, body),
   })
   .add({
     method: 'post',

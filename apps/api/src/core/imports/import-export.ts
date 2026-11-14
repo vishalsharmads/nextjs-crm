@@ -537,6 +537,92 @@ async function importRunner(input: StartInput, user: AuthUser, ctx: RequestConte
   return { def, headers, rows, importRow, failure };
 }
 
+/** Rows a check runs through; larger files are checked on their first rows. */
+const CHECK_ROWS = 5_000;
+class Rollback extends Error {}
+
+export interface ImportCheck {
+  total: number;
+  checked: number;
+  wouldCreate: number;
+  wouldUpdate: number;
+  wouldSkip: number;
+  failed: number;
+  /** The first problems, row by row. */
+  errors: { row: number; message: string; values: string[] }[];
+  /** The same problems grouped by what went wrong, most common first. */
+  problems: { message: string; rows: number[]; count: number }[];
+}
+
+/**
+ * Runs the import's own rules over the file without saving anything: each row is imported inside
+ * a transaction that is always rolled back (a savepoint per row, so one bad row does not spoil the
+ * rest). Updates of existing records are counted, not run.
+ */
+export async function checkImport(
+  ctx: RequestContext,
+  user: AuthUser,
+  input: StartInput,
+): Promise<ImportCheck> {
+  const def = ioDef(input.entity);
+  assertCan(user, `${def.resource}.import`);
+  assertCan(user, `${def.resource}.create`);
+  const file = await db('files')
+    .where({ uuid: input.fileUuid, entity: 'import', uploaded_by: user.id })
+    .whereNull('deleted_at')
+    .first();
+  if (!file) throw new AppError('NOT_FOUND', 'Upload the file again');
+  const targets = new Set((await importTargets(def, user)).map((t) => t.key));
+  for (const target of Object.values(input.mapping))
+    if (target && !targets.has(target)) throw new AppError('VALIDATION_FAILED', `Unknown field: ${target}`);
+
+  const { rows, importRow, failure } = await importRunner(input, user, ctx);
+  const out: ImportCheck = {
+    total: rows.length,
+    checked: Math.min(rows.length, CHECK_ROWS),
+    wouldCreate: 0,
+    wouldUpdate: 0,
+    wouldSkip: 0,
+    failed: 0,
+    errors: [],
+    problems: [],
+  };
+  const all: { row: number; message: string }[] = [];
+  const seen = { created: 'wouldCreate', updated: 'wouldUpdate', skipped: 'wouldSkip' } as const;
+  await db
+    .transaction(async (trx) => {
+      for (const [i, cells] of rows.slice(0, CHECK_ROWS).entries()) {
+        try {
+          out[seen[await trx.transaction((sp) => importRow(cells, sp))]]++;
+        } catch (err) {
+          out.failed++;
+          const f = failure(i, cells, err);
+          all.push({ row: f.row, message: f.message });
+          if (out.errors.length < 200) out.errors.push(f);
+        }
+      }
+      throw new Rollback();
+    })
+    .catch((err: unknown) => {
+      if (!(err instanceof Rollback)) throw err;
+    });
+  // Group by the message with quoted values taken out, so "Unknown stage "A"" and "…"B"" group.
+  const groups = new Map<string, number[]>();
+  for (const e of all) {
+    const k = e.message.replace(/"[^"]*"/g, '"…"').replace(/\b\d+(\.\d+)?\b/g, '#');
+    groups.set(k, [...(groups.get(k) ?? []), e.row]);
+  }
+  out.problems = [...groups.entries()]
+    .map(([_key, r]) => ({
+      message: all.find((e) => e.row === r[0])!.message,
+      rows: r.slice(0, 20),
+      count: r.length,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 30);
+  return out;
+}
+
 registerJob('import', async (job, progress) => {
   const input = importStartSchema.parse(job.payload);
   const userId = job.payload.userId as number;

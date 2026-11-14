@@ -178,6 +178,44 @@ describe('import and export', () => {
     expect(bad.body.error.message).toMatch(/Excel workbook/);
   });
 
+  it('checks a file against the import rules without saving anything', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const tag = Date.now().toString(36);
+    const file = csv([
+      ['First Name', 'E-mail', 'Company', 'Plan'],
+      [`Cia${tag}`, `cia${tag}@check.test`, `Checkco ${tag}`, 'Pro'],
+      [`Dov${tag}`, 'not-an-email', '', 'basic'],
+      [`Eli${tag}`, `eli${tag}@check.test`, '', 'Gold'],
+      [`Fay${tag}`, `fay${tag}@check.test`, '', 'Silver'],
+    ]);
+    const up = await client.agent
+      .post('/api/v1/imports')
+      .set('x-csrf-token', client.csrf)
+      .field('entity', 'contact')
+      .attach('file', file, 'check.csv')
+      .expect(201);
+    const check = await client
+      .post('/imports/check', {
+        entity: 'contact',
+        fileUuid: up.body.fileUuid,
+        mapping: { ...up.body.suggested, 'E-mail': 'email' },
+        options: { duplicates: 'skip' },
+      })
+      .expect(200);
+    expect(check.body).toMatchObject({ total: 4, checked: 4, wouldCreate: 1, failed: 3 });
+    // The two unknown plans are one kind of problem, the bad email another.
+    expect(check.body.problems).toHaveLength(2);
+    expect(check.body.problems[0]).toMatchObject({ count: 2, rows: [4, 5] });
+    expect(check.body.errors.map((e: { row: number }) => e.row)).toEqual([3, 4, 5]);
+    // Nothing was saved, not even the company the import would have created.
+    expect(await db('contacts').where('first_name', 'like', `%${tag}`)).toHaveLength(0);
+    expect(
+      await db('organizations')
+        .where({ name: `Checkco ${tag}` })
+        .first(),
+    ).toBeUndefined();
+  });
+
   it('exports the current list as CSV with visible custom fields only', async () => {
     const { client } = await clientWithRoles(['admin']);
     await client
