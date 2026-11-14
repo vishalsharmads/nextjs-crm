@@ -30,7 +30,7 @@ The installer creates the database, runs migrations, seeds defaults and the blue
 Then:
 
 1. Copy `deploy/crm-api.service.example` to `/etc/systemd/system/crm-acme.service`, adjust paths, `systemctl enable --now crm-acme`.
-2. Copy `deploy/nginx.conf.example` to a server block, set `server_name` and certificates, reload nginx.
+2. Copy `deploy/nginx-security-headers.conf` to `/etc/nginx/snippets/crm-security-headers.conf` and `deploy/nginx.conf.example` to a server block, set `server_name` and certificates, then run `nginx -t` and reload nginx. Every `location` includes the header snippet, because nginx drops inherited `add_header` lines in any block that sets its own. The example also rate-limits sign-in (`/api/auth/`, 10 a minute per address) and the API as a whole.
 3. Set `TRUST_PROXY=1` in `.env` (nginx is one proxy hop). `doctor` fails in production without it.
 4. Sign in, then set branding, invite users and review fields.
 

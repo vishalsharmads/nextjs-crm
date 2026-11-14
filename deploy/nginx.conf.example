@@ -2,6 +2,10 @@
 
 # Access log without query strings: search terms and filters often contain names and emails.
 # (Site files are included inside the http block, where log_format belongs. Define it once.)
+# Rate limits for sign-in and public endpoints (the API also limits per address).
+limit_req_zone $binary_remote_addr zone=crm_auth:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=crm_api:10m rate=20r/s;
+
 log_format crm_minimal '$remote_addr - [$time_local] "$request_method $uri $server_protocol" '
                        '$status $body_bytes_sent "$http_user_agent"';
 
@@ -18,14 +22,19 @@ server {
     index index.html;
     client_max_body_size 25m;
 
-    # Security headers for the SPA (the API sets its own).
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header Referrer-Policy no-referrer always;
-    add_header X-Frame-Options SAMEORIGIN always;
-    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'" always;
+    # Copy deploy/nginx-security-headers.conf to /etc/nginx/snippets/crm-security-headers.conf.
+    include snippets/crm-security-headers.conf;
+
+    location /api/auth/ {
+        limit_req zone=crm_auth burst=10 nodelay;
+        proxy_pass http://127.0.0.1:4000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
     location /api/ {
+        limit_req zone=crm_api burst=60 nodelay;
         proxy_pass http://127.0.0.1:4000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -44,10 +53,12 @@ server {
     # Hashed assets are immutable; index.html must always revalidate (branding is runtime anyway).
     location /assets/ {
         expires 1y;
+        include snippets/crm-security-headers.conf;
         add_header Cache-Control "public, immutable";
     }
     location / {
         try_files $uri /index.html;
+        include snippets/crm-security-headers.conf;
         add_header Cache-Control "no-cache";
     }
 }
