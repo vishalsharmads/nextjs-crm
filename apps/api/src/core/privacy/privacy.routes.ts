@@ -174,17 +174,31 @@ export const privacyRoutes = defineRoutes('/privacy', ['privacy'])
 
 /**
  * The record an unsubscribe link applies to now: links in old emails may name a contact that was
- * since merged into another, and the opt-out must reach the surviving record.
+ * since merged into another, or a lead that was converted, and the opt-out must reach the record
+ * the person lives on as.
  */
 async function survivingRecord(conn: Db, entity: DataSubjectEntity, uuid: string) {
+  type Found = { entity: DataSubjectEntity; id: number; uuid: string; marketing_opt_out: number };
+  let current: DataSubjectEntity = entity;
   let row = await conn(recordDefs[entity].table)
     .where({ uuid })
-    .first('id', 'uuid', 'marketing_opt_out', ...(entity === 'contact' ? ['merged_into_id'] : []));
+    .first(
+      'id',
+      'uuid',
+      'marketing_opt_out',
+      ...(entity === 'contact' ? ['merged_into_id'] : ['converted_contact_id']),
+    );
+  if (row?.converted_contact_id) {
+    current = 'contact';
+    row = await conn('contacts')
+      .where({ id: row.converted_contact_id })
+      .first('id', 'uuid', 'marketing_opt_out', 'merged_into_id');
+  }
   for (let hops = 0; row?.merged_into_id && hops < 10; hops++)
     row = await conn('contacts')
       .where({ id: row.merged_into_id })
       .first('id', 'uuid', 'marketing_opt_out', 'merged_into_id');
-  return row as { id: number; uuid: string; marketing_opt_out: number } | undefined;
+  return row ? ({ ...row, entity: current } as Found) : undefined;
 }
 
 const unsubscribeBody = z.object({
@@ -220,13 +234,13 @@ export const publicPrivacyRoutes = defineRoutes('/public/privacy', ['public'])
       await db.transaction(async (trx) => {
         const row = await survivingRecord(trx, t.entity, t.uuid);
         if (!row) return;
-        const subject = { entity: t.entity, id: row.id as number, uuid: row.uuid as string };
+        const subject = { entity: row.entity, id: row.id, uuid: row.uuid };
         await withdrawMarketing(trx, ctx, subject, 'unsubscribe');
         const already =
           body.doNotSell &&
           (await trx('privacy_requests')
             .where({
-              subject_type: t.entity,
+              subject_type: row.entity,
               subject_id: row.id,
               type: 'opt_out_sale_share',
               status: 'completed',
@@ -240,7 +254,7 @@ export const publicPrivacyRoutes = defineRoutes('/public/privacy', ['public'])
             uuid,
             type: 'opt_out_sale_share',
             status: 'completed',
-            subject_type: t.entity,
+            subject_type: row.entity,
             subject_id: row.id,
             channel: 'unsubscribe link',
             received_at: today,

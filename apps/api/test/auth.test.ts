@@ -74,8 +74,9 @@ describe('auth', () => {
     takeMail();
     const c = await anonymousClient();
     await c.post('/auth/password/forgot', { email: user.email }).expect(204);
-    const [mail] = takeMail();
-    expect(mail?.to).toBe(user.email);
+    // The captured mailbox is shared with other test files: pick this user's mail.
+    const mail = takeMail().find((m) => m.to === user.email);
+    expect(mail).toBeTruthy();
     expect(mail?.subject).toContain('Test CRM');
     const token = decodeURIComponent(/token=(\S+)/.exec(mail!.text)![1]!);
     await c.post('/auth/password/reset', { token, password: 'weak' }).expect(422);
@@ -89,7 +90,7 @@ describe('auth', () => {
     const c = await anonymousClient();
     takeMail();
     await c.post('/auth/password/forgot', { email: 'ghost@example.test' }).expect(204);
-    expect(takeMail()).toHaveLength(0);
+    expect(takeMail().filter((m) => m.to === 'ghost@example.test')).toHaveLength(0);
   });
 
   it('requires a TOTP code when 2FA is enabled', async () => {

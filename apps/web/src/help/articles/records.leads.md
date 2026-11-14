@@ -17,7 +17,7 @@ The {{leadPluralLower}} list shows everyone your role lets you see. Open one to 
 - **Edit**: change a field in place on the record page. You can undo from the message that appears.
 - **Work in bulk**: tick several rows to assign an owner, change a field, add tags or delete them.
 - **Log what happens**: add notes, tasks, calls and meetings from the record page. They appear in its timeline.
-- **Convert** qualified {{leadPluralLower}} from the record's menu: this creates {{contactLower}} records, and optionally {{organizationLower}} and {{dealLower}} records too.
+- **Convert** qualified {{leadPluralLower}} from the record's menu: this creates {{contactLower}} records, and optionally {{organizationLower}} and {{dealLower}} records too. The person's privacy choices go with them: an unsubscribe or a processing restriction on the {{leadLower}} also applies to the new {{contactLower}}, and consents are copied over. An unsubscribe link from an earlier email still works after conversion.
 - With the {{leadLower}} pipeline turned on (Settings → General), {{leadPluralLower}} also move through stages on a board.
 - {{leadPlural}} can be turned off entirely in Settings → General.
 

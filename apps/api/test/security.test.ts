@@ -62,7 +62,7 @@ describe('account lifecycle', () => {
     const created = await admin
       .post('/users', { email: 'temp@example.test', firstName: 'Temp', roleKeys: ['read_only'] })
       .expect(201);
-    const [mail] = takeMail();
+    const mail = takeMail().find((m) => m.to === 'temp@example.test');
     const token = decodeURIComponent(/token=(\S+)/.exec(mail!.text)![1]!);
     await admin.post(`/users/${created.body.uuid}/disable`).expect(200);
     const anon = await anonymousClient();

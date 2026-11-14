@@ -61,6 +61,19 @@ describe('module reads', () => {
   });
 });
 
+describe('timeline reads', () => {
+  it('logs reading a record history', async () => {
+    await setSettingsGroup('compliance', { accessLogging: true });
+    const { client, user } = await clientWithRoles(['admin']);
+    const c = await client.post('/contacts', { firstName: 'History' }).expect(201);
+    await client.get(`/contacts/${c.body.uuid}/timeline`).expect(200);
+    const row = await db('access_logs')
+      .where({ actor_id: user.id, entity_uuid: c.body.uuid, action: 'view' })
+      .first();
+    expect(row.detail).toEqual({ timeline: true });
+  });
+});
+
 describe('audit viewer', () => {
   it('filters, shows one entry and exports only with the export permission', async () => {
     const { client: admin, user } = await clientWithRoles(['admin']);

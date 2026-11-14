@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clientWithRoles, createRole } from './helpers';
+import { clientWithRoles, createRole, createUser, loginAs, unique } from './helpers';
 import { db } from '../src/db/knex';
 
 describe('custom fields', () => {
@@ -165,5 +165,31 @@ describe('custom fields', () => {
       })
       .expect(200);
     await client.post('/contacts', { firstName: 'Old', custom: { colour: 'blue' } }).expect(422);
+  });
+
+  it('keeps a hidden date field out of the dashboard date widget', async () => {
+    const { client: admin } = await clientWithRoles(['admin']);
+    const role = await createRole(['core.deals.*', 'core.dashboard.view'], { '*': 'all' });
+    const key = unique('renew_').replace(/[^a-z0-9_]/g, '_');
+    await admin
+      .post('/custom-fields', {
+        entity: 'deal',
+        key,
+        label: 'Renewal',
+        type: 'date',
+        filterable: true,
+        visibility: { default: 'write', roles: { [role]: 'hidden' } },
+      })
+      .expect(201);
+    const params = encodeURIComponent(JSON.stringify({ entity: 'deal', field: `cf.${key}`, days: 30 }));
+    const url = `/dashboards/widgets/date_window/data?params=${params}`;
+    expect((await admin.get(url).expect(200)).body.unavailable).toBeFalsy();
+    const viewer = await loginAs(await createUser({ roleKeys: [role] }));
+    expect((await viewer.get(url).expect(200)).body).toMatchObject({
+      unavailable: true,
+      reason: 'forbidden',
+    });
+    // Broken parameters are the caller's mistake, not a server error.
+    await admin.get('/dashboards/widgets/date_window/data?params=%7Bnope').expect(422);
   });
 });

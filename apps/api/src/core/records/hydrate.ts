@@ -4,6 +4,7 @@ import { db, type Db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
 import type { AuthUser } from '../../http/context';
+import { applyScope } from '../rbac/access';
 
 export const iso = (d: unknown): string | null => (d ? new Date(d as string).toISOString() : null);
 
@@ -40,18 +41,41 @@ export async function userIdFromRef(
   return row.id as number;
 }
 
-/** Look up a record id by uuid within a table (used for relation inputs). */
+/** Who links, so a link can only point at records they may see (see `idFromUuid`). */
+export interface LinkScope {
+  user: AuthUser;
+  resource: string;
+  ownerColumns: string[];
+  /** The id already linked: keeping it is allowed even if it is outside the caller's scope. */
+  current?: number | null;
+}
+
+/**
+ * Look up a record id by uuid within a table (used for relation inputs). With `scope`, a record the
+ * caller cannot see answers "Not found", exactly like one that does not exist, so a link can neither
+ * reach nor reveal (through the linked name in the response) records outside their scope.
+ */
 export async function idFromUuid(
   table: string,
   uuid: string | null | undefined,
   field: string,
   conn: Db = db,
+  scope?: LinkScope,
 ): Promise<number | null | undefined> {
   if (uuid === undefined) return undefined;
   if (uuid === null) return null;
-  const row = await conn(table).where({ uuid }).whereNull('deleted_at').first('id');
-  if (!row) throw new AppError('VALIDATION_FAILED', 'Not found', [{ path: field, message: 'Not found' }]);
+  const qb = conn(table).where(`${table}.uuid`, uuid).whereNull(`${table}.deleted_at`);
+  const row = await qb.clone().first(`${table}.id`);
+  if (row && scope && row.id !== scope.current) {
+    await applyScope(qb, scope.user, scope.resource, scope.ownerColumns, conn);
+    if (!(await qb.first(`${table}.id`))) return notFoundLink(field);
+  }
+  if (!row) return notFoundLink(field);
   return row.id as number;
+}
+
+function notFoundLink(field: string): never {
+  throw new AppError('VALIDATION_FAILED', 'Not found', [{ path: field, message: 'Not found' }]);
 }
 
 export async function tagsFor(type: string, ids: number[], conn: Db = db): Promise<Map<number, TagDto[]>> {

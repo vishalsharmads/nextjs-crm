@@ -225,6 +225,42 @@ describe('unsubscribe and opt-out of sale', () => {
   });
 });
 
+describe('lead conversion keeps privacy choices', () => {
+  it('carries the opt-out, the restriction and consents to the contact, and old links still work', async () => {
+    await withPurposes();
+    const lead = await admin.post('/leads', { firstName: 'Careful', lastName: 'Lead' }).expect(201);
+    await admin
+      .post(`/privacy/lead/${lead.body.uuid}/consents`, { purposeKey: 'newsletter', status: 'granted' })
+      .expect(200);
+    await admin.post(`/privacy/lead/${lead.body.uuid}/restriction`, { restricted: true }).expect(204);
+    await db('leads').where({ uuid: lead.body.uuid }).update({ marketing_opt_out: true });
+    const oldLink = unsubscribeToken('lead', lead.body.uuid);
+
+    await admin.post(`/leads/${lead.body.uuid}/convert`, {}).expect(200);
+    const row = await db('leads').where({ uuid: lead.body.uuid }).first('converted_contact_id');
+    const contact = await db('contacts').where({ id: row.converted_contact_id }).first();
+    expect(contact.marketing_opt_out).toBeTruthy();
+    expect(contact.processing_restricted).toBeTruthy();
+    expect(
+      await db('consents').where({
+        subject_type: 'contact',
+        subject_id: contact.id,
+        purpose_key: 'newsletter',
+      }),
+    ).toHaveLength(1);
+
+    // An unsubscribe link sent to the lead now applies to the contact.
+    await db('contacts').where({ id: contact.id }).update({ marketing_opt_out: false });
+    const app = await getApp();
+    await request(app)
+      .post('/api/v1/public/privacy/unsubscribe')
+      .query({ token: oldLink })
+      .send({})
+      .expect(200);
+    expect((await db('contacts').where({ id: contact.id }).first()).marketing_opt_out).toBeTruthy();
+  });
+});
+
 describe('restriction of processing', () => {
   it('stops webhooks, automations and outgoing email for the record', async () => {
     const hook = await admin
@@ -568,5 +604,31 @@ describe('data export is limited to what the exporter can see', () => {
     const { client: manager } = await clientWithRoles([await createRole(['core.privacy.manage'])]);
     expect((await manager.get(`/privacy/contact/${c.body.uuid}/export`)).status).toBe(403);
     for (const f of [hidden, special]) await admin.post(`/custom-fields/${f.body.uuid}/archive`).expect(200);
+  });
+});
+
+describe('merging contacts keeps privacy choices and module records', () => {
+  it('carries opt-out and restriction, and moves tickets and the portal account to the survivor', async () => {
+    const keep = await admin.post('/contacts', { firstName: 'Keep' }).expect(201);
+    const dup = await admin
+      .post('/contacts', { firstName: 'Dup', email: `dup-${Date.now()}@example.test` })
+      .expect(201);
+    const ticket = await admin
+      .post('/m/tickets/tickets', { subject: 'Before merge', contactUuid: dup.body.uuid })
+      .expect(201);
+    await admin.post('/m/portal/accounts', { contactUuid: dup.body.uuid }).expect(201);
+    await admin.post(`/privacy/contact/${dup.body.uuid}/restriction`, { restricted: true }).expect(204);
+    await db('contacts').where({ uuid: dup.body.uuid }).update({ marketing_opt_out: true });
+
+    await admin
+      .post('/contacts/merge', { primaryUuid: keep.body.uuid, secondaryUuids: [dup.body.uuid] })
+      .expect(200);
+    const survivor = await db('contacts').where({ uuid: keep.body.uuid }).first();
+    expect(survivor.marketing_opt_out).toBeTruthy();
+    expect(survivor.processing_restricted).toBeTruthy();
+    expect((await db('m_tickets_tickets').where({ uuid: ticket.body.uuid }).first()).contact_id).toBe(
+      survivor.id,
+    );
+    expect(await db('m_portal_accounts').where({ contact_id: survivor.id }).first()).toBeTruthy();
   });
 });

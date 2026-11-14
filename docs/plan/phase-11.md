@@ -10,4 +10,6 @@ Source: [production-readiness review](../review/production-readiness-2026-11.md)
 | 11d | Web reliability: unsaved-changes guard, error states on every list, confirm dialog instead of `window.confirm`, split the largest settings files, background polling off |
 | 11e | Delivery: release folders with rollback, backup timer and freshness check, `npm audit` and Dependabot in CI, replace or isolate exceljs, `DB_POOL_MAX`, readiness covers Redis and storage, SMTP test email, the flaky API test, "one API process" documented or Redis-backed limits and cache invalidation |
 
+**Status (2026-11-14):** 11a is built. Decision kept: a record's activities stay visible to anyone who can see the record (D9), so the timeline gained an access-log entry but no extra permission check. The flaky API test (shared captured mail) was fixed early. Import rows that find an existing organization outside the importer's scope now fail with "Not found" instead of linking it.
+
 Phases 12–18 (feature gaps) are listed in the [roadmap](../roadmap.md).

@@ -386,14 +386,19 @@ registerJob('automation.run', async (job) => {
   const log: string[] = [];
   let status: 'succeeded' | 'skipped' | 'failed' = 'succeeded';
   try {
-    // A delayed run judges the record as it is now, read as the rule's owner.
+    // Every run judges the record as the rule's owner sees it now, so conditions and templates
+    // never reveal records or fields the owner may not read (the event carries the actor's view).
     let gone = false;
-    if (job.payload.recheck && !event.type.endsWith('.deleted')) {
+    const owner = await runAs(automation.created_by);
+    if (!event.type.endsWith('.deleted')) {
       const def = findRecordDef(event.entity);
-      const owner = await runAs(automation.created_by);
       const fresh = def ? await getRecord(def, owner, event.uuid).catch(() => null) : null;
       if (fresh) event = { ...event, record: fresh as Record<string, unknown> };
       else gone = true;
+    } else if (!owner.isAdmin && event.record) {
+      // A deleted record can't be read again; custom values may be hidden from the owner.
+      const { custom: _custom, ...rest } = event.record;
+      event = { ...event, record: rest };
     }
     if (gone) {
       status = 'skipped';
@@ -405,7 +410,7 @@ registerJob('automation.run', async (job) => {
       status = 'skipped';
       log.push('conditions not met');
     } else {
-      const user = await runAs(automation.created_by);
+      const user = owner;
       const ctx: RequestContext = {
         requestId: `automation:${automation.uuid}`,
         ip: null,

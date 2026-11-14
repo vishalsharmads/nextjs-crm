@@ -137,6 +137,8 @@ describe('import and export', () => {
     const status = await client.get(`/imports/${start.body.jobUuid}`).expect(200);
     expect(status.body.status).toBe('succeeded');
     expect(status.body.result).toMatchObject({ created: 2, skipped: 1, failed: 1 });
+    // The uploaded file holds raw personal data: it is gone once the import ends.
+    expect(await db('files').where({ uuid: up.body.fileUuid }).first()).toBeUndefined();
     const errors = await client.get(`/imports/${start.body.jobUuid}/errors.csv`).expect(200);
     expect(errors.text).toContain('Platinum');
     const ana = await client.get('/contacts?q=ana%40import.test').expect(200);
@@ -221,6 +223,51 @@ describe('import and export', () => {
         .where({ name: `Checkco ${tag}` })
         .first(),
     ).toBeUndefined();
+  });
+
+  it('removes import uploads that were never imported after a day', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const up = await client.agent
+      .post('/api/v1/imports')
+      .set('x-csrf-token', client.csrf)
+      .field('entity', 'contact')
+      .attach('file', csv([['First Name'], ['Left behind']]), 'abandoned.csv')
+      .expect(201);
+    const { runRetention } = await import('../src/core/privacy/retention.service');
+    await runRetention(new Date(Date.now() + 2 * 3_600_000));
+    expect(await db('files').where({ uuid: up.body.fileUuid }).first()).toBeTruthy();
+    await runRetention(new Date(Date.now() + 25 * 3_600_000));
+    expect(await db('files').where({ uuid: up.body.fileUuid }).first()).toBeUndefined();
+  });
+
+  it('tells nobody about records a check would create', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const owner = await createUser({ roleKeys: ['admin'] });
+    const tag = Date.now().toString(36);
+    const up = await client.agent
+      .post('/api/v1/imports')
+      .set('x-csrf-token', client.csrf)
+      .field('entity', 'contact')
+      .attach(
+        'file',
+        csv([
+          ['First Name', 'Owner'],
+          [`Gus${tag}`, owner.email],
+        ]),
+        'owners.csv',
+      )
+      .expect(201);
+    const check = await client
+      .post('/imports/check', {
+        entity: 'contact',
+        fileUuid: up.body.fileUuid,
+        mapping: { 'First Name': 'firstName', Owner: 'ownerEmail' },
+        options: { duplicates: 'skip' },
+      })
+      .expect(200);
+    expect(check.body).toMatchObject({ wouldCreate: 1, failed: 0 });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(await db('notifications').where({ user_id: owner.id })).toHaveLength(0);
   });
 
   it('exports the current list as CSV with visible custom fields only', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clientWithRoles, createRole } from './helpers';
+import { clientWithRoles, createRole, createUser, loginAs } from './helpers';
 
 describe('rbac', () => {
   it('denies admin endpoints without the permission', async () => {
@@ -49,5 +49,68 @@ describe('rbac', () => {
     const adminRole = roles.body.data.find((r: { key: string }) => r.key === 'admin');
     expect((await client.delete(`/roles/${adminRole.uuid}`)).status).toBe(409);
     expect((await client.patch(`/roles/${adminRole.uuid}`, { permissions: [] })).status).toBe(409);
+  });
+});
+
+describe('team membership', () => {
+  it('lets only admins put themselves into a team, since teams widen record scope', async () => {
+    const { client: admin } = await clientWithRoles(['admin']);
+    const role = await createRole(['core.users.manage']);
+    const mgrUser = await createUser({ roleKeys: [role] });
+    const mgr = await loginAs(mgrUser);
+    const other = await createUser({ roleKeys: [role] });
+    const team = await admin
+      .post('/teams', { name: `Execs ${Date.now()}`, memberUuids: [other.uuid] })
+      .expect(201);
+
+    await mgr.patch(`/teams/${team.body.uuid}`, { memberUuids: [other.uuid, mgrUser.uuid] }).expect(403);
+    await mgr.patch(`/users/${mgrUser.uuid}`, { teamUuids: [team.body.uuid] }).expect(403);
+    await mgr.post('/teams', { name: `Mine ${Date.now()}`, memberUuids: [mgrUser.uuid] }).expect(403);
+    // Managing other people's membership is still allowed.
+    await mgr.post('/teams', { name: `Theirs ${Date.now()}`, memberUuids: [other.uuid] }).expect(201);
+    // An admin can add them.
+    await admin.patch(`/teams/${team.body.uuid}`, { memberUuids: [other.uuid, mgrUser.uuid] }).expect(200);
+    // Once in, they may edit the team without losing their place.
+    await mgr.patch(`/teams/${team.body.uuid}`, { memberUuids: [mgrUser.uuid] }).expect(200);
+  });
+});
+
+describe('links between records', () => {
+  it('cannot link a deal or contact to records outside the caller’s scope', async () => {
+    const { client: admin } = await clientWithRoles(['admin']);
+    const role = await createRole(['core.deals.*', 'core.contacts.*', 'core.organizations.view'], {
+      'core.deals': 'own',
+      'core.contacts': 'own',
+      'core.organizations': 'own',
+    });
+    const rep = await loginAs(await createUser({ roleKeys: [role] }));
+    const theirs = await admin.post('/contacts', { firstName: 'Not yours' }).expect(201);
+    const theirOrg = await admin.post('/organizations', { name: `Hidden ${Date.now()}` }).expect(201);
+
+    const res = await rep.post('/deals', { title: 'Peek', contactUuid: theirs.body.uuid }).expect(422);
+    expect(res.body.error.details[0].path).toBe('contactUuid');
+    await rep.post('/deals', { title: 'Peek', organizationUuid: theirOrg.body.uuid }).expect(422);
+    await rep.post('/contacts', { firstName: 'Mine', organizationUuid: theirOrg.body.uuid }).expect(422);
+
+    // A link an admin made is kept when the rep saves the deal with it unchanged.
+    const mine = await rep.post('/deals', { title: 'Mine' }).expect(201);
+    await admin.patch(`/deals/${mine.body.uuid}`, { contactUuid: theirs.body.uuid }).expect(200);
+    await rep
+      .patch(`/deals/${mine.body.uuid}`, { title: 'Mine 2', contactUuid: theirs.body.uuid })
+      .expect(200);
+  });
+});
+
+describe('user directory', () => {
+  it('shows people who do not manage users only active colleagues, and honours wildcards', async () => {
+    const invited = await createUser({ roleKeys: ['sales_rep'] });
+    const { db } = await import('../src/db/knex');
+    await db('users').where({ id: invited.id }).update({ status: 'invited' });
+    const rep = await loginAs(await createUser({ roleKeys: ['sales_rep'] }));
+    const seen = await rep.get(`/users?q=${encodeURIComponent(invited.email)}`).expect(200);
+    expect(seen.body.data).toHaveLength(0);
+    const wildcard = await loginAs(await createUser({ roleKeys: [await createRole(['core.users.*'])] }));
+    const full = await wildcard.get(`/users?q=${encodeURIComponent(invited.email)}`).expect(200);
+    expect(full.body.data[0]).toMatchObject({ status: 'invited', roles: expect.any(Array) });
   });
 });

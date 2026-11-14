@@ -138,6 +138,32 @@ describe('delayed and scheduled automations', () => {
     await mgr.patch(`/automations/${r.uuid}`, { active: false }).expect(200);
   });
 
+  it('runs an immediate rule as its owner, so it never sees records outside their scope', async () => {
+    const tag = unique('Scoped');
+    const role = await createRole(['core.automations.manage', 'core.deals.view'], { 'core.deals': 'own' });
+    const mgr = await loginAs(await createUser({ roleKeys: [role] }));
+    const created = await mgr
+      .post('/automations', {
+        name: unique('Leak '),
+        triggerEvent: 'deal.created',
+        conditions: { field: 'title', op: 'starts_with', value: tag },
+        actions: [{ type: 'notify', title: 'Saw {{record.title}}' }],
+      })
+      .expect(201);
+    rules.push(created.body.uuid);
+    // An admin's deal is out of the rule owner's reach.
+    await admin.post('/deals', { title: `${tag} secret` }).expect(201);
+    const auto = await db('automations').where({ uuid: created.body.uuid }).first('id');
+    let runs: { status: string; log: unknown }[] = [];
+    for (let i = 0; i < 50 && !runs.length; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      runs = await db('automation_runs').where({ automation_id: auto.id });
+    }
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.status).toBe('skipped');
+    expect(JSON.stringify(runs[0]!.log)).toContain('out of reach');
+  });
+
   it('validates schedules', async () => {
     await admin
       .post('/automations', {

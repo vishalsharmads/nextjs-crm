@@ -194,12 +194,35 @@ export const leadsRoutes = [
             }
             const ids = async (table: string, uuid: string | null) =>
               uuid ? ((await trx(table).where({ uuid }).first('id'))?.id as number) : null;
+            // The person's privacy choices go with them: an opt-out or a restriction on the lead
+            // must keep automated email and webhooks away from the contact too, and the proof of
+            // consent is copied (the ledger is append-only, so the lead keeps its own rows).
+            const contactId = (await ids('contacts', contact.uuid))!;
+            if (lead.marketing_opt_out || lead.processing_restricted)
+              await trx('contacts')
+                .where({ id: contactId })
+                .update({
+                  ...(lead.marketing_opt_out ? { marketing_opt_out: true } : {}),
+                  ...(lead.processing_restricted ? { processing_restricted: true } : {}),
+                });
+            const consents = await trx('consents')
+              .where({ subject_type: 'lead', subject_id: lead.id })
+              .orderBy('id');
+            if (consents.length)
+              await trx('consents').insert(
+                consents.map(({ id: _id, subject_type: _t, subject_id: _s, created_at, ...row }) => ({
+                  ...row,
+                  subject_type: 'contact',
+                  subject_id: contactId,
+                  created_at,
+                })),
+              );
             await trx('leads')
               .where({ id: lead.id })
               .update({
                 status: 'converted',
                 converted_at: new Date(),
-                converted_contact_id: await ids('contacts', contact.uuid),
+                converted_contact_id: contactId,
                 converted_organization_id: await ids('organizations', organizationUuid),
                 converted_deal_id: await ids('deals', dealUuid),
                 updated_by: user.id,

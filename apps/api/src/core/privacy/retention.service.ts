@@ -4,6 +4,7 @@ import { systemContext, type AuthUser, type RequestContext } from '../../http/co
 import { db } from '../../db/knex';
 import { logger } from '../../lib/logger';
 import { storage } from '../../lib/storage';
+import { purgeImportFiles } from '../imports/import-export';
 import { audit } from '../audit/audit.service';
 import { effectiveCompliance } from '../settings/settings.service';
 import { recordDefs } from '../records/registry';
@@ -154,6 +155,9 @@ export async function runRetention(now = new Date(), ctx: RequestContext = syste
     }
     erased.push({ rule, done, failed });
   }
+
+  // Import uploads that were never imported (an abandoned wizard) go after a day.
+  await purgeImportFiles({ olderThan: before(1, now) });
 
   const hk = housekeepingQueries(housekeeping, now);
   const cleaned = {} as Record<HousekeepingKey, number>;

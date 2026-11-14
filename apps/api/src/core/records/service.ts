@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Knex } from 'knex';
 import type { ListQuery, ListResponse } from '@app/shared';
 import { db, type Db } from '../../db/knex';
@@ -295,6 +296,12 @@ export async function restoreRecord<Dto>(
   return dto!;
 }
 
+/**
+ * Set while writes run only to be rolled back (an import check): nobody is told about records that
+ * will never exist.
+ */
+export const dryRun = new AsyncLocalStorage<true>();
+
 /** Tell the new owner/assignee about a record handed to them. */
 export async function notifyAssignment(
   def: ResourceDef,
@@ -303,7 +310,7 @@ export async function notifyAssignment(
   before?: Record<string, unknown>,
 ) {
   const col = def.notifyColumn;
-  if (!col) return;
+  if (!col || dryRun.getStore()) return;
   const to = row[col] as number | null | undefined;
   if (!to || to === user.id || (before && before[col] === to)) return;
   const title = (row.title ?? row.full_name ?? row.name ?? row.subject ?? '') as string;
