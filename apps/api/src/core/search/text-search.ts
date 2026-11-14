@@ -81,7 +81,18 @@ export function snippetOf(text: string, query: string, size = 300): string {
  * person quoted a phrase or used + and -, so "exact words" and -exclusions work.
  */
 function matchMode(query: string) {
-  return /["+-]/.test(query) ? 'IN BOOLEAN MODE' : 'IN NATURAL LANGUAGE MODE';
+  // Only a quote or a word that starts with + or - asks for boolean mode (not a hyphen inside a word).
+  return /"|(^|\s)[+-]\S/.test(query) ? 'IN BOOLEAN MODE' : 'IN NATURAL LANGUAGE MODE';
+}
+
+/** Characters with meaning in boolean mode that people type in ordinary text (emails, brackets). */
+export function safeAgainst(query: string): string {
+  return (
+    query
+      .replace(/[@<>()~*]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() || query
+  );
 }
 
 export async function searchText(
@@ -94,6 +105,7 @@ export async function searchText(
   const def = recordDefs.activity;
   assertCan(user, `${def.resource}.view`);
   const mode = matchMode(input.query);
+  const against = mode === 'IN BOOLEAN MODE' ? safeAgainst(input.query) : input.query;
 
   let relatedId: number | undefined;
   if (input.related) {
@@ -114,7 +126,7 @@ export async function searchText(
   const { qb: own } = await scopedQuery(def, user);
   narrow(own);
   own
-    .whereRaw(`MATCH(activities.subject, activities.body) AGAINST (? ${mode})`, [input.query])
+    .whereRaw(`MATCH(activities.subject, activities.body) AGAINST (? ${mode})`, [against])
     .select(
       'activities.id',
       'activities.uuid',
@@ -124,7 +136,7 @@ export async function searchText(
       'activities.related_type',
       'activities.related_id',
       'activities.updated_at',
-      db.raw(`MATCH(activities.subject, activities.body) AGAINST (? ${mode}) as score`, [input.query]),
+      db.raw(`MATCH(activities.subject, activities.body) AGAINST (? ${mode}) as score`, [against]),
     )
     .orderBy('score', 'desc')
     .limit(input.limit);
@@ -135,7 +147,7 @@ export async function searchText(
   comments
     .join('activity_comments as c', 'c.activity_id', 'activities.id')
     .whereNull('c.deleted_at')
-    .whereRaw(`MATCH(c.body) AGAINST (? ${mode})`, [input.query])
+    .whereRaw(`MATCH(c.body) AGAINST (? ${mode})`, [against])
     .select(
       'activities.id',
       'activities.uuid',
@@ -145,7 +157,7 @@ export async function searchText(
       'activities.related_type',
       'activities.related_id',
       'c.created_at as updated_at',
-      db.raw(`MATCH(c.body) AGAINST (? ${mode}) as score`, [input.query]),
+      db.raw(`MATCH(c.body) AGAINST (? ${mode}) as score`, [against]),
     )
     .orderBy('score', 'desc')
     .limit(input.limit);

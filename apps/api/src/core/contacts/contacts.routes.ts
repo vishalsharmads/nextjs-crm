@@ -10,6 +10,7 @@ import { checkDuplicates, probeFrom, rowProbe } from '../duplicates/duplicates';
 import { recordRoutes, uuidParam } from '../records/routes';
 import { contactsDef } from './contacts.def';
 import { organizationsDef } from '../organizations/organizations.def';
+import { assertStandardWrite } from '../custom-fields/standard-visibility';
 
 const mergeSchema = z.object({
   primaryUuid: z.uuid(),
@@ -77,6 +78,7 @@ export const contactsRoutes = [
       handler: async ({ ctx, user, params, body }) => {
         const contact = await getRow(contactsDef, user, params.uuid, db, { shares: 'edit' });
         const org = await getRow(organizationsDef, user, body.organizationUuid);
+        await assertStandardWrite('contact', user, { jobTitle: body.jobTitle });
         await db.transaction(async (trx) => {
           if (
             await trx('contact_organization')

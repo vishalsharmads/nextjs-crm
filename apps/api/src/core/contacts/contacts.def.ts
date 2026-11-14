@@ -1,3 +1,4 @@
+import { guardStandardFields } from '../custom-fields/standard-visibility';
 import type { Knex } from 'knex';
 import { contactCreateSchema, contactPatchSchema, type ContactDto } from '@app/shared';
 import { db } from '../../db/knex';
@@ -172,3 +173,6 @@ export const contactsDef: ResourceDef<Row, ContactDto> = {
     }));
   },
 };
+
+// Standard fields hidden from the viewer never leave the API (phase 12d).
+guardStandardFields(contactsDef);

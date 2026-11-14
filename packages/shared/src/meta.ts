@@ -1,3 +1,4 @@
+import type { StandardFieldLevels } from './custom-fields';
 import type { AccessDto, MeDto } from './auth';
 import type { CustomFieldDef, VisibilityLevel } from './custom-fields';
 import type {
@@ -136,6 +137,8 @@ export interface BootstrapDto {
     /** Active consent purposes (for form editors and record pages). */
     consentPurposes: { key: string; label: string; marketing: boolean }[];
   };
+  /** Standard fields that are read-only or hidden for this person (absent: they can edit it). */
+  standardFields: StandardFieldLevels;
   customFields: (CustomFieldDef & { level: VisibilityLevel })[];
   fieldGroups: FieldGroupDto[];
   layouts: LayoutDto[];

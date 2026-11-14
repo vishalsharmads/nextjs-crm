@@ -13,6 +13,7 @@ import { logger } from '../../lib/logger';
 import type { AuthUser } from '../../http/context';
 import { applyScope, can, scopeAllows } from '../rbac/access';
 import { domainFromWebsite } from '../organizations/organizations.def';
+import { standardFieldsAt } from '../custom-fields/standard-visibility';
 
 /** Where each record type keeps the values a rule compares. */
 const TYPES: Record<
@@ -155,6 +156,7 @@ interface Match {
   id: number;
   uuid: string;
   title: string;
+  rawTitle: string | null;
   subtitle: string | null;
   ownerId: number | null;
   rules: RuleRow[];
@@ -213,6 +215,7 @@ async function matchAll(
           id: r.id,
           uuid: r.uuid,
           title: r.title || r.subtitle || '',
+          rawTitle: r.title,
           subtitle: r.subtitle,
           ownerId: r.owner_id,
           rules: [],
@@ -223,6 +226,20 @@ async function matchAll(
     }
   }
   return [...found.values()];
+}
+
+/** The subtitle column of a type is a standard field when it is the email: hide it, and the title fallback to it. */
+const SUBTITLE_FIELD: Partial<Record<DuplicateEntity, string>> = { contact: 'email' };
+function shownNames(
+  entity: DuplicateEntity,
+  hidden: Set<string>,
+  title: string,
+  subtitle: string | null,
+  rawTitle: string | null,
+) {
+  const field = SUBTITLE_FIELD[entity];
+  if (!field || !hidden.has(field)) return { title, subtitle };
+  return { title: rawTitle || '', subtitle: null };
 }
 
 async function visibleTo(user: AuthUser, m: Match): Promise<boolean> {
@@ -240,7 +257,14 @@ export async function checkDuplicates(
   probe: Probe,
   opts: { excludeId?: number; limit?: number } = {},
 ): Promise<DuplicateCheckResult> {
-  const matches = await matchAll(entity, probe, { excludeId: opts.excludeId });
+  // A hidden standard field (an email, a phone) is never compared with a value the caller supplies,
+  // and never shown back: that would let it be guessed.
+  const hiddenOf = async (e: DuplicateEntity) =>
+    new Set((await standardFieldsAt(e, user, ['hidden'])).map((s) => s.field));
+  const hiddenHere = await hiddenOf(entity);
+  const safeProbe = Object.fromEntries(Object.entries(probe).filter(([k]) => !hiddenHere.has(k)));
+  const matches = await matchAll(entity, safeProbe, { excludeId: opts.excludeId });
+  const hiddenByType = new Map<DuplicateEntity, Set<string>>([[entity, hiddenHere]]);
   const data: DuplicateCandidate[] = [];
   let hidden = 0;
   let blocked = false;
@@ -250,10 +274,12 @@ export async function checkDuplicates(
       hidden++;
       continue;
     }
+    if (!hiddenByType.has(m.entity)) hiddenByType.set(m.entity, await hiddenOf(m.entity));
+    const shown = shownNames(m.entity, hiddenByType.get(m.entity)!, m.title, m.subtitle, m.rawTitle);
     data.push({
       uuid: m.uuid,
-      title: m.title,
-      subtitle: m.subtitle,
+      title: shown.title,
+      subtitle: shown.subtitle,
       reasons: m.rules.map((r) => r.name),
       score: m.rules.length * 40 + (m.rules.some((r) => r.action === 'block') ? 20 : 0),
       ...(m.entity !== entity ? { entity: m.entity } : {}),
@@ -359,13 +385,18 @@ export async function listPairs(
         `b.${t.title} as b_title`,
         `b.${t.subtitle} as b_sub`,
       );
+    const hidden = new Set((await standardFieldsAt(e, user, ['hidden'])).map((s) => s.field));
+    const side = (title: string | null, sub: string | null) => {
+      const shown = shownNames(e, hidden, title || sub || '', sub ?? null, title);
+      return shown;
+    };
     for (const r of rows)
       out.push({
         uuid: r.uuid,
         entity: e,
         rule: r.rule ?? null,
-        a: { uuid: r.a_uuid, title: r.a_title || r.a_sub || '', subtitle: r.a_sub ?? null },
-        b: { uuid: r.b_uuid, title: r.b_title || r.b_sub || '', subtitle: r.b_sub ?? null },
+        a: { uuid: r.a_uuid, ...side(r.a_title, r.a_sub) },
+        b: { uuid: r.b_uuid, ...side(r.b_title, r.b_sub) },
         createdAt: new Date(r.created_at).toISOString(),
       });
   }

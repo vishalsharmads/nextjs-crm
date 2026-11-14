@@ -32,6 +32,9 @@ import {
   type FieldOption,
   type FieldType,
   type VisibilityLevel,
+  type FieldVisibility,
+  type StandardFieldEntity,
+  STANDARD_HIDEABLE,
 } from '@app/shared';
 import { ApiError, apiGet, apiPatch, apiPost, apiPut } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
@@ -49,7 +52,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/misc';
-import { Sheet } from '@/components/ui/dialog';
+import { Dialog, DialogContent, Sheet } from '@/components/ui/dialog';
 import { Checkbox, Switch } from '@/components/ui/checkbox';
 import { CustomFieldInput } from '@/components/fields/custom-field';
 import { SettingsPage } from './layout';
@@ -194,6 +197,9 @@ export function FieldsPage() {
           </DndContext>
         )}
       </Pane>
+      {entity in STANDARD_HIDEABLE ? (
+        <StandardFieldsPane entity={entity as StandardFieldEntity} onSaved={refresh} />
+      ) : null}
       {editing ? (
         <FieldEditor
           entity={entity}
@@ -716,5 +722,139 @@ function OptionsEditor({
         </p>
       ) : null}
     </fieldset>
+  );
+}
+
+const LEVEL_TEXT: Record<VisibilityLevel, string> = {
+  write: 'Can edit',
+  read: 'Read only',
+  hidden: 'Hidden',
+};
+
+/** Standard fields (value, email…) that can be hidden or made read-only per role, like custom fields. */
+function StandardFieldsPane({ entity, onSaved }: { entity: StandardFieldEntity; onSaved: () => void }) {
+  const q = useQuery({
+    queryKey: ['custom-fields', 'standard'],
+    queryFn: () =>
+      apiGet<{ visibility: Record<string, Record<string, FieldVisibility>> }>('/custom-fields/standard'),
+  });
+  const roles = useQuery({
+    queryKey: ['roles'],
+    queryFn: () =>
+      apiGet<{ data: { key: string; name: string; isSystem: boolean }[] }>('/roles').then((r) => r.data),
+  });
+  const [editing, setEditing] = useState<string | null>(null);
+  const specs = STANDARD_HIDEABLE[entity];
+  const current = (field: string): FieldVisibility =>
+    q.data?.visibility[entity]?.[field] ?? { default: 'write', roles: {} };
+  const summary = (v: FieldVisibility) => {
+    const names = Object.entries(v.roles).map(
+      ([k, l]) => `${roles.data?.find((r) => r.key === k)?.name ?? k}: ${LEVEL_TEXT[l].toLowerCase()}`,
+    );
+    return [`Everyone: ${LEVEL_TEXT[v.default].toLowerCase()}`, ...names].join(' · ');
+  };
+  return (
+    <Pane title="Standard fields" padded={false}>
+      <p className="px-4 pt-3 text-xs text-muted">
+        Hide built-in fields such as a deal&apos;s value or a person&apos;s email from some roles, or make
+        them read only. Admins always see everything.
+      </p>
+      {q.isPending ? (
+        <Skeleton className="m-4 h-16" />
+      ) : q.isError ? (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+      ) : (
+        <ul className="divide-y divide-line">
+          {specs.map((f) => (
+            <li key={f.field} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+              <span className="font-medium">{f.label}</span>
+              <span className="min-w-0 flex-1 truncate text-xs text-muted">{summary(current(f.field))}</span>
+              <Button size="sm" onClick={() => setEditing(f.field)}>
+                Who can see it
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {editing ? (
+        <StandardVisibilityDialog
+          entity={entity}
+          field={editing}
+          label={specs.find((s) => s.field === editing)?.label ?? editing}
+          initial={current(editing)}
+          roles={(roles.data ?? []).filter((r) => !r.isSystem)}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            void q.refetch();
+            onSaved();
+          }}
+        />
+      ) : null}
+    </Pane>
+  );
+}
+
+function StandardVisibilityDialog({
+  entity,
+  field,
+  label,
+  initial,
+  roles,
+  onClose,
+  onSaved,
+}: {
+  entity: StandardFieldEntity;
+  field: string;
+  label: string;
+  initial: FieldVisibility;
+  roles: { key: string; name: string }[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [v, setV] = useState<FieldVisibility>(initial);
+  const save = useMutation({
+    mutationFn: () => apiPut(`/custom-fields/standard/${entity}/${field}`, { visibility: v }),
+    onSuccess: () => {
+      toast.success('Saved');
+      onSaved();
+      onClose();
+    },
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        title={`Who can see ${label}`}
+        description="Hidden fields are removed from every screen, search, export, report and API response for that role; read-only fields cannot be changed."
+        footer={
+          <>
+            <Button onClick={onClose}>Cancel</Button>
+            <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-1.5">
+          <VisibilityRow
+            label="Everyone (default)"
+            value={v.default}
+            onChange={(d) => setV({ ...v, default: d })}
+          />
+          {roles.map((r) => (
+            <VisibilityRow
+              key={r.key}
+              label={r.name}
+              value={v.roles[r.key] ?? null}
+              inherit={v.default}
+              onChange={(l) => {
+                const next = Object.fromEntries(Object.entries(v.roles).filter(([k]) => k !== r.key));
+                if (l !== null) next[r.key] = l;
+                setV({ ...v, roles: next });
+              }}
+            />
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

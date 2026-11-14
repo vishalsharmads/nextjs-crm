@@ -30,10 +30,13 @@ describe('blueprint engine', () => {
     await applyBlueprint(db, bp);
     const before = await db('blueprint_applications').count({ c: '*' }).first();
     const report = await applyBlueprint(db, bp);
-    expect(report.created).toEqual([]);
-    expect(report.updated).toEqual([]);
-    expect(report.conflicts).toEqual([]);
-    expect(report.status).toBe('unchanged');
+    // One assertion so a failure shows exactly what the second run changed.
+    expect({
+      created: report.created,
+      updated: report.updated,
+      conflicts: report.conflicts,
+      status: report.status,
+    }).toEqual({ created: [], updated: [], conflicts: [], status: 'unchanged' });
     const after = await db('blueprint_applications').count({ c: '*' }).first();
     expect(after).toEqual(before);
   });

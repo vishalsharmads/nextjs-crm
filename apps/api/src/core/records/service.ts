@@ -17,10 +17,18 @@ import { publicStageChanges } from '../pipelines/stage-engine';
 import { assertNotBlocked, probeFrom } from '../duplicates/duplicates';
 import type { ResourceDef } from './types';
 import { recordBasePath } from './paths';
+import { assertStandardWrite, standardLevels } from '../custom-fields/standard-visibility';
+import { hiddenColumns } from '../custom-fields/standard-visibility';
 
 export async function filterContext(def: ResourceDef, user: AuthUser): Promise<FilterContext> {
   const customDefs = await getDefinitions(def.entity);
-  return { def, user, customDefs, fieldLevels: fieldAccessMap(customDefs, user) };
+  return {
+    def,
+    user,
+    customDefs,
+    fieldLevels: fieldAccessMap(customDefs, user),
+    standardLevels: await standardLevels(def.entity, user),
+  };
 }
 
 /** A record row: every record table has a numeric id and a public uuid. */
@@ -65,7 +73,8 @@ export async function applyListCriteria(
     if (view.filters) compileFilter(qb, view.filters, fc);
   }
   if (query.filter) compileFilter(qb, query.filter, fc);
-  applySearch(qb, query.q, def);
+  const hidden = new Set([...(await hiddenColumns(def.entity, user))].map((c) => `${def.table}.${c}`));
+  applySearch(qb, query.q, def, hidden);
   return fc;
 }
 
@@ -148,6 +157,8 @@ export async function createRecord<Dto>(
 ): Promise<Dto> {
   assertCan(user, perm(def, 'create'));
   const core = def.createSchema.parse(input) as Record<string, unknown>;
+  // The raw input: schema defaults (a deal value of 0) are not something the person chose.
+  await assertStandardWrite(def.entity, user, input);
   const fc = await filterContext(def, user);
   const custom = prepareCustom(
     fc.customDefs,
@@ -226,6 +237,7 @@ export async function updateRecord<Dto>(
   const fc = await filterContext(def, user);
   const updated = await db.transaction(async (trx) => {
     const existing = await getRow(def, user, uuid, trx, { forUpdate: true });
+    await assertStandardWrite(def.entity, user, core, existing);
     const wctx = { user, conn: trx, ctx, existing };
     const row = await def.toRow(core, wctx);
     if ('owner_id' in row && row.owner_id !== existing.owner_id) {

@@ -12,6 +12,7 @@ import { fieldLevel, getDefinition } from '../custom-fields/definitions';
 import { isModuleEnabled } from '../../modules/registry';
 import { moduleWidget } from '../../modules/widgets';
 import { runReport, visibleReport } from '../reports/builder';
+import { standardLevels } from '../custom-fields/standard-visibility';
 
 const widgetSchema = z.object({
   key: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
@@ -93,6 +94,15 @@ async function widgetData(type: string, params: Record<string, unknown>, user: A
         count: Number(byStage.get(s.id)?.n ?? 0),
         value: Number(byStage.get(s.id)?.v ?? 0),
       }));
+      // Counts stay; sums are left out when deal values are hidden from the viewer.
+      if ((await standardLevels('deal', user)).value === 'hidden')
+        return {
+          pipeline: pipeline.name,
+          stages: data.map((s) => ({ ...s, value: null })),
+          total: null,
+          weighted: null,
+          count: data.reduce((a, s) => a + s.count, 0),
+        };
       return {
         pipeline: pipeline.name,
         stages: data,
@@ -154,7 +164,10 @@ async function widgetData(type: string, params: Record<string, unknown>, user: A
         won: w,
         lost: l,
         created: Number((created as { c: number }).c),
-        wonValue: Number((won as { v: number | null }).v ?? 0),
+        wonValue:
+          (await standardLevels('deal', user)).value === 'hidden'
+            ? null
+            : Number((won as { v: number | null }).v ?? 0),
         winRate: w + l ? Math.round((w / (w + l)) * 100) : null,
       };
     }
@@ -203,8 +216,11 @@ async function widgetData(type: string, params: Record<string, unknown>, user: A
         // The widget lists records and their dates: a field hidden from the viewer stays hidden.
         if (fieldLevel(fd, user) === 'hidden') return { unavailable: true, reason: 'forbidden' };
         column = `${def.table}.cf_${fd.key}`;
-      } else if (field === 'expected_close' && entity === 'deal') column = 'deals.expected_close';
-      else throw new AppError('VALIDATION_FAILED', 'Unsupported date field');
+      } else if (field === 'expected_close' && entity === 'deal') {
+        if ((await standardLevels('deal', user)).expected_close === 'hidden')
+          return { unavailable: true, reason: 'forbidden' };
+        column = 'deals.expected_close';
+      } else throw new AppError('VALIDATION_FAILED', 'Unsupported date field');
       const qb = db(def.table)
         .whereNull(`${def.table}.deleted_at`)
         .whereBetween(column, [

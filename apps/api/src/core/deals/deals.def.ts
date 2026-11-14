@@ -1,3 +1,4 @@
+import { guardStandardFields } from '../custom-fields/standard-visibility';
 import { dealInputSchema, dealPatchSchema, type DealDto } from '@app/shared';
 import type { Db } from '../../db/knex';
 import { endOfStage, recordStageHistory, resolveStage } from '../pipelines/stage-engine';
@@ -208,3 +209,6 @@ export const dealsDef: ResourceDef<Row, DealDto> = {
     });
   },
 };
+
+// Standard fields hidden from the viewer never leave the API (phase 12d).
+guardStandardFields(dealsDef);

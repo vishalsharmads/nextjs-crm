@@ -66,4 +66,10 @@ describe('global search', () => {
     const only = (await client.get(`/search?q=${word}&types=deal`).expect(200)).body.data as Hit[];
     expect(only.some((h) => h.type === 'activity')).toBe(false);
   });
+
+  it('searches text with an email address in it', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    await client.get(`/search?q=${encodeURIComponent('first-last@example.test')}`).expect(200);
+    await client.get(`/search?q=${encodeURIComponent('"exact words" -not (x)')}`).expect(200);
+  });
 });

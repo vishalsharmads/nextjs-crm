@@ -16,6 +16,7 @@ import {
   type TagDto,
   type UserRef,
   type VisibilityLevel,
+  type StandardFieldEntity,
 } from '@app/shared';
 import { useBoot } from '@/app/session';
 import { labelVars } from '@/lib/labels';
@@ -193,7 +194,40 @@ export function buildConfig(entity: RecordEntity, boot: ReturnType<typeof useBoo
     const labels = boot.labels[entity] ?? { singular: entity, plural: entity };
     return buildModuleConfig(meta, labels, boot.labels, boot.customFields, boot.me);
   }
-  return buildCoreConfig(entity, boot);
+  return withStandardLevels(
+    buildCoreConfig(entity, boot),
+    boot.standardFields?.[entity as StandardFieldEntity],
+  );
+}
+
+/**
+ * Standard fields hidden from this person disappear from columns, filters, forms and the detail
+ * panel; read-only ones stay visible but lose their input. The API enforces the same rules.
+ */
+function withStandardLevels(
+  config: EntityConfig,
+  levels: Record<string, VisibilityLevel> | undefined,
+): EntityConfig {
+  if (!levels) return config;
+  const hiddenInputs = new Set<string>();
+  const fields = config.fields
+    .filter((f) => {
+      if (levels[f.key] !== 'hidden') return true;
+      if (f.input) hiddenInputs.add(f.input);
+      return false;
+    })
+    .map((f) => {
+      if (levels[f.key] !== 'read' || !f.input) return f;
+      hiddenInputs.add(f.input);
+      return { ...f, input: undefined };
+    });
+  const gone = new Set(config.fields.filter((f) => levels[f.key] === 'hidden').map((f) => f.key));
+  return {
+    ...config,
+    fields,
+    defaultColumns: config.defaultColumns.filter((k) => !gone.has(k)),
+    formInputs: config.formInputs.filter((i) => !hiddenInputs.has(i)),
+  };
 }
 
 function buildCoreConfig(entity: CoreEntity, boot: ReturnType<typeof useBoot>): EntityConfig {

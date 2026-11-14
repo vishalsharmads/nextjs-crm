@@ -14,6 +14,7 @@ import { fieldLevel, getDefinitions } from '../custom-fields/definitions';
 import { plainText, searchText, snippetOf } from './text-search';
 import { logAccess } from '../audit/access-log';
 import type { AuthUser, RequestContext } from '../../http/context';
+import { hiddenColumns } from '../custom-fields/standard-visibility';
 
 interface SearchProvider {
   entity: RecordEntity;
@@ -90,10 +91,13 @@ async function searchProvider(
   const ft = fulltextQuery(q);
   const prefix = `${escapeLike(q)}%`;
   const fields = await searchableFields(def, user);
+  // Hidden standard fields (an email, a phone) are neither searched nor shown.
+  const hiddenCols = new Set([...(await hiddenColumns(def.entity, user))].map((c) => `${t}.${c}`));
+  const ftAllowed = !def.fulltext.some((c) => hiddenCols.has(c));
 
   // Two simple queries instead of one OR'd query, so each can use its own index.
   const fullText = async () => {
-    if (!ft || !def.fulltext.length) return [];
+    if (!ft || !def.fulltext.length || !ftAllowed) return [];
     const { qb } = await scopedQuery(def, user, db);
     const match = `MATCH(${def.fulltext.map(() => '??').join(', ')}) AGAINST (? IN BOOLEAN MODE)`;
     return (await qb
@@ -103,7 +107,9 @@ async function searchProvider(
       .limit(limit)) as Record<string, unknown>[];
   };
   const startsWith = async () => {
-    const cols = def.likeColumns.length ? def.likeColumns : [`${t}.${s.title}`];
+    const cols = (def.likeColumns.length ? def.likeColumns : [`${t}.${s.title}`]).filter(
+      (c) => !hiddenCols.has(c),
+    );
     const { qb } = await scopedQuery(def, user, db);
     qb.where((w) => {
       for (const c of cols) w.orWhere(c, 'like', prefix);
@@ -131,7 +137,8 @@ async function searchProvider(
       type: s.entity,
       uuid,
       title: title || '(no name)',
-      subtitle: (r.subtitle as string | null) ?? null,
+      subtitle:
+        s.subtitle && hiddenCols.has(`${t}.${s.subtitle}`) ? null : ((r.subtitle as string | null) ?? null),
       url: `${recordBasePath(def)}/${uuid}`,
       score: Math.round(total * 100) / 100,
       ...(prev?.matched || (matchedField && !bonus) ? { matched: prev?.matched ?? matchedField!.label } : {}),

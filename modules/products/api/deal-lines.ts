@@ -10,6 +10,7 @@ import {
   loadLines,
   recordDefs,
   saveLines,
+  standardLevels,
   updateRecord,
   type Db,
   type LineInput,
@@ -33,6 +34,12 @@ async function resolveProducts(lines: z.output<typeof lineItemInput>[], conn: Db
 
 const dealParam = z.object({ uuid: z.uuid() });
 
+/** Line amounts add up to the deal value: none for people the value is hidden from. */
+async function assertValueVisible(user: Parameters<typeof standardLevels>[1]) {
+  if ((await standardLevels('deal', user)).value === 'hidden')
+    throw new AppError('FORBIDDEN', 'Deal values are hidden for your role');
+}
+
 /**
  * Line items on a deal. Reading needs the deal (in scope) and the catalog; changing them needs
  * permission to update the deal. Totals are computed here, never trusted from the client.
@@ -44,6 +51,7 @@ export const dealLinesRoutes = defineRoutes('/m/products/deals', ['products'], '
     permission: 'products.products.view',
     params: dealParam,
     handler: async ({ user, params }) => {
+      await assertValueVisible(user);
       assertCan(user, `${recordDefs.deal.resource}.view`);
       const deal = await getRow(recordDefs.deal, user, params.uuid);
       const lines = (await loadLines(DEAL_LINES, 'deal_id', [deal.id], PRODUCTS)).get(deal.id) ?? [];
@@ -61,6 +69,7 @@ export const dealLinesRoutes = defineRoutes('/m/products/deals', ['products'], '
       applyToValue: z.boolean().default(false),
     }),
     handler: async ({ ctx, user, params, body }) => {
+      await assertValueVisible(user);
       assertCan(user, `${recordDefs.deal.resource}.update`);
       const deal = await getRow(recordDefs.deal, user, params.uuid);
       const resolved = await resolveProducts(body.lines, db);

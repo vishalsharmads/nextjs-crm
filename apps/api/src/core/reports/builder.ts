@@ -19,6 +19,7 @@ import { applyListCriteria, filterContext, scopedQuery } from '../records/servic
 import type { CoreFieldSpec, ResourceDef } from '../records/types';
 import { iso } from '../records/hydrate';
 import { getGroup } from '../settings/settings.service';
+import { standardLevels } from '../custom-fields/standard-visibility';
 
 /** Groups returned per report; the rest are summed into "Other". */
 const MAX_GROUPS = 50;
@@ -76,7 +77,7 @@ async function grouping(def: ResourceDef, d: ReportDefinition, user: AuthUser): 
     };
   }
   const spec: CoreFieldSpec | undefined = def.fields[field];
-  if (!spec) throw invalid('groupBy', 'Unknown field');
+  if (!spec || fc.standardLevels?.[field] === 'hidden') throw invalid('groupBy', 'Unknown field');
   if (spec.kind === 'user') {
     const column =
       def.ownerColumns.find((c) => c.endsWith('owner_id') || c.endsWith('assignee_id')) ??
@@ -136,6 +137,8 @@ async function metricColumn(def: ResourceDef, d: ReportDefinition, user: AuthUse
   }
   const spec = def.fields[field];
   if (!spec?.column || spec.kind !== 'number') throw invalid('metricField', 'Choose a number field');
+  if ((await standardLevels(def.entity, user))[field] === 'hidden')
+    throw invalid('metricField', 'Unknown field');
   const money = def.meta?.columns.find((c) => c.key === field)?.kind === 'money';
   return { column: spec.column, divisor: money ? 100 : 1 };
 }
