@@ -27,6 +27,7 @@ import * as m0025 from './0025_activity_recurrence';
 import * as m0026 from './0026_task_pipeline';
 import * as m0027 from './0027_text_search';
 import * as m0028 from './0028_record_comments';
+import * as m0029 from './0029_duplicate_rules';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -63,4 +64,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0026_task_pipeline': m0026,
   '0027_text_search': m0027,
   '0028_record_comments': m0028,
+  '0029_duplicate_rules': m0029,
 };

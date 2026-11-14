@@ -398,4 +398,66 @@ export interface DuplicateCandidate {
   subtitle: string | null;
   reasons: string[];
   score: number;
+  /** Set when the match is another record type (a lead matching a contact). */
+  entity?: string;
+}
+
+/** Record types with duplicate rules, and the fields a rule can compare. `cf:<key>` adds a filterable custom field. */
+export const DUPLICATE_ENTITIES = ['contact', 'organization', 'lead'] as const;
+export type DuplicateEntity = (typeof DUPLICATE_ENTITIES)[number];
+export const DUPLICATE_FIELDS: Record<DuplicateEntity, { key: string; label: string }[]> = {
+  contact: [
+    { key: 'email', label: 'Email' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'name', label: 'Name' },
+    { key: 'organization', label: 'Organization' },
+  ],
+  organization: [
+    { key: 'domain', label: 'Website' },
+    { key: 'name', label: 'Name' },
+  ],
+  lead: [
+    { key: 'email', label: 'Email' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'name', label: 'Name' },
+    { key: 'company', label: 'Company' },
+  ],
+};
+
+export const duplicateRuleSchema = z.object({
+  entity: z.enum(DUPLICATE_ENTITIES),
+  name: z.string().trim().min(1).max(100),
+  fields: z
+    .array(z.string().regex(/^(email|phone|name|organization|domain|company|cf:[a-z][a-z0-9_]{0,48})$/))
+    .min(1)
+    .max(4),
+  action: z.enum(['warn', 'block']).default('warn'),
+  active: z.boolean().default(true),
+});
+
+export interface DuplicateRuleDto {
+  uuid: string;
+  entity: DuplicateEntity;
+  name: string;
+  fields: string[];
+  action: 'warn' | 'block';
+  active: boolean;
+}
+
+/** What a create form learns about possible duplicates. */
+export interface DuplicateCheckResult {
+  data: DuplicateCandidate[];
+  /** Matches the person cannot open: counted, never described. */
+  hidden: number;
+  /** A blocking rule matched: saving will be refused. */
+  blocked: boolean;
+}
+
+export interface DuplicatePairDto {
+  uuid: string;
+  entity: 'contact' | 'organization';
+  rule: string | null;
+  a: { uuid: string; title: string; subtitle: string | null };
+  b: { uuid: string; title: string; subtitle: string | null };
+  createdAt: string;
 }

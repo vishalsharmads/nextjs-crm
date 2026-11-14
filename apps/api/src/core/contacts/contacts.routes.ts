@@ -5,10 +5,11 @@ import { conflict, notFound } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
 import { audit } from '../audit/audit.service';
 import { getRow } from '../records/service';
-import { findContactDuplicates, findOrganizationDuplicates, mergeRecords } from '../records/merge';
+import { mergeRecords } from '../records/merge';
+import { checkDuplicates, probeFrom, rowProbe } from '../duplicates/duplicates';
 import { recordRoutes, uuidParam } from '../records/routes';
 import { contactsDef } from './contacts.def';
-import { organizationsDef, domainFromWebsite } from '../organizations/organizations.def';
+import { organizationsDef } from '../organizations/organizations.def';
 
 const mergeSchema = z.object({
   primaryUuid: z.uuid(),
@@ -28,8 +29,9 @@ export const contactsRoutes = [
         phone: z.string().max(50).nullish(),
         firstName: z.string().max(100).nullish(),
         lastName: z.string().max(100).nullish(),
+        organizationUuid: z.uuid().nullish(),
       }),
-      handler: async ({ user, body }) => ({ data: await findContactDuplicates(user, body) }),
+      handler: ({ user, body }) => checkDuplicates(user, 'contact', probeFrom(body)),
     })
     .add({
       method: 'get',
@@ -38,15 +40,19 @@ export const contactsRoutes = [
       params: uuidParam,
       handler: async ({ user, params }) => {
         const row = await getRow(contactsDef, user, params.uuid);
-        return {
-          data: await findContactDuplicates(user, {
-            email: row.email as string,
-            phone: row.phone as string,
-            firstName: row.first_name as string,
-            lastName: row.last_name as string,
-            excludeUuid: params.uuid,
+        const org = await db('contact_organization')
+          .where({ contact_id: row.id })
+          .orderBy([{ column: 'is_primary', order: 'desc' }, { column: 'id' }])
+          .first('organization_id');
+        return checkDuplicates(
+          user,
+          'contact',
+          probeFrom({
+            ...rowProbe(row),
+            organizationId: (org?.organization_id as number | undefined) ?? null,
           }),
-        };
+          { excludeId: row.id as number },
+        );
       },
     })
     .add({
@@ -145,12 +151,7 @@ export const organizationsRoutes = [
       path: '/check-duplicates',
       permission: 'core.organizations.view',
       body: z.object({ name: z.string().max(200).nullish(), website: z.string().max(500).nullish() }),
-      handler: async ({ user, body }) => ({
-        data: await findOrganizationDuplicates(user, {
-          name: body.name,
-          domain: domainFromWebsite(body.website ?? null),
-        }),
-      }),
+      handler: ({ user, body }) => checkDuplicates(user, 'organization', probeFrom(body)),
     })
     .add({
       method: 'get',
@@ -159,13 +160,9 @@ export const organizationsRoutes = [
       params: uuidParam,
       handler: async ({ user, params }) => {
         const row = await getRow(organizationsDef, user, params.uuid);
-        return {
-          data: await findOrganizationDuplicates(user, {
-            name: row.name as string,
-            domain: row.domain as string,
-            excludeUuid: params.uuid,
-          }),
-        };
+        return checkDuplicates(user, 'organization', probeFrom(rowProbe(row)), {
+          excludeId: row.id as number,
+        });
       },
     })
     .add({
