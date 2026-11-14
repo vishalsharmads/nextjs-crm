@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DataStep } from './setup-data';
 import { ChangePreview, pathKey, type ChangeEdits, type ChangePreviewDto } from './change-preview';
 import { ApiError, apiGet, apiPost, apiPut } from '@/lib/api';
 import { useBoot } from '@/app/session';
@@ -180,7 +181,10 @@ export function SetupPage() {
             ) : step === 'proposal' ? (
               <ProposalStep session={session} onSaved={put} onNext={() => setView('built')} />
             ) : (
-              <BuiltStep session={session} />
+              <>
+                <BuiltStep session={session} />
+                <DataStep sessionUuid={session.uuid} />
+              </>
             )}
           </div>
         )}

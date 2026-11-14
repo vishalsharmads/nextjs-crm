@@ -26,5 +26,6 @@ Set up {{appName}} around how your business works. The assistant learns about yo
    Untick any part, rename things, leave out items in lists, then choose **Build my CRM**.
 
 5. **Done**: what was built, part by part. Anything that already existed is left as it was, and anything that could not be built says why. Nothing you had is removed.
+6. **Bring your data**: on the same page, upload the spreadsheets you already keep (Excel `.xlsx` or CSV, first sheet, first row as headings). Pick what the file holds, and the assistant matches each column to a field and notes anything to watch, such as a date format or a column it left out. Each field shows the format it expects; change any match. **Check the file** runs every row through the import rules without saving anything and shows how many would be added, updated or skipped. Each problem is explained in plain words with how to fix it in your sheet. **Import** brings in the rows that pass; rows with problems are left out, so fix them and import the file again. Sample rows are only sent to the assistant for record types it may read.
 
 Your progress is saved: come back to this page to continue, or choose **Start over**.
