@@ -55,7 +55,7 @@ describe('rbac', () => {
 describe('team membership', () => {
   it('lets only admins put themselves into a team, since teams widen record scope', async () => {
     const { client: admin } = await clientWithRoles(['admin']);
-    const role = await createRole(['core.users.manage', 'core.users.view']);
+    const role = await createRole(['core.users.manage']);
     const mgrUser = await createUser({ roleKeys: [role] });
     const mgr = await loginAs(mgrUser);
     const other = await createUser({ roleKeys: [role] });
@@ -98,5 +98,19 @@ describe('links between records', () => {
     await rep
       .patch(`/deals/${mine.body.uuid}`, { title: 'Mine 2', contactUuid: theirs.body.uuid })
       .expect(200);
+  });
+});
+
+describe('user directory', () => {
+  it('shows people who do not manage users only active colleagues, and honours wildcards', async () => {
+    const invited = await createUser({ roleKeys: ['sales_rep'] });
+    const { db } = await import('../src/db/knex');
+    await db('users').where({ id: invited.id }).update({ status: 'invited' });
+    const rep = await loginAs(await createUser({ roleKeys: ['sales_rep'] }));
+    const seen = await rep.get(`/users?q=${encodeURIComponent(invited.email)}`).expect(200);
+    expect(seen.body.data).toHaveLength(0);
+    const wildcard = await loginAs(await createUser({ roleKeys: [await createRole(['core.users.*'])] }));
+    const full = await wildcard.get(`/users?q=${encodeURIComponent(invited.email)}`).expect(200);
+    expect(full.body.data[0]).toMatchObject({ status: 'invited', roles: expect.any(Array) });
   });
 });

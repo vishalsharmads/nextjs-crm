@@ -8,7 +8,7 @@ import { newUuid } from '../../lib/ids';
 import { env } from '../../config/env';
 import { anonymizeUser } from '../privacy/staff';
 import { audit } from '../audit/audit.service';
-import { clearAccessCache } from '../rbac/access';
+import { can, clearAccessCache } from '../rbac/access';
 import { isKnownPermissionPattern, permissionCatalog } from '../rbac/catalog';
 import { burnUserTokens, createOneTimeToken } from '../auth/tokens';
 import { assertCanAssignRoles, assertCanGrant, assertCanManageUser } from '../rbac/grants';
@@ -106,8 +106,12 @@ export const usersRoutes = defineRoutes('/users', ['users'])
       .pick({ page: true, pageSize: true, q: true })
       .extend({ status: z.enum(['invited', 'active', 'disabled']).optional() }),
     handler: async ({ query, user }) => {
+      const full = can(user, 'core.users.manage');
       const base = db('users').whereNull('deleted_at');
-      if (query.status) base.where({ status: query.status });
+      // Pickers and mentions need active colleagues only; invited and disabled people are for those
+      // who manage users.
+      if (!full) base.where({ status: 'active' });
+      else if (query.status) base.where({ status: query.status });
       if (query.q) {
         const like = `%${escapeLike(query.q)}%`;
         base.where((w) =>
@@ -120,7 +124,6 @@ export const usersRoutes = defineRoutes('/users', ['users'])
         .orderBy([{ column: 'first_name' }, { column: 'last_name' }])
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize);
-      const full = user.isAdmin || user.permissions.includes('core.users.manage');
       const data = full
         ? await Promise.all(rows.map((r) => userDto(r.id)))
         : rows.map((r) => ({
