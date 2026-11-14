@@ -21,6 +21,7 @@ import { SettingsPage } from './layout';
 import { useSaveGroup, useSettings } from './general-page';
 import { floorHint } from './compliance-floors';
 import { useEntityConfig } from '@/features/records/entities';
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 
 const PROFILE_COPY: Record<ComplianceProfile, { label: string; help: string }> = {
   standard: {
@@ -58,6 +59,7 @@ export function ComplianceSettingsPage() {
 
 function ComplianceForm({ initial }: { initial: ComplianceSettings }) {
   const form = useForm({ defaultValues: initial });
+  useUnsavedChanges(form.formState.isDirty);
   const save = useSaveGroup('compliance');
   const [confirm, setConfirm] = useState<ComplianceSettings | null>(null);
   const roles = useQuery({

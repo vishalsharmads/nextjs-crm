@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/input';
 import { ErrorState, Pane, Skeleton } from '@/components/ui/misc';
 import { SettingsPage } from './layout';
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 
 /** Business details and defaults printed on quotes, invoices and contracts. */
 export function CommerceSettingsPage() {
@@ -36,6 +37,7 @@ function CommerceForm({ initial }: { initial: CommerceSettings }) {
   const { modules } = useBoot();
   const on = (k: string) => modules.enabled.includes(k);
   const form = useForm<CommerceSettings>({ defaultValues: initial });
+  useUnsavedChanges(form.formState.isDirty);
   const save = useMutation({
     mutationFn: (v: CommerceSettings) =>
       apiPatch<CommerceSettings>('/settings/commerce', {

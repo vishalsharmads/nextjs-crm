@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Pane } from '@/components/ui/misc';
 import { SettingsPage } from './layout';
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 
 /** Rename what things are called everywhere: menus, titles, buttons, empty states and emails. */
 export function VocabularyPage() {
@@ -27,6 +28,10 @@ export function VocabularyPage() {
   });
   const set = (k: string, f: 'singular' | 'plural', v: string) =>
     setDraft((d) => ({ ...d, [k]: { ...d[k]!, [f]: v } }));
+  const saved = Object.fromEntries(
+    keys.map((k) => [k, labels[k] ?? DEFAULT_LABELS[k as keyof typeof DEFAULT_LABELS]]),
+  );
+  useUnsavedChanges(JSON.stringify(draft) !== JSON.stringify(saved));
   return (
     <SettingsPage
       title={t('settings.vocabulary')}

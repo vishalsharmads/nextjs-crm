@@ -23,6 +23,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
 import { SettingsPage } from './layout';
 import { floorHint } from './compliance-floors';
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 
 interface AllSettings {
   general: GeneralSettings;
@@ -99,12 +100,16 @@ export function GeneralSettingsPage() {
 
 function RegionalForm({ initial }: { initial: GeneralSettings }) {
   const form = useForm({ defaultValues: initial });
+  useUnsavedChanges(form.formState.isDirty);
   const save = useSaveGroup('general');
   return (
     <Pane title="Regional">
       <form
         onSubmit={form.handleSubmit((v) =>
-          save.mutate({ ...v, weekStartsOn: Number(v.weekStartsOn) as GeneralSettings['weekStartsOn'] }),
+          save.mutate(
+            { ...v, weekStartsOn: Number(v.weekStartsOn) as GeneralSettings['weekStartsOn'] },
+            { onSuccess: () => form.reset(v) },
+          ),
         )}
         className="grid gap-4 sm:grid-cols-2"
       >
@@ -301,11 +306,15 @@ export function SecuritySettingsPage() {
 
 function SecurityForm({ initial, profile }: { initial: SecuritySettings; profile: ComplianceProfile }) {
   const form = useForm({ defaultValues: initial });
+  useUnsavedChanges(form.formState.isDirty);
   const hint = (key: keyof SecuritySettings) => floorHint('security', key, profile);
   const save = useSaveGroup('security');
   const num = { valueAsNumber: true } as const;
   return (
-    <form onSubmit={form.handleSubmit((v) => save.mutate(v))} className="flex flex-col gap-6">
+    <form
+      onSubmit={form.handleSubmit((v) => save.mutate(v, { onSuccess: () => form.reset(v) }))}
+      className="flex flex-col gap-6"
+    >
       <Pane title="Passwords">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Minimum length" help={hint('passwordMinLength')}>

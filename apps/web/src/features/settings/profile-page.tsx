@@ -14,6 +14,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/checkbox';
 import { SettingsPage } from './layout';
 import { AccessTokens, ConnectedApps } from './ai-clients';
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 
 export function ProfilePage() {
   const t = useT();
@@ -35,6 +36,7 @@ function ProfileForm() {
   const qc = useQueryClient();
   const t = useT();
   const form = useForm({ defaultValues: { firstName: me.firstName, lastName: me.lastName } });
+  useUnsavedChanges(form.formState.isDirty);
   const save = useMutation({
     mutationFn: (v: { firstName: string; lastName: string }) => apiPatch('/me', v),
     onSuccess: () => {
@@ -44,7 +46,10 @@ function ProfileForm() {
   });
   return (
     <Pane title="Name">
-      <form onSubmit={form.handleSubmit((v) => save.mutate(v))} className="grid gap-4 sm:grid-cols-2">
+      <form
+        onSubmit={form.handleSubmit((v) => save.mutate(v, { onSuccess: () => form.reset(v) }))}
+        className="grid gap-4 sm:grid-cols-2"
+      >
         <Field label="First name">{(p) => <Input {...p} {...form.register('firstName')} />}</Field>
         <Field label="Last name">{(p) => <Input {...p} {...form.register('lastName')} />}</Field>
         <p className="text-sm text-muted sm:col-span-2">
