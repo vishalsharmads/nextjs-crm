@@ -22,7 +22,7 @@ import { csvSafe } from '../../lib/csv';
 import { audit } from '../audit/audit.service';
 import { assertCan, loadAccess } from '../rbac/access';
 import { customContext } from '../records/common';
-import { applyListCriteria, createRecord, scopedQuery, updateRecord } from '../records/service';
+import { applyListCriteria, createRecord, dryRun, scopedQuery, updateRecord } from '../records/service';
 import { getRecordDef, recordDefs } from '../records/registry';
 import type { IoColumn, ResourceDef } from '../records/types';
 import { applySort } from '../records/filters';
@@ -648,7 +648,7 @@ export async function checkImport(
     .transaction(async (trx) => {
       for (const [i, cells] of rows.slice(0, CHECK_ROWS).entries()) {
         try {
-          out[seen[await trx.transaction((sp) => importRow(cells, sp))]]++;
+          out[seen[await dryRun.run(true, () => trx.transaction((sp) => importRow(cells, sp)))]]++;
         } catch (err) {
           out.failed++;
           const f = failure(i, cells, err);

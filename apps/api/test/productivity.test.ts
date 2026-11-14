@@ -223,6 +223,36 @@ describe('import and export', () => {
     ).toBeUndefined();
   });
 
+  it('tells nobody about records a check would create', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const owner = await createUser({ roleKeys: ['admin'] });
+    const tag = Date.now().toString(36);
+    const up = await client.agent
+      .post('/api/v1/imports')
+      .set('x-csrf-token', client.csrf)
+      .field('entity', 'contact')
+      .attach(
+        'file',
+        csv([
+          ['First Name', 'Owner'],
+          [`Gus${tag}`, owner.email],
+        ]),
+        'owners.csv',
+      )
+      .expect(201);
+    const check = await client
+      .post('/imports/check', {
+        entity: 'contact',
+        fileUuid: up.body.fileUuid,
+        mapping: { 'First Name': 'firstName', Owner: 'ownerEmail' },
+        options: { duplicates: 'skip' },
+      })
+      .expect(200);
+    expect(check.body).toMatchObject({ wouldCreate: 1, failed: 0 });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(await db('notifications').where({ user_id: owner.id })).toHaveLength(0);
+  });
+
   it('exports the current list as CSV with visible custom fields only', async () => {
     const { client } = await clientWithRoles(['admin']);
     await client
