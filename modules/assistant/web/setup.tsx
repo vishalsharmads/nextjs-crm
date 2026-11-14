@@ -3,16 +3,29 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   ArrowRight,
+  BarChart3,
   Check,
+  CircleAlert,
   Globe,
+  Hammer,
+  Layers,
+  Lightbulb,
+  ListChecks,
+  Palette,
   Plus,
   RefreshCw,
   Send,
   SkipForward,
   Sparkles,
+  Tags,
   Trash2,
+  Users,
   Wand2,
+  Workflow,
 } from 'lucide-react';
+import { Link } from 'react-router';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ChangePreview, pathKey, type ChangeEdits, type ChangePreviewDto } from './change-preview';
 import { ApiError, apiGet, apiPost, apiPut } from '@/lib/api';
 import { useBoot } from '@/app/session';
 import { cn } from '@/lib/cn';
@@ -72,6 +85,18 @@ interface Session {
   } | null;
   interview: Turn[];
   brief: Brief | null;
+  proposal: { items: ProposalItem[] } | null;
+  built: { results: { area: string; ok: boolean; message: string }[]; at: string } | null;
+}
+
+interface ProposalItem {
+  id: string;
+  area: string;
+  title: string;
+  detail?: string;
+  advice?: boolean;
+  preview: ChangePreviewDto;
+  payload: Record<string, unknown>;
 }
 
 const key = ['m', 'assistant', 'setup'] as const;
@@ -83,6 +108,7 @@ const STEPS = [
   { id: 'interview', label: 'Questions' },
   { id: 'brief', label: 'Brief' },
   { id: 'proposal', label: 'Setup' },
+  { id: 'built', label: 'Done' },
 ] as const;
 type StepId = (typeof STEPS)[number]['id'];
 
@@ -151,12 +177,10 @@ export function SetupPage() {
               <InterviewStep session={session} onSaved={put} onNext={() => setView('brief')} />
             ) : step === 'brief' ? (
               <BriefStep session={session} onSaved={put} onNext={() => setView('proposal')} />
+            ) : step === 'proposal' ? (
+              <ProposalStep session={session} onSaved={put} onNext={() => setView('built')} />
             ) : (
-              <Pane>
-                <p className="text-sm text-muted">
-                  Your brief is approved. The proposed setup comes next: you will choose what is built.
-                </p>
-              </Pane>
+              <BuiltStep session={session} />
             )}
           </div>
         )}
@@ -895,5 +919,212 @@ function WordPair({
         onChange={(e) => change('plural', e.target.value)}
       />
     </div>
+  );
+}
+
+const AREA_ICON: Record<string, typeof Sparkles> = {
+  branding: Palette,
+  preset: Layers,
+  names: Tags,
+  pipeline: Workflow,
+  fields: ListChecks,
+  roles: Users,
+  reports: BarChart3,
+  next: Lightbulb,
+};
+
+function ProposalStep({
+  session,
+  onSaved,
+  onNext,
+}: {
+  session: Session;
+  onSaved: (s: Session) => void;
+  onNext: () => void;
+}) {
+  const { labels } = useBoot();
+  const items = session.proposal?.items ?? [];
+  const [off, setOff] = useState<string[]>([]);
+  const [texts, setTexts] = useState<Record<string, Record<string, string | boolean>>>({});
+  const [dropped, setDropped] = useState<Record<string, Record<string, number[]>>>({});
+  const propose = useMutation({
+    mutationFn: () => apiPost<Session>(`/m/assistant/setup/${session.uuid}/proposal`),
+    onSuccess: onSaved,
+    onError: (err) => toast.error(errorText(err)),
+  });
+  // The proposal is made as soon as the step opens.
+  useEffect(() => {
+    if (!session.proposal && !propose.isPending && !propose.isError) propose.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.proposal]);
+  const edits = (it: ProposalItem): ChangeEdits => {
+    const set = it.preview.fields.flatMap((f): NonNullable<ChangeEdits['set']> => {
+      const v = f.edit ? texts[it.id]?.[pathKey(f.edit)] : undefined;
+      if (!f.edit || v === undefined) return [];
+      if (typeof v === 'boolean') return v !== (f.value === 'Yes') ? [{ path: f.edit, value: v }] : [];
+      return v.trim() && v !== f.value ? [{ path: f.edit, value: v.trim() }] : [];
+    });
+    const drop = (it.preview.lists ?? []).flatMap((l) =>
+      (dropped[it.id]?.[pathKey(l.path)] ?? []).map((index) => ({ path: l.path, index })),
+    );
+    return { ...(set.length ? { set } : {}), ...(drop.length ? { drop } : {}) };
+  };
+  const chosen = items.filter((i) => !i.advice && !off.includes(i.id));
+  const build = useMutation({
+    mutationFn: () =>
+      apiPost<Session>(`/m/assistant/setup/${session.uuid}/build`, {
+        include: chosen.map((i) => i.id),
+        edits: Object.fromEntries(chosen.map((i) => [i.id, edits(i)])),
+      }),
+    onSuccess: (s) => {
+      onSaved(s);
+      onNext();
+    },
+    onError: (err) => toast.error(errorText(err)),
+  });
+  if (propose.isPending || (!session.proposal && !propose.isError))
+    return (
+      <Pane>
+        <p className="ai-shimmer text-sm">Putting your setup together…</p>
+      </Pane>
+    );
+  if (!items.length)
+    return (
+      <Pane>
+        <div className="flex flex-col items-start gap-2 text-sm">
+          <p>The setup could not be prepared.</p>
+          <Button onClick={() => propose.mutate()}>
+            <RefreshCw /> Try again
+          </Button>
+        </div>
+      </Pane>
+    );
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted">
+        Here is the setup for {session.brief?.businessName}. Untick anything you do not want, rename things
+        and leave out items in lists. Nothing is built until you choose <strong>Build my CRM</strong>, and
+        nothing you already have is removed.
+      </p>
+      {items.map((it) => {
+        const Icon = AREA_ICON[it.area] ?? Sparkles;
+        const on = !off.includes(it.id);
+        return (
+          <Pane key={it.id} padded={false}>
+            <div className={cn('p-4', !on && 'opacity-60')}>
+              <div className="flex items-start gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
+                  <Icon className="size-4" aria-hidden />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{it.title}</p>
+                  {it.detail ? <p className="text-sm text-muted">{it.detail}</p> : null}
+                </div>
+                {it.advice ? (
+                  <Badge tone="outline">Suggestion</Badge>
+                ) : (
+                  <label className="flex shrink-0 items-center gap-1.5 text-sm">
+                    <Checkbox
+                      checked={on}
+                      onCheckedChange={(v) =>
+                        setOff((x) => (v ? x.filter((y) => y !== it.id) : [...x, it.id]))
+                      }
+                    />
+                    Include
+                  </label>
+                )}
+              </div>
+              {on ? (
+                <div className="ps-11">
+                  {it.area === 'branding' && typeof it.payload.primary === 'string' ? (
+                    <p className="mt-2 flex items-center gap-2 text-xs text-muted">
+                      Colours:
+                      {[it.payload.primary, it.payload.accent]
+                        .filter((c): c is string => typeof c === 'string')
+                        .map((c) => (
+                          // A colour from the client's own website, shown as a swatch.
+                          <span
+                            key={c}
+                            className="inline-block size-5 rounded-full border border-line"
+                            style={{ background: c }}
+                          />
+                        ))}
+                    </p>
+                  ) : null}
+                  <ChangePreview
+                    preview={it.preview}
+                    input={it.payload}
+                    labels={labels}
+                    recordPath={() => null}
+                    texts={texts[it.id] ?? {}}
+                    onText={(k, v) => setTexts((x) => ({ ...x, [it.id]: { ...x[it.id], [k]: v } }))}
+                    dropped={dropped[it.id] ?? {}}
+                    onToggle={(k, index, keep) =>
+                      setDropped((x) => {
+                        const list = x[it.id]?.[k] ?? [];
+                        return {
+                          ...x,
+                          [it.id]: {
+                            ...x[it.id],
+                            [k]: keep ? list.filter((i) => i !== index) : [...list, index],
+                          },
+                        };
+                      })
+                    }
+                    hideDetails
+                  />
+                </div>
+              ) : null}
+            </div>
+          </Pane>
+        );
+      })}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="primary"
+          onClick={() => build.mutate()}
+          loading={build.isPending}
+          disabled={!chosen.length}
+        >
+          <Hammer /> Build my CRM
+        </Button>
+        <Button variant="ghost" onClick={() => propose.mutate()} disabled={build.isPending}>
+          <RefreshCw /> Propose again
+        </Button>
+        <span className="text-sm text-muted">{chosen.length} parts chosen</span>
+      </div>
+    </div>
+  );
+}
+
+function BuiltStep({ session }: { session: Session }) {
+  const results = session.built?.results ?? [];
+  const failed = results.filter((r) => !r.ok);
+  return (
+    <Pane title={failed.length ? 'Built, with a few things to check' : 'Your CRM is set up'}>
+      <ul className="space-y-1.5 text-sm">
+        {results.map((r, i) => (
+          <li key={i} className="flex items-start gap-2">
+            {r.ok ? (
+              <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-label="Done" />
+            ) : (
+              <CircleAlert className="mt-0.5 size-4 shrink-0 text-accent" aria-label="Not done" />
+            )}
+            <span>{r.message}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
+        <Button asChild variant="primary">
+          <Link to="/deals">See your pipeline</Link>
+        </Button>
+        <Button asChild>
+          <Link to="/settings/fields">Review fields</Link>
+        </Button>
+        <Button asChild variant="ghost">
+          <Link to="/m/assistant">Ask the assistant for the next steps</Link>
+        </Button>
+      </div>
+    </Pane>
   );
 }

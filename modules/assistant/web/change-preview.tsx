@@ -50,6 +50,7 @@ export function ChangePreview({
   dropped,
   onToggle,
   note,
+  hideDetails = false,
 }: {
   preview: ChangePreviewDto;
   input: Record<string, unknown>;
@@ -60,6 +61,8 @@ export function ChangePreview({
   dropped: Record<string, number[]>;
   onToggle: (key: string, index: number, keep: boolean) => void;
   note?: string;
+  /** Leave out the raw "Details" (for people setting up, not reviewing a model's change). */
+  hideDetails?: boolean;
 }) {
   return (
     <div className="mt-2 space-y-2.5">
@@ -146,7 +149,7 @@ export function ChangePreview({
         );
       })}
       {note ? <p className="text-xs text-muted">Assistant&apos;s note: {note}</p> : null}
-      <Details input={input} />
+      {hideDetails ? null : <Details input={input} />}
     </div>
   );
 }
