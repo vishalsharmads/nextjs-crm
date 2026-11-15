@@ -25,6 +25,9 @@ const PUBLIC_FORM_SUBMIT = /^\/api\/v1\/public\/forms\/[0-9a-f-]{36}\/submit$/;
 const PUBLIC_UNSUBSCRIBE = /^\/api\/v1\/public\/privacy\/unsubscribe$/;
 // OAuth client endpoints are called by AI clients, not browsers with a session (PKCE protects codes).
 const OAUTH_CLIENT = /^\/api\/v1\/oauth\/(register|token|revoke)$/;
+// Booking a meeting (and cancelling it with the emailed link) is done by visitors without a session.
+const PUBLIC_BOOKING =
+  /^\/api\/v1\/public\/book\/([a-z0-9][a-z0-9-]{2,59}|manage\/[A-Za-z0-9_-]{43}\/cancel)$/;
 
 export function csrfProtection(req: Request, _res: Response, next: NextFunction) {
   if (SAFE.has(req.method)) return next();
@@ -38,7 +41,10 @@ export function csrfProtection(req: Request, _res: Response, next: NextFunction)
   const path = req.originalUrl.split('?')[0]!;
   if (
     req.method === 'POST' &&
-    (PUBLIC_FORM_SUBMIT.test(path) || PUBLIC_UNSUBSCRIBE.test(path) || OAUTH_CLIENT.test(path))
+    (PUBLIC_FORM_SUBMIT.test(path) ||
+      PUBLIC_UNSUBSCRIBE.test(path) ||
+      OAUTH_CLIENT.test(path) ||
+      PUBLIC_BOOKING.test(path))
   )
     return next();
   const cookie = req.cookies?.[CSRF_COOKIE] as string | undefined;
