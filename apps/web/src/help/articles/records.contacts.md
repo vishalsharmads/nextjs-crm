@@ -24,6 +24,7 @@ The {{contactPluralLower}} list shows everyone your role lets you see. Open one 
 - **Duplicates**: a new {{contactLower}} that matches an existing one is flagged while you type (Settings → Duplicate rules decides what counts). Matches found later appear under **Possible duplicates** (⌘K) to merge.
 - **Share**: ⋯ → **Share** gives one more person or team access to this record, to view or to edit, without changing their role. They still need permission for this kind of record. A view share lets them read it and add notes and comments; an edit share also lets them change its fields. A share never lets them delete, merge, reassign or share it onwards, and merging records removes the merged-away record's shares. The owner, admins and people with the share permission can share; anyone can remove their own access.
 - **People in a meeting or call**: add contacts, {{leadPluralLower}}, {{organizationPluralLower}} and colleagues as participants. The activity then shows on each of their timelines. Emails are linked the same way: a message to two people shows on both, and a conversation shows as one item you can open to read every message.
+- **Invitations**: when adding a meeting with participants, tick **Send invitations by email**. Guests get an invitation they can accept in their calendar; their answers appear next to their names, and changing the time sends them an update (deleting the meeting cancels it). People whose processing is restricted are never sent invitations.
 
 ## Fields
 

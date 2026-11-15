@@ -16,6 +16,7 @@ export interface ParticipantRow {
   kind: ParticipantKind;
   record_id: number;
   role: ParticipantRole;
+  status?: 'needs_action' | 'accepted' | 'declined' | 'tentative' | null;
 }
 
 /**
@@ -49,11 +50,26 @@ export async function resolveParticipants(
   return [...out.values()];
 }
 
-/** Replace an activity's participants. */
+/** Replace an activity's participants, keeping the rows (and invitation answers) of people who stay. */
 export async function setParticipants(conn: Db, activityId: number, rows: ParticipantRow[]) {
-  await conn('activity_participants').where({ activity_id: activityId }).delete();
-  if (rows.length)
-    await conn('activity_participants').insert(rows.map((r) => ({ activity_id: activityId, ...r })));
+  const existing = (await conn('activity_participants').where({
+    activity_id: activityId,
+  })) as (ParticipantRow & {
+    id: number;
+  })[];
+  const key = (r: { kind: string; record_id: number }) => `${r.kind}:${r.record_id}`;
+  const wanted = new Map(rows.map((r) => [key(r), r]));
+  const gone = existing.filter((e) => !wanted.has(key(e))).map((e) => e.id);
+  if (gone.length) await conn('activity_participants').whereIn('id', gone).delete();
+  const have = new Set(existing.map(key));
+  const added = rows.filter((r) => !have.has(key(r)));
+  if (added.length)
+    await conn('activity_participants').insert(added.map((r) => ({ activity_id: activityId, ...r })));
+  for (const e of existing) {
+    const w = wanted.get(key(e));
+    if (w && w.role !== e.role)
+      await conn('activity_participants').where({ id: e.id }).update({ role: w.role });
+  }
 }
 
 /** Add participants, keeping existing ones. */
@@ -108,7 +124,14 @@ export async function participantsOf(
     const n = names.get(`${r.kind}:${r.record_id}`);
     if (!n) continue;
     const list = out.get(r.activity_id) ?? [];
-    list.push({ kind: r.kind, uuid: n.uuid, name: n.name, role: r.role, email: n.email });
+    list.push({
+      kind: r.kind,
+      uuid: n.uuid,
+      name: n.name,
+      role: r.role,
+      email: n.email,
+      status: r.status ?? null,
+    });
     out.set(r.activity_id, list);
   }
   return out;

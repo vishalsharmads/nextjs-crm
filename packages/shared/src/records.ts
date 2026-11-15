@@ -183,6 +183,8 @@ export interface ParticipantDto {
   role: ParticipantRole;
   /** Their email address, for replies (absent when hidden from the viewer or unknown). */
   email?: string | null;
+  /** Their answer to a meeting invitation. */
+  status?: 'needs_action' | 'accepted' | 'declined' | 'tentative' | null;
 }
 
 export const participantInputSchema = z.object({

@@ -17,3 +17,8 @@ Change your name, notifications, password and two-factor authentication, see whe
 - **Active sessions**: sign out a device you no longer use.
 - **Access tokens**: for AI clients that connect over MCP. A read-only token can only look; a full token can also make changes, always with your permissions.
 - **Connected apps**: AI apps you approved by signing in. Disconnect them here.
+
+## Calendar
+
+- **Your calendar**: connect one calendar by its CalDAV address (most calendar services and servers offer one; use an app password if asked). Every 15 minutes, events whose guests include your {{contactPluralLower}} or {{leadPluralLower}} become meetings on their records, meetings you add here appear in that calendar, and changes to the time or title go both ways (the most recent change wins). Repeating events only count as busy time.
+- **Subscribe from another calendar**: create a private address of your meetings and tasks with a time, for calendar apps that subscribe to a web address. Anyone with the address can see the titles and times, so replace or remove it if it is shared by mistake.
