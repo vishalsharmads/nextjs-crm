@@ -14,6 +14,7 @@ import { pushRoutes } from './push/push';
 import { trackingRoutes } from './email/tracking';
 import { calendarFeedRoutes, publicCalendarRoutes } from './calendar/feed';
 import { calendarAccountRoutes } from './calendar/sync';
+import { bookingPageRoutes, publicBookingRoutes } from './booking/booking';
 import { customFieldsRoutes, fieldGroupsRoutes, layoutsRoutes } from './custom-fields/custom-fields.routes';
 import { pipelinesRoutes } from './pipelines/pipelines.routes';
 import { notificationsRoutes } from './notifications/notifications.routes';
@@ -68,6 +69,8 @@ export function coreRouteGroups(): RouteGroup[] {
     calendarFeedRoutes,
     publicCalendarRoutes,
     calendarAccountRoutes,
+    bookingPageRoutes,
+    publicBookingRoutes,
     notificationsRoutes,
     savedViewsRoutes,
     importsRoutes,

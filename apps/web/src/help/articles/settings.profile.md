@@ -22,3 +22,12 @@ Change your name, notifications, password and two-factor authentication, see whe
 
 - **Your calendar**: connect one calendar by its CalDAV address (most calendar services and servers offer one; use an app password if asked). Every 15 minutes, events whose guests include {{contactPluralLower}} or {{leadPluralLower}} you can see become meetings on their records, meetings you add here appear in that calendar, and changes to the time or title go both ways (the most recent change wins). Repeating events only count as busy time.
 - **Subscribe from another calendar**: create a private address of your meetings and tasks with a time (titles and times only, never notes), for calendar apps that subscribe to a web address. Anyone with the address can see the titles and times, so replace or remove it if it is shared by mistake.
+
+## Booking page
+
+A public link where customers book a meeting with you, without emailing back and forth.
+
+- Choose the address, your working hours and time zone, and one or more meeting types (length, a gap kept free before and after, how much notice you need, and an optional question).
+- Visitors see only free times: your working hours minus your meetings here and the busy times of your connected calendar. Times are shown in their own time zone.
+- A booking becomes a meeting with you, on the {{contactLower}} or {{leadLower}} with that email address if you can see one, otherwise on a new {{leadLower}} (or {{contactLower}} when {{leadPluralLower}} are off). The visitor gets an invitation with a link to cancel; cancelling removes the meeting.
+- Switch the page off to stop new bookings. Automations can react to **A meeting is booked**.

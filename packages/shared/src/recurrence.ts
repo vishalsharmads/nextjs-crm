@@ -31,9 +31,12 @@ interface Wall {
 }
 
 /** Wall-clock parts of an instant in a time zone. */
-export function wallClock(at: Date, timeZone: string): Wall {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', {
+const formatters = new Map<string, Intl.DateTimeFormat>();
+/** Building a formatter is costly: one per time zone, reused. */
+function formatter(timeZone: string) {
+  let f = formatters.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', {
       timeZone,
       year: 'numeric',
       month: '2-digit',
@@ -41,7 +44,15 @@ export function wallClock(at: Date, timeZone: string): Wall {
       hour: '2-digit',
       minute: '2-digit',
       hourCycle: 'h23',
-    })
+    });
+    formatters.set(timeZone, f);
+  }
+  return f;
+}
+
+export function wallClock(at: Date, timeZone: string): Wall {
+  const parts = Object.fromEntries(
+    formatter(timeZone)
       .formatToParts(at)
       .map((p) => [p.type, p.value]),
   );

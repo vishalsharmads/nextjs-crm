@@ -18,6 +18,7 @@ import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 import { NOTIFICATION_CATEGORIES, type NotificationCategory } from '@app/shared';
 import { currentSubscription, disablePush, enablePush, pushSupported } from '@/lib/push';
 import { CalendarPane } from './calendar-pane';
+import { BookingPane } from '@/features/booking/booking-pane';
 
 export function ProfilePage() {
   const t = useT();
@@ -26,6 +27,7 @@ export function ProfilePage() {
       <ProfileForm />
       <NotificationsForm />
       <CalendarPane />
+      <BookingPane />
       <PasswordForm />
       <TwoFactor />
       <Sessions />

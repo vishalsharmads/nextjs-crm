@@ -70,6 +70,14 @@ const AutomationsPage = lazyPage(() => import('@/features/settings/automations-p
 const FormsPage = lazyPage(() => import('@/features/settings/forms-page'), 'FormsPage');
 const LayoutBuilderPage = lazyPage(() => import('@/features/settings/layout-builder'), 'LayoutBuilderPage');
 const PublicFormPage = lazyPage(() => import('@/features/forms/public-form-page'), 'PublicFormPage');
+const PublicBookingPage = lazyPage(
+  () => import('@/features/booking/public-booking-page'),
+  'PublicBookingPage',
+);
+const ManageBookingPage = lazyPage(
+  () => import('@/features/booking/public-booking-page'),
+  'ManageBookingPage',
+);
 const UnsubscribePage = lazyPage(() => import('@/features/privacy/unsubscribe-page'), 'UnsubscribePage');
 const CommerceSettingsPage = lazyPage(
   () => import('@/features/settings/commerce-page'),
@@ -154,6 +162,8 @@ export const router = createBrowserRouter(
     { path: '/reset-password', element: <ResetPasswordPage /> },
     { path: '/accept-invite', element: <AcceptInvitePage /> },
     { path: '/f/:uuid', element: page(<PublicFormPage />) },
+    { path: '/book/manage/:token', element: page(<ManageBookingPage />) },
+    { path: '/book/:slug', element: page(<PublicBookingPage />) },
     { path: '/unsubscribe', element: page(<UnsubscribePage />) },
     { path: '/p/:moduleKey/*', element: <PublicModuleOutlet />, errorElement: <RouteError /> },
     {

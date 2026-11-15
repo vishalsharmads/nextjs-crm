@@ -30,6 +30,8 @@ export const EVENT_TYPES = [
   'form.submitted',
   // Someone commented on a record (entity and uuid are the record's).
   'comment.created',
+  // A visitor booked a meeting through a scheduling link (entity activity, uuid the meeting).
+  'meeting.booked',
   // Commercial modules (emitted only while the module is enabled).
   'quote.created',
   'quote.sent',
