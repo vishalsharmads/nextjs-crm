@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>You are offline</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 16px;
+        text-align: center;
+      }
+      button {
+        font: inherit;
+        padding: 8px 16px;
+        margin-top: 12px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You are offline</h1>
+      <p>Check your connection, then try again. Nothing is stored on this device while you are away.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

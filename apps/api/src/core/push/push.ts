@@ -145,8 +145,8 @@ export const pushRoutes = defineRoutes('/me/push', ['me'])
     },
   })
   .add({
-    method: 'delete',
-    path: '/subscriptions',
+    method: 'post',
+    path: '/subscriptions/remove',
     permission: 'authenticated',
     body: z.object({ endpoint: z.url().max(2000) }),
     status: 204,

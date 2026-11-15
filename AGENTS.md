@@ -62,6 +62,7 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 | marked                                                                                          | Renders in-app help articles (already installed with the editor's Markdown)     |
 | i18next, react-i18next                                                                          | Locale files + vocabulary interpolation                                         |
 | qrcode                                                                                          | 2FA setup QR code                                                               |
+| web-push                                                                                        | Web Push: VAPID signing and payload encryption (fragile to hand-roll)           |
 | @fontsource/*                                                                                   | Self-hosted fonts selectable from branding (no external font CDN)               |
 | astro, @astrojs/sitemap, @astrojs/check                                                         | Static marketing site (`apps/site`), sitemap, type checks                       |
 | gsap                                                                                            | Marketing-site animation (hero intro, industry re-tailoring)                    |

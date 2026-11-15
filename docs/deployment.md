@@ -64,6 +64,7 @@ A switch back does not undo migrations. Migrations only add tables and columns, 
 - Run **one API process per instance** (the systemd unit does). Rate limits and the short-lived settings and permission caches live in process memory; a second process would count limits separately and see setting changes a few seconds late. `REDIS_URL` moves background jobs and scheduled work to Redis, not these.
 - `DB_POOL_MAX` (default 10) sets database connections per process. Keep it below MySQL's `max_connections` together with everything else that connects.
 - `/api/v1/health` answers while the process runs (for restarts). `/api/v1/health/ready` also checks the database, that `STORAGE_DIR` is writable and, with `REDIS_URL`, that Redis answers; it returns `{ status, database, storage, redis }` and 503 when something is down. Use it for uptime monitoring.
+- Push notifications and installing the app need HTTPS (browsers refuse service workers on plain http, except localhost). The VAPID key pair is created on first use and kept encrypted (`crypto:rotate` re-encrypts it); push messages go out from the API to the browsers' push services over the internet. `sw.js` must be served with `no-cache`, as the nginx example does for everything outside `/assets/`.
 - Settings → Email → **Send test email** (admins) checks the SMTP settings end to end.
 
 ## Backups

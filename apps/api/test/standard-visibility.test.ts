@@ -1,7 +1,10 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { clientWithRoles, createRole } from './helpers';
+import { clientWithRoles, createRole, restoreSettingsAfterEach } from './helpers';
 import { db } from '../src/db/knex';
 import { clearStandardVisibilityCache } from '../src/core/custom-fields/standard-visibility';
+
+// Tests here turn on the leads feature: put the setting back for other files.
+restoreSettingsAfterEach(['features']);
 
 describe('standard field visibility', () => {
   afterAll(async () => {
