@@ -5,13 +5,14 @@ import { defineRoutes } from '../../http/routes';
 import { encrypt } from '../../lib/crypto';
 import { AppError, notFound } from '../../lib/errors';
 import { newUuid } from '../../lib/ids';
-import { isTest } from '../../config/env';
+import { env, isTest } from '../../config/env';
 import { enqueue, every, registerJob } from '../../lib/jobs';
 import { logger } from '../../lib/logger';
 import { audit } from '../audit/audit.service';
+import { systemContext, type AuthUser } from '../../http/context';
 import { onEvent } from '../events/events';
 import { assertSafeUrl } from '../webhooks/webhooks';
-import { addParticipants, participantsFromAddresses } from '../activities/participants';
+import { addParticipants, participantsFromAddresses, visibleTo } from '../activities/participants';
 import { deleteEvent, fetchEvents, putEvent, verifyCalendar, type CalendarAccount } from './caldav';
 import { buildCalendar, plain, uidFor } from './ics';
 
@@ -31,6 +32,9 @@ interface AccountRow extends CalendarAccount {
   last_error: string | null;
   active: number | boolean;
 }
+
+/** Changes made by sync are recorded as the calendar's owner, through the calendar. */
+const calendarCtx = (userId: number) => ({ ...systemContext('calendar'), user: { id: userId } as AuthUser });
 
 const accountDto = (a: AccountRow) => ({
   uuid: a.uuid,
@@ -109,6 +113,12 @@ export async function syncCalendar(account: AccountRow): Promise<{ logged: numbe
       await db('calendar_links')
         .where({ id: link.id })
         .update({ etag: remote.etag, href: remote.href, synced_at: new Date() });
+      await audit(db, calendarCtx(account.user_id), {
+        action: 'activity.updated',
+        entity: 'activity',
+        entityId: link.activity_id as number,
+        diff: { from: 'calendar', start_at: start.toISOString(), subject: ev.summary, cancelled },
+      });
       updated++;
       continue;
     }
@@ -119,10 +129,14 @@ export async function syncCalendar(account: AccountRow): Promise<{ logged: numbe
     ]
       .map((a) => a.replace(/^mailto:/i, '').toLowerCase())
       .filter((a) => a.includes('@'));
-    const people = await participantsFromAddresses(
-      db,
-      addresses.map((address) => ({ address, role: 'attendee' as const })),
-      own,
+    // Only people the calendar's owner may see (scope, restriction, hidden email).
+    const people = await visibleTo(
+      account.user_id,
+      await participantsFromAddresses(
+        db,
+        addresses.map((address) => ({ address, role: 'attendee' as const })),
+        own,
+      ),
     );
     const home = people.find((p) => p.kind === 'contact') ?? people.find((p) => p.kind === 'lead');
     if (!home) continue;
@@ -150,6 +164,12 @@ export async function syncCalendar(account: AccountRow): Promise<{ logged: numbe
         uid,
         href: remote.href,
         etag: remote.etag,
+      });
+      await audit(trx, calendarCtx(account.user_id), {
+        action: 'activity.created',
+        entity: 'activity',
+        entityId: activityId!,
+        diff: { from: 'calendar', subject: ev.summary },
       });
     });
     logged++;
@@ -197,6 +217,15 @@ registerJob('calendar.push', async (job) => {
   if (!a || a.type !== 'meeting' || !a.start_at || !a.assignee_id) return;
   const account = (await db('calendar_accounts').where({ user_id: a.assignee_id, active: true }).first()) as
     AccountRow | undefined;
+  // Reassigned (or the assignee has no calendar): the meeting leaves the previous assignee's calendar.
+  for (const old of await db('calendar_links')
+    .where({ activity_id: a.id })
+    .whereNot({ account_id: account?.id ?? 0 })) {
+    const other = (await db('calendar_accounts').where({ id: old.account_id }).first()) as
+      AccountRow | undefined;
+    if (other) await deleteEvent(other, old.href as string).catch(() => undefined);
+    await db('calendar_links').where({ id: old.id }).delete();
+  }
   if (!account) return;
   const link = await db('calendar_links').where({ account_id: account.id, activity_id: a.id }).first();
   if (a.deleted_at) {
@@ -237,7 +266,11 @@ onEvent(async (e) => {
   if (!['activity.created', 'activity.updated', 'activity.deleted'].includes(e.type)) return;
   const a = await db('activities').where({ uuid: e.uuid }).first('id', 'type', 'assignee_id');
   if (a?.type !== 'meeting' || !a.assignee_id) return;
-  if (!(await db('calendar_accounts').where({ user_id: a.assignee_id, active: true }).first('id'))) return;
+  const hasCalendar = await db('calendar_accounts')
+    .where({ user_id: a.assignee_id, active: true })
+    .first('id');
+  const wasPushed = await db('calendar_links').where({ activity_id: a.id }).first('id');
+  if (!hasCalendar && !wasPushed) return;
   await enqueue('calendar.push', { activityId: a.id }).catch((err: unknown) =>
     logger.warn({ err }, 'Calendar push not queued'),
   );
@@ -268,6 +301,12 @@ export const calendarAccountRoutes = defineRoutes('/calendar/accounts', ['calend
     status: 201,
     summary: 'Connect a CalDAV calendar (checked before saving)',
     handler: async ({ ctx, user, body }) => {
+      // The password travels with every request: https only (plain http only where private
+      // addresses are allowed, which is development).
+      if (!body.url.startsWith('https://') && !env.WEBHOOKS_ALLOW_PRIVATE)
+        throw new AppError('VALIDATION_FAILED', 'Use the calendar’s https address', [
+          { path: 'url', message: 'Use https' },
+        ]);
       await assertSafeUrl(body.url, 'url');
       const { displayName } = await verifyCalendar(body.url, body.username, body.password);
       const uuid = newUuid();
@@ -294,7 +333,8 @@ export const calendarAccountRoutes = defineRoutes('/calendar/accounts', ['calend
   .add({
     method: 'post',
     path: '/:uuid/sync',
-    permission: 'core.activities.view',
+    // Sync creates and changes meetings.
+    permission: 'core.activities.create',
     params: z.object({ uuid: z.uuid() }),
     handler: async ({ user, params }) => {
       const a = (await db('calendar_accounts').where({ uuid: params.uuid, user_id: user.id }).first()) as

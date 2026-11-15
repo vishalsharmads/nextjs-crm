@@ -191,3 +191,30 @@ export function whereOnRecord(qb: Knex.QueryBuilder, type: RelatedType, id: numb
     ),
   );
 }
+
+/**
+ * Of the people found by email address, those this user may see: permission and record scope, not
+ * restricted, and with the email not hidden from them (12d). Colleagues always stay. Used by mail and
+ * calendar sync, so a synced message never attaches to a record the mailbox owner cannot open.
+ */
+export async function visibleTo(userId: number, rows: ParticipantRow[]): Promise<ParticipantRow[]> {
+  const { loadAccess } = await import('../rbac/access');
+  const { standardLevels } = await import('../custom-fields/standard-visibility');
+  const access = await loadAccess(userId);
+  const user = { id: userId, ...access } as unknown as AuthUser;
+  const out: ParticipantRow[] = [];
+  for (const r of rows) {
+    if (r.kind === 'user') {
+      out.push(r);
+      continue;
+    }
+    const meta = KINDS[r.kind];
+    if (!can(user, `${meta.resource}.view`)) continue;
+    if (r.kind !== 'organization' && (await standardLevels(r.kind, user)).email === 'hidden') continue;
+    const qb = db(meta.table).where(`${meta.table}.id`, r.record_id).whereNull(`${meta.table}.deleted_at`);
+    if (r.kind !== 'organization') qb.where(`${meta.table}.processing_restricted`, false);
+    await applyScope(qb, user, meta.resource, [`${meta.table}.owner_id`]);
+    if (await qb.first(`${meta.table}.id`)) out.push(r);
+  }
+  return out;
+}

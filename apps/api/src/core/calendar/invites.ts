@@ -7,6 +7,8 @@ import { logger } from '../../lib/logger';
 import { sendMail } from '../../lib/mailer';
 import { onEvent } from '../events/events';
 import { getBranding } from '../settings/settings.service';
+import { audit } from '../audit/audit.service';
+import { systemContext } from '../../http/context';
 import { buildCalendar, plain, uidFor } from './ics';
 
 /**
@@ -28,9 +30,11 @@ async function attendeesOf(conn: Db, activityId: number): Promise<Attendee[]> {
   const out: Attendee[] = [];
   for (const r of rows) {
     const table = r.kind === 'user' ? 'users' : r.kind === 'contact' ? 'contacts' : 'leads';
-    const p = await conn(table).where({ id: r.record_id }).first();
+    const p = await conn(table).where({ id: r.record_id }).whereNull('deleted_at').first();
     if (!p?.email) continue;
-    if (r.kind !== 'user' && p.processing_restricted) continue;
+    if (r.kind !== 'user' && (p.processing_restricted || p.merged_into_id || p.converted_contact_id))
+      continue;
+    if (r.kind === 'user' && p.status !== 'active') continue;
     const name =
       r.kind === 'user' ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() : (p.full_name as string) || '';
     out.push({
@@ -67,7 +71,16 @@ registerJob('calendar.invite', async (job) => {
   const attendees = await attendeesOf(db, activityId);
   const organizer = await organizerOf(db, a);
   if (!organizer || !attendees.length) return;
-  const invited = attendees.filter((x) => x.email !== organizer.email.toLowerCase());
+  const recipients = new Set(
+    (await db('activity_participants')
+      .where({ activity_id: activityId })
+      .where((w) => w.whereNotNull('invited_at').orWhere('status', 'needs_action'))
+      .pluck('id')) as number[],
+  );
+  const invited = attendees.filter(
+    (x) => x.email !== organizer.email.toLowerCase() && recipients.has(x.participantId),
+  );
+  if (!invited.length) return;
   const content = buildCalendar(
     [
       {
@@ -136,11 +149,18 @@ export async function afterMeetingWrite(
       existing.subject !== now.subject);
   if (!invite && !(invitedBefore && changed)) return;
   // Sent after the save commits (the activity.created/updated event), so the job sees the participants.
+  // "Send invitations" marks everyone on the meeting now as invited-to-be; later changes only reach
+  // people already invited, never someone added since without an invitation.
+  if (invite)
+    await conn('activity_participants')
+      .where({ activity_id: id })
+      .whereNull('invited_at')
+      .update({ status: 'needs_action' });
   await conn('activities')
     .where({ id })
     .update({
       invite_pending: true,
-      ...(op === 'update' ? { ical_sequence: conn.raw('ical_sequence + 1') } : {}),
+      ...(op === 'update' && invitedBefore ? { ical_sequence: conn.raw('ical_sequence + 1') } : {}),
     });
 }
 
@@ -173,12 +193,14 @@ const STATUS: Record<string, string> = {
 };
 
 /**
- * An attendee's answer (METHOD:REPLY) found in synced mail: set their status on the meeting.
- * Returns true when the message was a reply to one of our invitations.
+ * An attendee's answer (METHOD:REPLY) found in mail synced for `mailboxOwnerId`. Only the sender's
+ * own answer counts, only on a meeting the mailbox owner organizes, and only while it exists.
+ * Returns true when the message was such an answer (it is then not logged as mail).
  */
-export async function applyInvitationReply(parsed: ParsedMail): Promise<boolean> {
+export async function applyInvitationReply(parsed: ParsedMail, mailboxOwnerId: number): Promise<boolean> {
   const part = parsed.attachments?.find((x) => /text\/calendar/i.test(x.contentType));
-  if (!part) return false;
+  const sender = parsed.from?.value[0]?.address?.toLowerCase();
+  if (!part || !sender) return false;
   try {
     const cal = new ICAL.Component(ICAL.parse(part.content.toString('utf8')));
     if (String(cal.getFirstPropertyValue('method') ?? '').toUpperCase() !== 'REPLY') return false;
@@ -188,28 +210,41 @@ export async function applyInvitationReply(parsed: ParsedMail): Promise<boolean>
     if (!uid.endsWith(`@${host}`)) return false;
     const activity = await db('activities')
       .where({ uuid: uid.slice(0, -host.length - 1) })
-      .first('id');
+      .whereNull('deleted_at')
+      .where((w) => w.where('assignee_id', mailboxOwnerId).orWhere('owner_id', mailboxOwnerId))
+      .first('id', 'uuid');
     if (!activity) return false;
-    for (const prop of ev?.getAllProperties('attendee') ?? []) {
-      const email = String(prop.getFirstValue() ?? '')
-        .replace(/^mailto:/i, '')
-        .toLowerCase();
-      const status = STATUS[String(prop.getParameter('partstat') ?? '').toUpperCase()];
-      if (!email || !status) continue;
-      for (const [kind, table, col] of [
-        ['contact', 'contacts', 'email_norm'],
-        ['lead', 'leads', 'email_norm'],
-        ['user', 'users', 'email'],
-      ] as const) {
-        const ids = (await db(table).where(col, email).pluck('id')) as number[];
-        if (ids.length)
-          await db('activity_participants')
-            .where({ activity_id: activity.id, kind })
-            .whereIn('record_id', ids)
-            .update({ status });
-      }
+    const mine = (ev?.getAllProperties('attendee') ?? []).find(
+      (p) =>
+        String(p.getFirstValue() ?? '')
+          .replace(/^mailto:/i, '')
+          .toLowerCase() === sender,
+    );
+    const status = mine ? STATUS[String(mine.getParameter('partstat') ?? '').toUpperCase()] : undefined;
+    if (!status) return false;
+    let changed = 0;
+    for (const [kind, table, col] of [
+      ['contact', 'contacts', 'email_norm'],
+      ['lead', 'leads', 'email_norm'],
+      ['user', 'users', 'email'],
+    ] as const) {
+      const ids = (await db(table).where(col, sender).pluck('id')) as number[];
+      if (ids.length)
+        changed += await db('activity_participants')
+          .where({ activity_id: activity.id, kind })
+          .whereIn('record_id', ids)
+          .whereNotNull('invited_at')
+          .update({ status });
     }
-    return true;
+    if (changed)
+      await audit(db, systemContext('calendar'), {
+        action: 'activity.invitation_answered',
+        entity: 'activity',
+        entityId: activity.id as number,
+        entityUuid: activity.uuid as string,
+        diff: { status },
+      });
+    return changed > 0;
   } catch (err) {
     logger.warn({ err }, 'Calendar reply could not be read');
     return false;

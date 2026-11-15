@@ -110,7 +110,7 @@ describe('calendar', () => {
   });
 
   it('invites participants, sends updates and a cancellation, and reads their replies', async () => {
-    const { client } = await clientWithRoles(['admin']);
+    const { client, user: me } = await clientWithRoles(['admin']);
     const stamp = Date.now();
     const contact = await client
       .post('/contacts', { firstName: 'Guest', email: `guest-${stamp}@example.test` })
@@ -162,7 +162,7 @@ describe('calendar', () => {
         'END:VCALENDAR',
       ].join('\r\n'),
     );
-    expect(await applyInvitationReply(reply)).toBe(true);
+    expect(await applyInvitationReply(reply, me.id)).toBe(true);
     const part = await db('activity_participants')
       .join('activities as a', 'a.id', 'activity_participants.activity_id')
       .where('a.uuid', meeting.body.uuid)
@@ -238,5 +238,68 @@ describe('calendar', () => {
       .expect(201);
     const pushed = [...store.values()].find((e) => e.ics.includes(`From CRM ${stamp}`));
     expect(pushed?.ics).toContain(`UID:${crm.body.uuid}@`);
+  });
+
+  it('closes the side doors found in review', async () => {
+    const { client: admin, user: organizer } = await clientWithRoles(['admin']);
+    const stamp = Date.now();
+    const a = await admin
+      .post('/contacts', { firstName: 'Ann', email: `ann-${stamp}@example.test` })
+      .expect(201);
+    const b = await admin
+      .post('/contacts', { firstName: 'Bob', email: `bob-${stamp}@example.test` })
+      .expect(201);
+    const meeting = await admin
+      .post('/activities', {
+        type: 'meeting',
+        subject: `Side ${stamp}`,
+        startAt: new Date(Date.now() + 86_400_000).toISOString(),
+        participants: [
+          { kind: 'contact', uuid: a.body.uuid },
+          { kind: 'contact', uuid: b.body.uuid },
+        ],
+        invite: true,
+      })
+      .expect(201);
+    const forged = (from: string, attendee: string) =>
+      simpleParser(
+        [
+          `From: ${from}`,
+          'Subject: x',
+          'MIME-Version: 1.0',
+          'Content-Type: text/calendar; method=REPLY',
+          '',
+          'BEGIN:VCALENDAR',
+          'METHOD:REPLY',
+          'BEGIN:VEVENT',
+          `UID:${uidFor(meeting.body.uuid)}`,
+          `ATTENDEE;PARTSTAT=DECLINED:mailto:${attendee}`,
+          'END:VEVENT',
+          'END:VCALENDAR',
+        ].join('\r\n'),
+      );
+    // Ann cannot answer for Bob, and nobody can answer through someone else's mailbox.
+    expect(
+      await applyInvitationReply(
+        await forged(`ann-${stamp}@example.test`, `bob-${stamp}@example.test`),
+        organizer.id,
+      ),
+    ).toBe(false);
+    const stranger = await createUser({ roleKeys: ['admin'] });
+    expect(
+      await applyInvitationReply(
+        await forged(`ann-${stamp}@example.test`, `ann-${stamp}@example.test`),
+        stranger.id,
+      ),
+    ).toBe(false);
+    const statuses = await db('activity_participants')
+      .join('activities as x', 'x.id', 'activity_participants.activity_id')
+      .where('x.uuid', meeting.body.uuid)
+      .pluck('activity_participants.status');
+    expect(statuses).toEqual(['needs_action', 'needs_action']);
+
+    // A calendar server may not point requests at other hosts or at private addresses.
+    const { safeRequest } = await import('../src/lib/safe-net');
+    await expect(safeRequest('GET', 'http://169.254.169.254/latest/', {})).rejects.toThrow(/not reachable/);
   });
 });

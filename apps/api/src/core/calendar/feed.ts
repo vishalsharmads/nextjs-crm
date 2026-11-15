@@ -5,7 +5,9 @@ import { db } from '../../db/knex';
 import { defineRoutes } from '../../http/routes';
 import { audit } from '../audit/audit.service';
 import { getBranding } from '../settings/settings.service';
-import { buildCalendar, plain, uidFor, type IcsEvent } from './ics';
+import { buildCalendar, uidFor, type IcsEvent } from './ics';
+import { can, loadAccess } from '../rbac/access';
+import type { AuthUser } from '../../http/context';
 
 /**
  * A private iCalendar feed per person (meetings they hold or attend, tasks with a due time), for
@@ -67,7 +69,9 @@ export const publicCalendarRoutes = defineRoutes('/public/calendar', ['public'])
     const user = feed
       ? await db('users').where({ id: feed.user_id, status: 'active' }).whereNull('deleted_at').first('id')
       : null;
-    if (!user) {
+    // The person must still be allowed to see activities (a role change ends the feed's content too).
+    const access = user ? await loadAccess(user.id as number) : null;
+    if (!user || !access || !can({ id: user.id, ...access } as unknown as AuthUser, 'core.activities.view')) {
       res.status(404).type('text/plain').send('This calendar address is no longer valid.');
       return;
     }
@@ -93,12 +97,27 @@ export const publicCalendarRoutes = defineRoutes('/public/calendar', ['public'])
               .where({ 'ap.kind': 'user', 'ap.record_id': user.id }),
           ),
       )
+      // Nothing about people whose processing is restricted.
+      .whereNotExists((e) =>
+        e
+          .select(db.raw('1'))
+          .from('contacts as c')
+          .whereRaw("activities.related_type = 'contact' AND c.id = activities.related_id")
+          .where('c.processing_restricted', true),
+      )
+      .whereNotExists((e) =>
+        e
+          .select(db.raw('1'))
+          .from('leads as l')
+          .whereRaw("activities.related_type = 'lead' AND l.id = activities.related_id")
+          .where('l.processing_restricted', true),
+      )
+      .orderByRaw('COALESCE(start_at, due_at)')
       .limit(2000)
       .select(
         'uuid',
         'type',
         'subject',
-        'body',
         'start_at',
         'end_at',
         'due_at',
@@ -113,7 +132,8 @@ export const publicCalendarRoutes = defineRoutes('/public/calendar', ['public'])
       start: (r.start_at ?? r.due_at) as Date,
       end: (r.type === 'meeting' ? r.end_at : null) as Date | null,
       summary: (r.subject as string) || (r.type === 'meeting' ? 'Meeting' : 'Task'),
-      description: plain(r.body as string | null).slice(0, 2000) || null,
+      // Titles and times only: notes stay in the app, behind sign-in.
+      description: null,
       url: `${app.origin}${app.pathname.replace(/\/$/, '')}/tasks/${r.uuid as string}`,
       status: r.outcome === 'cancelled' ? 'CANCELLED' : 'CONFIRMED',
       updated: r.updated_at as Date,

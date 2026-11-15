@@ -111,8 +111,11 @@ export async function fetchEvents(account: CalendarAccount, from: Date, to: Date
     const data = /<(?:\w+:)?calendar-data[^>]*>([\s\S]*?)<\/(?:\w+:)?calendar-data>/i.exec(block)?.[1];
     if (!href || !data) continue;
     const etag = /<(?:\w+:)?getetag>([^<]*)</i.exec(block)?.[1] ?? null;
+    // Only addresses on the calendar's own server: a server may not point us (and the password) elsewhere.
+    const target = new URL(decodeXml(href.trim()), account.url);
+    if (target.origin !== new URL(account.url).origin) continue;
     out.push({
-      href: new URL(decodeXml(href.trim()), account.url).toString(),
+      href: target.toString(),
       etag: etag ? decodeXml(etag) : null,
       ics: decodeXml(data),
     });

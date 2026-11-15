@@ -179,7 +179,6 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
     return row;
   },
   async afterWrite(id, input, { user, conn, ctx, existing }, op) {
-    await afterMeetingWrite(conn, id, op, input.invite === true, existing);
     if (input.participants !== undefined)
       await setParticipants(
         conn,
@@ -190,6 +189,8 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
           input.participants as { kind: ParticipantKind; uuid: string; role: ParticipantRole }[],
         ),
       );
+    // After the participants are saved: invitations go to the people on the meeting now.
+    await afterMeetingWrite(conn, id, op, input.invite === true, existing);
     const now = await conn('activities').where({ id }).first('stage_id', 'completed_at');
     if (now?.stage_id && (existing?.stage_id ?? null) !== now.stage_id)
       await recordStageHistory(
