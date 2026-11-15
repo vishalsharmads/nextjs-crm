@@ -25,6 +25,7 @@ import { addParticipants, participantsFromAddresses, whereOnRecord } from '../ac
 import { accessTokenFor, finishOAuth, mailOAuthProviders, startOAuth, tokenColumns } from './oauth';
 import { logAccess } from '../audit/access-log';
 import { activitiesDef } from '../activities/activities.def';
+import { instrument, recipientsRefuseTracking, trackingAllowed } from './tracking';
 
 const server = z.object({
   host: z.string().min(1).max(255),
@@ -173,6 +174,8 @@ const sendBody = z.object({
   inReplyTo: z.string().max(500).nullish(),
   /** Reply to this email (an activity): sets In-Reply-To and References from its conversation. */
   replyToActivityUuid: z.uuid().nullish(),
+  /** Count opens and clicks (only when the workspace allows tracking and no recipient refuses it). */
+  track: z.boolean().default(false),
 });
 
 /** Find the record an email is about: explicit, else the first contact matching a recipient. */
@@ -249,6 +252,12 @@ export async function sendEmail(ctx: RequestContext, user: AuthUser, input: z.in
   }
 
   const html = sanitizeBody(input.body) ?? '';
+  // What goes out may carry tracking; the timeline keeps the message as written.
+  const tracked =
+    input.track && (await trackingAllowed()) && !(await recipientsRefuseTracking([...input.to, ...input.cc]))
+      ? instrument(html)
+      : null;
+  const outHtml = tracked?.html ?? html;
   const text = html
     .replace(/<br\s*\/?>/g, '\n')
     .replace(/<\/p>/g, '\n\n')
@@ -264,7 +273,7 @@ export async function sendEmail(ctx: RequestContext, user: AuthUser, input: z.in
       to: input.to,
       cc: input.cc,
       subject: input.subject,
-      html,
+      html: outHtml,
       text,
       inReplyTo: inReplyTo ?? undefined,
       references: references.length ? references : undefined,
@@ -287,7 +296,7 @@ export async function sendEmail(ctx: RequestContext, user: AuthUser, input: z.in
       await sendMail({
         to,
         subject: input.subject,
-        html,
+        html: outHtml,
         text,
         fromName: `${name} (${branding.appName})`,
         fromAddress: branding.emailFromAddress || undefined,
@@ -338,6 +347,8 @@ export async function sendEmail(ctx: RequestContext, user: AuthUser, input: z.in
       direction: 'outbound',
       message_id: messageId,
       in_reply_to: inReplyTo,
+      tracking_token: tracked?.token ?? null,
+      tracking_links: tracked ? JSON.stringify(tracked.links) : null,
       from_address: account?.email ?? user.email,
       to_addresses: JSON.stringify(input.to),
       cc_addresses: JSON.stringify(input.cc),

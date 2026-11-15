@@ -78,6 +78,11 @@ export const SETTINGS_HELP: { [G in SettingsGroup]: HelpFor<(typeof SETTINGS_GRO
       description:
         'Give tasks, calls and meetings statuses (such as To do, In progress, Waiting, Done) and a board. Reaching the done stage completes them.',
     },
+    emailTracking: {
+      label: 'Email tracking',
+      description:
+        'Let people see when emails sent from the app are opened and their links clicked. Off under the Privacy and Health data profiles, and never for people who opted out of marketing.',
+    },
   },
   deals: {
     lostReasons: {
@@ -208,6 +213,11 @@ export const SETTINGS_HELP: { [G in SettingsGroup]: HelpFor<(typeof SETTINGS_GRO
       label: 'Minimal notification emails',
       description:
         'Notification emails say only that something needs attention, with a link, and no names or details.',
+    },
+    noEmailTracking: {
+      label: 'Never track emails',
+      description:
+        'No open or click tracking on any email, whatever the workspace setting. Always on under the Privacy and Health data profiles.',
     },
     encryptUploads: {
       label: 'Encrypt uploaded files',

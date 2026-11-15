@@ -19,3 +19,7 @@ Enter the mail server details for sending and, optionally, receiving. Replies fr
 - Mail you send from {{appName}} through your mailbox is also saved in its **Sent** folder, so it appears in your mail program.
 - **Log sent mail too**: mail you write in your mail program to known {{contactPluralLower}} and {{leadPluralLower}} is logged on their records, like mail you receive. Turn it off per mailbox.
 - Every person on a message who is a known {{contactLower}} or {{leadLower}} gets it on their timeline, and replies are grouped into one conversation. Choose **Reply** on an email in a timeline to answer in the same conversation.
+
+## Tracking
+
+When an admin turns on **Email tracking** (Settings → General), the email composer offers **Track opens and clicks**. The email then shows "Opened 2 times, last 3 hours ago · 1 link click" in the timeline. Opens are approximate: some mail apps load images on their own. Tracking is never added under the Privacy or Health data profiles, or for anyone who opted out of marketing or whose processing is restricted. The tracking data is erased with the person.

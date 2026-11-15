@@ -165,6 +165,7 @@ function FeaturesForm({ initial }: { initial: FeatureSettings }) {
   const [leads, setLeads] = useState(initial.leads);
   const [leadPipeline, setLeadPipeline] = useState(initial.leadPipeline);
   const [taskPipeline, setTaskPipeline] = useState(initial.taskPipeline);
+  const [emailTracking, setEmailTracking] = useState(initial.emailTracking);
   return (
     <Pane title="Features">
       <label className="flex items-start justify-between gap-4">
@@ -205,6 +206,23 @@ function FeaturesForm({ initial }: { initial: FeatureSettings }) {
           onCheckedChange={(v) => {
             setTaskPipeline(v);
             save.mutate({ taskPipeline: v });
+          }}
+        />
+      </label>
+      <label className="mt-4 flex items-start justify-between gap-4 border-t border-line pt-4">
+        <span>
+          <span className="block text-sm font-medium">Email tracking</span>
+          <span className="block text-sm text-muted">
+            Let people see when emails sent from here are opened and their links clicked. Never under the
+            Privacy or Health data profiles, and never for people who opted out of marketing.
+          </span>
+        </span>
+        <Switch
+          aria-label="Email tracking"
+          checked={emailTracking}
+          onCheckedChange={(v) => {
+            setEmailTracking(v);
+            save.mutate({ emailTracking: v });
           }}
         />
       </label>

@@ -71,6 +71,8 @@ export const complianceSettingsSchema = z.object({
   webhookMinimal: z.boolean().default(false),
   /** Notification emails say only that something needs attention, with a link: no names or details. */
   notificationEmailMinimal: z.boolean().default(false),
+  /** Never add open or click tracking to emails, whatever the workspace setting says. */
+  noEmailTracking: z.boolean().default(false),
   /** Encrypt uploaded files at rest with the application key ring. */
   encryptUploads: z.boolean().default(false),
   /** Shown on the sign-in screen (for example an authorized-use warning). */
@@ -98,6 +100,7 @@ export const PROFILE_FLOORS: Record<ComplianceProfile, ProfileFloors> = {
     compliance: {
       auditRetentionDays: { kind: 'keepAtLeast', value: 365 },
       dsarDueDays: { kind: 'atMost', value: 30 },
+      noEmailTracking: { kind: 'on' },
     },
   },
   hipaa: {
@@ -115,6 +118,7 @@ export const PROFILE_FLOORS: Record<ComplianceProfile, ProfileFloors> = {
       accessLogging: { kind: 'on' },
       webhookMinimal: { kind: 'on' },
       notificationEmailMinimal: { kind: 'on' },
+      noEmailTracking: { kind: 'on' },
       encryptUploads: { kind: 'on' },
       // HIPAA keeps required documentation for six years.
       auditRetentionDays: { kind: 'keepAtLeast', value: 2190 },

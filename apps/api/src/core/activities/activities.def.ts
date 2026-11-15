@@ -231,12 +231,29 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
     const emailIds = rows.filter((r) => r.type === 'email').map((r) => r.id);
     const threadOf = new Map<number, string>();
     const threadSize = new Map<string, number>();
+    const trackingOf = new Map<number, NonNullable<ActivityDto['tracking']>>();
     if (emailIds.length) {
       const msgs = await conn('email_messages')
         .whereIn('activity_id', emailIds)
-        .whereNotNull('thread_id')
-        .select('activity_id', 'thread_id');
-      for (const m of msgs) threadOf.set(m.activity_id as number, m.thread_id as string);
+        .select(
+          'activity_id',
+          'thread_id',
+          'tracking_token',
+          'open_count',
+          'last_opened_at',
+          'click_count',
+          'last_clicked_at',
+        );
+      for (const m of msgs) {
+        if (m.thread_id) threadOf.set(m.activity_id as number, m.thread_id as string);
+        if (m.tracking_token)
+          trackingOf.set(m.activity_id as number, {
+            opens: Number(m.open_count),
+            lastOpenedAt: iso(m.last_opened_at),
+            clicks: Number(m.click_count),
+            lastClickedAt: iso(m.last_clicked_at),
+          });
+      }
       const threads = [...new Set(threadOf.values())];
       if (threads.length)
         for (const t of (await conn('email_messages')
@@ -280,6 +297,7 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
         updatedAt: iso(r.updated_at)!,
         overdue: !r.completed_at && !!r.due_at && new Date(r.due_at as string).getTime() < now,
         participants: people.get(r.id) ?? [],
+        tracking: trackingOf.get(r.id) ?? null,
         thread: threadOf.has(r.id)
           ? { id: threadOf.get(r.id)!, count: threadSize.get(threadOf.get(r.id)!) ?? 1 }
           : null,

@@ -162,6 +162,13 @@ export interface ActivityDto {
   participants: ParticipantDto[];
   /** Emails: the conversation this message belongs to, and how many messages it has. */
   thread?: { id: string; count: number } | null;
+  /** Emails sent with tracking: opens (approximate: some mail apps load images on their own) and clicks. */
+  tracking?: {
+    opens: number;
+    lastOpenedAt: string | null;
+    clicks: number;
+    lastClickedAt: string | null;
+  } | null;
 }
 
 export const PARTICIPANT_KINDS = ['contact', 'lead', 'organization', 'user'] as const;
