@@ -55,6 +55,7 @@ const SECRET_COLUMNS: [table: string, column: string, aad: (id: number) => strin
   ['mail_accounts', 'access_token_enc', () => 'mail_accounts.access_token_enc'],
   ['mail_accounts', 'refresh_token_enc', () => 'mail_accounts.refresh_token_enc'],
   ['push_vapid', 'private_key_enc', () => 'push_vapid.private_key_enc'],
+  ['calendar_accounts', 'password_enc', () => 'calendar_accounts.password_enc'],
   // Module tables exist only once the module has been enabled.
   ['m_assistant_config', 'api_key_enc', () => 'm_assistant_config.api_key_enc'],
 ];

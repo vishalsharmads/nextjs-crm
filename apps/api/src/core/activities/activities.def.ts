@@ -32,6 +32,7 @@ import { taskStageColumns } from './task-stage';
 import { recordStageHistory } from '../pipelines/stage-engine';
 import { participantsOf, resolveParticipants, setParticipants } from './participants';
 import { standardLevels } from '../custom-fields/standard-visibility';
+import { afterMeetingWrite } from '../calendar/invites';
 
 type Row = Record<string, unknown> & { id: number };
 
@@ -188,6 +189,8 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
           input.participants as { kind: ParticipantKind; uuid: string; role: ParticipantRole }[],
         ),
       );
+    // After the participants are saved: invitations go to the people on the meeting now.
+    await afterMeetingWrite(conn, id, op, input.invite === true, existing);
     const now = await conn('activities').where({ id }).first('stage_id', 'completed_at');
     if (now?.stage_id && (existing?.stage_id ?? null) !== now.stage_id)
       await recordStageHistory(

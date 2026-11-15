@@ -21,11 +21,17 @@ import { recordDefs } from '../records/registry';
 import { sanitizeBody } from '../activities/activities.def';
 import { getBranding } from '../settings/settings.service';
 import { restrictedRecipients } from '../privacy/privacy.service';
-import { addParticipants, participantsFromAddresses, whereOnRecord } from '../activities/participants';
+import {
+  addParticipants,
+  participantsFromAddresses,
+  visibleTo,
+  whereOnRecord,
+} from '../activities/participants';
 import { accessTokenFor, finishOAuth, mailOAuthProviders, startOAuth, tokenColumns } from './oauth';
 import { logAccess } from '../audit/access-log';
 import { activitiesDef } from '../activities/activities.def';
 import { instrument, recipientsRefuseTracking, trackingAllowed } from './tracking';
+import { applyInvitationReply } from '../calendar/invites';
 
 const server = z.object({
   host: z.string().min(1).max(255),
@@ -375,6 +381,8 @@ export async function logSyncedMessage(
   parsed: ParsedMail,
   direction: 'inbound' | 'outbound',
 ): Promise<boolean> {
+  // An attendee's answer to one of our invitations updates the meeting; it is not logged as mail.
+  if (await applyInvitationReply(parsed, account.user_id)) return false;
   const from = parsed.from?.value[0]?.address?.toLowerCase();
   if (!from || !parsed.messageId) return false;
   // Already logged (sent from the CRM, or seen in another folder).
@@ -386,7 +394,7 @@ export async function logSyncedMessage(
   const toList = list(parsed.to);
   const ccList = list(parsed.cc);
   // Logged when anyone on it is a known contact or lead (not only the sender).
-  const people = await participantsFromAddresses(
+  let people = await participantsFromAddresses(
     db,
     [
       { address: from, role: 'from' },
@@ -395,6 +403,8 @@ export async function logSyncedMessage(
     ],
     [account.email],
   );
+  // Only people the mailbox owner may see (scope, restriction, hidden email).
+  people = await visibleTo(account.user_id, people);
   const home = people.find((p) => p.kind === 'contact') ?? people.find((p) => p.kind === 'lead');
   if (!home) return false;
   const references = Array.isArray(parsed.references)

@@ -183,6 +183,8 @@ export interface ParticipantDto {
   role: ParticipantRole;
   /** Their email address, for replies (absent when hidden from the viewer or unknown). */
   email?: string | null;
+  /** Their answer to a meeting invitation. */
+  status?: 'needs_action' | 'accepted' | 'declined' | 'tentative' | null;
 }
 
 export const participantInputSchema = z.object({
@@ -343,6 +345,8 @@ export const activityInputSchema = z.object({
   completed: z.boolean().optional(),
   /** Replaces the participant list when given. */
   participants: z.array(participantInputSchema).max(50).optional(),
+  /** Meetings: email invitations (.ics) to the participants; later changes send updates. */
+  invite: z.boolean().optional(),
   custom: customInput,
 });
 export const activityCreateSchema = activityInputSchema.refine(

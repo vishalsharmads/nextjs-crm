@@ -17,6 +17,7 @@ import { AccessTokens, ConnectedApps } from './ai-clients';
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 import { NOTIFICATION_CATEGORIES, type NotificationCategory } from '@app/shared';
 import { currentSubscription, disablePush, enablePush, pushSupported } from '@/lib/push';
+import { CalendarPane } from './calendar-pane';
 
 export function ProfilePage() {
   const t = useT();
@@ -24,6 +25,7 @@ export function ProfilePage() {
     <SettingsPage title={t('settings.profile')}>
       <ProfileForm />
       <NotificationsForm />
+      <CalendarPane />
       <PasswordForm />
       <TwoFactor />
       <Sessions />

@@ -18,7 +18,7 @@ Enter the mail server details for sending and, optionally, receiving. Replies fr
 - **Sign in with…**: when your administrator set up sign-in options, choose one to connect your mailbox without a password. If the sign-in later expires, the mailbox shows a message asking you to reconnect.
 - Mail you send from {{appName}} through your mailbox is also saved in its **Sent** folder, so it appears in your mail program.
 - **Log sent mail too**: mail you write in your mail program to known {{contactPluralLower}} and {{leadPluralLower}} is logged on their records, like mail you receive. Turn it off per mailbox.
-- Every person on a message who is a known {{contactLower}} or {{leadLower}} gets it on their timeline, and replies are grouped into one conversation. Choose **Reply** on an email in a timeline to answer in the same conversation.
+- Every person on a message who is a {{contactLower}} or {{leadLower}} you can see gets it on their timeline, and replies are grouped into one conversation. Choose **Reply** on an email in a timeline to answer in the same conversation.
 
 ## Tracking
 

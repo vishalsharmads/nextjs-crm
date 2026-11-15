@@ -180,7 +180,13 @@ export function ActivityItem({
           {TYPE_LABEL[a.type]}
           {a.assignee ? ` · ${a.assignee.name}` : ''}
           {a.type === 'note' ? ` · ${formatRelative(a.createdAt)}` : ''}
-          {a.participants?.length ? ` · with ${a.participants.map((p) => p.name).join(', ')}` : ''}
+          {a.participants?.length
+            ? ` · with ${a.participants
+                .map((p) =>
+                  p.status && p.status !== 'needs_action' ? `${p.name} (${STATUS_TEXT[p.status]})` : p.name,
+                )
+                .join(', ')}`
+            : ''}
         </p>
         {a.tracking ? (
           <p className="mt-0.5 text-xs text-muted">
@@ -265,6 +271,12 @@ function EmailThread({
   );
 }
 
+const STATUS_TEXT: Record<string, string> = {
+  accepted: 'accepted',
+  declined: 'declined',
+  tentative: 'maybe',
+};
+
 /** One composer for notes, tasks, calls and meetings on a record. */
 export function ActivityComposer({
   related,
@@ -281,6 +293,7 @@ export function ActivityComposer({
   const [when, setWhen] = useState('');
   const [assignee, setAssignee] = useState<string | null>(me.uuid);
   const [participants, setParticipants] = useState<PickedParticipant[]>([]);
+  const [invite, setInvite] = useState(false);
   const reset = () => {
     setSubject('');
     setBody('');
@@ -304,6 +317,7 @@ export function ActivityComposer({
         ...(type === 'meeting' || type === 'call'
           ? { participants: participants.map(({ kind, uuid }) => ({ kind, uuid })) }
           : {}),
+        ...(type === 'meeting' && invite && when ? { invite: true } : {}),
       }),
     onSuccess: () => {
       reset();
@@ -386,6 +400,16 @@ export function ActivityComposer({
         ) : null}
         {type === 'meeting' || type === 'call' ? (
           <ParticipantsPicker value={participants} onChange={setParticipants} />
+        ) : null}
+        {type === 'meeting' && participants.length ? (
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={invite}
+              onCheckedChange={(v) => setInvite(v === true)}
+              aria-label="Send invitations"
+            />
+            Send invitations by email (changes to the time send updates)
+          </label>
         ) : null}
         <div className="flex justify-end">
           <Button type="submit" size="sm" variant="primary" disabled={!valid} loading={create.isPending}>
