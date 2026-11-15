@@ -10,6 +10,7 @@ import { env, isTest } from './config/env';
 import './core/imports/import-export';
 import { startWebhookRetries } from './core/webhooks/webhooks';
 import { scanDuplicates } from './core/duplicates/duplicates';
+import { startCalendarSync } from './core/calendar/sync';
 import { startMailSync } from './core/email/email';
 import { maintainAuditLogs } from './core/audit/integrity';
 import { remindDueRequests } from './core/privacy/requests.service';
@@ -48,6 +49,7 @@ export async function bootstrap(): Promise<{ app: Express; shutdown: () => Promi
     every(10 * 60_000, 'tasks.digest', () => sendTaskDigests());
     startWebhookRetries();
     startMailSync();
+    startCalendarSync();
     startAutomationScheduler();
     every(60 * 60_000, 'oauth.purge', () => purgeOAuth());
     every(60 * 60_000, 'audit.maintain', maintainAuditLogs);

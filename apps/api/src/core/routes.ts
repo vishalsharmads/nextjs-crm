@@ -12,6 +12,8 @@ import { searchRoutes } from './search/search.routes';
 import { duplicateRoutes } from './duplicates/duplicates.routes';
 import { pushRoutes } from './push/push';
 import { trackingRoutes } from './email/tracking';
+import { calendarFeedRoutes, publicCalendarRoutes } from './calendar/feed';
+import { calendarAccountRoutes } from './calendar/sync';
 import { customFieldsRoutes, fieldGroupsRoutes, layoutsRoutes } from './custom-fields/custom-fields.routes';
 import { pipelinesRoutes } from './pipelines/pipelines.routes';
 import { notificationsRoutes } from './notifications/notifications.routes';
@@ -63,6 +65,9 @@ export function coreRouteGroups(): RouteGroup[] {
     duplicateRoutes,
     pushRoutes,
     trackingRoutes,
+    calendarFeedRoutes,
+    publicCalendarRoutes,
+    calendarAccountRoutes,
     notificationsRoutes,
     savedViewsRoutes,
     importsRoutes,

@@ -343,6 +343,8 @@ export const activityInputSchema = z.object({
   completed: z.boolean().optional(),
   /** Replaces the participant list when given. */
   participants: z.array(participantInputSchema).max(50).optional(),
+  /** Meetings: email invitations (.ics) to the participants; later changes send updates. */
+  invite: z.boolean().optional(),
   custom: customInput,
 });
 export const activityCreateSchema = activityInputSchema.refine(

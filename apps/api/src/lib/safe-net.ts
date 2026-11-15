@@ -115,3 +115,59 @@ export function safePost(
     req.end(body);
   });
 }
+
+export interface SafeResponse {
+  status: number;
+  headers: Record<string, string | string[] | undefined>;
+  body: string;
+}
+
+/**
+ * Any HTTP request to a user-supplied address (CalDAV) with the address pinned through
+ * `safeLookup`, no redirects, a time limit and a size limit on the answer.
+ */
+export function safeRequest(
+  method: string,
+  url: string,
+  headers: Record<string, string>,
+  body?: string,
+  opts: { timeoutMs?: number; allowPrivate?: boolean; maxBytes?: number } = {},
+): Promise<SafeResponse> {
+  const u = new URL(url);
+  const mod = u.protocol === 'https:' ? https : http;
+  const max = opts.maxBytes ?? 10 * 1024 * 1024;
+  return new Promise((resolve, reject) => {
+    const req = mod.request(
+      u,
+      {
+        method,
+        headers: {
+          ...headers,
+          ...(body !== undefined ? { 'Content-Length': Buffer.byteLength(body).toString() } : {}),
+        },
+        lookup: opts.allowPrivate ? undefined : safeLookup,
+        timeout: opts.timeoutMs ?? 20_000,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        res.on('data', (c: Buffer) => {
+          size += c.length;
+          if (size > max) req.destroy(new Error('The answer is too large'));
+          else chunks.push(c);
+        });
+        res.on('end', () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            headers: res.headers,
+            body: Buffer.concat(chunks).toString('utf8'),
+          }),
+        );
+        res.on('error', reject);
+      },
+    );
+    req.on('timeout', () => req.destroy(new Error('Timed out')));
+    req.on('error', reject);
+    req.end(body);
+  });
+}

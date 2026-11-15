@@ -15,6 +15,8 @@ export interface OutgoingMail {
   replyTo?: string;
   /** Extra headers, for example List-Unsubscribe on marketing email. */
   headers?: Record<string, string>;
+  /** A calendar invitation (text/calendar), shown by mail apps as accept and decline buttons. */
+  icalEvent?: { method: 'REQUEST' | 'CANCEL'; content: string };
 }
 
 /** Test hook: when set, mail is captured instead of sent. */
@@ -46,6 +48,7 @@ export async function sendMail(mail: OutgoingMail) {
       text: mail.text,
       replyTo: mail.replyTo,
       headers: mail.headers,
+      icalEvent: mail.icalEvent ? { ...mail.icalEvent, filename: 'invite.ics' } : undefined,
     });
   } catch (err) {
     // The address is personal data: log a keyed hash to correlate failures, not the address

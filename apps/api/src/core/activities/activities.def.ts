@@ -32,6 +32,7 @@ import { taskStageColumns } from './task-stage';
 import { recordStageHistory } from '../pipelines/stage-engine';
 import { participantsOf, resolveParticipants, setParticipants } from './participants';
 import { standardLevels } from '../custom-fields/standard-visibility';
+import { afterMeetingWrite } from '../calendar/invites';
 
 type Row = Record<string, unknown> & { id: number };
 
@@ -178,6 +179,7 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
     return row;
   },
   async afterWrite(id, input, { user, conn, ctx, existing }, op) {
+    await afterMeetingWrite(conn, id, op, input.invite === true, existing);
     if (input.participants !== undefined)
       await setParticipants(
         conn,

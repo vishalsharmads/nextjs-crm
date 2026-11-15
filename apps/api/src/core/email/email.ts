@@ -26,6 +26,7 @@ import { accessTokenFor, finishOAuth, mailOAuthProviders, startOAuth, tokenColum
 import { logAccess } from '../audit/access-log';
 import { activitiesDef } from '../activities/activities.def';
 import { instrument, recipientsRefuseTracking, trackingAllowed } from './tracking';
+import { applyInvitationReply } from '../calendar/invites';
 
 const server = z.object({
   host: z.string().min(1).max(255),
@@ -375,6 +376,8 @@ export async function logSyncedMessage(
   parsed: ParsedMail,
   direction: 'inbound' | 'outbound',
 ): Promise<boolean> {
+  // An attendee's answer to one of our invitations updates the meeting; it is not logged as mail.
+  if (await applyInvitationReply(parsed)) return false;
   const from = parsed.from?.value[0]?.address?.toLowerCase();
   if (!from || !parsed.messageId) return false;
   // Already logged (sent from the CRM, or seen in another folder).

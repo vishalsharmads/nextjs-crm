@@ -34,6 +34,7 @@ import * as m0032 from './0032_push';
 import * as m0033 from './0033_participants_threads';
 import * as m0034 from './0034_mailbox_oauth';
 import * as m0035 from './0035_email_tracking';
+import * as m0036 from './0036_calendar';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -77,4 +78,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0033_participants_threads': m0033,
   '0034_mailbox_oauth': m0034,
   '0035_email_tracking': m0035,
+  '0036_calendar': m0036,
 };
