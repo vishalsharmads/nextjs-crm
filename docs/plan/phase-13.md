@@ -79,3 +79,8 @@ Vendor-specific mail and calendar APIs, shared team inboxes, email sequences (ph
 - E2E: log a meeting with two contacts and see it on both; book a meeting through a public link and see it on the calendar.
 
 Estimate: about 5–6 weeks, in the order 13a → 13e.
+
+## Progress
+
+**13a built (2026-11-16).** `activity_participants` (contact, lead, organization or colleague, with a role) put an activity on every participant's timeline and record activity list (`whereOnRecord`); participants are checked against the writer's scope and replaced as a list. Meetings and calls take participants in the composer. Sent and synced email adds every known address as a participant, and synced mail is logged when anyone on it (not only the sender) is a known contact or lead. `email_messages.thread_id` comes from In-Reply-To/References or a recent same-subject message between the same people (`threadFor`); the timeline shows one item per conversation with its size, and `GET /email/threads/:id?type&uuid` lists the messages on that record. Privacy export lists participations; erasure removes them; merges move them. Decision kept (D2): colleagues added as participants see the meeting in their calendar filter, but participation does not widen who can open the activity. Also fixed: the test helper that restores settings now keeps blueprint columns, which was the cause of the intermittent blueprint test failure.
+
