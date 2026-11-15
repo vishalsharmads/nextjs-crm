@@ -16,6 +16,7 @@ import { boardQuerySchema, loadBoard, moveToStage } from '../pipelines/board';
 import { endOfStage, publicStageChanges, recordStageHistory } from '../pipelines/stage-engine';
 import { getGroup } from '../settings/settings.service';
 import { notFound } from '../../lib/errors';
+import { whereOnRecord } from './participants';
 
 async function assertTaskPipeline() {
   if (!(await getGroup('features')).taskPipeline) throw notFound('Task statuses');
@@ -152,9 +153,8 @@ export const activitiesRoutes = [
         const parentDef = recordDefs[query.type];
         assertCan(user, `${parentDef.resource}.view`);
         const parent = await getRow(parentDef, user, query.uuid);
-        const qb = db('activities')
-          .whereNull('deleted_at')
-          .where({ related_type: query.type, related_id: parent.id });
+        const qb = db('activities').whereNull('deleted_at');
+        whereOnRecord(qb, query.type, parent.id as number);
         if (query.status === 'open') qb.whereNull('completed_at');
         if (query.status === 'done') qb.whereNotNull('completed_at');
         const rows = await qb
@@ -184,7 +184,20 @@ export const activitiesRoutes = [
         await applyScope(qb, user, activitiesDef.resource, activitiesDef.ownerColumns);
         if (query.assignee) {
           const uuid = query.assignee === '@me' ? user.uuid : query.assignee;
-          qb.whereIn('assignee_id', db('users').select('id').where({ uuid }));
+          const person = db('users').select('id').where({ uuid });
+          // Their own meetings, and meetings they attend.
+          qb.where((w) =>
+            w
+              .whereIn('assignee_id', person)
+              .orWhereExists((e) =>
+                e
+                  .select(db.raw('1'))
+                  .from('activity_participants as ap')
+                  .whereRaw('ap.activity_id = activities.id')
+                  .where('ap.kind', 'user')
+                  .whereIn('ap.record_id', db('users').select('id').where({ uuid })),
+              ),
+          );
         }
         const rows = await qb.limit(1000);
         return { data: await activitiesDef.toDtos(rows, { user, conn: db }) };

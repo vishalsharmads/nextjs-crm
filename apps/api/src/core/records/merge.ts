@@ -114,6 +114,15 @@ async function repoint(
     .whereIn('related_id', secondaryIds)
     .update({ related_id: primaryId });
   await trx('files').where({ entity }).whereIn('entity_id', secondaryIds).update({ entity_id: primaryId });
+  // Participations move to the kept record (one row per activity).
+  const parts = await trx('activity_participants').where({ kind: entity }).whereIn('record_id', secondaryIds);
+  for (const p of parts) {
+    const dup = await trx('activity_participants')
+      .where({ activity_id: p.activity_id, kind: entity, record_id: primaryId })
+      .first('id');
+    if (dup) await trx('activity_participants').where({ id: p.id }).delete();
+    else await trx('activity_participants').where({ id: p.id }).update({ record_id: primaryId });
+  }
   await trx('record_comments')
     .where({ entity })
     .whereIn('record_id', secondaryIds)

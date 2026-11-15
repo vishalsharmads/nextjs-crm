@@ -6,6 +6,8 @@ import {
   type ActivityDto,
   type Recurrence,
   type RelatedType,
+  type ParticipantKind,
+  type ParticipantRole,
 } from '@app/shared';
 import type { Db } from '../../db/knex';
 import { AppError } from '../../lib/errors';
@@ -28,6 +30,7 @@ import { checklistCounts } from './checklist-counts';
 import { spawnNextOccurrence } from './recurrence';
 import { taskStageColumns } from './task-stage';
 import { recordStageHistory } from '../pipelines/stage-engine';
+import { participantsOf, resolveParticipants, setParticipants } from './participants';
 
 type Row = Record<string, unknown> & { id: number };
 
@@ -173,7 +176,17 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
     Object.assign(row, await taskStageColumns(conn, input, row, existing));
     return row;
   },
-  async afterWrite(id, _input, { user, conn, ctx, existing }, op) {
+  async afterWrite(id, input, { user, conn, ctx, existing }, op) {
+    if (input.participants !== undefined)
+      await setParticipants(
+        conn,
+        id,
+        await resolveParticipants(
+          conn,
+          user,
+          input.participants as { kind: ParticipantKind; uuid: string; role: ParticipantRole }[],
+        ),
+      );
     const now = await conn('activities').where({ id }).first('stage_id', 'completed_at');
     if (now?.stage_id && (existing?.stage_id ?? null) !== now.stage_id)
       await recordStageHistory(
@@ -205,6 +218,27 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
         : Promise.resolve([] as Record<string, unknown>[]),
     ]);
     const stageOf = new Map(stages.map((s) => [s.id as number, s]));
+    const ids = rows.map((r) => r.id);
+    const people = await participantsOf(conn, ids);
+    // Emails: the thread each message is in, and how many messages that thread has.
+    const emailIds = rows.filter((r) => r.type === 'email').map((r) => r.id);
+    const threadOf = new Map<number, string>();
+    const threadSize = new Map<string, number>();
+    if (emailIds.length) {
+      const msgs = await conn('email_messages')
+        .whereIn('activity_id', emailIds)
+        .whereNotNull('thread_id')
+        .select('activity_id', 'thread_id');
+      for (const m of msgs) threadOf.set(m.activity_id as number, m.thread_id as string);
+      const threads = [...new Set(threadOf.values())];
+      if (threads.length)
+        for (const t of (await conn('email_messages')
+          .whereIn('thread_id', threads)
+          .groupBy('thread_id')
+          .select('thread_id')
+          .count({ n: '*' })) as { thread_id: string; n: number }[])
+          threadSize.set(t.thread_id, Number(t.n));
+    }
     const related = new Map<string, { uuid: string; title: string }>();
     for (const type of Object.keys(RELATED_TABLE) as RelatedType[]) {
       const ids = rows.filter((r) => r.related_type === type).map((r) => r.related_id as number);
@@ -238,6 +272,10 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
         createdAt: iso(r.created_at)!,
         updatedAt: iso(r.updated_at)!,
         overdue: !r.completed_at && !!r.due_at && new Date(r.due_at as string).getTime() < now,
+        participants: people.get(r.id) ?? [],
+        thread: threadOf.has(r.id)
+          ? { id: threadOf.get(r.id)!, count: threadSize.get(threadOf.get(r.id)!) ?? 1 }
+          : null,
         stage: (() => {
           const st = stageOf.get(r.stage_id as number);
           return st

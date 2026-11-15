@@ -1,7 +1,8 @@
 import { inflateRawSync } from 'node:zlib';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { clientWithRoles } from './helpers';
 import { db } from '../src/db/knex';
+import { clearSettingsCache } from '../src/core/settings/settings.service';
 import { onEvent, type DomainEvent } from '../src/core/events/events';
 
 const events: DomainEvent[] = [];
@@ -15,10 +16,17 @@ interface Column {
   leads: { uuid: string; stage: { uuid: string } | null }[];
 }
 
+// Other files create leads too: put the stored features row back exactly as it was (not through the
+// API, which would mark the setting as changed on this instance and upset blueprint checks).
+let savedFeatures: Record<string, unknown>[] = [];
+beforeAll(async () => {
+  savedFeatures = await db('settings').where({ key: 'features' }).select('*');
+});
 afterAll(async () => {
-  // Other files create leads too: leave the feature off as the factory default.
-  const { client } = await clientWithRoles(['admin']);
-  await client.patch('/settings/features', { leadPipeline: false }).expect(200);
+  await db('settings').where({ key: 'features' }).delete();
+  for (const { id: _id, ...row } of savedFeatures)
+    await db('settings').insert({ ...row, value: JSON.stringify(row.value) });
+  clearSettingsCache();
 });
 
 describe('lead pipeline', () => {
