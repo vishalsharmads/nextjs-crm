@@ -76,10 +76,11 @@ describe('two-way mailbox', () => {
     expect(url.searchParams.get('client_id')).toBe('client-1');
     const state = url.searchParams.get('state')!;
 
-    // A state belongs to the person who started the sign-in.
+    // An unknown or used state is refused; the state alone names the person (sessions may expire meanwhile).
     const { client: other } = await clientWithRoles([role]);
-    const wrong = await other.get(`/email/oauth/callback?code=abc&state=${state}`).expect(303);
-    expect(wrong.headers.location).toContain('error=');
+    const bad = await other.get('/email/oauth/callback?code=abc&state=nope').expect(303);
+    expect(bad.headers.location).toContain('error=');
+    expect(state).toHaveLength(64);
 
     const start2 = await client.post('/email/oauth/example/start').expect(200);
     const state2 = new URL(start2.body.url).searchParams.get('state')!;

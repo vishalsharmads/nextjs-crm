@@ -70,7 +70,7 @@ export function redirectUri() {
 /** Start a sign-in: a one-time state and PKCE verifier, and the provider's sign-in address. */
 export async function startOAuth(userId: number, key: string): Promise<string> {
   const p = providerByKey(key);
-  const state = base64url(randomBytes(32)).slice(0, 64);
+  const state = base64url(randomBytes(48));
   const verifier = base64url(randomBytes(48));
   await db('mail_oauth_states')
     .where('created_at', '<', new Date(Date.now() - 15 * 60_000))
@@ -136,15 +136,17 @@ function emailFromIdToken(idToken: string | undefined): string | null {
   }
 }
 
-/** Finish a sign-in: exchange the code and connect (or reconnect) the mailbox. Returns its uuid. */
+/**
+ * Finish a sign-in: exchange the code. The person is the one who started it, identified by the
+ * one-time state (not the session, which may have expired while they were at the provider).
+ */
 export async function finishOAuth(
-  userId: number,
   state: string,
   code: string,
-): Promise<{ email: string; provider: MailOAuthProvider; tokens: TokenResponse }> {
+): Promise<{ userId: number; email: string; provider: MailOAuthProvider; tokens: TokenResponse }> {
   const row = await db('mail_oauth_states').where({ state }).first();
   await db('mail_oauth_states').where({ state }).delete();
-  if (!row || row.user_id !== userId || new Date(row.created_at).getTime() < Date.now() - 15 * 60_000)
+  if (!row || new Date(row.created_at).getTime() < Date.now() - 15 * 60_000)
     throw new AppError('VALIDATION_FAILED', 'This sign-in expired. Start again from Settings → Email.');
   const p = providerByKey(row.provider as string);
   const tokens = await tokenRequest(p, {
@@ -159,7 +161,7 @@ export async function finishOAuth(
       'UPSTREAM_FAILED',
       'The mail provider did not say which address you signed in with. Ask your administrator to add the "openid email" scopes.',
     );
-  return { email, provider: p, tokens };
+  return { userId: row.user_id as number, email, provider: p, tokens };
 }
 
 export const tokenColumns = (t: TokenResponse) => ({

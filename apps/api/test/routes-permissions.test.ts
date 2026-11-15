@@ -56,6 +56,8 @@ describe('route permissions', () => {
       // OAuth client endpoints (PKCE, rate limited) and MCP, which authenticates callers itself.
       /^post \/oauth\/(register|token|revoke)$/,
       /^post \/mcp$/,
+      // Mailbox sign-in return: the single-use state (64 random characters) names the person.
+      /^get \/email\/oauth\/callback$/,
     ];
     const unexpected = publicRoutes.filter((r) => !allowed.some((re) => re.test(r)));
     expect(unexpected).toEqual([]);

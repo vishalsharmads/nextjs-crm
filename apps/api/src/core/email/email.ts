@@ -527,18 +527,24 @@ export const emailRoutes = defineRoutes('/email', ['email'])
   .add({
     method: 'get',
     path: '/oauth/callback',
-    permission: 'core.email.use',
+    // Public: the one-time state names the person; the session may have expired at the provider.
+    permission: 'public',
     query: z.object({
       code: z.string().max(4000).optional(),
       state: z.string().max(100).optional(),
       error: z.string().max(200).optional(),
     }),
     summary: 'Where the mail provider sends people back after signing in',
-    handler: async ({ ctx, user, query, res }) => {
+    handler: async ({ ctx, query, res }) => {
       if (query.error || !query.code || !query.state)
         return backToSettings(res, { error: 'The sign-in was cancelled or refused.' });
       try {
-        const { email, provider, tokens } = await finishOAuth(user.id, query.state, query.code);
+        const { userId, email, provider, tokens } = await finishOAuth(query.state, query.code);
+        const user = await db('users')
+          .where({ id: userId, status: 'active' })
+          .whereNull('deleted_at')
+          .first();
+        if (!user) throw new AppError('FORBIDDEN', 'This account cannot connect a mailbox.');
         const uuid = newUuid();
         await db.transaction(async (trx) => {
           await trx('mail_accounts')
@@ -546,7 +552,7 @@ export const emailRoutes = defineRoutes('/email', ['email'])
               uuid,
               user_id: user.id,
               email,
-              display_name: `${user.firstName} ${user.lastName}`.trim(),
+              display_name: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim(),
               smtp: JSON.stringify(provider.smtp),
               imap: JSON.stringify(provider.imap),
               auth_type: 'oauth',
@@ -569,11 +575,15 @@ export const emailRoutes = defineRoutes('/email', ['email'])
               'active',
               'last_error',
             ]);
-          await audit(trx, ctx, {
-            action: 'mail_account.connected',
-            entity: 'mail_account',
-            diff: { email, via: provider.key },
-          });
+          await audit(
+            trx,
+            { ...ctx, user: null },
+            {
+              action: 'mail_account.connected',
+              entity: 'mail_account',
+              diff: { email, via: provider.key },
+            },
+          );
         });
         return backToSettings(res, { connected: email });
       } catch (err) {
