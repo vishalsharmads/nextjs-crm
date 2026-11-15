@@ -119,6 +119,14 @@ async function eraseCoreTraces(
     to_addresses: JSON.stringify([]),
     cc_addresses: JSON.stringify([]),
     subject: '',
+    // Tracking says when the person read and clicked: it goes with them.
+    tracking_token: null,
+    tracking_links: null,
+    open_count: 0,
+    first_opened_at: null,
+    last_opened_at: null,
+    click_count: 0,
+    last_clicked_at: null,
   };
   if (activityIds.length)
     add('emailMessages', await trx('email_messages').whereIn('activity_id', activityIds).update(blankMail));

@@ -27,6 +27,8 @@ export const featureSettingsSchema = z.object({
   leadPipeline: z.boolean().default(false),
   /** Tasks, calls and meetings move through status stages on a board (done = completed). */
   taskPipeline: z.boolean().default(false),
+  /** Offer open and click tracking on emails sent from the app (never under privacy profiles). */
+  emailTracking: z.boolean().default(false),
 });
 export type FeatureSettings = z.infer<typeof featureSettingsSchema>;
 

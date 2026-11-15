@@ -58,6 +58,8 @@ describe('route permissions', () => {
       /^post \/mcp$/,
       // Mailbox sign-in return: the single-use state (64 random characters) names the person.
       /^get \/email\/oauth\/callback$/,
+      // Email tracking pixel and link counter: a random token, no record ids, stored links only.
+      /^get \/t\/(o\/:file|c\/:token\/:index)$/,
     ];
     const unexpected = publicRoutes.filter((r) => !allowed.some((re) => re.test(r)));
     expect(unexpected).toEqual([]);
