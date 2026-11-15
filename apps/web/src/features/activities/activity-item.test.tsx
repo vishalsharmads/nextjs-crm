@@ -12,7 +12,10 @@ vi.mock('@/lib/api', () => ({
 vi.mock('@/components/editor/use-templates', () => ({ useSavedReplies: () => [] }));
 vi.mock('@/app/session', () => ({
   useT: () => (k: string) => k,
-  useBoot: () => ({ me: { uuid: 'me' } }),
+  useBoot: () => ({
+    me: { uuid: 'me' },
+    settings: { features: { emailTracking: false }, session: { profile: 'standard' } },
+  }),
   useCan: () => (perm: string) => perm === 'core.email.use',
   useLabel: (entity: string) =>
     entity === 'deal'

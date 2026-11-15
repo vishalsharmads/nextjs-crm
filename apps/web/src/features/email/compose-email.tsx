@@ -8,6 +8,8 @@ import { Field, Input, NativeSelect } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/editor/rich-text-editor';
 import { useSavedReplies } from '@/components/editor/use-templates';
 import { Sheet } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useBoot } from '@/app/session';
 
 /** Write an email to a record's address; it is sent and logged on the record's timeline. */
 export function ComposeEmail({
@@ -33,6 +35,10 @@ export function ComposeEmail({
   );
   const [body, setBody] = useState('');
   const [account, setAccount] = useState<string>('');
+  const { settings } = useBoot();
+  // Offered only where the workspace allows it; the server checks profiles and opt-outs again.
+  const canTrack = settings.features.emailTracking && settings.session.profile === 'standard';
+  const [track, setTrack] = useState(canTrack);
   // A saved reply fills the subject too, unless one is already written.
   const onRendered = useCallback((r: { subject: string }) => setSubject((s) => s || r.subject), []);
   const replies = useSavedReplies(related, onRendered);
@@ -45,6 +51,7 @@ export function ComposeEmail({
         related,
         accountUuid: account || null,
         replyToActivityUuid: reply?.activityUuid ?? null,
+        track: canTrack && track,
       }),
     onSuccess: () => {
       toast.success('Email sent');
@@ -113,6 +120,16 @@ export function ComposeEmail({
             />
           )}
         </Field>
+        {canTrack ? (
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={track}
+              onCheckedChange={(v) => setTrack(v === true)}
+              aria-label="Track opens and clicks"
+            />
+            Track opens and clicks
+          </label>
+        ) : null}
       </div>
     </Sheet>
   );

@@ -182,6 +182,16 @@ export function ActivityItem({
           {a.type === 'note' ? ` · ${formatRelative(a.createdAt)}` : ''}
           {a.participants?.length ? ` · with ${a.participants.map((p) => p.name).join(', ')}` : ''}
         </p>
+        {a.tracking ? (
+          <p className="mt-0.5 text-xs text-muted">
+            {a.tracking.opens
+              ? `Opened ${a.tracking.opens === 1 ? 'once' : `${a.tracking.opens} times`}${a.tracking.lastOpenedAt ? `, last ${formatRelative(a.tracking.lastOpenedAt)}` : ''}`
+              : 'Not opened yet'}
+            {a.tracking.clicks
+              ? ` · ${a.tracking.clicks} link ${a.tracking.clicks === 1 ? 'click' : 'clicks'}`
+              : ''}
+          </p>
+        ) : null}
         {a.type === 'email' && record && can('core.email.use') ? (
           <button
             type="button"
