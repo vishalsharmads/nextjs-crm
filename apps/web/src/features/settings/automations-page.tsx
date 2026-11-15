@@ -99,6 +99,7 @@ function useEventLabel() {
   return (event: string) => {
     if (event === 'schedule') return 'On a schedule';
     if (event === 'comment.created') return 'Someone comments on a record';
+    if (event === 'meeting.booked') return 'A meeting is booked';
     const [entity, action] = event.split('.') as [string, string];
     const noun = entity === 'form' ? 'Web form' : (L[entity] ?? entity);
     return `${noun} ${verbs[action] ?? action}`;
