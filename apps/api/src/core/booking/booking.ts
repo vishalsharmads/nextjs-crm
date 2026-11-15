@@ -22,6 +22,7 @@ import { createRecord, deleteRecord } from '../records/service';
 import { recordDefs } from '../records/registry';
 import { participantsFromAddresses, visibleTo } from '../activities/participants';
 import { getGroup } from '../settings/settings.service';
+import { restrictedRecipients } from '../privacy/privacy.service';
 
 /**
  * Scheduling links (plan 13e). A person publishes a page with meeting types and working hours;
@@ -252,7 +253,10 @@ async function book(ctx: RequestContext, slug: string, input: z.output<typeof bo
   );
   let person = known.find((p) => p.kind === 'contact') ?? known.find((p) => p.kind === 'lead');
   const { leads } = await getGroup('features');
-  if (!person) {
+  // Someone whose processing is restricted is never added again as a new record: the meeting is
+  // still booked, with them in its notes only.
+  const restricted = (await restrictedRecipients([email])) > 0;
+  if (!person && !restricted) {
     const [first, ...rest] = input.name.split(/\s+/);
     try {
       const def = leads ? recordDefs.lead : recordDefs.contact;
