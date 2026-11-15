@@ -18,6 +18,12 @@ import { notFound } from '../../lib/errors';
 import { audit } from '../audit/audit.service';
 import * as auth from './auth.service';
 import { revokeFamily } from './tokens';
+import {
+  DEFAULT_NOTIFICATION_EMAIL,
+  DEFAULT_NOTIFICATION_PUSH,
+  NOTIFICATION_CATEGORIES,
+  type NotificationCategory,
+} from '@app/shared';
 
 export const authRoutes = defineRoutes('/auth', ['auth'])
   .add({
@@ -99,7 +105,20 @@ const profileSchema = z.object({
   lastName: z.string().trim().max(100).optional(),
   locale: z.string().max(10).nullable().optional(),
   timezone: z.string().max(64).nullable().optional(),
-  notifications: z.object({ email: z.boolean().optional(), taskDigest: z.boolean().optional() }).optional(),
+  notifications: z
+    .object({
+      email: z.boolean().optional(),
+      taskDigest: z.boolean().optional(),
+      categories: z
+        .partialRecord(
+          z.enum(
+            NOTIFICATION_CATEGORIES.map((c) => c.key) as [NotificationCategory, ...NotificationCategory[]],
+          ),
+          z.object({ email: z.boolean().optional(), push: z.boolean().optional() }),
+        )
+        .optional(),
+    })
+    .optional(),
 });
 
 export async function getMe(userId: number): Promise<MeDto> {
@@ -122,8 +141,30 @@ export async function getMe(userId: number): Promise<MeDto> {
     notifications: {
       email: prefsOf(u.preferences).emailNotifications !== false,
       taskDigest: prefsOf(u.preferences).taskDigest === true,
+      categories: Object.fromEntries(
+        NOTIFICATION_CATEGORIES.map(({ key }) => {
+          const c = (
+            prefsOf(u.preferences).notificationCategories as
+              Record<string, { email?: boolean; push?: boolean }> | undefined
+          )?.[key];
+          return [
+            key,
+            {
+              email: c?.email ?? DEFAULT_NOTIFICATION_EMAIL[key],
+              push: c?.push ?? DEFAULT_NOTIFICATION_PUSH[key],
+            },
+          ];
+        }),
+      ) as MeDto['notifications']['categories'],
     },
   };
+}
+
+/** Each kind keeps the channel it was not asked to change. */
+function mergeCategories(stored: unknown, changes: Record<string, { email?: boolean; push?: boolean }>) {
+  const out = { ...((stored as Record<string, { email?: boolean; push?: boolean }> | undefined) ?? {}) };
+  for (const [k, v] of Object.entries(changes)) out[k] = { ...out[k], ...v };
+  return out;
 }
 
 const prefsOf = (v: unknown) =>
@@ -147,6 +188,9 @@ export const meRoutes = defineRoutes('/me', ['me'])
             ...prefs,
             ...(n.email !== undefined ? { emailNotifications: n.email } : {}),
             ...(n.taskDigest !== undefined ? { taskDigest: n.taskDigest } : {}),
+            ...(n.categories
+              ? { notificationCategories: mergeCategories(prefs.notificationCategories, n.categories) }
+              : {}),
           });
         }
         await trx('users')

@@ -15,6 +15,8 @@ import { Switch } from '@/components/ui/checkbox';
 import { SettingsPage } from './layout';
 import { AccessTokens, ConnectedApps } from './ai-clients';
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
+import { NOTIFICATION_CATEGORIES, type NotificationCategory } from '@app/shared';
+import { currentSubscription, disablePush, enablePush, pushSupported } from '@/lib/push';
 
 export function ProfilePage() {
   const t = useT();
@@ -65,19 +67,19 @@ function ProfileForm() {
   );
 }
 
-/** Personal notification choices: email copies and the morning task digest. */
+/** Personal notification choices: email copies, push on this device, per kind, and the task digest. */
 function NotificationsForm() {
   const { me } = useBoot();
   const qc = useQueryClient();
-  const prefs = me.notifications ?? { email: true, taskDigest: false };
+  const prefs = me.notifications;
   const save = useMutation({
-    mutationFn: (notifications: Partial<typeof prefs>) => apiPatch('/me', { notifications }),
+    mutationFn: (notifications: Record<string, unknown>) => apiPatch('/me', { notifications }),
     onSuccess: () => {
       toast.success('Saved');
       void qc.invalidateQueries({ queryKey: bootstrapKey });
     },
   });
-  const row = (key: keyof typeof prefs, label: string, help: string) => (
+  const row = (key: 'email' | 'taskDigest', label: string, help: string) => (
     <label className="flex items-start justify-between gap-4 py-2">
       <span>
         <span className="block text-sm font-medium">{label}</span>
@@ -91,21 +93,100 @@ function NotificationsForm() {
       />
     </label>
   );
+  const setCategory = (key: NotificationCategory, channel: 'email' | 'push', value: boolean) =>
+    save.mutate({ categories: { [key]: { [channel]: value } } });
   return (
     <Pane title="Notifications">
       <div className="divide-y divide-line">
         {row(
           'email',
           'Email me a copy',
-          'Assignments, mentions and reminders also arrive by email. They always appear under the bell.',
+          'Notifications also arrive by email for the kinds chosen below. They always appear under the bell.',
         )}
         {row(
           'taskDigest',
           'Daily digest',
           'Each morning, one email with your tasks due today and anything overdue.',
         )}
+        <PushOnThisDevice />
+        <div className="py-3">
+          <table className="w-full text-sm">
+            <caption className="sr-only">Notification channels by kind</caption>
+            <thead>
+              <tr className="text-xs text-muted">
+                <th className="py-1 text-start font-medium">Kind</th>
+                <th className="w-20 py-1 text-center font-medium">Email</th>
+                <th className="w-20 py-1 text-center font-medium">Push</th>
+              </tr>
+            </thead>
+            <tbody>
+              {NOTIFICATION_CATEGORIES.map((c) => (
+                <tr key={c.key} className="border-t border-line">
+                  <td className="py-2">{c.label}</td>
+                  <td className="py-2 text-center">
+                    <Switch
+                      aria-label={`${c.label}: email`}
+                      checked={prefs.email && prefs.categories[c.key].email}
+                      disabled={save.isPending || !prefs.email}
+                      onCheckedChange={(v) => setCategory(c.key, 'email', v)}
+                    />
+                  </td>
+                  <td className="py-2 text-center">
+                    <Switch
+                      aria-label={`${c.label}: push`}
+                      checked={prefs.categories[c.key].push}
+                      disabled={save.isPending}
+                      onCheckedChange={(v) => setCategory(c.key, 'push', v)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </Pane>
+  );
+}
+
+/** Push notifications are per browser: turn them on here, on each device you use. */
+function PushOnThisDevice() {
+  const [state, setState] = useState<'unknown' | 'on' | 'off' | 'unsupported' | 'blocked'>('unknown');
+  useEffect(() => {
+    if (!pushSupported()) return setState('unsupported');
+    if (Notification.permission === 'denied') return setState('blocked');
+    void currentSubscription().then((s) => setState(s ? 'on' : 'off'));
+  }, []);
+  const toggle = useMutation({
+    mutationFn: async (on: boolean) => {
+      if (on) return (await enablePush()) ? 'on' : Notification.permission === 'denied' ? 'blocked' : 'off';
+      await disablePush();
+      return 'off';
+    },
+    onSuccess: (next) => {
+      setState(next);
+      toast.success(next === 'on' ? 'Push turned on for this device' : 'Push turned off for this device');
+    },
+  });
+  const help =
+    state === 'unsupported'
+      ? 'This browser cannot receive push notifications. Install the app on your phone or use a current browser.'
+      : state === 'blocked'
+        ? 'Notifications are blocked for this site in your browser settings. Allow them there, then come back.'
+        : 'Pop-up notifications on this device, even when the app is closed. Choose the kinds below.';
+  return (
+    <label className="flex items-start justify-between gap-4 py-2">
+      <span>
+        <span className="block text-sm font-medium">Push on this device</span>
+        <span className="block text-sm text-muted">{help}</span>
+      </span>
+      <Switch
+        aria-label="Push on this device"
+        checked={state === 'on'}
+        disabled={state === 'unsupported' || state === 'blocked' || state === 'unknown' || toggle.isPending}
+        onCheckedChange={(v) => toggle.mutate(v)}
+      />
+    </label>
   );
 }
 

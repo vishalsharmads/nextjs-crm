@@ -1,8 +1,11 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { clientWithRoles, createRole, createUser, loginAs } from './helpers';
+import { clientWithRoles, createRole, createUser, loginAs, restoreSettingsAfterEach } from './helpers';
 import { db } from '../src/db/knex';
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+// Tests here turn on the leads feature: put the setting back for other files.
+restoreSettingsAfterEach(['features']);
 
 describe('duplicate rules', () => {
   afterAll(async () => {

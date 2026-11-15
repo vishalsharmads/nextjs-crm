@@ -14,9 +14,12 @@ import { ConfirmHost } from '@/components/ui/confirm';
 import { router } from '@/app/router';
 import { applyBranding } from '@/theme/apply';
 import { FACTORY_THEME } from '@/theme/defaults';
+import { registerServiceWorker } from '@/lib/push';
 
 // Factory theme until the instance's branding loads.
 applyBranding({ ...FACTORY_THEME, assets: {} }, 'system');
+
+registerServiceWorker();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

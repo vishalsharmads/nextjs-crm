@@ -10,6 +10,7 @@ import { tagsRoutes } from './tags/tags.routes';
 import { filesRoutes } from './files/files.routes';
 import { searchRoutes } from './search/search.routes';
 import { duplicateRoutes } from './duplicates/duplicates.routes';
+import { pushRoutes } from './push/push';
 import { customFieldsRoutes, fieldGroupsRoutes, layoutsRoutes } from './custom-fields/custom-fields.routes';
 import { pipelinesRoutes } from './pipelines/pipelines.routes';
 import { notificationsRoutes } from './notifications/notifications.routes';
@@ -59,6 +60,7 @@ export function coreRouteGroups(): RouteGroup[] {
     filesRoutes,
     searchRoutes,
     duplicateRoutes,
+    pushRoutes,
     notificationsRoutes,
     savedViewsRoutes,
     importsRoutes,

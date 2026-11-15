@@ -9,7 +9,7 @@ describe('daily task digest', () => {
     const person = await createUser({ roleKeys: ['sales_rep'] });
     const me = await loginAs(person);
     const prefs = await me.patch('/me', { notifications: { taskDigest: true } }).expect(200);
-    expect(prefs.body.notifications).toEqual({ email: true, taskDigest: true });
+    expect(prefs.body.notifications).toMatchObject({ email: true, taskDigest: true });
 
     // A fixed morning in UTC (the test workspace's zone).
     const morning = new Date('2031-03-10T09:00:00Z');

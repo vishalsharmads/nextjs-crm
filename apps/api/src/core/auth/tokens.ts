@@ -164,4 +164,6 @@ export async function burnUserTokens(conn: Db, userId: number) {
     .where({ user_id: userId })
     .whereNull('revoked_at')
     .update({ revoked_at: new Date() });
+  // Browsers that receive push notifications for this person stop getting them too.
+  await conn('push_subscriptions').where({ user_id: userId }).delete();
 }

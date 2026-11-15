@@ -52,6 +52,7 @@ const SECRET_COLUMNS: [table: string, column: string, aad: (id: number) => strin
   ['users', 'totp_secret_enc', totpAad],
   ['webhooks', 'secret_enc', () => 'webhooks.secret_enc'],
   ['mail_accounts', 'password_enc', () => 'mail_accounts.password_enc'],
+  ['push_vapid', 'private_key_enc', () => 'push_vapid.private_key_enc'],
   // Module tables exist only once the module has been enabled.
   ['m_assistant_config', 'api_key_enc', () => 'm_assistant_config.api_key_enc'],
 ];
