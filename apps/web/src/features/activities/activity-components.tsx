@@ -34,6 +34,7 @@ import { Badge, EmptyState, ErrorState, Skeleton } from '@/components/ui/misc';
 import { UserPicker } from '@/components/fields/pickers';
 import { ChecklistProgress } from './task-checklist';
 import { ParticipantsPicker, type PickedParticipant } from './participants-picker';
+import { ComposeEmail } from '@/features/email/compose-email';
 
 export const ACTIVITY_ICON: Record<ActivityType, typeof StickyNote> = {
   note: StickyNote,
@@ -118,6 +119,12 @@ export function ActivityItem({
   record?: { type: RelatedType; uuid: string };
 }) {
   const [threadOpen, setThreadOpen] = useState(false);
+  const [replying, setReplying] = useState(false);
+  const replyTo =
+    a.type === 'email' && record
+      ? (a.participants.find((p) => p.role === 'from' && p.kind !== 'user') ??
+        a.participants.find((p) => p.kind !== 'user'))
+      : undefined;
   const toggle = useToggleActivity();
   const can = useCan();
   const Icon = ACTIVITY_ICON[a.type];
@@ -175,6 +182,23 @@ export function ActivityItem({
           {a.type === 'note' ? ` · ${formatRelative(a.createdAt)}` : ''}
           {a.participants?.length ? ` · with ${a.participants.map((p) => p.name).join(', ')}` : ''}
         </p>
+        {a.type === 'email' && record && can('core.email.use') ? (
+          <button
+            type="button"
+            className="me-3 text-xs text-primary hover:underline"
+            onClick={() => setReplying(true)}
+          >
+            Reply
+          </button>
+        ) : null}
+        {replying && record ? (
+          <ComposeEmail
+            to={replyTo?.email ?? ''}
+            related={record}
+            reply={{ activityUuid: a.uuid, subject: a.subject }}
+            onClose={() => setReplying(false)}
+          />
+        ) : null}
         {a.thread && a.thread.count > 1 && record ? (
           <div className="mt-1">
             <button

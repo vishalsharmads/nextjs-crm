@@ -14,10 +14,13 @@ export function ComposeEmail({
   to,
   related,
   onClose,
+  reply,
 }: {
   to: string;
   related: { type: RelatedType; uuid: string };
   onClose: () => void;
+  /** Answer this email: same conversation, subject prefixed with "Re:". */
+  reply?: { activityUuid: string; subject: string };
 }) {
   const qc = useQueryClient();
   const accounts = useQuery({
@@ -25,7 +28,9 @@ export function ComposeEmail({
     queryFn: () => apiGet<{ data: { uuid: string; email: string }[] }>('/email/accounts').then((r) => r.data),
   });
   const [recipients, setRecipients] = useState(to);
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(() =>
+    reply ? (/^re:/i.test(reply.subject) ? reply.subject : `Re: ${reply.subject}`) : '',
+  );
   const [body, setBody] = useState('');
   const [account, setAccount] = useState<string>('');
   // A saved reply fills the subject too, unless one is already written.
@@ -39,6 +44,7 @@ export function ComposeEmail({
         body,
         related,
         accountUuid: account || null,
+        replyToActivityUuid: reply?.activityUuid ?? null,
       }),
     onSuccess: () => {
       toast.success('Email sent');
@@ -51,7 +57,7 @@ export function ComposeEmail({
     <Sheet
       open
       onOpenChange={(o) => !o && onClose()}
-      title="New email"
+      title={reply ? 'Reply' : 'New email'}
       width="max-w-lg"
       footer={
         <>

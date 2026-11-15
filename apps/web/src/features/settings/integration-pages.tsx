@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { SAVED_REPLY_PREFIX } from '@app/shared';
@@ -657,6 +658,9 @@ interface MailAccount {
   imap: { host: string; port: number; secure: boolean } | null;
   lastSyncAt: string | null;
   lastError: string | null;
+  authType: 'password' | 'oauth';
+  provider: string | null;
+  syncSent: boolean;
 }
 
 export function EmailSettingsPage() {
@@ -681,6 +685,23 @@ export function EmailSettingsPage() {
     mutationFn: () => apiPost<{ sentTo: string }>('/settings/email/test'),
     onSuccess: (r) => toast.success(`Test email sent to ${r.sentTo}`),
   });
+  const sentToggle = useMutation({
+    mutationFn: (v: { uuid: string; syncSent: boolean }) =>
+      apiPatch(`/email/accounts/${v.uuid}`, { syncSent: v.syncSent }),
+    onSuccess: refresh,
+  });
+  // Back from a provider's sign-in page: say how it went, then clean the address bar.
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const connected = params.get('connected');
+    const failed = params.get('error');
+    if (!connected && !failed) return;
+    if (connected) toast.success(`Connected ${connected}`);
+    if (failed) toast.error(failed);
+    refresh();
+    setParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <SettingsPage
       title={t('settings.email')}
@@ -708,6 +729,7 @@ export function EmailSettingsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{a.email}</p>
                   <p className="text-xs text-muted">
+                    {a.provider ? `Signed in with ${a.provider} · ` : ''}
                     Sending via {a.smtp.host}
                     {a.imap
                       ? ` · syncing ${a.imap.host}${a.lastSyncAt ? `, last ${formatRelative(a.lastSyncAt)}` : ''}`
@@ -715,6 +737,16 @@ export function EmailSettingsPage() {
                   </p>
                   {a.lastError ? <p className="text-xs text-accent">{a.lastError}</p> : null}
                 </div>
+                {a.imap ? (
+                  <label className="flex items-center gap-2 text-xs text-muted">
+                    <Switch
+                      aria-label={`Also log mail sent from your mail program for ${a.email}`}
+                      checked={a.syncSent}
+                      onCheckedChange={(v) => sentToggle.mutate({ uuid: a.uuid, syncSent: v })}
+                    />
+                    Log sent mail too
+                  </label>
+                ) : null}
                 {a.imap ? (
                   <Button
                     size="sm"
@@ -781,6 +813,16 @@ function ConnectMailbox({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Could not connect'),
   });
+  const providers = useQuery({
+    queryKey: ['mail-oauth-providers'],
+    queryFn: () =>
+      apiGet<{ data: { key: string; name: string }[] }>('/email/oauth/providers').then((r) => r.data),
+  });
+  const signIn = useMutation({
+    mutationFn: (key: string) => apiPost<{ url: string }>(`/email/oauth/${key}/start`),
+    // The provider's own sign-in page; it sends the person back to this page.
+    onSuccess: (r) => window.location.assign(r.url),
+  });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent
@@ -800,6 +842,20 @@ function ConnectMailbox({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           </>
         }
       >
+        {providers.data?.length ? (
+          <div className="mb-4 flex flex-col gap-2 border-b border-line pb-4">
+            {providers.data.map((p) => (
+              <Button
+                key={p.key}
+                onClick={() => signIn.mutate(p.key)}
+                loading={signIn.isPending && signIn.variables === p.key}
+              >
+                Sign in with {p.name}
+              </Button>
+            ))}
+            <p className="text-xs text-muted">Or enter the mail server details:</p>
+          </div>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
           {error ? <p className="text-sm text-accent sm:col-span-2">{error}</p> : null}
           <Field label="Email">

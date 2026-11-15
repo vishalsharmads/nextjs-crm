@@ -5,9 +5,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ActivityDto } from '@app/shared';
 import { ActivityItem } from './activity-components';
 
+vi.mock('@/lib/api', () => ({
+  apiGet: () => Promise.resolve({ data: [] }),
+  apiPost: () => Promise.resolve({}),
+}));
+vi.mock('@/components/editor/use-templates', () => ({ useSavedReplies: () => [] }));
 vi.mock('@/app/session', () => ({
+  useT: () => (k: string) => k,
   useBoot: () => ({ me: { uuid: 'me' } }),
-  useCan: () => () => false,
+  useCan: () => (perm: string) => perm === 'core.email.use',
   useLabel: (entity: string) =>
     entity === 'deal'
       ? { singular: 'Membership', plural: 'Memberships' }
@@ -86,5 +92,34 @@ describe('activity item', () => {
       'aria-expanded',
       'true',
     );
+  });
+
+  it('opens a reply to an email in the same conversation', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    const email = {
+      ...note,
+      uuid: 'e2',
+      type: 'email',
+      subject: 'Offer',
+      participants: [
+        { kind: 'contact', uuid: 'c1', name: 'Ann Lee', role: 'from', email: 'ann@example.test' },
+      ],
+      thread: null,
+    } as unknown as ActivityDto;
+    const { TooltipProvider } = await import('@/components/ui/menu');
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <TooltipProvider>
+          <MemoryRouter>
+            <ul>
+              <ActivityItem a={email} record={{ type: 'contact', uuid: 'c1' }} />
+            </ul>
+          </MemoryRouter>
+        </TooltipProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    expect(await screen.findByDisplayValue('Re: Offer')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('ann@example.test')).toBeInTheDocument();
   });
 });

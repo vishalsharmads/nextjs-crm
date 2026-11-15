@@ -174,6 +174,8 @@ export interface ParticipantDto {
   uuid: string;
   name: string;
   role: ParticipantRole;
+  /** Their email address, for replies (absent when hidden from the viewer or unknown). */
+  email?: string | null;
 }
 
 export const participantInputSchema = z.object({
