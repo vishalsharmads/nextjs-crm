@@ -20,5 +20,5 @@ Change your name, notifications, password and two-factor authentication, see whe
 
 ## Calendar
 
-- **Your calendar**: connect one calendar by its CalDAV address (most calendar services and servers offer one; use an app password if asked). Every 15 minutes, events whose guests include your {{contactPluralLower}} or {{leadPluralLower}} become meetings on their records, meetings you add here appear in that calendar, and changes to the time or title go both ways (the most recent change wins). Repeating events only count as busy time.
-- **Subscribe from another calendar**: create a private address of your meetings and tasks with a time, for calendar apps that subscribe to a web address. Anyone with the address can see the titles and times, so replace or remove it if it is shared by mistake.
+- **Your calendar**: connect one calendar by its CalDAV address (most calendar services and servers offer one; use an app password if asked). Every 15 minutes, events whose guests include {{contactPluralLower}} or {{leadPluralLower}} you can see become meetings on their records, meetings you add here appear in that calendar, and changes to the time or title go both ways (the most recent change wins). Repeating events only count as busy time.
+- **Subscribe from another calendar**: create a private address of your meetings and tasks with a time (titles and times only, never notes), for calendar apps that subscribe to a web address. Anyone with the address can see the titles and times, so replace or remove it if it is shared by mistake.
