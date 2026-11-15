@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRightLeft, FilePlus, GitMerge, MessageSquare, PencilLine, Sparkles } from 'lucide-react';
-import type { TimelineItem } from '@app/shared';
+import { RELATED_TYPES, type RelatedType, type TimelineItem } from '@app/shared';
 import { apiGet } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { formatRelative, formatDateTime } from '@/lib/format';
@@ -17,7 +17,7 @@ const ICON = {
   comment: MessageSquare,
 } as const;
 
-type TimelineConfig = Pick<EntityConfig, 'route' | 'fields'>;
+type TimelineConfig = Pick<EntityConfig, 'route' | 'fields'> & { entity?: string };
 
 function fieldLabel(config: TimelineConfig, key: string) {
   const k = key.startsWith('custom.') ? `cf.${key.slice(7)}` : key;
@@ -63,7 +63,15 @@ export function Timeline({ config, uuid }: { config: TimelineConfig; uuid: strin
             <li key={item.id} className="border-b border-line last:border-0">
               <ul>
                 {/* Rolled up from a related record (a contact's deal): say where it was logged. */}
-                <ActivityItem a={item.activity} showRelated={item.activity.related?.uuid !== uuid} />
+                <ActivityItem
+                  a={item.activity}
+                  showRelated={item.activity.related?.uuid !== uuid}
+                  record={
+                    RELATED_TYPES.includes(config.entity as RelatedType)
+                      ? { type: config.entity as RelatedType, uuid }
+                      : undefined
+                  }
+                />
               </ul>
             </li>
           );

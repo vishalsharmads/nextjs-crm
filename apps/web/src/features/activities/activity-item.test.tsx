@@ -56,4 +56,35 @@ describe('activity item', () => {
     show(false);
     expect(screen.queryByRole('link')).toBeNull();
   });
+
+  it('names the participants and opens an email conversation', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    const email = {
+      ...note,
+      uuid: 'e1',
+      type: 'email',
+      subject: 'Quote',
+      participants: [
+        { kind: 'contact', uuid: 'c1', name: 'Ann Lee', role: 'to' },
+        { kind: 'user', uuid: 'u1', name: 'Sam Rep', role: 'cc' },
+      ],
+      thread: { id: 't1', count: 3 },
+    } as unknown as ActivityDto;
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <ul>
+            <ActivityItem a={email} record={{ type: 'contact', uuid: 'c1' }} />
+          </ul>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText(/with Ann Lee, Sam Rep/)).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: '3 messages in this conversation' });
+    fireEvent.click(button);
+    expect(screen.getByRole('button', { name: 'Hide conversation' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
 });

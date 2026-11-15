@@ -30,9 +30,10 @@ import { Input } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/editor/rich-text-editor';
 import { useSavedReplies } from '@/components/editor/use-templates';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge, EmptyState, Skeleton } from '@/components/ui/misc';
+import { Badge, EmptyState, ErrorState, Skeleton } from '@/components/ui/misc';
 import { UserPicker } from '@/components/fields/pickers';
 import { ChecklistProgress } from './task-checklist';
+import { ParticipantsPicker, type PickedParticipant } from './participants-picker';
 
 export const ACTIVITY_ICON: Record<ActivityType, typeof StickyNote> = {
   note: StickyNote,
@@ -106,7 +107,17 @@ function RelatedLink({ related }: { related: NonNullable<ActivityDto['related']>
   );
 }
 
-export function ActivityItem({ a, showRelated }: { a: ActivityDto; showRelated?: boolean }) {
+export function ActivityItem({
+  a,
+  showRelated,
+  record,
+}: {
+  a: ActivityDto;
+  showRelated?: boolean;
+  /** The record whose timeline shows this item: needed to open an email conversation. */
+  record?: { type: RelatedType; uuid: string };
+}) {
+  const [threadOpen, setThreadOpen] = useState(false);
   const toggle = useToggleActivity();
   const can = useCan();
   const Icon = ACTIVITY_ICON[a.type];
@@ -162,9 +173,61 @@ export function ActivityItem({ a, showRelated }: { a: ActivityDto; showRelated?:
           {TYPE_LABEL[a.type]}
           {a.assignee ? ` · ${a.assignee.name}` : ''}
           {a.type === 'note' ? ` · ${formatRelative(a.createdAt)}` : ''}
+          {a.participants?.length ? ` · with ${a.participants.map((p) => p.name).join(', ')}` : ''}
         </p>
+        {a.thread && a.thread.count > 1 && record ? (
+          <div className="mt-1">
+            <button
+              type="button"
+              className="text-xs text-primary hover:underline"
+              aria-expanded={threadOpen}
+              onClick={() => setThreadOpen(!threadOpen)}
+            >
+              {threadOpen ? 'Hide conversation' : `${a.thread.count} messages in this conversation`}
+            </button>
+            {threadOpen ? <EmailThread threadId={a.thread.id} record={record} /> : null}
+          </div>
+        ) : null}
       </div>
     </li>
+  );
+}
+
+interface ThreadMessage extends ActivityDto {
+  message: { direction: 'inbound' | 'outbound'; from: string; to: string[]; sentAt: string };
+}
+
+/** Every message of an email conversation that is on this record, oldest first. */
+function EmailThread({
+  threadId,
+  record,
+}: {
+  threadId: string;
+  record: { type: RelatedType; uuid: string };
+}) {
+  const q = useQuery({
+    queryKey: ['email-thread', threadId, record.uuid],
+    queryFn: () =>
+      apiGet<{ data: ThreadMessage[] }>(`/email/threads/${threadId}`, {
+        type: record.type,
+        uuid: record.uuid,
+      }).then((r) => r.data),
+  });
+  if (q.isPending) return <Skeleton className="mt-2 h-16" />;
+  if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
+  return (
+    <ol className="mt-2 flex flex-col gap-2 border-s-2 border-line ps-3">
+      {q.data.map((m) => (
+        <li key={m.uuid} className="text-sm">
+          <p className="text-xs text-muted">
+            {m.message.direction === 'inbound' ? m.message.from : `To ${m.message.to.join(', ')}`} ·{' '}
+            {formatDateTime(m.message.sentAt)}
+          </p>
+          <p className="font-medium">{m.subject}</p>
+          {m.body ? <div className="rte-prose text-sm" dangerouslySetInnerHTML={{ __html: m.body }} /> : null}
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -183,10 +246,12 @@ export function ActivityComposer({
   const [body, setBody] = useState('');
   const [when, setWhen] = useState('');
   const [assignee, setAssignee] = useState<string | null>(me.uuid);
+  const [participants, setParticipants] = useState<PickedParticipant[]>([]);
   const reset = () => {
     setSubject('');
     setBody('');
     setWhen('');
+    setParticipants([]);
   };
   const replies = useSavedReplies(related);
   const create = useMutation({
@@ -202,6 +267,9 @@ export function ActivityComposer({
         assigneeUuid: assignee,
         related,
         completed: type === 'call' && !when ? true : undefined,
+        ...(type === 'meeting' || type === 'call'
+          ? { participants: participants.map(({ kind, uuid }) => ({ kind, uuid })) }
+          : {}),
       }),
     onSuccess: () => {
       reset();
@@ -281,6 +349,9 @@ export function ActivityComposer({
               <UserPicker value={assignee} onChange={setAssignee} placeholder="Assignee" />
             </div>
           </div>
+        ) : null}
+        {type === 'meeting' || type === 'call' ? (
+          <ParticipantsPicker value={participants} onChange={setParticipants} />
         ) : null}
         <div className="flex justify-end">
           <Button type="submit" size="sm" variant="primary" disabled={!valid} loading={create.isPending}>
