@@ -133,14 +133,17 @@ export function takeMail() {
  * them back after it.
  */
 export function restoreSettingsAfterEach(keys: string[]) {
-  let saved: { key: string; value: unknown }[] = [];
+  let saved: Record<string, unknown>[] = [];
   beforeEach(async () => {
-    saved = await db('settings').whereIn('key', keys).select('key', 'value');
+    saved = await db('settings').whereIn('key', keys).select('*');
   });
   afterEach(async () => {
     await db('settings').whereIn('key', keys).delete();
-    for (const row of saved)
-      await db('settings').insert({ key: row.key, group: row.key, value: JSON.stringify(row.value) });
+    // Whole rows, blueprint columns included: a row put back without them would look locally created.
+    for (const row of saved) {
+      const { id: _id, ...rest } = row;
+      await db('settings').insert({ ...rest, value: JSON.stringify(row.value) });
+    }
     clearSettingsCache();
   });
 }
