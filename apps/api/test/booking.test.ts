@@ -138,4 +138,71 @@ describe('scheduling links', () => {
       .expect(200);
     await request(app).get(`/api/v1/public/book/${slug}`).expect(404);
   });
+
+  it('offers no time inside a clock change, never runs past closing time, and refuses overlapping hours', async () => {
+    // Sunday 29 March 2026: London skips 01:00–02:00.
+    const springSlots = computeSlots({
+      hours: { sun: [['00:30', '03:00']] },
+      timeZone: 'Europe/London',
+      type: { durationMin: 30, bufferMin: 0, noticeHours: 0, horizonDays: 1 },
+      busy: [],
+      now: new Date('2026-03-28T23:00:00Z'),
+      stepMin: 30,
+    });
+    const londonTimes = springSlots.map((d) =>
+      d.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' }),
+    );
+    expect(londonTimes).not.toContain('01:30');
+    expect(new Set(londonTimes).size).toBe(londonTimes.length);
+    const { client } = await clientWithRoles(['admin']);
+    await client
+      .put('/me/booking-page', {
+        slug: `overlap-${Date.now().toString(36)}`,
+        title: 'x',
+        timeZone: 'UTC',
+        hours: {
+          mon: [
+            ['09:00', '12:00'],
+            ['11:00', '13:00'],
+          ],
+        },
+        meetingTypes: [{ key: 'a', name: 'A', durationMin: 30 }],
+      })
+      .expect(422);
+    await client
+      .put('/me/booking-page', {
+        slug: `tz-${Date.now().toString(36)}`,
+        title: 'x',
+        timeZone: '+05:30',
+        hours: {},
+        meetingTypes: [{ key: 'a', name: 'A', durationMin: 30 }],
+      })
+      .expect(422);
+  });
+
+  it('lets only one of two visitors take the same time', async () => {
+    const { client } = await clientWithRoles(['admin']);
+    const slug = `race-${Date.now().toString(36)}`;
+    const allDay = [['00:00', '23:59']];
+    await client
+      .put('/me/booking-page', {
+        slug,
+        title: 'Race',
+        timeZone: 'UTC',
+        hours: { sun: allDay, mon: allDay, tue: allDay, wed: allDay, thu: allDay, fri: allDay, sat: allDay },
+        meetingTypes: [{ key: 'a', name: 'A', durationMin: 30, noticeHours: 1, horizonDays: 3 }],
+      })
+      .expect(200);
+    const app = await getApp();
+    const slots = await request(app).get(`/api/v1/public/book/${slug}/slots?type=a`).expect(200);
+    const start = slots.body.slots[0] as string;
+    const results = await Promise.all(
+      [1, 2].map((n) =>
+        request(app)
+          .post(`/api/v1/public/book/${slug}`)
+          .send({ type: 'a', start, name: `Racer ${n}`, email: `racer-${n}-${Date.now()}@example.test` }),
+      ),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+  });
 });

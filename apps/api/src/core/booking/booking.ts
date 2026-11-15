@@ -18,7 +18,7 @@ import { logger } from '../../lib/logger';
 import { audit } from '../audit/audit.service';
 import { emit } from '../events/events';
 import { can, loadAccess } from '../rbac/access';
-import { createRecord, deleteRecord } from '../records/service';
+import { createRecord, emitRecordEvent } from '../records/service';
 import { recordDefs } from '../records/registry';
 import { participantsFromAddresses, visibleTo } from '../activities/participants';
 import { getGroup } from '../settings/settings.service';
@@ -159,13 +159,11 @@ export const bookingPageRoutes = defineRoutes('/me/booking-page', ['me'])
     body: bookingPageSchema,
     summary: 'Create or change your booking page',
     handler: async ({ ctx, user, body }) => {
-      try {
-        new Intl.DateTimeFormat('en', { timeZone: body.timeZone });
-      } catch {
+      // A named zone with daylight-saving rules (not a fixed offset such as +05:30).
+      if (!Intl.supportedValuesOf('timeZone').includes(body.timeZone) && body.timeZone !== 'UTC')
         throw new AppError('VALIDATION_FAILED', 'Unknown time zone', [
           { path: 'timeZone', message: 'Unknown' },
         ]);
-      }
       const keys = body.meetingTypes.map((t) => t.key);
       if (new Set(keys).size !== keys.length)
         throw new AppError('VALIDATION_FAILED', 'Meeting types need different keys', [
@@ -230,6 +228,12 @@ const bookBody = z.object({
   website: z.string().max(200).optional(),
 });
 
+/** Open future bookings one visitor may hold on one page, and bookings a page takes per day. */
+const PER_EMAIL = 3;
+const PER_DAY = 50;
+// Control characters (line breaks included) never reach a subject or an invitation.
+const clean = (s: string) => s.replace(/\p{Cc}+/gu, ' ').trim();
+
 async function book(ctx: RequestContext, slug: string, input: z.output<typeof bookBody>) {
   const { page, host } = await livePage(slug);
   const type = page.meeting_types.find((t) => t.key === input.type);
@@ -239,85 +243,139 @@ async function book(ctx: RequestContext, slug: string, input: z.output<typeof bo
       throw new AppError('VALIDATION_FAILED', `Please answer: ${q.label}`, [
         { path: `answers.${q.key}`, message: 'Required' },
       ]);
-  const start = new Date(input.start);
-  // The slot must still be free (another visitor may have taken it).
-  const free = await slotsFor(page, type);
-  if (!free.some((s) => s.getTime() === start.getTime()))
-    throw new AppError('CONFLICT', 'That time is no longer available. Choose another.');
-
-  const email = input.email.toLowerCase();
-  // An existing contact or lead the host can see, else a new lead (like a web form).
-  const known = await visibleTo(
-    host.id,
-    await participantsFromAddresses(db, [{ address: email, role: 'attendee' }], [host.email]),
+  // Only the page's own questions are kept.
+  const answers = Object.fromEntries(
+    type.questions
+      .filter((q) => input.answers[q.key]?.trim())
+      .map((q) => [q.key, input.answers[q.key]!.trim()]),
   );
-  let person = known.find((p) => p.kind === 'contact') ?? known.find((p) => p.kind === 'lead');
-  const { leads } = await getGroup('features');
-  // Someone whose processing is restricted is never added again as a new record: the meeting is
-  // still booked, with them in its notes only.
-  const restricted = (await restrictedRecipients([email])) > 0;
-  if (!person && !restricted) {
-    const [first, ...rest] = input.name.split(/\s+/);
-    try {
-      const def = leads ? recordDefs.lead : recordDefs.contact;
-      const created = (await createRecord(def, ctx, host, {
-        firstName: first,
-        lastName: rest.join(' '),
-        email,
-        source: 'Booking',
-        ownerUuid: host.uuid,
-      })) as { uuid: string };
-      const row = await db(def.table).where({ uuid: created.uuid }).first('id');
-      person = { kind: leads ? 'lead' : 'contact', record_id: row.id as number, role: 'attendee' };
-    } catch (err) {
-      // A duplicate rule may refuse a new record: the meeting is still booked, with the visitor in its notes.
-      logger.warn({ err: (err as Error).message }, 'Booking could not create a record for the visitor');
-    }
-  }
-  const personUuid = person
-    ? ((
-        await db(person.kind === 'lead' ? 'leads' : 'contacts')
-          .where({ id: person.record_id })
-          .first('uuid')
-      )?.uuid as string)
-    : null;
-  const details = [
-    `<p>Booked through ${escapeHtml(page.title)} by ${escapeHtml(input.name)} (${escapeHtml(email)}).</p>`,
-    ...type.questions
-      .filter((q) => input.answers[q.key])
-      .map((q) => `<p><strong>${escapeHtml(q.label)}</strong><br>${escapeHtml(input.answers[q.key]!)}</p>`),
-  ].join('');
-  const meeting = (await createRecord(recordDefs.activity, ctx, host, {
-    type: 'meeting',
-    subject: `${type.name}: ${input.name}`.slice(0, 255),
-    body: details,
-    startAt: start.toISOString(),
-    endAt: new Date(start.getTime() + type.durationMin * 60_000).toISOString(),
-    assigneeUuid: host.uuid,
-    ...(person && personUuid
-      ? {
-          related: { type: person.kind as 'contact' | 'lead', uuid: personUuid },
-          participants: [{ kind: person.kind as 'contact' | 'lead', uuid: personUuid }],
-          invite: true,
-        }
-      : {}),
-  })) as { uuid: string };
-  const activity = await db('activities').where({ uuid: meeting.uuid }).first('id');
+  const name = clean(input.name).slice(0, 200) || 'Visitor';
+  const email = input.email.toLowerCase();
+  const start = new Date(input.start);
+  // Written as the page owner through a booking page, so the audit trail says where it came from.
+  const actorCtx: RequestContext = { ...ctx, user: host };
   const token = randomBytes(32).toString('base64url');
-  await db('bookings').insert({
-    page_id: page.id,
-    activity_id: activity.id,
-    type_key: type.key,
-    token_hash: hash(token),
-    visitor_name: input.name,
-    visitor_email: email,
-    answers: JSON.stringify(input.answers),
+
+  const done = await db.transaction(async (trx) => {
+    // One booking at a time per page: the next visitor waits, then sees this one's meeting as busy.
+    await trx('booking_pages').where({ id: page.id }).forUpdate().first('id');
+    const open = await trx('bookings as b')
+      .join('activities as a', 'a.id', 'b.activity_id')
+      .where({ 'b.page_id': page.id, 'b.visitor_email': email })
+      .whereNull('b.cancelled_at')
+      .whereNull('a.deleted_at')
+      .where('a.start_at', '>', new Date())
+      .count({ c: '*' })
+      .first();
+    if (Number((open as { c: number }).c) >= PER_EMAIL)
+      throw new AppError(
+        'RATE_LIMITED',
+        'You already have bookings coming up. Cancel one before booking another.',
+      );
+    const today = await trx('bookings')
+      .where({ page_id: page.id })
+      .where('created_at', '>', new Date(Date.now() - 86_400_000))
+      .count({ c: '*' })
+      .first();
+    if (Number((today as { c: number }).c) >= PER_DAY)
+      throw new AppError('RATE_LIMITED', 'This page is not taking more bookings today. Try again tomorrow.');
+    // The slot must still be free (checked under the page lock).
+    if (!(await slotIsFree(page, type, start)))
+      throw new AppError('CONFLICT', 'That time is no longer available. Choose another.');
+
+    // An existing contact or lead the host can see (never a restricted one), else a new lead.
+    const known = await visibleTo(
+      host.id,
+      await participantsFromAddresses(trx, [{ address: email, role: 'attendee' }], [host.email]),
+    );
+    let person = known.find((p) => p.kind === 'contact') ?? known.find((p) => p.kind === 'lead');
+    let createdPerson: { entity: 'lead' | 'contact'; dto: Record<string, unknown> } | null = null;
+    const { leads } = await getGroup('features');
+    const restricted = (await restrictedRecipients([email], trx)) > 0;
+    if (!person && !restricted) {
+      const [first, ...rest] = name.split(/\s+/);
+      const entity = leads ? ('lead' as const) : ('contact' as const);
+      try {
+        const created = (await createRecord(
+          recordDefs[entity],
+          actorCtx,
+          host,
+          { firstName: first, lastName: rest.join(' '), email, source: 'Booking', ownerUuid: host.uuid },
+          trx,
+        )) as Record<string, unknown> & { uuid: string };
+        const row = await trx(recordDefs[entity].table).where({ uuid: created.uuid }).first('id');
+        person = { kind: entity, record_id: row.id as number, role: 'attendee' };
+        createdPerson = { entity, dto: created };
+      } catch (err) {
+        // A duplicate rule may refuse a new record: the meeting is still booked, with the visitor in its notes.
+        if (!(err instanceof AppError)) throw err;
+        logger.warn({ err: err.message }, 'Booking could not create a record for the visitor');
+      }
+    }
+    const personUuid = person
+      ? ((
+          await trx(person.kind === 'lead' ? 'leads' : 'contacts')
+            .where({ id: person.record_id })
+            .first('uuid')
+        )?.uuid as string)
+      : null;
+    const details = [
+      `<p>Booked through ${escapeHtml(page.title)} by ${escapeHtml(name)} (${escapeHtml(email)}).</p>`,
+      ...type.questions
+        .filter((q) => answers[q.key])
+        .map((q) => `<p><strong>${escapeHtml(q.label)}</strong><br>${escapeHtml(answers[q.key]!)}</p>`),
+    ].join('');
+    const meeting = (await createRecord(
+      recordDefs.activity,
+      actorCtx,
+      host,
+      {
+        type: 'meeting',
+        subject: `${type.name}: ${name}`.slice(0, 255),
+        body: details,
+        startAt: start.toISOString(),
+        endAt: new Date(start.getTime() + type.durationMin * 60_000).toISOString(),
+        assigneeUuid: host.uuid,
+        // The invitation goes only to the record with the email the visitor typed.
+        ...(person && personUuid
+          ? {
+              related: { type: person.kind as 'contact' | 'lead', uuid: personUuid },
+              participants: [{ kind: person.kind as 'contact' | 'lead', uuid: personUuid }],
+              invite: true,
+            }
+          : {}),
+      },
+      trx,
+    )) as Record<string, unknown> & { uuid: string };
+    const activity = await trx('activities').where({ uuid: meeting.uuid }).first('id');
+    await trx('bookings').insert({
+      page_id: page.id,
+      activity_id: activity.id,
+      type_key: type.key,
+      token_hash: hash(token),
+      visitor_name: name,
+      visitor_email: email,
+      answers: JSON.stringify(answers),
+    });
+    await audit(trx, actorCtx, {
+      action: 'meeting.booked',
+      entity: 'activity',
+      entityId: activity.id as number,
+      entityUuid: meeting.uuid,
+      diff: { page: page.slug, type: type.key, start: start.toISOString() },
+    });
+    return { meeting, createdPerson };
   });
+
+  // After commit: the usual events (webhooks, automations, the invitation).
+  if (done.createdPerson)
+    await emitRecordEvent(recordDefs[done.createdPerson.entity], 'created', done.createdPerson.dto, host);
+  await emitRecordEvent(recordDefs.activity, 'created', done.meeting, host);
   await emit({
     type: 'meeting.booked',
     entity: 'activity',
-    uuid: meeting.uuid,
-    record: { uuid: meeting.uuid, type: type.key, start: start.toISOString() },
+    uuid: done.meeting.uuid,
+    record: { uuid: done.meeting.uuid, type: type.key, start: start.toISOString() },
     actorId: host.id,
   });
   const app = new URL(env.APP_URL);
@@ -325,6 +383,19 @@ async function book(ctx: RequestContext, slug: string, input: z.output<typeof bo
     start: start.toISOString(),
     manageUrl: `${app.origin}${app.pathname.replace(/\/$/, '')}/book/manage/${token}`,
   };
+}
+
+/** Is one start time free? Computes only around that day, not the whole horizon. */
+async function slotIsFree(page: PageRow, type: MeetingType, start: Date, now = new Date()) {
+  if (Number.isNaN(start.getTime())) return false;
+  const busy = await busyOf(
+    page.user_id,
+    new Date(start.getTime() - 86_400_000),
+    new Date(start.getTime() + 2 * 86_400_000),
+  );
+  return computeSlots({ hours: page.hours, timeZone: page.time_zone, type, busy, now }).some(
+    (s) => s.getTime() === start.getTime(),
+  );
 }
 
 const escapeHtml = (s: string) =>
@@ -379,15 +450,35 @@ export const publicBookingRoutes = defineRoutes('/public/book', ['public'])
         .whereNull('cancelled_at')
         .first();
       if (!b) throw notFound('Booking');
-      const page = (await db('booking_pages').where({ id: b.page_id }).first()) as PageRow;
-      const host = await owner(page.user_id);
       const activity = await db('activities')
         .where({ id: b.activity_id })
         .whereNull('deleted_at')
-        .first('uuid');
-      await db('bookings').where({ id: b.id }).update({ cancelled_at: new Date() });
-      if (host && activity)
-        await deleteRecord(recordDefs.activity, ctx, { ...host, isAdmin: true }, activity.uuid as string);
+        .first('id', 'uuid', 'start_at');
+      if (activity && new Date(activity.start_at) <= new Date())
+        throw new AppError(
+          'VALIDATION_FAILED',
+          'This meeting has already started and can no longer be cancelled here.',
+        );
+      const page = (await db('booking_pages').where({ id: b.page_id }).first()) as PageRow;
+      const host = await owner(page.user_id);
+      const actorCtx: RequestContext = { ...ctx, user: host };
+      // The booking and its meeting go together, or neither does (no elevated rights needed).
+      await db.transaction(async (trx) => {
+        await trx('bookings').where({ id: b.id }).update({ cancelled_at: new Date() });
+        if (activity) {
+          await trx('activities').where({ id: activity.id }).update({ deleted_at: new Date() });
+          await audit(trx, actorCtx, {
+            action: 'activity.deleted',
+            entity: 'activity',
+            entityId: activity.id as number,
+            entityUuid: activity.uuid as string,
+            diff: { cancelledBy: 'visitor', booking: true },
+          });
+        }
+      });
+      // The invitation's cancellation and the host's calendar follow the usual deleted event.
+      if (activity && host)
+        await emitRecordEvent(recordDefs.activity, 'deleted', { uuid: activity.uuid as string }, host);
     },
   })
   .add({

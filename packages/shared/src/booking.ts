@@ -19,7 +19,7 @@ export const meetingTypeSchema = z.object({
     .max(24 * 14)
     .default(4),
   /** How far ahead bookings are offered. */
-  horizonDays: z.number().int().min(1).max(180).default(30),
+  horizonDays: z.number().int().min(1).max(90).default(30),
   questions: z
     .array(
       z.object({
@@ -39,7 +39,17 @@ export const bookingPageSchema = z.object({
   intro: z.string().trim().max(2000).default(''),
   timeZone: z.string().min(1).max(64),
   /** Working hours per weekday, as [start, end] pairs of HH:MM in the page's time zone. */
-  hours: z.partialRecord(z.enum(WEEKDAYS), z.array(z.tuple([time, time])).max(4)),
+  hours: z.partialRecord(
+    z.enum(WEEKDAYS),
+    z
+      .array(z.tuple([time, time]))
+      .max(4)
+      .refine((ranges) => ranges.every(([a, b]) => a < b), 'Each range must end after it starts')
+      .refine((ranges) => {
+        const sorted = [...ranges].sort((x, y) => x[0].localeCompare(y[0]));
+        return sorted.every((r, i) => i === 0 || sorted[i - 1]![1] <= r[0]);
+      }, 'Ranges on one day must not overlap'),
+  ),
   meetingTypes: z.array(meetingTypeSchema).min(1).max(10),
   active: z.boolean().default(true),
 });
@@ -72,21 +82,32 @@ export function computeSlots(opts: {
   const dur = opts.type.durationMin * 60_000;
   const buf = opts.type.bufferMin * 60_000;
   const busy = opts.busy.map((b) => [b.start.getTime() - buf, b.end.getTime() + buf] as const);
-  const out: Date[] = [];
+  const out = new Set<number>();
   const today = wallClock(opts.now, opts.timeZone);
   for (let i = 0; i <= opts.type.horizonDays; i++) {
     const day = new Date(Date.UTC(today.y, today.m - 1, today.d + i));
     const w = { y: day.getUTCFullYear(), m: day.getUTCMonth() + 1, d: day.getUTCDate() };
     const ranges = opts.hours[WEEKDAYS[day.getUTCDay()]!] ?? [];
     for (const [from, to] of ranges) {
+      const close = zonedTime(
+        { ...w, hh: Math.floor(toMinutes(to) / 60), mm: toMinutes(to) % 60 },
+        opts.timeZone,
+      ).getTime();
       for (let min = toMinutes(from); min + opts.type.durationMin <= toMinutes(to); min += step) {
-        const start = zonedTime({ ...w, hh: Math.floor(min / 60), mm: min % 60 }, opts.timeZone).getTime();
+        const hh = Math.floor(min / 60);
+        const mm = min % 60;
+        const start = zonedTime({ ...w, hh, mm }, opts.timeZone).getTime();
+        // A wall time that does not exist (skipped by a clock change) is not offered.
+        const back = wallClock(new Date(start), opts.timeZone);
+        if (back.hh !== hh || back.mm !== mm || back.d !== w.d) continue;
         const end = start + dur;
+        // Real elapsed time: on a day the clocks go back, a meeting still ends by closing time.
+        if (end > close) continue;
         if (start < earliest || start > latest) continue;
         if (busy.some(([bs, be]) => start < be && end > bs)) continue;
-        out.push(new Date(start));
+        out.add(start);
       }
     }
   }
-  return out;
+  return [...out].sort((a, b) => a - b).map((t) => new Date(t));
 }
