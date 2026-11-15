@@ -32,6 +32,7 @@ import * as m0030 from './0030_record_shares';
 import * as m0031 from './0031_standard_field_visibility';
 import * as m0032 from './0032_push';
 import * as m0033 from './0033_participants_threads';
+import * as m0034 from './0034_mailbox_oauth';
 
 export interface Migration {
   up(knex: Knex): Promise<void>;
@@ -73,4 +74,5 @@ export const coreMigrations: Record<string, Migration> = {
   '0031_standard_field_visibility': m0031,
   '0032_push': m0032,
   '0033_participants_threads': m0033,
+  '0034_mailbox_oauth': m0034,
 };

@@ -52,6 +52,8 @@ const schema = z.object({
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
   MAIL_FROM: z.string().default('no-reply@localhost'),
+  /** Optional JSON file listing OAuth sign-in providers for mailboxes (operator-supplied, never shipped). */
+  MAIL_OAUTH_PROVIDERS_FILE: z.string().optional(),
 
   STORAGE_DIR: z.string().default('./storage'),
   UPLOAD_MAX_MB: z.coerce.number().int().min(1).max(200).default(20),
