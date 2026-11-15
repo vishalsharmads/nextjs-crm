@@ -31,6 +31,7 @@ import { spawnNextOccurrence } from './recurrence';
 import { taskStageColumns } from './task-stage';
 import { recordStageHistory } from '../pipelines/stage-engine';
 import { participantsOf, resolveParticipants, setParticipants } from './participants';
+import { standardLevels } from '../custom-fields/standard-visibility';
 
 type Row = Record<string, unknown> & { id: number };
 
@@ -220,6 +221,12 @@ export const activitiesDef: ResourceDef<Row, ActivityDto> = {
     const stageOf = new Map(stages.map((s) => [s.id as number, s]));
     const ids = rows.map((r) => r.id);
     const people = await participantsOf(conn, ids);
+    // A participant's email follows the standard field rules of their record type.
+    const emailHidden = new Set<string>();
+    for (const kind of ['contact', 'lead', 'organization'] as const)
+      if ((await standardLevels(kind, user)).email === 'hidden') emailHidden.add(kind);
+    if (emailHidden.size)
+      for (const list of people.values()) for (const p of list) if (emailHidden.has(p.kind)) p.email = null;
     // Emails: the thread each message is in, and how many messages that thread has.
     const emailIds = rows.filter((r) => r.type === 'email').map((r) => r.id);
     const threadOf = new Map<number, string>();

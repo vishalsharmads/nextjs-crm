@@ -77,7 +77,7 @@ export async function participantsOf(
     .orderBy('id')) as (ParticipantRow & {
     activity_id: number;
   })[];
-  const names = new Map<string, { uuid: string; name: string }>();
+  const names = new Map<string, { uuid: string; name: string; email: string | null }>();
   const byKind = (k: ParticipantKind) => [
     ...new Set(rows.filter((r) => r.kind === k).map((r) => r.record_id)),
   ];
@@ -85,8 +85,14 @@ export async function participantsOf(
     const ids = byKind(kind);
     if (!ids.length) continue;
     const meta = KINDS[kind];
-    for (const r of await conn(meta.table).whereIn('id', ids).select('id', 'uuid', `${meta.title} as name`))
-      names.set(`${kind}:${r.id}`, { uuid: r.uuid as string, name: (r.name as string) || '' });
+    for (const r of await conn(meta.table)
+      .whereIn('id', ids)
+      .select('id', 'uuid', `${meta.title} as name`, 'email'))
+      names.set(`${kind}:${r.id}`, {
+        uuid: r.uuid as string,
+        name: (r.name as string) || '',
+        email: (r.email as string | null) ?? null,
+      });
   }
   const userIds = byKind('user');
   if (userIds.length)
@@ -96,12 +102,13 @@ export async function participantsOf(
       names.set(`user:${u.id}`, {
         uuid: u.uuid as string,
         name: `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || (u.email as string),
+        email: u.email as string,
       });
   for (const r of rows) {
     const n = names.get(`${r.kind}:${r.record_id}`);
     if (!n) continue;
     const list = out.get(r.activity_id) ?? [];
-    list.push({ kind: r.kind, uuid: n.uuid, name: n.name, role: r.role });
+    list.push({ kind: r.kind, uuid: n.uuid, name: n.name, role: r.role, email: n.email });
     out.set(r.activity_id, list);
   }
   return out;
