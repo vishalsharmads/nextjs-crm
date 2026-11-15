@@ -158,7 +158,29 @@ export interface ActivityDto {
   recurrence: Recurrence | null;
   /** Checklist progress; total 0 when the task has no checklist. */
   checklist: { done: number; total: number };
+  /** People and colleagues involved besides the related record (meeting attendees, email recipients). */
+  participants: ParticipantDto[];
+  /** Emails: the conversation this message belongs to, and how many messages it has. */
+  thread?: { id: string; count: number } | null;
 }
+
+export const PARTICIPANT_KINDS = ['contact', 'lead', 'organization', 'user'] as const;
+export type ParticipantKind = (typeof PARTICIPANT_KINDS)[number];
+export const PARTICIPANT_ROLES = ['attendee', 'organizer', 'from', 'to', 'cc'] as const;
+export type ParticipantRole = (typeof PARTICIPANT_ROLES)[number];
+
+export interface ParticipantDto {
+  kind: ParticipantKind;
+  uuid: string;
+  name: string;
+  role: ParticipantRole;
+}
+
+export const participantInputSchema = z.object({
+  kind: z.enum(PARTICIPANT_KINDS),
+  uuid: z.uuid(),
+  role: z.enum(PARTICIPANT_ROLES).default('attendee'),
+});
 
 // ---------- Inputs (shared by API validation and web forms) ----------
 
@@ -310,6 +332,8 @@ export const activityInputSchema = z.object({
   pipelineUuid: z.uuid().optional(),
   stageUuid: z.uuid().optional(),
   completed: z.boolean().optional(),
+  /** Replaces the participant list when given. */
+  participants: z.array(participantInputSchema).max(50).optional(),
   custom: customInput,
 });
 export const activityCreateSchema = activityInputSchema.refine(

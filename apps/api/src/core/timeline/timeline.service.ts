@@ -16,6 +16,8 @@ import { redactDiff } from '../records/custom';
 import { userRefs } from '../records/hydrate';
 import { STAGED, type StagedEntity } from '../pipelines/stage-engine';
 import { hiddenColumns } from '../custom-fields/standard-visibility';
+import type { RelatedType } from '@app/shared';
+import { whereOnRecord } from '../activities/participants';
 
 /** Fields that are bookkeeping, or are shown elsewhere (stage moves), not as "changed X". */
 const NOISE = new Set([
@@ -94,7 +96,8 @@ export async function recordTimeline(
     const related = await rolledUp(entity, id, user);
     const acts = await db('activities')
       .where((w) => {
-        w.where({ related_type: entity, related_id: id });
+        // Related to the record, or with the record among its participants.
+        whereOnRecord(w, entity as RelatedType, id);
         if (related.deal)
           w.orWhere((o) => o.where('related_type', 'deal').whereIn('related_id', related.deal!.qb));
         if (related.contact)
@@ -105,7 +108,13 @@ export async function recordTimeline(
       .orderBy('created_at', 'desc')
       .limit(opts.limit);
     const dtos = await activitiesDef.toDtos(acts, { user, conn: db });
+    // An email conversation is one item: its newest message, with the thread's size.
+    const seenThreads = new Set<string>();
     for (const a of dtos) {
+      if (a.thread) {
+        if (seenThreads.has(a.thread.id)) continue;
+        seenThreads.add(a.thread.id);
+      }
       items.push({
         id: `activity:${a.uuid}`,
         kind: 'activity',

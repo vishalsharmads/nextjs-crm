@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { RELATED_TYPES, type RelatedType } from '@app/shared';
 import { defineRoutes } from '../../http/routes';
 import type { AuthUser, RequestContext } from '../../http/context';
-import { db } from '../../db/knex';
+import { db, type Db } from '../../db/knex';
 import { isTest } from '../../config/env';
 import { AppError, notFound } from '../../lib/errors';
 import { decrypt, encrypt } from '../../lib/crypto';
@@ -20,6 +20,10 @@ import { recordDefs } from '../records/registry';
 import { sanitizeBody } from '../activities/activities.def';
 import { getBranding } from '../settings/settings.service';
 import { restrictedRecipients } from '../privacy/privacy.service';
+import { addParticipants, participantsFromAddresses } from '../activities/participants';
+import { whereOnRecord } from '../activities/participants';
+import { logAccess } from '../audit/access-log';
+import { activitiesDef } from '../activities/activities.def';
 
 const server = z.object({
   host: z.string().min(1).max(255),
@@ -65,6 +69,49 @@ function transportFor(a: AccountRow) {
     secure: a.smtp.secure,
     auth: { user: a.email, pass: decrypt(a.password_enc, 'mail_accounts.password_enc') },
   });
+}
+
+// ---------- Threads ----------
+
+const normSubject = (s: string) =>
+  s
+    .replace(/^\s*((re|fw|fwd|aw|sv|antw)\s*(\[\d+\])?\s*:\s*)+/i, '')
+    .trim()
+    .toLowerCase();
+
+/**
+ * The conversation a message belongs to: the thread of a message it replies to (In-Reply-To,
+ * References), else a recent message with the same subject between the same people, else a new one.
+ */
+export async function threadFor(
+  conn: Db,
+  m: { inReplyTo?: string | null; references?: string[]; subject: string; addresses: string[] },
+): Promise<string> {
+  const ids = [m.inReplyTo, ...(m.references ?? [])].filter((x): x is string => !!x).slice(-20);
+  if (ids.length) {
+    const hit = await conn('email_messages')
+      .whereIn('message_id', ids)
+      .whereNotNull('thread_id')
+      .first('thread_id');
+    if (hit) return hit.thread_id as string;
+  }
+  const subject = normSubject(m.subject);
+  if (subject && m.addresses.length) {
+    const recent = await conn('email_messages')
+      .whereNotNull('thread_id')
+      .where('sent_at', '>=', new Date(Date.now() - 30 * 86_400_000))
+      .orderBy('sent_at', 'desc')
+      .limit(200)
+      .select('thread_id', 'subject', 'from_address', 'to_addresses');
+    const people = new Set(m.addresses.map((a) => a.toLowerCase()));
+    const match = recent.find((r) => {
+      if (normSubject(r.subject as string) !== subject) return false;
+      const theirs = [r.from_address as string, ...((r.to_addresses as string[] | null) ?? [])];
+      return theirs.some((a) => people.has(String(a).toLowerCase()));
+    });
+    if (match) return match.thread_id as string;
+  }
+  return newUuid();
 }
 
 // ---------- Sending ----------
@@ -174,8 +221,27 @@ export async function sendEmail(ctx: RequestContext, user: AuthUser, input: z.in
       updated_by: user.id,
       custom: JSON.stringify({}),
     });
+    const own = account?.email ?? user.email;
+    await addParticipants(
+      trx,
+      activityId!,
+      await participantsFromAddresses(
+        trx,
+        [
+          ...input.to.map((address) => ({ address, role: 'to' as const })),
+          ...input.cc.map((address) => ({ address, role: 'cc' as const })),
+        ],
+        [own],
+      ),
+    );
     await trx('email_messages').insert({
       uuid: newUuid(),
+      thread_id: await threadFor(trx, {
+        inReplyTo: input.inReplyTo,
+        references: input.inReplyTo ? [input.inReplyTo] : [],
+        subject: input.subject,
+        addresses: [...input.to, ...input.cc],
+      }),
       activity_id: activityId,
       mail_account_id: account?.id ?? null,
       direction: 'outbound',
@@ -223,8 +289,29 @@ export async function syncAccount(account: AccountRow): Promise<number> {
       const from = parsed.from?.value[0]?.address?.toLowerCase();
       if (!from || !parsed.messageId) continue;
       if (await db('email_messages').where({ message_id: parsed.messageId }).first()) continue;
-      const contact = await db('contacts').where({ email_norm: from }).whereNull('deleted_at').first('id');
-      if (!contact) continue;
+      const list = (v: typeof parsed.to) =>
+        (Array.isArray(v) ? v.flatMap((t) => t.value) : (v?.value ?? []))
+          .map((t) => t.address?.toLowerCase())
+          .filter((a): a is string => !!a);
+      const toList = list(parsed.to);
+      const ccList = list(parsed.cc);
+      // Logged when anyone on it is a known contact or lead (not only the sender).
+      const people = await participantsFromAddresses(
+        db,
+        [
+          { address: from, role: 'from' },
+          ...toList.map((address) => ({ address, role: 'to' as const })),
+          ...ccList.map((address) => ({ address, role: 'cc' as const })),
+        ],
+        [account.email],
+      );
+      const home = people.find((p) => p.kind === 'contact') ?? people.find((p) => p.kind === 'lead');
+      if (!home) continue;
+      const references = Array.isArray(parsed.references)
+        ? parsed.references
+        : parsed.references
+          ? [parsed.references]
+          : [];
       const html =
         sanitizeBody(typeof parsed.html === 'string' ? parsed.html : (parsed.textAsHtml ?? '')) ?? '';
       await db.transaction(async (trx) => {
@@ -236,20 +323,27 @@ export async function syncAccount(account: AccountRow): Promise<number> {
           completed_at: parsed.date ?? new Date(),
           owner_id: account.user_id,
           assignee_id: account.user_id,
-          related_type: 'contact',
-          related_id: contact.id,
+          related_type: home.kind,
+          related_id: home.record_id,
           custom: JSON.stringify({}),
         });
-        const to = Array.isArray(parsed.to) ? parsed.to.flatMap((t) => t.value) : (parsed.to?.value ?? []);
+        await addParticipants(trx, activityId!, people);
         await trx('email_messages').insert({
           uuid: newUuid(),
+          thread_id: await threadFor(trx, {
+            inReplyTo: parsed.inReplyTo,
+            references,
+            subject: parsed.subject ?? '',
+            addresses: [from, ...toList, ...ccList],
+          }),
           activity_id: activityId,
           mail_account_id: account.id,
           direction: 'inbound',
           message_id: parsed.messageId,
           in_reply_to: parsed.inReplyTo ?? null,
           from_address: from,
-          to_addresses: JSON.stringify(to.map((t) => t.address)),
+          to_addresses: JSON.stringify(toList),
+          cc_addresses: JSON.stringify(ccList),
           subject: (parsed.subject ?? '').slice(0, 500),
           sent_at: parsed.date ?? new Date(),
         });
@@ -285,6 +379,58 @@ export const startMailSync = () => {
 // ---------- Routes ----------
 
 export const emailRoutes = defineRoutes('/email', ['email'])
+  .add({
+    method: 'get',
+    path: '/threads/:threadId',
+    permission: 'core.activities.view',
+    params: z.object({ threadId: z.uuid() }),
+    query: z.object({ type: z.enum(RELATED_TYPES), uuid: z.uuid() }),
+    summary: 'The messages of one conversation, as seen from a record the caller can open',
+    handler: async ({ ctx, user, params, query }) => {
+      // Visibility follows the record (decision D9): only messages on this record are listed.
+      const def = recordDefs[query.type];
+      assertCan(user, `${def.resource}.view`);
+      const record = await getRow(def, user, query.uuid);
+      const qb = db('activities')
+        .join('email_messages as m', 'm.activity_id', 'activities.id')
+        .whereNull('activities.deleted_at')
+        .where('m.thread_id', params.threadId);
+      whereOnRecord(qb, query.type, record.id as number);
+      const rows = (await qb
+        .orderBy('m.sent_at')
+        .limit(200)
+        .select(
+          'activities.*',
+          'm.direction',
+          'm.from_address',
+          'm.to_addresses',
+          'm.cc_addresses',
+          'm.message_id',
+          'm.sent_at',
+        )) as Record<string, unknown>[];
+      await logAccess(ctx, {
+        action: 'view',
+        entity: query.type,
+        entityId: record.id as number,
+        entityUuid: query.uuid,
+        detail: { thread: params.threadId },
+      });
+      const dtos = await activitiesDef.toDtos(rows as never[], { user, conn: db });
+      return {
+        data: dtos.map((a, i) => ({
+          ...a,
+          message: {
+            direction: rows[i]!.direction as 'inbound' | 'outbound',
+            from: rows[i]!.from_address as string,
+            to: (rows[i]!.to_addresses as string[] | null) ?? [],
+            cc: (rows[i]!.cc_addresses as string[] | null) ?? [],
+            messageId: (rows[i]!.message_id as string | null) ?? null,
+            sentAt: new Date(rows[i]!.sent_at as string).toISOString(),
+          },
+        })),
+      };
+    },
+  })
   .add({
     method: 'get',
     path: '/accounts',
