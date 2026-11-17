@@ -7,7 +7,15 @@
  * the page is plain, stacked sections (see the `html.motion` rules in story.astro).
  */
 import { gsap } from 'gsap';
-import { storyCopy, workspaceHtml, type StoryIndustry } from '../../data/story';
+import {
+  CUSTOM_DEFAULTS,
+  STORY_OTHER,
+  customIndustry,
+  storyCopy,
+  workspaceHtml,
+  type CustomInput,
+  type StoryIndustry,
+} from '../../data/story';
 import { initialState, type StoryScene, type StoryState } from './state';
 
 const root = document.querySelector<HTMLElement>('[data-story]');
@@ -69,23 +77,74 @@ function init(root: HTMLElement) {
     );
     const workspace = root.querySelector<HTMLElement>('[data-workspace]');
     if (workspace) workspace.innerHTML = workspaceHtml(next);
+    // While a described business is showing, "Other" carries its name
+    root.querySelectorAll<HTMLOptionElement>(`option[value="${STORY_OTHER}"]`).forEach((o) => {
+      o.textContent = next.slug === STORY_OTHER ? `Yours: ${next.business}` : 'Other: describe your business';
+    });
     selects.forEach((s) => (s.value = next.slug));
     choices.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.industry === next.slug)));
     scene?.setIndustry(next);
   }
 
+  function setUrl(slug: string | null) {
+    const url = new URL(window.location.href);
+    if (slug) url.searchParams.set('for', slug);
+    else url.searchParams.delete('for');
+    window.history.replaceState(window.history.state, '', url);
+  }
+
   function pick(slug: string) {
+    if (slug === STORY_OTHER) return openOther();
     const next = industries.find((i) => i.slug === slug);
     if (!next || next.slug === current.slug) return;
     applyIndustry(next);
-    const url = new URL(window.location.href);
-    url.searchParams.set('for', next.slug);
-    window.history.replaceState(window.history.state, '', url);
+    setUrl(next.slug);
   }
+
+  /* "Other": the visitor describes their business and the whole story plays in their words */
+  const dialog = root.querySelector<HTMLDialogElement>('[data-other]');
+  const form = root.querySelector<HTMLFormElement>('[data-other-form]');
+  let custom: CustomInput = CUSTOM_DEFAULTS;
+  function openOther() {
+    if (!dialog || !form) return;
+    const f = form.elements;
+    const set = (name: string, value: string) => {
+      const el = f.namedItem(name);
+      if (el instanceof HTMLInputElement) el.value = value;
+    };
+    const mine = current.slug === STORY_OTHER;
+    set('business', mine ? custom.business : '');
+    set('contacts', mine ? custom.contacts : '');
+    set('deals', mine ? custom.deals : '');
+    set('stages', mine ? custom.stages.join(', ') : '');
+    set('accent', custom.accent);
+    dialog.showModal();
+  }
+  dialog?.addEventListener('close', () => {
+    if (dialog.returnValue === 'ok' && form) {
+      const data = new FormData(form);
+      const text = (name: string, fallback: string) => String(data.get(name) ?? '').trim() || fallback;
+      custom = {
+        business: text('business', CUSTOM_DEFAULTS.business),
+        contacts: text('contacts', CUSTOM_DEFAULTS.contacts),
+        deals: text('deals', CUSTOM_DEFAULTS.deals),
+        stages: text('stages', CUSTOM_DEFAULTS.stages.join(', ')).split(','),
+        accent: text('accent', CUSTOM_DEFAULTS.accent),
+      };
+      applyIndustry(customIndustry(custom));
+      setUrl(null);
+    } else {
+      // cancelled: the pickers go back to what is showing
+      selects.forEach((s) => (s.value = current.slug));
+    }
+    dialog.returnValue = '';
+  });
+
   selects.forEach((s) => s.addEventListener('change', () => pick(s.value)));
   choices.forEach((b) => b.addEventListener('click', () => pick(b.dataset.industry!)));
 
   applyIndustry(current);
+  if (asked === STORY_OTHER) openOther();
   if (!motion) return;
   restoreScroll();
 

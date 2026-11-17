@@ -384,7 +384,7 @@ export function createScene(
     const mat = new MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, fog: false });
     const mesh = new Mesh(cardGeo, mat);
     cloth.add(mesh);
-    return { mesh, mat, ctx, tex, stage: 0 };
+    return { mesh, mat, ctx, tex, stage: 0, has: false };
   });
 
   /* the woven label */
@@ -589,10 +589,8 @@ export function createScene(
   /* ---------------------------------------------------------------- labels */
 
   let ind = first;
-  let selected = Math.max(
-    0,
-    industries.findIndex((i) => i.slug === first.slug),
-  );
+  // -1 for a business described under "Other": no panel of the ring is its own
+  let selected = industries.findIndex((i) => i.slug === first.slug);
   let drawnSet = -1;
 
   function drawPanels(set: number) {
@@ -605,7 +603,7 @@ export function createScene(
       if (set === 2) {
         // Columns are stretched tall; squash the drawing so text looks right once stretched.
         ctx.scale(1, COL_W / COL_H);
-        if (i < ind.stages.length && i < 5) {
+        if (i < Math.min(5, ind.stages.length)) {
           ctx.fillStyle = C.goldCss;
           ctx.font = `600 30px ${BODY}`;
           ctx.fillText(`STAGE ${i + 1}`, 44, 84);
@@ -648,6 +646,7 @@ export function createScene(
   function drawCards() {
     cards.forEach((c, i) => {
       const data = ind.cards[i];
+      c.has = !!data && data.stage < Math.min(5, ind.stages.length);
       c.stage = data?.stage ?? i;
       const { ctx } = c;
       ctx.clearRect(0, 0, 512, 256);
@@ -736,7 +735,7 @@ export function createScene(
   const v = new Vector3();
   const look = new Vector3();
   const tmp = new Vector3();
-  let spinNow = -selected * (TAU / 9);
+  let spinNow = -Math.max(0, selected) * (TAU / 9);
   // The bolt unrolls once, on the first screen; arriving mid-story it is already flat.
   let roll = opts.unroll ? 0 : 1;
   let intro = opts.unroll ? 0 : 1;
@@ -789,7 +788,7 @@ export function createScene(
     cloth.scale.setScalar(1 - st.dim * 0.25);
 
     /* panels */
-    const spinTarget = -selected * (TAU / 9);
+    const spinTarget = selected < 0 ? spinNow : -selected * (TAU / 9);
     // turn the shortest way round to the chosen industry
     let delta = spinTarget - spinNow;
     delta = ((((delta + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
@@ -799,6 +798,8 @@ export function createScene(
     const board = ease(clamp01(st.board));
     // the board steps back when the real product screen takes its place
     const handover = 1 - ease(clamp01(st.proof));
+    const nCols = Math.min(5, ind.stages.length);
+    const colX = (k: number) => (k - (nCols - 1) / 2) * 1.2;
     panels.forEach((p, i) => {
       const sep = st.cut;
       // 1. assembled or cut
@@ -815,12 +816,12 @@ export function createScene(
       let sx = 1;
       let sy = 1;
       let alpha = 1;
-      if (i < 5) tmp.set((i - 2) * 1.2, 0, 0);
+      if (i < nCols) tmp.set(colX(i), 0, 0);
       else tmp.set(p.grid.x * 0.4, -2.6, -0.5);
       v.lerp(tmp, board);
       ry = MathUtils.lerp(ry, 0, board);
       rz = MathUtils.lerp(rz, 0, board);
-      if (i < 5) {
+      if (i < nCols) {
         sx = MathUtils.lerp(1, COL_W, board);
         sy = MathUtils.lerp(1, COL_H, board);
       } else {
@@ -839,17 +840,18 @@ export function createScene(
 
     /* cards on the board: the latest stage moves first, so columns never pile up */
     const order = [...cards].sort((a, b) => b.stage - a.stage);
-    const movers = order.filter((c) => c.stage < 4);
+    const last = nCols - 1;
+    const movers = order.filter((c) => c.has && c.stage < last);
     cards.forEach((c) => {
-      const show = clamp01(st.cards) * board * (1 - st.dim) * handover;
+      const show = c.has ? clamp01(st.cards) * board * (1 - st.dim) * handover : 0;
       c.mat.opacity = show;
       c.mesh.visible = show > 0.01;
       const k = movers.indexOf(c);
       const f = k < 0 ? 0 : smooth(k * 0.22, k * 0.22 + 0.34, st.cardMove);
       const from = c.stage;
-      const to = Math.min(4, c.stage + 1);
-      const x = MathUtils.lerp((from - 2) * 1.2, (to - 2) * 1.2, f);
-      const slotTo = to === 4 && k >= 0 ? 1 : 0;
+      const to = Math.min(last, c.stage + 1);
+      const x = MathUtils.lerp(colX(from), colX(to), f);
+      const slotTo = to === last && k >= 0 ? 1 : 0;
       const y = MathUtils.lerp(0.42, 0.42 - slotTo * 0.56, f);
       c.mesh.position.set(x, y - (1 - show) * 0.3, 0.06 + Math.sin(Math.PI * f) * 0.4);
       c.mesh.rotation.z = Math.sin(Math.PI * f) * -0.08;
@@ -918,10 +920,7 @@ export function createScene(
   return {
     setIndustry(next) {
       ind = next;
-      selected = Math.max(
-        0,
-        industries.findIndex((i) => i.slug === next.slug),
-      );
+      selected = industries.findIndex((i) => i.slug === next.slug);
       redrawAll();
     },
     frame,

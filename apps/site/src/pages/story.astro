@@ -8,7 +8,9 @@
 import Base from '../layouts/Base.astro';
 import { industries } from '../data/industries';
 import {
+  CUSTOM_DEFAULTS,
   STORY_DEFAULT,
+  STORY_OTHER,
   coreModules,
   storyCopy,
   toStoryIndustry,
@@ -74,6 +76,7 @@ const description =
       <label for="story-industry">Fitting for</label>
       <select id="story-industry" data-industry-select>
         {story.map((i) => <option value={i.slug} selected={i.slug === first.slug}>{i.name}</option>)}
+        <option value={STORY_OTHER}>Other: describe your business</option>
       </select>
     </div>
 
@@ -91,6 +94,7 @@ const description =
             <label for="hero-industry">Watch it being made for</label>
             <select id="hero-industry" data-industry-select>
               {story.map((i) => <option value={i.slug} selected={i.slug === first.slug}>{i.name}</option>)}
+              <option value={STORY_OTHER}>Other: describe your business</option>
             </select>
           </div>
           <div class="ctas">
@@ -201,6 +205,12 @@ const description =
                 </li>
               ))
             }
+            <li>
+              <button type="button" data-industry={STORY_OTHER} aria-pressed="false">
+                Other
+                <span class="chip-sub">Describe yours</span>
+              </button>
+            </li>
           </ul>
           <p class="muted small" data-at="0.22">
             Need something no template has? Admins add their own record types, like lab orders or lockers, with their
@@ -364,6 +374,48 @@ const description =
         </div>
       </div>
     </section>
+    <dialog class="other" data-other aria-labelledby="other-title">
+      <form method="dialog" data-other-form>
+        <p class="eyebrow">Other</p>
+        <h2 class="h3" id="other-title">Describe your business</h2>
+        <p class="muted small">
+          In the product, the assistant asks you this in setup mode and proposes the rest. Try it here: the whole
+          story will play in your words.
+        </p>
+        <div class="field">
+          <label for="other-business">Business name</label>
+          <input class="input" id="other-business" name="business" maxlength="40" placeholder={CUSTOM_DEFAULTS.business} />
+        </div>
+        <div class="field">
+          <label for="other-contacts">What do you call the people you serve?</label>
+          <input class="input" id="other-contacts" name="contacts" maxlength="24" placeholder={CUSTOM_DEFAULTS.contacts} />
+        </div>
+        <div class="field">
+          <label for="other-deals">What do you call the work you win?</label>
+          <input class="input" id="other-deals" name="deals" maxlength="24" placeholder={CUSTOM_DEFAULTS.deals} />
+        </div>
+        <div class="field">
+          <label for="other-stages">Your stages, first to last</label>
+          <input
+            class="input"
+            id="other-stages"
+            name="stages"
+            maxlength="120"
+            placeholder={CUSTOM_DEFAULTS.stages.join(', ')}
+            aria-describedby="other-stages-help"
+          />
+          <p class="fine" id="other-stages-help">Two to five, separated by commas.</p>
+        </div>
+        <div class="field field-color">
+          <label for="other-accent">Brand color</label>
+          <input id="other-accent" name="accent" type="color" value={CUSTOM_DEFAULTS.accent} />
+        </div>
+        <div class="other-actions">
+          <button class="btn btn-ghost" type="submit" value="cancel">Cancel</button>
+          <button class="btn btn-tape" type="submit" value="ok">Tailor it</button>
+        </div>
+      </form>
+    </dialog>
   </div>
 </Base>
 
@@ -945,6 +997,54 @@ const description =
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     overflow: hidden;
+  }
+
+  /* ---------- "Other": describe your business ---------- */
+  .story dialog.other {
+    width: min(92vw, 480px);
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 18px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 30px 80px rgb(0 0 0 / 0.55);
+  }
+  .story dialog.other::backdrop {
+    background: rgb(5 12 9 / 0.66);
+    backdrop-filter: blur(3px);
+  }
+  .story dialog.other[open] {
+    animation: story-pop 220ms var(--ease-out);
+  }
+  @keyframes story-pop {
+    from {
+      opacity: 0;
+      scale: 0.97;
+    }
+  }
+  .story .other form {
+    display: grid;
+    gap: 14px;
+    padding: 24px;
+  }
+  .story .other .field-color {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .story .other input[type='color'] {
+    width: 56px;
+    height: 40px;
+    padding: 2px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: transparent;
+  }
+  .story .other-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 6px;
   }
 
   /* ---------- Chat ---------- */

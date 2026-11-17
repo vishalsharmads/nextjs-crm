@@ -1,11 +1,14 @@
 /**
  * Copy for the "Cut to measure" 3D story page (/story). Every line that depends on the visitor's industry
  * comes from `storyCopy`, which runs at build time (the default industry) and in the browser (when the
- * visitor picks another one). Keep it free of runtime imports so the page script stays small.
+ * visitor picks another one, or describes their own business under "Other"). Keep it free of runtime
+ * imports so the page script stays small.
  */
 import type { Industry } from './industries';
 
 export const STORY_DEFAULT = 'healthcare-clinics';
+/** The picker value for "Other: describe your business". */
+export const STORY_OTHER = 'other';
 
 /** Made-up example businesses, one per industry. Labelled as examples on the page. */
 const businessNames: Record<string, string> = {
@@ -69,6 +72,98 @@ export function toStoryIndustry(i: Industry): StoryIndustry {
 /** Modules every business gets beside its industry's own five; they fill the nine panels of the cloth. */
 export const coreModules = ['Tasks', 'Inbox', 'Calendar', 'Assistant'];
 
+/** What a visitor tells us under "Other". */
+export interface CustomInput {
+  business: string;
+  contacts: string;
+  deals: string;
+  stages: string[];
+  accent: string;
+}
+
+export const CUSTOM_DEFAULTS: CustomInput = {
+  business: 'Harbour & Co',
+  contacts: 'Clients',
+  deals: 'Projects',
+  stages: ['Enquiry', 'Quoted', 'Booked', 'In progress', 'Done'],
+  accent: DEFAULT_ACCENT,
+};
+
+const clean = (s: string, max: number) => s.replace(/\s+/g, ' ').trim().slice(0, max);
+
+/** A rough singular for labels like "New Project"; the visitor only types plurals. */
+function singular(word: string): string {
+  if (/ies$/i.test(word)) return word.replace(/ies$/i, 'y');
+  if (/(ss|us|is)$/i.test(word)) return word;
+  if (/(ches|shes|xes|sses)$/i.test(word)) return word.replace(/es$/i, '');
+  return word.replace(/s$/i, '');
+}
+
+/** Builds a story industry from the visitor's own words, with sensible generic modules, day and records. */
+export function customIndustry(input: CustomInput): StoryIndustry {
+  const business = clean(input.business, 40) || CUSTOM_DEFAULTS.business;
+  const contacts = clean(input.contacts, 24) || CUSTOM_DEFAULTS.contacts;
+  const deals = clean(input.deals, 24) || CUSTOM_DEFAULTS.deals;
+  let stages = input.stages
+    .map((s) => clean(s, 22))
+    .filter(Boolean)
+    .slice(0, 5);
+  if (stages.length < 2) stages = CUSTOM_DEFAULTS.stages;
+  const accent = /^#[0-9a-f]{6}$/i.test(input.accent) ? input.accent : DEFAULT_ACCENT;
+  const deal = singular(deals);
+  const contact = singular(contacts);
+  const first = stages[0];
+  const last = stages[stages.length - 1];
+  const people = ['Avery Lane', 'Northside Co', 'J. Moreno', 'Brightwater', 'K. Osei'];
+  // details that read right in any column, since records move a stage on the board
+  const notes = [
+    `New ${deal.toLowerCase()}`,
+    'Call back Tue',
+    'Quote accepted',
+    'Due Friday',
+    'Paid in full',
+  ];
+  return {
+    slug: STORY_OTHER,
+    name: 'Your business',
+    short: 'Yours',
+    vocab: { contact, contacts, deal, deals, company: 'Company' },
+    stages,
+    modules: [
+      { name: `${deals} pipeline`, use: `${first} to ${last}, with an owner on every one` },
+      { name: 'Quotes and invoices', use: 'Quote, get accepted online, invoice and record payments' },
+      { name: 'Bookings', use: 'People, rooms and equipment booked without clashes' },
+      { name: 'Client portal', use: `${contacts} see their documents, invoices and requests` },
+      { name: 'Automations', use: 'Follow-ups and reminders that run themselves' },
+    ],
+    day: [
+      {
+        time: '8:30',
+        what: `New ${contacts.toLowerCase()} from your web form are waiting, already assigned.`,
+      },
+      {
+        time: '11:00',
+        what: `A ${deal.toLowerCase()} moves to ${stages[1]}; the quote goes out from the record.`,
+      },
+      {
+        time: '15:00',
+        what: `The ${contact.toLowerCase()} accepts in the portal; the next task is created for you.`,
+      },
+      {
+        time: '17:00',
+        what: `The dashboard shows every ${deal.toLowerCase()} by stage, and what is overdue.`,
+      },
+    ],
+    cards: stages.map((_, n) => ({
+      name: people[n] ?? `${contact} ${n + 1}`,
+      detail: notes[n] ?? `${deal} ${n + 1}`,
+      stage: n,
+    })),
+    business,
+    accent,
+  };
+}
+
 const lower = (s: string) => s.toLowerCase();
 
 /** Text for every `data-t` slot on the page, for one industry. */
@@ -128,7 +223,7 @@ const esc = (s: string) =>
 /**
  * The product screen for one industry, as HTML: the workspace's name and brand color, its words in the
  * menu, and its board in its own stages with its records (each one stage on, as the 3D board leaves them).
- * Everything is escaped.
+ * Everything is escaped, because "Other" puts the visitor's own words in it.
  */
 export function workspaceHtml(i: StoryIndustry): string {
   const n = i.stages.length;
