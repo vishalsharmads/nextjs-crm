@@ -1,0 +1,1102 @@
+---
+/**
+ * "Cut to measure": an alternate, scroll-driven 3D landing page. The story is in docs/site/3d-landing-story.md.
+ * Each act is a tall section with a sticky frame; scripts/story/story.ts turns the scroll into a position in
+ * the acts, which drives the WebGL cloth (scripts/story/scene.ts) and reveals the text (data-at / data-until).
+ * With reduced motion the acts are ordinary stacked sections and nothing animates.
+ */
+import Base from '../layouts/Base.astro';
+import { industries } from '../data/industries';
+import { STORY_DEFAULT, coreModules, storyCopy, toStoryIndustry } from '../data/story';
+import { site } from '../data/site';
+
+const story = industries.map(toStoryIndustry);
+const first = story.find((i) => i.slug === STORY_DEFAULT) ?? story[0];
+const t = storyCopy(first);
+const maxModules = Math.max(...story.map((i) => i.modules.length));
+const maxDay = Math.max(...story.map((i) => i.day.length));
+const at = (base: number, step: number, n: number) => (base + step * n).toFixed(3);
+
+/** Section heights in viewport heights; the last 100vh of each is the hand-over to the next act. */
+const H = [170, 360, 300, 240, 260, 340, 400, 240, 200];
+const chapters = [
+  'The bolt',
+  'The measure',
+  'The pattern',
+  'Same cloth',
+  'The stitching',
+  'The fitting',
+  'The gold thread',
+  'The label',
+  'Alterations',
+];
+const title = 'Cut to measure | Bespoq, the CRM tailored to your business';
+const description =
+  'See how Bespoq is made for one business: AI learns how you work, proposes the setup, and you confirm it. Your words, your pipeline, your modules, your name on the label.';
+---
+
+<Base title={title} description={description}>
+  <div
+    class="story"
+    data-story
+    data-industries={JSON.stringify(story)}
+    data-default={first.slug}
+    data-screenshot="/product/deals.webp"
+  >
+    <div class="stage-wrap" aria-hidden="true">
+      <div class="stage-box">
+        <canvas class="stage" data-stage></canvas>
+      </div>
+    </div>
+    <nav class="chapters" data-chapters aria-label="Story chapters">
+      <span class="rail" aria-hidden="true"><span data-progress></span></span>
+      <ol>
+        {
+          chapters.map((c, i) => (
+            <li>
+              <a href={`#act-${i}`} data-chapter>
+                <span class="tick" aria-hidden="true" />
+                <span class="name">{c}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </nav>
+
+    <!-- 0 · The bolt -->
+    <section class="act act-hero" id="act-0" data-act style={`--h:${H[0]}vh`} aria-labelledby="story-title">
+      <div class="frame">
+        <div class="copy">
+          <p class="eyebrow">Cut to measure</p>
+          <h1 class="display" id="story-title">Every business is a different shape.</h1>
+          <p class="lede muted">
+            Most CRMs come in one size. Bespoq is made the way a tailor makes a suit: an AI that learns how you work, a
+            setup you approve line by line, and a CRM in your own words.
+          </p>
+          <div class="hero-pick">
+            <label for="hero-industry">Watch it being made for</label>
+            <select id="hero-industry" data-industry-select>
+              {story.map((i) => <option value={i.slug} selected={i.slug === first.slug}>{i.name}</option>)}
+            </select>
+          </div>
+          <div class="ctas">
+            <a class="btn btn-tape" href="#act-1">See how it’s made</a>
+            <a class="btn btn-ghost" href="/demo">Book a fitting</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 1 · The measure -->
+    <section class="act" id="act-1" data-act style={`--h:${H[1]}vh`} aria-labelledby="act-1-title">
+      <div class="frame">
+        <div class="copy">
+          <p class="eyebrow">1 · The measure</p>
+          <h2 class="h2" id="act-1-title">It starts with a conversation, not a settings screen.</h2>
+          <p class="muted small">
+            In setup mode the assistant asks how your business works, the way a tailor asks how you’ll wear the suit.
+          </p>
+          <div class="picker" data-picker>
+            <label for="story-industry">Fitting for</label>
+            <select id="story-industry" data-industry-select>
+              {story.map((i) => <option value={i.slug} selected={i.slug === first.slug}>{i.name}</option>)}
+            </select>
+          </div>
+          <ol class="chat" aria-label="Example setup conversation">
+            <li class="msg me" data-at="0.04"><span data-t="a1">{t.a1}</span></li>
+            <li class="msg ai" data-at="0.1"><span data-t="q2">{t.q2}</span></li>
+            <li class="msg me" data-at="0.17"><span data-t="a2">{t.a2}</span></li>
+            <li class="msg ai" data-at="0.25"><span data-t="q3">{t.q3}</span></li>
+            <li class="msg me" data-at="0.32"><span data-t="a3">{t.a3}</span></li>
+            <li class="msg ai" data-at="0.4"><span data-t="q4">{t.q4}</span></li>
+            <li class="msg me" data-at="0.47"><span data-t="a4">{t.a4}</span></li>
+            <li class="msg ai" data-at="0.55"><span data-t="done1">{t.done1}</span></li>
+          </ol>
+          <ul class="tags" aria-label="What it measured">
+            <li data-at="0.18" data-t="m1">{t.m1}</li>
+            <li data-at="0.33" data-t="m2">{t.m2}</li>
+            <li data-at="0.48" data-t="m3">{t.m3}</li>
+            <li data-at="0.56" data-t="m4">{t.m4}</li>
+            <li data-at="0.6" data-t="m5">{t.m5}</li>
+          </ul>
+          <p class="fine">An example conversation with a made-up business.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 · The pattern and the cut -->
+    <section class="act" id="act-2" data-act style={`--h:${H[2]}vh`} aria-labelledby="act-2-title">
+      <div class="frame">
+        <div class="copy stages">
+          <div class="stage-a" data-at="0" data-until="0.48">
+            <p class="eyebrow">2 · The pattern</p>
+            <h2 class="h2" id="act-2-title">The AI proposes. You decide.</h2>
+            <div class="ui-card" role="group" aria-label="Proposed setup">
+              <p class="ui-title">Here’s what I’ll set up</p>
+              <ul class="ui-lines">
+                <li data-at="0.03" data-t="p1">{t.p1}</li>
+                <li data-at="0.07" data-t="p2">{t.p2}</li>
+                <li data-at="0.11" data-t="p3">{t.p3}</li>
+                <li data-at="0.15" data-t="p4">{t.p4}</li>
+                <li data-at="0.19" data-t="p5">{t.p5}</li>
+                <li data-at="0.23" data-t="p6">{t.p6}</li>
+              </ul>
+              <p class="ui-actions" data-at="0.26">
+                <span class="ui-btn ghost">Edit</span>
+                <span class="ui-btn confirm" data-at="0.34"><span class="before">Confirm</span><span class="after"
+                    >Confirmed</span
+                  ></span>
+              </p>
+            </div>
+            <p class="muted small">Nothing changes until you press Confirm. Remove a line, rename a stage, then confirm.</p>
+          </div>
+          <div class="stage-b" data-at="0.48">
+            <p class="eyebrow">2 · The cut</p>
+            <h2 class="h2">One clean cut, and it speaks your language.</h2>
+            <dl class="morph">
+              <div>
+                <dt>Contacts</dt>
+                <dd><span data-t="contacts" data-scramble="Contacts" data-at="0.53">Contacts</span></dd>
+              </div>
+              <div>
+                <dt>Deals</dt>
+                <dd><span data-t="deals" data-scramble="Deals" data-at="0.57">Deals</span></dd>
+              </div>
+            </dl>
+            <div class="ui-card import" data-at="0.6">
+              <p class="ui-title">Your old spreadsheet</p>
+              <p>Columns matched to your new fields, then every row checked in a dry run. Rows that need attention are flagged before anything is saved.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 · Same cloth, a different cut -->
+    <section class="act" id="act-3" data-act style={`--h:${H[3]}vh`} aria-labelledby="act-3-title">
+      <div class="frame">
+        <div class="copy">
+          <p class="eyebrow">3 · Same cloth</p>
+          <h2 class="h2" id="act-3-title">One product. Nine cuts. Yours is one of them.</h2>
+          <p class="lede muted small-lede" data-at="0.05">
+            Every industry template sets its own words, stages, fields and roles on the same product. Not a fork and
+            not a custom build, so you still get every update.
+          </p>
+          <ul class="chips" data-at="0.12" aria-label="Choose an industry">
+            {
+              story.map((i) => (
+                <li>
+                  <button type="button" data-industry={i.slug} aria-pressed={i.slug === first.slug ? 'true' : 'false'}>
+                    {i.short}
+                    <span class="chip-sub">{i.vocab.deals}</span>
+                  </button>
+                </li>
+              ))
+            }
+          </ul>
+          <p class="muted small" data-at="0.22">
+            Need something no template has? Admins add their own record types, like lab orders or lockers, with their
+            own fields, without code.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 · The stitching -->
+    <section class="act" id="act-4" data-act style={`--h:${H[4]}vh`} aria-labelledby="act-4-title">
+      <div class="frame">
+        <div class="copy">
+          <p class="eyebrow">4 · The stitching</p>
+          <h2 class="h2" id="act-4-title">Switch on what you need. Leave out what you don’t.</h2>
+          <ul class="modules" data-list="modules">
+            {
+              Array.from({ length: maxModules }, (_, n) => (
+                <li data-at={at(0.08, 0.05, n)} hidden={!first.modules[n]}>
+                  <strong data-part>{first.modules[n]?.name}</strong>
+                  <span data-part class="muted">
+                    {first.modules[n]?.use}
+                  </span>
+                </li>
+              ))
+            }
+          </ul>
+          <p class="muted small" data-at="0.36">
+            Every workspace also has {coreModules.slice(0, -1).join(', ').toLowerCase()} and the {coreModules.at(-1)?.toLowerCase()}.
+            One system instead of five tools held together with copy and paste.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 · The fitting -->
+    <section class="act" id="act-5" data-act style={`--h:${H[5]}vh`} aria-labelledby="act-5-title">
+      <div class="frame">
+        <div class="copy stages">
+          <div class="stage-a" data-at="0" data-until="0.54">
+          <p class="eyebrow">5 · The fitting</p>
+          <h2 class="h2" id="act-5-title">Then it gets worn, every day.</h2>
+          <ol class="day" data-list="day">
+            {
+              Array.from({ length: maxDay }, (_, n) => (
+                <li data-at={at(0.08, 0.1, n)} hidden={!first.day[n]}>
+                  <time data-part>{first.day[n]?.time}</time>
+                  <span data-part>{first.day[n]?.what}</span>
+                </li>
+              ))
+            }
+          </ol>
+          <p class="muted small" data-at="0.5">
+            Boards in your stages, tasks with checklists and reminders, automations that wait or run on a schedule,
+            comments with @mentions, and reports on your real numbers.
+          </p>
+          </div>
+          <div class="stage-b" data-at="0.54">
+            <p class="eyebrow">5 · The fitting</p>
+            <h2 class="h2">And here’s the real thing.</h2>
+            <p class="lede muted small-lede" data-at="0.58">
+              A board from the product, as one workspace set it up: a software company that calls its work
+              Opportunities. Same product as yours, in their words.
+            </p>
+            <a class="link" href="/demo#live" data-at="0.62">Open the live demo</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 · The gold thread -->
+    <section class="act" id="act-6" data-act style={`--h:${H[6]}vh`} aria-labelledby="act-6-title">
+      <div class="frame">
+        <div class="copy stages">
+          <div class="stage-a" data-at="0" data-until="0.34">
+            <p class="eyebrow">6 · The gold thread</p>
+            <h2 class="h2" id="act-6-title">AI that works inside your CRM, on your terms.</h2>
+            <ol class="chat" aria-label="Example conversation with the assistant">
+              <li class="msg me" data-at="0.02"><span data-t="q6a">{t.q6a}</span></li>
+              <li class="msg ai" data-at="0.06"><span data-t="a6a">{t.a6a}</span></li>
+              <li class="msg me" data-at="0.1"><span data-t="q6b">{t.q6b}</span></li>
+              <li class="msg ai" data-at="0.14"><span data-t="a6b">{t.a6b}</span></li>
+              <li class="msg me" data-at="0.18"><span data-t="q6c">{t.q6c}</span></li>
+              <li class="msg ai confirm-card" data-at="0.22">
+                <span class="ui-title">Confirm this change</span>
+                <span data-t="c6">{t.c6}</span>
+                <span class="ui-btn confirm" data-at="0.26"><span class="before">Confirm</span><span class="after"
+                    >Confirmed</span
+                  ></span>
+              </li>
+              <li class="msg ai" data-at="0.29"><span data-t="a6c">{t.a6c}</span></li>
+            </ol>
+          </div>
+          <div class="stage-b" data-at="0.34">
+            <p class="eyebrow">6 · The gold thread</p>
+            <h2 class="h2">Four gates it never goes around.</h2>
+            <ol class="gates">
+              <li data-at="0.35">
+                <strong>It sees only what you can see.</strong>
+                <span class="muted">Hidden fields are never sent, and other people’s records stay theirs.</span>
+              </li>
+              <li data-at="0.43">
+                <strong>It asks before it changes anything.</strong>
+                <span class="muted">The exact change is shown first. Nothing happens until someone confirms.</span>
+              </li>
+              <li data-at="0.51">
+                <strong>It leaves a trail.</strong>
+                <span class="muted">Every action is in the audit log, marked as made by the assistant.</span>
+              </li>
+              <li data-at="0.6">
+                <strong>It’s your choice.</strong>
+                <span class="muted">Pick the AI provider and model, or run your own. Off until an admin turns it on.</span>
+              </li>
+            </ol>
+            <p class="muted small" data-at="0.66">
+              The thread runs beyond the page too: AI apps that support MCP connect with each person’s own sign-in, read
+              only or read and write.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 · The label -->
+    <section class="act" id="act-7" data-act style={`--h:${H[7]}vh`} aria-labelledby="act-7-title">
+      <div class="frame">
+        <div class="copy">
+          <p class="eyebrow">7 · The label</p>
+          <h2 class="h2" id="act-7-title">Your name on the label. Your data in your vault.</h2>
+          <ul class="ticks">
+            <li data-at="0.1">Your own instance and your own database, hosted where you choose. Export everything, any time.</li>
+            <li data-at="0.16">Roles and record access, two-factor sign-in, and an audit log nobody can edit.</li>
+            <li data-at="0.22">Settings for privacy-sensitive work: access logging, data requests, retention and encrypted fields.</li>
+            <li data-at="0.28">No per-seat licence fees.</li>
+          </ul>
+          <p class="muted small" data-at="0.36">
+            For agencies, the same label is sewn in for every client: their name, logo, colors and domain, never ours.{' '}
+            <a class="link" href="/white-label">White-label for agencies</a>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 · Alterations and the fitting room -->
+    <section class="act act-end" id="act-8" data-act style={`--h:${H[8]}vh`} aria-labelledby="act-8-title">
+      <div class="frame">
+        <div class="copy">
+          <p class="eyebrow">8 · Alterations</p>
+          <h2 class="h1" id="act-8-title">Tailored once. Altered whenever you need.</h2>
+          <p class="lede muted" data-at="0.04">
+            A new stage, a new role, a new module or a second location: ask for it, confirm it, and keep working. Your
+            CRM changes as your business does.
+          </p>
+          <div class="ctas" data-at="0.1">
+            <a class="btn btn-tape" href="/demo">Book a fitting</a>
+            <a class="btn btn-ghost" href="/demo#live">Try the live demo</a>
+          </div>
+          <p class="fine" data-at="0.14">
+            <span data-t="business">{t.business}</span> and the conversations on this page are made-up examples. Built and
+            supported by {site.company.name}.
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+</Base>
+
+<script>
+  import '../scripts/story/story';
+</script>
+
+<style is:global>
+  /* ---------- Stage: the WebGL canvas stays put while the story scrolls, and leaves with it ---------- */
+  .story {
+    position: relative;
+    isolation: isolate;
+  }
+  .story .stage-wrap {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .story .stage-box {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100lvh;
+    background:
+      radial-gradient(60% 50% at 70% 45%, rgb(42 81 65 / 0.35), transparent 70%),
+      var(--bg);
+  }
+  .story.no-gl .stage-box {
+    background-color: var(--mat);
+    background-image:
+      radial-gradient(60% 50% at 70% 45%, rgb(217 178 90 / 0.08), transparent 70%),
+      linear-gradient(var(--mat-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--mat-line) 1px, transparent 1px);
+    background-size:
+      100% 100%,
+      200px 200px,
+      200px 200px;
+  }
+  .story .stage {
+    display: block;
+    width: 100%;
+    height: 100%;
+    transition: opacity 400ms ease;
+  }
+  .story.no-gl .stage {
+    display: none;
+  }
+  .story.stage-off .stage {
+    opacity: 0;
+  }
+
+  /* ---------- Chapter rail: a tape down the right edge; each tick jumps to its chapter ---------- */
+  .story .chapters {
+    display: none;
+  }
+  html.motion .story[data-ready] .chapters {
+    display: block;
+    position: fixed;
+    inset-inline-end: 10px;
+    top: 50%;
+    translate: 0 -50%;
+    z-index: 20;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 300ms var(--ease-out),
+      visibility 0s linear 300ms;
+  }
+  html.motion .story[data-ready] .chapters.on {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 300ms var(--ease-out),
+      visibility 0s;
+  }
+  .story .chapters .rail {
+    position: absolute;
+    inset-inline-end: 9px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+    border-radius: 2px;
+  }
+  .story .chapters .rail span {
+    display: block;
+    height: 100%;
+    background: var(--tape);
+    transform-origin: top;
+    transform: scaleY(0);
+  }
+  .story .chapters ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+  }
+  .story .chapters a {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    min-height: 28px;
+    padding-inline: 8px 0;
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .story .chapters .tick {
+    order: 2;
+    width: 12px;
+    height: 2px;
+    background: var(--border-strong);
+    transition:
+      width 200ms var(--ease-out),
+      background-color 200ms ease;
+  }
+  .story .chapters .name {
+    order: 1;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    opacity: 0;
+    translate: 6px 0;
+    transition:
+      opacity 180ms var(--ease-out),
+      translate 180ms var(--ease-out);
+  }
+  .story .chapters a[aria-current] .tick {
+    width: 20px;
+    background: var(--tape);
+  }
+  .story .chapters a:focus-visible .name,
+  .story .chapters a[aria-current]:focus-visible .name {
+    opacity: 1;
+    translate: 0 0;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .story .chapters:hover .name {
+      opacity: 1;
+      translate: 0 0;
+    }
+    .story .chapters a:hover {
+      color: var(--text);
+    }
+    .story .chapters a:hover .tick {
+      width: 20px;
+      background: var(--text);
+    }
+  }
+
+  /* ---------- Hero: the industry choice starts here, and the words arrive with the bolt ---------- */
+  .story .hero-pick {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    font-size: 15px;
+  }
+  .story .hero-pick label {
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .story .hero-pick select {
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--tape);
+    background: var(--surface);
+    color: var(--text);
+    font: 600 15px/1 var(--font-body);
+  }
+  html.motion .story .act-hero .copy > * {
+    animation: story-rise 700ms var(--ease-out) both;
+  }
+  html.motion .story .act-hero .copy > :nth-child(2) {
+    animation-delay: 80ms;
+  }
+  html.motion .story .act-hero .copy > :nth-child(3) {
+    animation-delay: 220ms;
+  }
+  html.motion .story .act-hero .copy > :nth-child(4) {
+    animation-delay: 1100ms;
+  }
+  html.motion .story .act-hero .copy > :nth-child(5) {
+    animation-delay: 1250ms;
+  }
+  @keyframes story-rise {
+    from {
+      opacity: 0;
+      translate: 0 16px;
+    }
+  }
+
+  /* ---------- Acts: tall sections with a sticky frame (only when motion runs) ---------- */
+  .story .act {
+    position: relative;
+  }
+  .story .frame {
+    display: grid;
+    align-items: center;
+    padding-block: 112px 64px;
+    padding-inline: max(var(--gutter), calc((100vw - var(--max)) / 2 + var(--gutter)));
+  }
+  html.motion .story .act {
+    height: var(--h);
+  }
+  /* a soft shade behind the words so the 3D never fights the text */
+  html.motion .story .frame::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(60vw, 820px);
+    background: linear-gradient(90deg, rgb(11 26 21 / 0.82) 40%, transparent);
+    pointer-events: none;
+  }
+  html.motion .story .frame {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100svh;
+    padding-block: 96px 48px;
+  }
+  .story .copy {
+    position: relative;
+    max-width: 520px;
+    display: grid;
+    gap: 18px;
+    align-content: center;
+  }
+  .story .act-end .h1 {
+    font-size: clamp(38px, 4.6vw, 64px);
+  }
+  .story .act-hero .copy {
+    max-width: 600px;
+  }
+  .story .act-hero .display {
+    font-size: clamp(52px, 6.2vw, 92px);
+  }
+  .story .eyebrow {
+    color: var(--tape);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .story .small {
+    font-size: 15.5px;
+    line-height: 1.55;
+  }
+  .story .small-lede {
+    font-size: 17px;
+  }
+  .story .fine {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .story .ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 6px;
+  }
+  .story [hidden] {
+    display: none !important;
+  }
+
+  /* ---------- Reveals: hidden until their moment, only when the script is running ---------- */
+  html.motion .story[data-ready] [data-at] {
+    opacity: 0;
+    translate: 0 12px;
+    visibility: hidden;
+    transition:
+      opacity 340ms var(--ease-out),
+      translate 420ms var(--ease-out),
+      visibility 0s linear 420ms;
+  }
+  html.motion .story[data-ready] [data-at].on {
+    opacity: 1;
+    translate: 0 0;
+    visibility: visible;
+    transition:
+      opacity 340ms var(--ease-out),
+      translate 420ms var(--ease-out),
+      visibility 0s;
+  }
+  /* Two scenes in one frame swap in place */
+  html.motion .story .stages {
+    display: grid;
+  }
+  html.motion .story .stages > * {
+    grid-area: 1 / 1;
+    display: grid;
+    gap: 18px;
+    align-content: center;
+  }
+  html:not(.motion) .story .stages {
+    gap: 56px;
+  }
+  html:not(.motion) .story .stages > * {
+    display: grid;
+    gap: 18px;
+  }
+
+  /* ---------- Picker ---------- */
+  .story .picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    justify-self: start;
+    padding: 6px 8px 6px 16px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    font-size: 14px;
+    z-index: 30;
+  }
+  .story .picker label {
+    color: var(--tape);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .story .picker select {
+    min-height: 40px;
+    max-width: 62vw;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font: 600 15px/1 var(--font-body);
+  }
+  html.motion .story[data-ready] .picker {
+    position: fixed;
+    bottom: 20px;
+    inset-inline-end: 28px;
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+    opacity: 0;
+    translate: 0 12px;
+    visibility: hidden;
+    transition:
+      opacity 300ms var(--ease-out),
+      translate 300ms var(--ease-out),
+      visibility 0s linear 300ms;
+  }
+  html.motion .story[data-ready] .picker.on {
+    opacity: 1;
+    translate: 0 0;
+    visibility: visible;
+    transition:
+      opacity 300ms var(--ease-out),
+      translate 300ms var(--ease-out),
+      visibility 0s;
+  }
+
+  /* ---------- Chat ---------- */
+  .story .chat {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .story .act .h2 {
+    font-size: clamp(30px, 3.4vw, 46px);
+  }
+  html.motion .story .chat {
+    max-height: 32vh;
+    overflow: hidden;
+    mask-image: linear-gradient(transparent, black 22%);
+  }
+  .story .msg {
+    max-width: 88%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 15.5px;
+    line-height: 1.45;
+  }
+  .story .msg.ai {
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-end-start-radius: 4px;
+  }
+  .story .msg.me {
+    align-self: flex-end;
+    background: rgb(217 178 90 / 0.14);
+    border: 1px solid rgb(217 178 90 / 0.35);
+    border-end-end-radius: 4px;
+  }
+  html.motion .story[data-ready] .msg[data-at]:not(.on) {
+    display: none;
+  }
+  html.motion .story[data-ready] .msg.on {
+    animation: story-msg 420ms var(--ease-out);
+  }
+  @keyframes story-msg {
+    from {
+      opacity: 0;
+      translate: 0 10px;
+      scale: 0.98;
+    }
+  }
+  .story .confirm-card {
+    display: grid;
+    gap: 8px;
+    border-color: rgb(217 178 90 / 0.5) !important;
+  }
+
+  /* ---------- Measurements ---------- */
+  .story .tags {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .story .tags li {
+    padding: 4px 12px 4px 10px;
+    border-radius: 999px;
+    border: 1px dashed rgb(217 178 90 / 0.6);
+    color: var(--tape);
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+  .story .tags li::before {
+    content: '↔ ';
+    opacity: 0.7;
+  }
+
+  /* ---------- Product-like cards (paper, like the app) ---------- */
+  .story .ui-card {
+    background: var(--chalk);
+    color: var(--ink);
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: 0 18px 50px rgb(0 0 0 / 0.35);
+    display: grid;
+    gap: 10px;
+    font-size: 15px;
+  }
+  .story .ui-title {
+    font-weight: 650;
+    font-family: var(--font-display);
+    font-size: 17px;
+  }
+  .story .ui-lines {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+  }
+  .story .ui-lines li {
+    padding-inline-start: 24px;
+    position: relative;
+  }
+  .story .ui-lines li::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 2px;
+    top: 0.45em;
+    width: 12px;
+    height: 7px;
+    border-inline-start: 2px solid var(--steel);
+    border-bottom: 2px solid var(--steel);
+    rotate: -45deg;
+  }
+  .story .ui-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .story .ui-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 16px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 14px;
+    background: var(--ink);
+    color: var(--chalk);
+    justify-self: end;
+  }
+  .story .ui-btn.ghost {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .story .msg .ui-btn {
+    background: var(--text);
+    color: var(--bg);
+  }
+  .story .ui-btn .after {
+    display: none;
+  }
+  /* The confirm button's own reveal is the "press": it is visible as Confirm, then turns gold */
+  html.motion .story[data-ready] .ui-btn.confirm[data-at] {
+    opacity: 1;
+    translate: 0 0;
+    visibility: inherit;
+  }
+  .story .ui-btn.confirm.on,
+  html:not(.motion) .story .ui-btn.confirm {
+    background: var(--tape);
+    color: var(--tape-ink);
+    animation: story-press 360ms var(--ease-out);
+  }
+  .story .ui-btn.confirm.on .before,
+  html:not(.motion) .story .ui-btn.confirm .before {
+    display: none;
+  }
+  .story .ui-btn.confirm.on .after,
+  html:not(.motion) .story .ui-btn.confirm .after {
+    display: inline;
+  }
+  .story .ui-btn.confirm .after::before {
+    content: '✓ ';
+  }
+  @keyframes story-press {
+    40% {
+      scale: 0.94;
+    }
+  }
+
+  /* ---------- Word morph ---------- */
+  .story .morph {
+    margin: 0;
+    display: grid;
+    gap: 6px;
+  }
+  .story .morph div {
+    display: grid;
+    gap: 2px;
+  }
+  .story .morph dt {
+    font-size: 18px;
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: rgb(217 178 90 / 0.7);
+  }
+  .story .morph dd {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(36px, 4.6vw, 60px);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  html.motion .story[data-ready] .morph [data-at] {
+    opacity: 1;
+    translate: 0 0;
+    visibility: inherit;
+    color: var(--muted);
+    transition: color 400ms ease;
+  }
+  html.motion .story[data-ready] .morph [data-at].on,
+  html:not(.motion) .story .morph dd span {
+    color: var(--tape);
+  }
+  .story .import p:last-child {
+    color: var(--steel);
+  }
+
+  /* ---------- Industry chips ---------- */
+  .story .chips {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .story .chips button {
+    display: grid;
+    text-align: start;
+    gap: 1px;
+    padding: 8px 14px;
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--border-strong);
+    background: rgb(17 35 28 / 0.75);
+    color: var(--text);
+    font: 600 14.5px/1.2 var(--font-body);
+    cursor: pointer;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      transform 160ms var(--ease-out);
+  }
+  .story .chips button:active {
+    transform: scale(0.97);
+  }
+  .story .chips .chip-sub {
+    font-weight: 400;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .story .chips button[aria-pressed='true'] {
+    background: var(--tape);
+    border-color: var(--tape);
+    color: var(--tape-ink);
+  }
+  .story .chips button[aria-pressed='true'] .chip-sub {
+    color: rgb(26 20 5 / 0.75);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .story .chips button:hover {
+      border-color: var(--tape);
+    }
+  }
+
+  /* ---------- Lists ---------- */
+  .story .modules,
+  .story .day,
+  .story .gates,
+  .story .ticks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .story .modules li,
+  .story .gates li {
+    display: grid;
+    gap: 2px;
+    padding-block: 10px;
+    padding-inline-start: 16px;
+    border-inline-start: 2px dashed rgb(217 178 90 / 0.6);
+    font-size: 15.5px;
+  }
+  .story .day li {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 12px;
+    font-size: 15.5px;
+    line-height: 1.5;
+  }
+  .story .day time {
+    color: var(--tape);
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+  .story .gates {
+    counter-reset: gate;
+  }
+  .story .gates strong {
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 620;
+  }
+  .story .ticks li {
+    padding-inline-start: 28px;
+    position: relative;
+    font-size: 16px;
+  }
+  .story .ticks li::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0.62em;
+    width: 16px;
+    height: 2px;
+    background-image: linear-gradient(90deg, var(--tape) 60%, transparent 0);
+    background-size: 6px 2px;
+  }
+
+  /* ---------- Narrow screens: the picture sits above, the words below ---------- */
+  @media (max-width: 899px) {
+    html.motion .story .frame::before {
+      display: none;
+    }
+    html.motion .story .frame {
+      align-items: end;
+      padding-block: 88px 20px;
+    }
+    html.motion .story .copy {
+      max-width: none;
+      padding-top: 56px;
+      background: linear-gradient(transparent, rgb(11 26 21 / 0.9) 56px, rgb(11 26 21 / 0.96));
+      margin-inline: calc(-1 * var(--gutter));
+      padding-inline: var(--gutter);
+      overflow: hidden;
+      gap: 12px;
+    }
+    html.motion .story .act-hero .copy {
+      max-height: none;
+    }
+    /* on a phone the headline carries the act; its intro line makes way for the picture */
+    html.motion .story .act:not(.act-hero):not(.act-end) .copy p.muted.small:not([data-at]),
+    html.motion .story .act:not(.act-hero):not(.act-end) .copy .fine {
+      display: none;
+    }
+    html.motion .story .copy {
+      max-height: 60svh;
+    }
+    html.motion .story .chat {
+      max-height: 21svh;
+    }
+    .story .act-hero .display {
+      font-size: clamp(38px, 10.5vw, 56px);
+    }
+    .story .act-hero .lede {
+      font-size: 15.5px;
+    }
+    .story .h2 {
+      font-size: clamp(26px, 7vw, 34px);
+    }
+    .story .h1 {
+      font-size: clamp(34px, 9vw, 44px);
+    }
+    .story .lede {
+      font-size: 16.5px;
+    }
+    .story .small,
+    .story .msg,
+    .story .modules li,
+    .story .day li,
+    .story .ticks li {
+      font-size: 14.5px;
+    }
+    html.motion .story[data-ready] .picker {
+      bottom: auto;
+      top: 82px;
+      inset-inline: 16px auto;
+    }
+    html.motion .story[data-ready] .chapters {
+      display: none;
+    }
+  }
+</style>

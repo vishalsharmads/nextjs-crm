@@ -39,6 +39,7 @@ Pages run under a strict CSP (`script-src 'self'`), so every script is a file: n
 - Guides: `src/data/articles.ts`
 - Product screenshots: `public/product/*.webp` (2000×1250, taken at 1440×900 and 2× from the demo workspace), listed per feature in `screens` in `src/pages/features.astro`
 - The assistant demo on the home page: `src/components/AssistantDemo.astro` (script in `src/scripts/motion.ts`)
+- The 3D story page (`/story`, "Cut to measure"): copy in `src/data/story.ts`, page in `src/pages/story.astro`, scroll timeline in `src/scripts/story/story.ts` and the Three.js scene in `src/scripts/story/scene.ts` (loaded only on that page). Link to it in an industry's words with `/story?for=<industry slug>` (for example `/story?for=law-firms`). The story itself: `docs/site/3d-landing-story.md`
 
 Placeholders to replace before launch: testimonials and logos (`src/components/Proof.astro`), the
 "three weeks" figure, office details, privacy and terms text, and `site.email`.

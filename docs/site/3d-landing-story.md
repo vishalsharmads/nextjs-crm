@@ -1,6 +1,10 @@
 # Cut to Measure: the story behind a 3D landing page for Bespoq
 
-A concept story for an alternate, scroll-driven 3D landing page. It explains what Bespoq is, what it does,
+A concept story for an alternate, scroll-driven 3D landing page. Built as `/story` on the marketing site
+(`apps/site/src/pages/story.astro`), with the live setup conversation of variant C from
+[the variants](3d-landing-story-variants.md): the visitor picks an industry and the whole story plays in its words.
+
+The original concept follows. It explains what Bespoq is, what it does,
 who it serves, how it adapts to each business, and how AI helps build it. It sets the narrative and the
 scenes; visuals, technology and copy length are for the design step.
 
