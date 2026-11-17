@@ -64,6 +64,14 @@ const description =
       </ol>
     </nav>
 
+    <!-- Lives at the top level: inside an act, the later acts' pinned frames would cover it. -->
+    <div class="picker" data-picker>
+      <label for="story-industry">Fitting for</label>
+      <select id="story-industry" data-industry-select>
+        {story.map((i) => <option value={i.slug} selected={i.slug === first.slug}>{i.name}</option>)}
+      </select>
+    </div>
+
     <!-- 0 · The bolt -->
     <section class="act act-hero" id="act-0" data-act style={`--h:${H[0]}vh`} aria-labelledby="story-title">
       <div class="frame">
@@ -97,12 +105,6 @@ const description =
           <p class="muted small">
             In setup mode the assistant asks how your business works, the way a tailor asks how you’ll wear the suit.
           </p>
-          <div class="picker" data-picker>
-            <label for="story-industry">Fitting for</label>
-            <select id="story-industry" data-industry-select>
-              {story.map((i) => <option value={i.slug} selected={i.slug === first.slug}>{i.name}</option>)}
-            </select>
-          </div>
           <ol class="chat" aria-label="Example setup conversation">
             <li class="msg me" data-at="0.04"><span data-t="a1">{t.a1}</span></li>
             <li class="msg ai" data-at="0.1"><span data-t="q2">{t.q2}</span></li>
@@ -717,6 +719,10 @@ const description =
       opacity 300ms var(--ease-out),
       translate 300ms var(--ease-out),
       visibility 0s;
+  }
+
+  html:not(.motion) .story .picker {
+    display: none;
   }
 
   /* ---------- Chat ---------- */
