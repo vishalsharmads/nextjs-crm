@@ -38,6 +38,7 @@ How to work around them:
 - When two agent sessions share this machine, give each its own git worktree and its own test databases (`DATABASE_URL_TEST=…/crm_test_<name>`, `DATABASE_URL_E2E=…/crm_e2e_<name>`); test runs drop and recreate their databases.
 - Reading `.env` is denied to agents; the defaults work for tests.
 - After pulling new migrations, run `npm run db:migrate` on `crm_dev` before signing in.
+- The user's LAN demo (`http://192.168.11.61:3000`, `npm run start:single`, `node dist/server.js`) uses `crm_demo` through `.env`. After rebuilding it, run `npm run db:migrate` too: the server does not migrate on start, and missing tables show up as 500s on records, timelines and search (2026-11-17, 0027–0037 were missing).
 
 ## History
 
