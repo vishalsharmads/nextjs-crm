@@ -68,6 +68,7 @@ Node 24 LTS (`engines >= 22`), TypeScript strict, ESM. Express 5, Knex + mysql2,
 | @fontsource/*                                                                                   | Self-hosted fonts selectable from branding (no external font CDN)               |
 | astro, @astrojs/sitemap, @astrojs/check                                                         | Static marketing site (`apps/site`), sitemap, type checks                       |
 | gsap                                                                                            | Marketing-site animation (hero intro, industry re-tailoring)                    |
+| three                                                                                           | Marketing-site 3D story page (`/story`): WebGL scene, loaded only there         |
 | @fontsource-variable/*                                                                          | Self-hosted marketing-site fonts                                                |
 | vitest 5, supertest, @testing-library/*, jsdom, @playwright/test                                | Tests                                                                           |
 | eslint, typescript-eslint, prettier, husky, lint-staged, commitlint, concurrently               | Tooling                                                                         |
