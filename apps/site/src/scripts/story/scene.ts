@@ -628,10 +628,18 @@ export function createScene(
         ctx.font = `600 30px ${BODY}`;
         ctx.fillText(eyebrow, 66, 104);
         ctx.fillStyle = C.text;
-        ctx.font = `620 72px ${DISPLAY}`;
-        wrap(ctx, name, 390)
+        // shrink until the longest word fits (a single word can't wrap: "Construction", "Recruitment")
+        let size = 72;
+        const fits = () =>
+          name.split(' ').every((w) => ctx.measureText(w).width <= 384) && wrap(ctx, name, 384).length <= 3;
+        ctx.font = `620 ${size}px ${DISPLAY}`;
+        while (!fits() && size > 36) {
+          size -= 4;
+          ctx.font = `620 ${size}px ${DISPLAY}`;
+        }
+        wrap(ctx, name, 384)
           .slice(0, 3)
-          .forEach((l, n) => ctx.fillText(l, 64, 190 + n * 74));
+          .forEach((l, n) => ctx.fillText(l, 64, 118 + size + n * size * 1.03));
         ctx.globalAlpha = 0.78;
         ctx.font = `500 30px ${BODY}`;
         const subLines = wrap(ctx, sub, 390).slice(0, 3);
