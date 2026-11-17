@@ -7,7 +7,13 @@
  */
 import Base from '../layouts/Base.astro';
 import { industries } from '../data/industries';
-import { STORY_DEFAULT, coreModules, storyCopy, toStoryIndustry } from '../data/story';
+import {
+  STORY_DEFAULT,
+  coreModules,
+  storyCopy,
+  toStoryIndustry,
+  workspaceHtml,
+} from '../data/story';
 import { site } from '../data/site';
 
 const story = industries.map(toStoryIndustry);
@@ -41,7 +47,6 @@ const description =
     data-story
     data-industries={JSON.stringify(story)}
     data-default={first.slug}
-    data-screenshot="/product/deals.webp"
   >
     <div class="stage-wrap" aria-hidden="true">
       <div class="stage-box">
@@ -255,14 +260,13 @@ const description =
           </div>
           <div class="stage-b" data-at="0.54">
             <p class="eyebrow">5 · The fitting</p>
-            <h2 class="h2">And here’s the real thing.</h2>
-            <p class="lede muted small-lede" data-at="0.58">
-              A board from the product, as one workspace set it up: a software company that calls its work
-              Opportunities. Same product as yours, in their words.
-            </p>
+            <h2 class="h2">And here it is, in your workspace.</h2>
+            <p class="lede muted small-lede" data-at="0.58" data-t="ws">{t.ws}</p>
+            <p class="fine" data-at="0.6">An illustration of the product as the template sets it up.</p>
             <a class="link" href="/demo#live" data-at="0.62">Open the live demo</a>
           </div>
         </div>
+        <div class="ws-wrap" data-at="0.56" data-workspace aria-hidden="true" set:html={workspaceHtml(first)} />
       </div>
     </section>
 
@@ -725,6 +729,224 @@ const description =
     display: none;
   }
 
+  /* ---------- The workspace: the product screen, per industry ---------- */
+  .story .ws-wrap {
+    display: block;
+    margin-top: 32px;
+  }
+  html.motion .story .ws-wrap {
+    position: absolute;
+    top: 50%;
+    inset-inline-end: max(var(--gutter), calc((100vw - var(--max)) / 2 + var(--gutter)));
+    /* whatever is left beside the 520px text column */
+    width: min(
+      720px,
+      calc(100vw - 2 * max(var(--gutter), calc((100vw - var(--max)) / 2 + var(--gutter))) - 580px)
+    );
+    margin: 0;
+    translate: 0 -50%;
+    perspective: 1600px;
+  }
+  html.motion .story[data-ready] .ws-wrap[data-at] {
+    translate: 0 -46%;
+  }
+  html.motion .story[data-ready] .ws-wrap[data-at].on {
+    translate: 0 -50%;
+  }
+  html.motion .story[data-ready] .ws-wrap .ws {
+    transform: rotateX(14deg) rotateY(-10deg) scale(0.94);
+    transform-origin: 50% 60%;
+    transition: transform 700ms var(--ease-out);
+  }
+  html.motion .story[data-ready] .ws-wrap.on .ws {
+    transform: rotateX(4deg) rotateY(-6deg);
+  }
+  .story .ws {
+    --ws-ink: #14201b;
+    --ws-steel: #5e6b66;
+    --ws-line: #e3e8e4;
+    --ws-bg: #f6f8f6;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    aspect-ratio: 16 / 10;
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--ws-bg);
+    color: var(--ws-ink);
+    font-size: clamp(9px, 0.82vw, 12px);
+    line-height: 1.3;
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.06),
+      0 40px 90px rgb(0 0 0 / 0.55),
+      0 0 0 6px color-mix(in srgb, var(--ws-accent) 22%, transparent);
+  }
+  .story .ws-top {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    padding: 0.9em 1.2em;
+    background: #ffffff;
+    border-bottom: 1px solid var(--ws-line);
+  }
+  .story .ws-logo {
+    display: grid;
+    place-items: center;
+    width: 2.2em;
+    height: 2.2em;
+    border-radius: 0.6em;
+    background: var(--ws-accent);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.95em;
+  }
+  .story .ws-top strong {
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .story .ws-search {
+    flex: 1;
+    max-width: 22em;
+    margin-inline-start: 1.6em;
+    padding: 0.5em 0.9em;
+    border: 1px solid var(--ws-line);
+    border-radius: 0.6em;
+    color: var(--ws-steel);
+    background: var(--ws-bg);
+  }
+  .story .ws-me {
+    margin-inline-start: auto;
+    display: grid;
+    place-items: center;
+    width: 2.2em;
+    height: 2.2em;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--ws-accent) 14%, #ffffff);
+    color: var(--ws-accent);
+    font-weight: 700;
+    font-size: 0.85em;
+  }
+  .story .ws-body {
+    display: grid;
+    grid-template-columns: 11em 1fr;
+    min-height: 0;
+  }
+  .story .ws-side {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+    padding: 1em 0.6em;
+    background: #ffffff;
+    border-inline-end: 1px solid var(--ws-line);
+  }
+  .story .ws-nav {
+    padding: 0.45em 0.7em;
+    border-radius: 0.5em;
+    color: var(--ws-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .story .ws-nav.is-on {
+    background: color-mix(in srgb, var(--ws-accent) 12%, #ffffff);
+    color: var(--ws-accent);
+    font-weight: 650;
+  }
+  .story .ws-group {
+    margin: 0.9em 0.7em 0.2em;
+    font-size: 0.85em;
+    color: var(--ws-steel);
+  }
+  .story .ws-main {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 1em;
+    padding: 1.2em;
+    min-width: 0;
+  }
+  .story .ws-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+  }
+  .story .ws-head strong {
+    font-family: var(--font-display);
+    font-size: 1.9em;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+  }
+  .story .ws-btn {
+    padding: 0.55em 1em;
+    border-radius: 0.6em;
+    background: var(--ws-accent);
+    color: #ffffff;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .story .ws-board {
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    gap: 0.7em;
+    min-height: 0;
+  }
+  .story .ws-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    padding: 0.6em;
+    border-radius: 0.7em;
+    background: #eef1ee;
+    border-top: 3px solid var(--tone, var(--ws-line));
+    min-width: 0;
+  }
+  .story .ws-col-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4em;
+    min-height: 2.6em;
+    font-weight: 650;
+    line-height: 1.25;
+  }
+  .story .ws-col-head i {
+    flex: none;
+    align-self: center;
+    width: 0.6em;
+    height: 0.6em;
+    border-radius: 50%;
+    background: var(--tone);
+  }
+  .story .ws-col-head em {
+    margin-inline-start: auto;
+    font-style: normal;
+    font-weight: 500;
+    color: var(--ws-steel);
+  }
+  .story .ws-card {
+    display: grid;
+    gap: 0.25em;
+    padding: 0.6em 0.7em;
+    border-radius: 0.55em;
+    background: #ffffff;
+    border: 1px solid var(--ws-line);
+    border-inline-start: 3px solid var(--ws-accent);
+    box-shadow: 0 1px 2px rgb(20 32 27 / 0.06);
+  }
+  .story .ws-card b {
+    font-weight: 650;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .story .ws-card span {
+    color: var(--ws-steel);
+    font-size: 0.92em;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
   /* ---------- Chat ---------- */
   .story .chat {
     list-style: none;
@@ -1095,6 +1317,22 @@ const description =
     .story .day li,
     .story .ticks li {
       font-size: 14.5px;
+    }
+    html.motion .story .ws-wrap {
+      top: 150px;
+      inset-inline: 12px;
+      width: auto;
+      translate: 0 0;
+    }
+    html.motion .story[data-ready] .ws-wrap[data-at],
+    html.motion .story[data-ready] .ws-wrap[data-at].on {
+      translate: 0 0;
+    }
+    .story .ws {
+      font-size: 7.5px;
+    }
+    .story .ws-body {
+      grid-template-columns: 8.5em 1fr;
     }
     html.motion .story[data-ready] .picker {
       bottom: auto;

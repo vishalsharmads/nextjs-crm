@@ -7,7 +7,7 @@
  * the page is plain, stacked sections (see the `html.motion` rules in story.astro).
  */
 import { gsap } from 'gsap';
-import { storyCopy, type StoryIndustry } from '../../data/story';
+import { storyCopy, workspaceHtml, type StoryIndustry } from '../../data/story';
 import { initialState, type StoryScene, type StoryState } from './state';
 
 const root = document.querySelector<HTMLElement>('[data-story]');
@@ -67,6 +67,8 @@ function init(root: HTMLElement) {
       'stages',
       next.stages.map((s) => [s]),
     );
+    const workspace = root.querySelector<HTMLElement>('[data-workspace]');
+    if (workspace) workspace.innerHTML = workspaceHtml(next);
     selects.forEach((s) => (s.value = next.slug));
     choices.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.industry === next.slug)));
     scene?.setIndustry(next);
@@ -96,7 +98,6 @@ function init(root: HTMLElement) {
       .then(({ createScene }) => {
         scene = createScene(canvas, industries, current, {
           unroll: window.scrollY < window.innerHeight * 0.5,
-          screenshot: root.dataset.screenshot ?? '',
         });
         root.classList.remove('no-gl');
       })

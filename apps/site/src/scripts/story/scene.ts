@@ -24,7 +24,6 @@ import {
   Points,
   Scene,
   ShaderMaterial,
-  TextureLoader,
   TorusGeometry,
   Vector3,
   WebGLRenderer,
@@ -312,7 +311,7 @@ export function createScene(
   el: HTMLCanvasElement,
   industries: StoryIndustry[],
   first: StoryIndustry,
-  opts: { unroll: boolean; screenshot: string },
+  opts: { unroll: boolean },
 ): StoryScene {
   const renderer = new WebGLRenderer({
     canvas: el,
@@ -470,26 +469,6 @@ export function createScene(
   });
   const fibres = new Points(fibreGeo, fibreMat);
   cloth.add(fibres);
-
-  /* the real product: a screenshot the board hands over to, loaded when first needed */
-  const proofMat = new MeshBasicMaterial({ transparent: true, opacity: 0, fog: false });
-  const proof = new Mesh(new PlaneGeometry(4.64, 2.9), proofMat);
-  proof.visible = false;
-  cloth.add(proof);
-  let proofRequested = false;
-  const softCanvas = canvas(256, 160);
-  softCanvas.ctx.filter = 'blur(14px)';
-  softCanvas.ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-  softCanvas.ctx.fillRect(28, 28, 200, 104);
-  const proofShadowMat = new MeshBasicMaterial({
-    map: new CanvasTexture(softCanvas.el),
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    fog: false,
-  });
-  const proofShadow = new Mesh(new PlaneGeometry(5.9, 3.7), proofShadowMat);
-  cloth.add(proofShadow);
 
   /* the measuring tape, lying on the cloth */
   const tapeCurve = new CatmullRomCurve3([
@@ -676,7 +655,8 @@ export function createScene(
       ctx.fillStyle = C.chalk;
       roundRect(ctx, 4, 4, 504, 248, 26);
       ctx.fill();
-      ctx.fillStyle = C.goldCss;
+      // the workspace's own brand color, as on its cards in the product
+      ctx.fillStyle = ind.accent;
       roundRect(ctx, 4, 4, 12, 248, 6);
       ctx.fill();
       ctx.fillStyle = C.ink;
@@ -818,7 +798,7 @@ export function createScene(
     const ring = ease(clamp01(st.ring));
     const board = ease(clamp01(st.board));
     // the board steps back when the real product screen takes its place
-    const handover = 1 - 0.9 * ease(clamp01(st.proof));
+    const handover = 1 - ease(clamp01(st.proof));
     panels.forEach((p, i) => {
       const sep = st.cut;
       // 1. assembled or cut
@@ -889,28 +869,6 @@ export function createScene(
     shadow.scale.set(1, Math.max(0.05, laid), 1);
     shadow.position.y = (1 - laid) * 2.2;
     shadow.visible = shadowMat.opacity > 0.01;
-
-    /* the real product screen */
-    if (st.proof > 0.001 && !proofRequested) {
-      proofRequested = true;
-      new TextureLoader().load(opts.screenshot, (tex) => {
-        tex.anisotropy = 8;
-        proofMat.map = tex;
-        proofMat.needsUpdate = true;
-      });
-    }
-    const pr = ease(clamp01(st.proof));
-    const prShow = proofMat.map ? pr : 0;
-    proofMat.opacity = prShow;
-    proof.visible = prShow > 0.01;
-    proof.position.set(0.55, 0.05, 0.5 + (1 - pr) * 0.6);
-    proof.rotation.x = (1 - pr) * -0.35;
-    proof.scale.setScalar(0.85 + 0.15 * pr);
-    proofShadowMat.opacity = prShow * 0.7;
-    proofShadow.visible = prShow > 0.01;
-    proofShadow.position.set(0.65, -0.2, 0.42 + (1 - pr) * 0.6);
-    proofShadow.rotation.x = proof.rotation.x;
-    proofShadow.scale.copy(proof.scale);
 
     /* tape */
     tapeMat.uniforms.uDraw.value = st.tapeDraw * ease(intro);
