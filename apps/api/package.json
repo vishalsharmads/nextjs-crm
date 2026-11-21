@@ -31,16 +31,16 @@
     "handlebars": "4.7.10",
     "helmet": "8.3.0",
     "ical.js": "^2.2.1",
-    "imapflow": "^2.5.9",
-    "jose": "6.2.13",
+    "imapflow": "^2.12.1",
+    "jose": "6.2.17",
     "knex": "3.3.0",
-    "mailparser": "^3.10.0",
+    "mailparser": "^3.14.5",
     "multer": "2.5.0",
     "mysql2": "3.24.6",
     "nodemailer": "^10.1.7",
     "pino": "9.14.0",
     "pino-http": "10.5.0",
-    "sanitize-html": "2.18.1",
+    "sanitize-html": "2.18.2",
     "uuid": "11.1.1",
     "web-push": "^3.6.7",
     "yazl": "^3.3.1",
@@ -59,10 +59,10 @@
     "@types/web-push": "^3.6.4",
     "@types/yazl": "^3.3.1",
     "pino-pretty": "13.2.0",
-    "supertest": "7.3.1",
+    "supertest": "7.3.2",
     "tsup": "8.5.1",
     "tsx": "4.23.15",
-    "vitest": "5.0.5"
+    "vitest": "5.1.1"
   },
   "exports": {
     "./module-api": "./src/module-api.ts"
